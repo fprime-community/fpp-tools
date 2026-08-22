@@ -18,7 +18,7 @@ fpp-format --check path/to/model.fpp
 cat path/to/model.fpp | fpp-format --stdin
 
 # Override the indentation width and maximum line length
-fpp-format --indent 4 --line-length 100 path/to/model.fpp
+fpp-format --indent 2 --line-length 100 path/to/model.fpp
 ```
 
 ## Options
@@ -28,7 +28,7 @@ fpp-format --indent 4 --line-length 100 path/to/model.fpp
 | `--check`              | Check formatting without writing; exit `1` if a file is unformatted. |
 | `--stdin`              | Read from stdin and write to stdout (default when no files given). |
 | `--recursive-includes` | Also follow `include` specifiers and format reachable `.fppi` fragments. |
-| `--indent <N>`         | Number of spaces per indentation level. Overrides `.fpp-format` (default: `2`). |
+| `--indent <N>`         | Number of spaces per indentation level. Overrides `.fpp-format` (default: `4`). |
 | `--line-length <N>`    | Maximum line width before specs explode their clauses. Overrides `.fpp-format` (default: `80`). |
 | `--entry <RULE>`       | Select the parser entrypoint / grammar rule (see below).          |
 | `--help`               | Print usage.                                                       |
@@ -47,7 +47,7 @@ ignored:
 
 ```ini
 # .fpp-format
-indent = 2
+indent = 4
 line-length = 80
 ```
 
@@ -55,7 +55,7 @@ Supported keys:
 
 | Key           | Description                              | Default |
 | ------------- | ---------------------------------------- | ------- |
-| `indent`      | Spaces per indentation level.            | `2`     |
+| `indent`      | Spaces per indentation level.            | `4`     |
 | `line-length` | Maximum line width before clauses break. | `80`    |
 
 Precedence, lowest to highest: built-in defaults → `.fpp-format` file →

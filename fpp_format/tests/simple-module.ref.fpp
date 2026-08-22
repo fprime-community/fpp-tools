@@ -1,3 +1,3 @@
 module F {
-  constant a = 1
+    constant a = 1
 }

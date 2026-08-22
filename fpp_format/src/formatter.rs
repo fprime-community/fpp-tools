@@ -32,16 +32,19 @@ impl Formatter {
     // ---- containers (ROOT / member lists) ------------------------------
 
     fn lower_container(&self, node: &SyntaxNode) -> Doc {
-        join_items(&self.collect_items(node))
+        join_items(&self.collect_items(node).items)
     }
 
     /// Collect member items from a container, attaching trailing comments /
     /// post-annotations to the preceding item and tracking blank lines.
-    fn collect_items(&self, node: &SyntaxNode) -> Vec<Item> {
+    fn collect_items(&self, node: &SyntaxNode) -> Collected {
         let mut items: Vec<Item> = Vec::new();
         let mut saw_eol = false;
         let mut blank = false;
         let mut started = false;
+        // Whether a blank line separates the last member from the closing
+        // delimiter (used to preserve a trailing blank inside a module body).
+        let mut trailing_blank = false;
         // Newlines seen in the current run of trivia since the last real item.
         // The lexer splits a blank line that carries trailing whitespace into
         // separate EOL tokens (`"\n"` WHITESPACE `"\n"`), so a blank line must
@@ -62,12 +65,16 @@ impl Formatter {
                         saw_eol = true;
                     }
                     LEFT_CURLY | LEFT_PAREN | LEFT_SQUARE => started = true,
-                    RIGHT_CURLY | RIGHT_PAREN | RIGHT_SQUARE => {}
+                    RIGHT_CURLY | RIGHT_PAREN | RIGHT_SQUARE => {
+                        if started && newlines >= 2 {
+                            trailing_blank = true;
+                        }
+                    }
                     COMMENT => {
                         if saw_eol || items.is_empty() {
                             items.push(Item::line_swallowing(Doc::text(t.text()), blank));
                         } else {
-                            attach(&mut items, Doc::text(t.text()));
+                            attach(&mut items, Doc::text(t.text()), " ");
                         }
                         saw_eol = false;
                         blank = false;
@@ -85,9 +92,12 @@ impl Formatter {
                         if items.is_empty() {
                             items.push(Item::line_swallowing(Doc::text(t.text()), blank));
                         } else {
+                            // A `@<` post-annotation is separated from the item it
+                            // documents by two spaces (before alignment padding).
                             attach(
                                 &mut items,
                                 Doc::anchor(AnchorKind::PostAnnotation, Doc::text(t.text())),
+                                "  ",
                             );
                         }
                         saw_eol = false;
@@ -111,7 +121,10 @@ impl Formatter {
                 started = true;
             }
         }
-        items
+        Collected {
+            items,
+            trailing_blank,
+        }
     }
 
     // ---- dispatch ------------------------------------------------------
@@ -170,27 +183,39 @@ impl Formatter {
 
     fn lower_member_list(&self, node: &SyntaxNode) -> Doc {
         let cfg = list_cfg(node.kind());
-        let items = self.collect_items(node);
+        let Collected {
+            items,
+            trailing_blank,
+        } = self.collect_items(node);
         let always = match cfg.mode {
             ListMode::Always => true,
             ListMode::Auto => false,
         };
         let force_block = always || items.iter().any(|i| i.comment);
 
+        // A definition-scope body preserves a single blank line at its start
+        // and end when the source had one; other block bodies (structs, enums,
+        // sub-blocks, inline lists) always hug their braces.
+        let keep_blank = preserves_edge_blanks(node.kind());
+
         if items.is_empty() {
             return match cfg.mode {
+                // An empty scope keeps its lone blank line if the source had
+                // one (it is simultaneously the body's start and end).
                 ListMode::Always => Doc::concat(vec![
                     Doc::text(cfg.open),
-                    Doc::hardline(),
+                    break_lines(keep_blank && trailing_blank),
                     Doc::text(cfg.close),
                 ]),
                 ListMode::Auto => Doc::text(format!("{}{}", cfg.open, cfg.close)),
             };
         }
+        let lead_blank = keep_blank && items.first().is_some_and(|i| i.blank_before);
+        let trail_blank = keep_blank && trailing_blank;
 
         let pad = if cfg.open == "{" { " " } else { "" };
         let (open_line, body) = if force_block {
-            (Doc::hardline(), join_items(&items))
+            (break_lines(lead_blank), join_items(&items))
         } else {
             (
                 Doc::Line {
@@ -214,7 +239,7 @@ impl Formatter {
         match cfg.close_style {
             Close::Dedent => {
                 inner.push(if force_block {
-                    Doc::hardline()
+                    break_lines(trail_blank)
                 } else {
                     Doc::Line {
                         flat: pad,
@@ -225,7 +250,7 @@ impl Formatter {
             }
             Close::Trail => {
                 inner.push(if force_block {
-                    Doc::hardline()
+                    break_lines(trail_blank)
                 } else {
                     Doc::Line {
                         flat: "",
@@ -369,6 +394,21 @@ impl Formatter {
 // Items
 // ============================================================================
 
+/// The members of a container plus whether a blank line preceded its close.
+struct Collected {
+    items: Vec<Item>,
+    trailing_blank: bool,
+}
+
+/// A hard break, doubled to `\n\n` (an intentional blank line) when `blank`.
+fn break_lines(blank: bool) -> Doc {
+    if blank {
+        Doc::concat(vec![Doc::hardline(), Doc::hardline()])
+    } else {
+        Doc::hardline()
+    }
+}
+
 struct Item {
     doc: Doc,
     blank_before: bool,
@@ -396,12 +436,15 @@ impl Item {
     }
 }
 
-fn attach(items: &mut [Item], extra: Doc) {
+/// Append `extra` to the preceding item on the same line, separated by `gap`
+/// (a trailing comment uses one space, a `@<` annotation two). If that item is
+/// itself line-swallowing, `extra` drops to the next line instead.
+fn attach(items: &mut [Item], extra: Doc, gap: &str) {
     if let Some(last) = items.last_mut() {
         let sep = if last.comment {
             Doc::hardline()
         } else {
-            Doc::text(" ")
+            Doc::text(gap)
         };
         let d = std::mem::replace(&mut last.doc, Doc::Nil);
         last.doc = Doc::concat(vec![d, sep, extra]);
@@ -440,6 +483,23 @@ fn join_items_sep(items: &[Item], sep: Doc) -> Doc {
 
 fn is_explodable(kind: SyntaxKind) -> bool {
     kind.is_spec() || kind == DEF_COMPONENT_INSTANCE
+}
+
+/// Whether a block body preserves a single blank line at its start and end when
+/// the source had one. True for definition scopes and connection blocks; other
+/// bodies (structs, enums, packet sub-blocks, inline lists) hug their
+/// delimiters.
+fn preserves_edge_blanks(kind: SyntaxKind) -> bool {
+    match kind {
+        MODULE_MEMBER_LIST
+        | COMPONENT_MEMBER_LIST
+        | INTERFACE_MEMBER_LIST
+        | TOPOLOGY_MEMBER_LIST
+        | STATE_MACHINE_MEMBER_LIST
+        | STATE_MEMBER_LIST
+        | CONNECTION_MEMBER_LIST => true,
+        _ => false,
+    }
 }
 
 fn is_clause_node(kind: SyntaxKind) -> bool {
@@ -561,8 +621,18 @@ fn sep_doc(prev: &SyntaxToken, cur: &SyntaxToken) -> Doc {
 
 /// Flat inter-token separator (" " or "").
 fn flat_sep(prev: &SyntaxToken, cur: &SyntaxToken) -> &'static str {
+    // A `@<` post-annotation is always preceded by two spaces, matching the
+    // member-list path in `attach`.
+    if cur.kind() == POST_ANNOTATION {
+        return "  ";
+    }
     if prev.kind() == DOT || cur.kind() == DOT {
         return "";
+    }
+    // The enum representation-type colon (`enum E : U8`) takes a leading space,
+    // unlike the tight `name: Type` colon of struct fields and formal params.
+    if cur.kind() == COLON && cur.parent().is_some_and(|p| p.kind() == DEF_ENUM) {
+        return " ";
     }
     let cur_tight = match cur.kind() {
         COLON | COMMA | SEMI | RIGHT_PAREN | RIGHT_SQUARE => true,

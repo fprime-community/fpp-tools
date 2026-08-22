@@ -46,14 +46,14 @@ impl Drop for TempDir {
 const UNFORMATTED: &str = "module M {\nconstant x = 1\n}\n";
 
 #[test]
-fn default_indent_is_two_without_config() {
+fn default_indent_is_four_without_config() {
     let dir = TempDir::new("default");
     let file = dir.path().join("a.fpp");
     fs::write(&file, UNFORMATTED).unwrap();
 
     let status = Command::new(bin()).arg(&file).status().unwrap();
     assert!(status.success());
-    assert_eq!(indent_of(&fs::read_to_string(&file).unwrap()), 2);
+    assert_eq!(indent_of(&fs::read_to_string(&file).unwrap()), 4);
 }
 
 #[test]

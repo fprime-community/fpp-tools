@@ -14,7 +14,7 @@ use std::process;
 ///
 /// The indentation width and maximum line length are read from the nearest
 /// `.fpp-format` file (searched upward from each file's directory), falling
-/// back to built-in defaults (2-space indent, 80-column width). The --indent
+/// back to built-in defaults (4-space indent, 80-column width). The --indent
 /// and --line-length flags override whatever the file specifies.
 #[derive(Parser, Debug)]
 #[command(version, author, about, long_about)]

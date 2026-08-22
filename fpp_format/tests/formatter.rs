@@ -120,6 +120,7 @@ fmt_test!(multiline_string_align, "multiline-string-align");
 fmt_test!(constant_align, "constant-align");
 fmt_test!(enum_annotation_align, "enum-annotation-align");
 fmt_test!(param_annotation, "param-annotation");
+fmt_test!(blank_lines, "blank-lines");
 
 #[test]
 fn component_inner() {

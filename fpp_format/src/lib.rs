@@ -19,7 +19,7 @@ pub use crate::include::{FormattedUnit, format_file_recursive};
 /// Configuration options for the formatter
 #[derive(Debug, Clone)]
 pub struct FormatOptions {
-    /// Number of spaces per indentation level (default: 2)
+    /// Number of spaces per indentation level (default: 4)
     pub indent_width: usize,
     /// Maximum line width; specs wider than this explode their clauses and
     /// group-style member lists break onto multiple lines (default: 80)
@@ -27,7 +27,7 @@ pub struct FormatOptions {
 }
 
 /// Default number of spaces per indentation level.
-pub const DEFAULT_INDENT_WIDTH: usize = 2;
+pub const DEFAULT_INDENT_WIDTH: usize = 4;
 /// Default maximum line width.
 pub const DEFAULT_MAX_LINE_WIDTH: usize = 80;
 
@@ -129,9 +129,9 @@ mod tests {
 
     #[test]
     fn test_default_options() {
-        // The default formatting profile is 2-space indent, 80-column width.
+        // The default formatting profile is 4-space indent, 80-column width.
         let options = FormatOptions::default();
-        assert_eq!(options.indent_width, 2);
+        assert_eq!(options.indent_width, 4);
         assert_eq!(options.max_line_width, 80);
         assert_eq!(options.indent_width, DEFAULT_INDENT_WIDTH);
         assert_eq!(options.max_line_width, DEFAULT_MAX_LINE_WIDTH);
@@ -382,12 +382,12 @@ module Outer {
         let formatted =
             format_text(input, TopEntryPoint::Module, FormatOptions::default()).unwrap();
         assert_eq!(
-            formatted, "module M {\n  constant a = 1\n\n  constant b = 2\n}\n",
+            formatted, "module M {\n    constant a = 1\n\n    constant b = 2\n}\n",
             "trailing-whitespace blank line not preserved:\n{}",
             formatted
         );
         // Same content without the stray spaces must format identically.
-        let clean = "module M {\n  constant a = 1\n\n  constant b = 2\n}\n";
+        let clean = "module M {\n    constant a = 1\n\n    constant b = 2\n}\n";
         let clean_formatted =
             format_text(clean, TopEntryPoint::Module, FormatOptions::default()).unwrap();
         assert_eq!(formatted, clean_formatted);
@@ -402,7 +402,7 @@ module Outer {
         let formatted =
             format_text(input, TopEntryPoint::Module, FormatOptions::default()).unwrap();
         assert_eq!(
-            formatted, "module M {\n  constant a = 1\n\n  constant b = 2\n}\n",
+            formatted, "module M {\n    constant a = 1\n\n    constant b = 2\n}\n",
             "blank run not collapsed to one:\n{}",
             formatted
         );

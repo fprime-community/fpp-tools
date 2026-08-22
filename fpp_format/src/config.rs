@@ -12,7 +12,7 @@
 //!
 //! ```text
 //! # Spaces per indentation level
-//! indent = 2
+//! indent = 4
 //! # Maximum line width before specs explode their clauses
 //! line-length = 80
 //! ```
