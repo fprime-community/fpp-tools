@@ -37,6 +37,7 @@ dist/
 # checked-in `fpp_python/fpp_python.pyi` type stub is NOT matched by this.
 *.so
 *.pyd
+venv/
 
 # Ignore any AI files
 CLAUDE.md

@@ -18,21 +18,6 @@ members = [
     "fpp_python_macros",
 ]
 
-# Exclude fpp_macros from test suite
-default-members = [
-    "fpp",
-    "fpp_lsp_server",
-    "fpp_analysis",
-    "fpp_ast",
-    "fpp_core",
-    "fpp_errors",
-    "fpp_lexer",
-    "fpp_parser",
-    "fpp_lsp_parser",
-    "fpp_util",
-    "fpp_diagram",
-]
-
 resolver = "2"
 
 [workspace.package]
