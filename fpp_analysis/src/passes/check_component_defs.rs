@@ -19,12 +19,12 @@ pub struct CheckComponentDefs;
 
 /// Run a builder that produces an updated component, emitting any error and
 /// marking the component as broken (so subsequent members are skipped) on error.
-fn update(a: &mut Analysis, f: impl FnOnce(&Analysis, Component) -> SemanticResult<Component>) {
-    let Some(component) = a.component.take() else {
+fn update(a: &mut Analysis, f: impl FnOnce(&Analysis, &mut Component) -> SemanticResult<()>) {
+    let Some(mut component) = a.component.take() else {
         return;
     };
-    match f(a, component) {
-        Ok(c) => a.component = Some(c),
+    match f(a, &mut component) {
+        Ok(_) => a.component = Some(component),
         Err(err) => err.emit(),
     }
 }
@@ -121,7 +121,6 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         update(a, |a, component| {
             let id = a.get_nonnegative_big_int_value_opt(&node.id)?;
             let (param, default_opcode) = Param::from_spec(a, node, component.default_opcode)?;
-            let mut component = component;
             component.default_opcode = default_opcode;
             component.add_param(id, param)
         });
@@ -160,11 +159,11 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         update(a, |a, component| {
             let symbol = match a.use_def_map.get(&node.interface.id()) {
                 Some(symbol @ Symbol::Interface(_)) => symbol.clone(),
-                _ => return Ok(component),
+                _ => return Ok(()),
             };
             let interface = match a.interface_map.get(&symbol) {
                 Some(iface) => iface.clone(),
-                None => return Ok(component),
+                None => return Ok(()),
             };
             component.add_imported_interface(&interface, node.span())
         });
@@ -203,7 +202,7 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         update(a, |a, component| {
             match StateMachineInstance::from_spec(a, node)? {
                 Some(instance) => component.add_state_machine_instance(instance),
-                None => Ok(component),
+                None => Ok(()),
             }
         });
         ControlFlow::Continue(())
