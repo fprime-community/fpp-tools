@@ -9,13 +9,18 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
 use std::sync::Arc;
 
+/// An FPP Type
 #[derive(Debug, Clone)]
 pub enum Type {
+    /// Primitive integer types
     PrimitiveInt(IntegerKind),
+    /// Floating-point types
     Float(FloatKind),
+    /// The type of a string
     String(Option<i128>),
+    /// The Boolean type
     Boolean,
-    /** The type of arbitrary-width integers */
+    /// The type of arbitrary-width integers
     Integer,
     AbsType(AbsType),
     AliasType(AliasType),
@@ -27,6 +32,7 @@ pub enum Type {
 }
 
 impl Type {
+    /// Get the underlying type
     pub fn underlying_type(ty: &Arc<Type>) -> Arc<Type> {
         match ty.deref() {
             Type::AliasType(alias) => Type::underlying_type(&alias.alias_type),
@@ -34,7 +40,7 @@ impl Type {
         }
     }
 
-    /** Get the default value */
+    /// Get the default value
     pub fn default_value(&self) -> Option<Value> {
         match self {
             Type::PrimitiveInt(kind) => Some(Value::PrimitiveInteger(PrimitiveIntegerValue {
@@ -69,7 +75,7 @@ impl Type {
         }
     }
 
-    /** Get the array size */
+    /// Get the array size
     pub fn array_size(&self) -> Option<usize> {
         match self {
             Type::AliasType(ty) => ty.alias_type.array_size(),
@@ -79,7 +85,7 @@ impl Type {
         }
     }
 
-    /** Get the definition node identifier, if any */
+    /// Get the definition node identifier, if any
     pub fn def_node_id(&self) -> Option<fpp_core::Node> {
         match self {
             Type::AbsType(ty) => Some(ty.node.node_id),
@@ -91,7 +97,7 @@ impl Type {
         }
     }
 
-    /** Does this type have numeric members? */
+    /// Does this type have numeric members?
     pub fn has_numeric_members(&self) -> bool {
         match self {
             Type::AliasType(ty) => ty.alias_type.has_numeric_members(),
@@ -110,7 +116,7 @@ impl Type {
         }
     }
 
-    /** Is this type convertible to a numeric type? */
+    /// Is this type convertible to a numeric type?
     pub fn is_convertible_to_numeric(&self) -> bool {
         match self {
             Type::AliasType(ty) => ty.alias_type.is_convertible_to_numeric(),
@@ -119,7 +125,7 @@ impl Type {
         }
     }
 
-    /** Is this type promotable to an array type? */
+    /// Is this type promotable to an array type?
     pub fn is_promotable_to_array(&self) -> bool {
         match self {
             Type::AliasType(ty) => ty.alias_type.is_promotable_to_array(),
@@ -130,7 +136,7 @@ impl Type {
         }
     }
 
-    /** Is this type displayable? */
+    /// Is this type displayable?
     pub fn is_displayable(&self) -> bool {
         match self {
             Type::PrimitiveInt(_) => true,
@@ -154,7 +160,7 @@ impl Type {
         }
     }
 
-    /** Is this type a float type? */
+    /// Is this type a float type?
     pub fn is_float(&self) -> bool {
         match self {
             Type::AliasType(ty) => ty.alias_type.is_float(),
@@ -244,7 +250,7 @@ impl Type {
         }
     }
 
-    /** Is this type an int type? */
+    /// Is this type an int type?
     pub fn is_int(&self) -> bool {
         match self {
             Type::AliasType(ty) => ty.alias_type.is_int(),
@@ -254,7 +260,7 @@ impl Type {
         }
     }
 
-    /** Is this type a primitive type? */
+    /// Is this type a primitive type?
     pub fn is_primitive(&self) -> bool {
         match self {
             Type::AliasType(ty) => ty.alias_type.is_primitive(),
@@ -265,17 +271,17 @@ impl Type {
         }
     }
 
-    /** Is this type a canonical (non-aliased) type? */
+    /// Is this type a canonical (non-aliased) type?
     pub fn is_canonical(&self) -> bool {
         !matches!(self, Type::AliasType(_))
     }
 
-    /** Is this type promotable to a struct type? */
+    /// Is this type promotable to a struct type?
     pub fn is_promotable_to_struct(&self) -> bool {
         self.is_promotable_to_array()
     }
 
-    /** Is this type numeric? */
+    /// Is this type numeric?
     pub fn is_numeric(&self) -> bool {
         match self {
             Type::AliasType(ty) => ty.alias_type.is_numeric(),
@@ -283,6 +289,7 @@ impl Type {
         }
     }
 
+    /// Is `from` convertible to `to`?
     pub fn convert(from: &Arc<Type>, to: &Arc<Type>) -> TypeConversionResult {
         Type::convert_impl(
             Type::underlying_type(from).deref(),
@@ -428,7 +435,7 @@ impl Type {
         }
     }
 
-    /** Check for type identity */
+    /// Check for type identity
     pub fn identical(t1: &Type, t2: &Type) -> bool {
         match (t1, t2) {
             (Type::PrimitiveInt(k1), Type::PrimitiveInt(k2)) => k1 == k2,
@@ -442,6 +449,7 @@ impl Type {
         }
     }
 
+    /// Compute the common type for a pair of types
     pub fn common_type(t1_a: &Arc<Type>, t2_a: &Arc<Type>) -> Option<Arc<Type>> {
         // Trivial case, types are the same
         if Type::identical(t1_a, t2_a) {
@@ -736,6 +744,7 @@ impl TypeConversionError {
 
 pub type TypeConversionResult = Result<(), TypeConversionError>;
 
+/// Primitive types
 pub trait PrimitiveType {
     fn bit_width(&self) -> u32;
 }
@@ -781,75 +790,75 @@ impl PrimitiveType for FloatKind {
     }
 }
 
-/** An abstract type */
+/// An abstract type
 #[derive(Debug, Clone)]
 pub struct AbsType {
-    /** The AST node giving the definition */
+    /// The AST node giving the definition
     pub node: fpp_ast::DefAbsType,
     pub default_value: Option<AbsTypeValue>,
 }
 
-/** An alias type */
+/// An alias type
 #[derive(Debug, Clone)]
 pub struct AliasType {
-    /** The AST node giving the definition */
+    /// The AST node giving the definition
     pub node: fpp_ast::DefAliasType,
-    /** Type that this typedef points to */
+    /// Type that this typedef points to
     pub alias_type: Arc<Type>,
 }
 
-/** A named array type */
+/// A named array type
 #[derive(Debug, Clone)]
 pub struct ArrayType {
-    /** The AST node giving the definition */
+    /// The AST node giving the definition
     pub node: fpp_ast::DefArray,
-    /** The structurally equivalent anonymous array */
+    /// The structurally equivalent anonymous array
     pub anon_array: AnonArrayType,
-    /** The specified default value, if any */
+    /// The specified default value, if any
     pub default: Option<Value>,
-    /** The specified format, if any */
+    /// The specified format, if any
     pub format: Option<Format>,
 }
 
-/** An anonymous array type */
+/// An anonymous array type
 #[derive(Debug, Clone)]
 pub struct AnonArrayType {
-    /** The array size */
+    /// The array size
     pub size: Option<usize>,
-    /** The element type */
+    /// The element type
     pub elt_type: Arc<Type>,
 }
 
-/** An enum type */
+/// An enum type
 #[derive(Debug, Clone)]
 pub struct EnumType {
-    /** The AST node giving the definition */
+    /// The AST node giving the definition
     pub node: fpp_ast::DefEnum,
-    /** The representation type */
+    /// The representation type
     pub rep_type: IntegerKind,
-    /** The default value */
+    /// The default value
     pub default: Option<Value>,
 }
 
-/** A named struct type */
+/// A named struct type
 #[derive(Debug, Clone)]
 pub struct StructType {
-    /** The AST node giving the definition */
+    /// The AST node giving the definition
     pub node: fpp_ast::DefStruct,
-    /** The structurally equivalent anonymous struct type */
+    /// The structurally equivalent anonymous struct type
     pub anon_struct: AnonStructType,
-    /** The default value */
+    /// The default value
     pub default: Option<StructValue>,
-    /** The member sizes */
+    /// The member sizes
     pub sizes: HashMap<String, u32>,
-    /** The member formats */
+    /// The member formats
     pub formats: HashMap<String, Format>,
 }
 
-/** An anonymous struct type */
+/// An anonymous struct type
 #[derive(Debug, Clone)]
 pub struct AnonStructType {
-    /** The members */
+    /// The members
     pub members: HashMap<String, Arc<Type>>,
 }
 

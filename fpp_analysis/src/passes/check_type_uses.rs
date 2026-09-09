@@ -13,6 +13,9 @@ use rustc_hash::FxHashMap as HashMap;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
+/// Compute and check the types of type definition symbols, enumerated
+/// constant symbols, and type names, except that array size expressions and
+/// default value expressions are still unevaluated.
 pub struct CheckTypeUses<'ast> {
     super_: UseAnalyzer<'ast, Self>,
 }

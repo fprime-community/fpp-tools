@@ -8,7 +8,7 @@ use fpp_core::{CompilerContext, DiagnosticData, DiagnosticEmitter, Level, Node, 
 use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
-// Comparable, span-free shape mirroring the Scala `Format` structure.
+// Comparable, span-free shape for Format's parsed representation.
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, PartialEq, Clone)]
@@ -58,9 +58,9 @@ fn shape(p: &FormatPart) -> Shape {
 }
 
 // ---------------------------------------------------------------------------
-// Error-counting emitter: mirrors the `WriteEmitter`-buffer pattern used in
-// `types.rs`, but keeps a precise count of error-level diagnostics so we don't
-// have to string-match rendered output.
+// Error-counting emitter: follows the same `WriteEmitter`-buffer pattern used
+// in `types.rs`, but keeps a precise count of error-level diagnostics so we
+// don't have to string-match rendered output.
 // ---------------------------------------------------------------------------
 
 #[derive(Default)]
@@ -85,7 +85,7 @@ struct ParseResult {
     /// With an empty type list, the only non-parser error `Format::new` can
     /// raise is the length-mismatch (one field vs. zero types). We subtract
     /// those out here so `parser_errors` reflects *only* the format parser's
-    /// own diagnostics (Scala's `NoSuccess`).
+    /// own diagnostics.
     parser_errors: usize,
 }
 
@@ -128,14 +128,13 @@ fn parse(input: &str) -> ParseResult {
 }
 
 // ---------------------------------------------------------------------------
-// "format" should parse <input> as <expected>   (Scala `ok` list)
+// "format" should parse <input> as <expected>
 // ---------------------------------------------------------------------------
 
 #[test]
 fn parses_ok_cases() {
-    // (input, expected span-free shape). Mirrors the Scala `ok` list exactly.
-    // Scala's `Format(prefix, List((field, suffix)))` flattens to a `Vec` of
-    // interleaved literals and replacement fields.
+    // (input, expected span-free shape) pairs. The parsed representation
+    // flattens to a `Vec` of interleaved literals and replacement fields.
     let ok: Vec<(&str, Vec<Shape>)> = vec![
         ("abcd", vec![Shape::Literal("abcd".into())]),
         ("ab{{cd", vec![Shape::Literal("ab{cd".into())]),
@@ -237,13 +236,13 @@ fn parses_ok_cases() {
 }
 
 // ---------------------------------------------------------------------------
-// "format" should not parse <input>   (Scala `error` list)
+// "format" should not parse <input>
 // ---------------------------------------------------------------------------
 
 #[test]
 fn rejects_error_cases() {
-    // Scala checks these produce `NoSuccess`. Rust surfaces the failure by
-    // emitting one or more error-level diagnostics from the format parser.
+    // These inputs fail to parse; the failure surfaces as one or more
+    // error-level diagnostics emitted by the format parser.
     let error_inputs = ["{", "}", "ab{1234xyz}cd", "ab{.3b}cd"];
 
     for input in error_inputs {

@@ -18,6 +18,8 @@ impl CheckComponentInstanceDefs {
             let i1 = instances[idx];
             let i2 = instances[idx + 1];
             if i2.max_id >= i2.base_id && i1.base_id >= i2.base_id {
+                // Error: i2 has a nonempty ID range, and
+                // base id for i1 lies in the ID range of i2
                 SemanticError::OverlappingIdRanges {
                     base_id1: i1.base_id,
                     name1: i1.name.clone(),
@@ -30,8 +32,10 @@ impl CheckComponentInstanceDefs {
                 .emit();
                 return;
             } else if i1.max_id < i2.base_id {
+                // OK: ID ranges do not overlap; continue checking
                 idx += 1;
             } else {
+                // Error: Base id for i2 lies in the ID range of i1
                 SemanticError::OverlappingIdRanges {
                     base_id1: i2.base_id,
                     name1: i2.name.clone(),

@@ -14,6 +14,8 @@ use fpp_core::Spanned;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
+/// Finalize type definitions. Update the types of uses (type names) that
+/// refer to the definitions.
 pub struct FinalizeTypeDefs<'ast> {
     super_: NestedAnalyzer<'ast, Analysis, Self>,
 }
@@ -136,7 +138,9 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         }
 
         a.visited_symbol_set.insert(symbol);
+        // Finalize the referenced type
         let ty = self.ty(a, &node.type_name);
+        // Update the alias type in the type map
         a.type_map.insert(
             node.node_id,
             Arc::new(Type::AliasType(AliasType {
@@ -159,6 +163,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         }
 
         a.visited_symbol_set.insert(symbol);
+        // Finalize the element type
         let elt_type = self.ty(a, &node.elt_type);
 
         let size = match self.expr_as_integer(a, &node.size) {
@@ -186,6 +191,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             return ControlFlow::Continue(());
         }
 
+        // Update the size and element type
         let anon_array = AnonArrayType {
             size: Some(size as usize),
             elt_type: elt_type.clone(),
@@ -229,6 +235,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             format,
         });
 
+        // Update the array type in the type map
         a.type_map.insert(node.node_id, Arc::new(ty));
         ControlFlow::Continue(())
     }
@@ -286,11 +293,13 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         };
 
         for member in &node.members {
+            // Finalize the member's type
             let member_ty = self.ty(a, &member.type_name);
             ty.anon_struct
                 .members
                 .insert(member.name.data.clone(), member_ty.clone());
 
+            // Compute the size
             let size = self.expr_as_integer_opt(a, &member.size);
             match size {
                 None => {}
@@ -316,6 +325,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
                 }
             }
 
+            // Compute the format
             if let Some(format) = &member.format {
                 ty.formats.insert(
                     member.name.data.clone(),
@@ -324,6 +334,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             }
         }
 
+        // Update the struct type in the type map
         a.type_map.insert(node.node_id, Arc::new(Type::Struct(ty)));
         ControlFlow::Continue(())
     }

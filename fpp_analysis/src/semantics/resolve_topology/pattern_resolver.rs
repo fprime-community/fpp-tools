@@ -1,3 +1,5 @@
+// Resolve connection patterns
+
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
@@ -79,6 +81,7 @@ fn resolve_to_single_port(
     }
 }
 
+/// Gets the specified general port from a component instance
 fn get_general_port(
     a: &Analysis,
     ci_use: &(ComponentInstance, Span),
@@ -210,6 +213,7 @@ fn for_targets(
     Ok(result)
 }
 
+/// Resolve a command pattern
 fn resolve_command(
     a: &Analysis,
     pattern: &ConnectionPattern,
@@ -256,6 +260,7 @@ fn resolve_command(
     })
 }
 
+/// Resolve a pattern involving connections from a single special target port
 fn resolve_from_special(
     a: &Analysis,
     pattern: &ConnectionPattern,
@@ -290,6 +295,7 @@ fn get_ping_ports(
     Ok((ping_in, ping_out))
 }
 
+/// Resolve a health pattern
 fn resolve_health(
     a: &Analysis,
     pattern: &ConnectionPattern,
@@ -299,6 +305,7 @@ fn resolve_health(
     let (source_in, source_out) = get_ping_ports(a, &pattern.source)?;
     for_targets(pattern, instances, |target| {
         let (target_in, target_out) = get_ping_ports(a, target)?;
+        // Health component does not ping itself
         if source_out.interface_instance != target_in.interface_instance {
             Ok(vec![
                 (
@@ -316,6 +323,7 @@ fn resolve_health(
     })
 }
 
+/// Resolve a param pattern
 fn resolve_param(
     a: &Analysis,
     pattern: &ConnectionPattern,

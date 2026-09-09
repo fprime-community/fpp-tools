@@ -8,90 +8,91 @@ use fpp_core::{SourceFile, Span, Spanned};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
+/// The analysis data structure
 #[derive(Debug)]
 pub struct Analysis {
-    /** The mapping from symbols to their parent symbols */
+    /// The mapping from symbols to their parent symbols
     pub parent_symbol_map: HashMap<Symbol, Symbol>,
-    /** The outermost scope */
+    /// The outermost scope
     pub global_scope: Scope,
-    /** The mapping from symbols with scopes to their scopes */
+    /// The mapping from symbols with scopes to their scopes
     pub symbol_scope_map: HashMap<Symbol, Scope>,
-    /** The mapping from definition node ID to their entered symbol */
+    /// The mapping from definition node ID to their entered symbol
     pub symbol_map: HashMap<fpp_core::Node, Symbol>,
-    /** The mapping from uses (by node ID) to their definitions */
+    /// The mapping from uses (by node ID) to their definitions
     pub use_def_map: HashMap<fpp_core::Node, Symbol>,
-    /** The list of use-def matchings on the current use-def path.
-     *  Used during cycle analysis. */
+    /// The list of use-def matchings on the current use-def path.
+    /// Used during cycle analysis.
     pub use_def_matching_list: Vec<UseDefMatching>,
-    /** The set of symbols visited so far */
+    /// The set of symbols visited so far
     pub visited_symbol_set: HashSet<Symbol>,
-    /** The set of symbols on the current use-def path.
-     *  Used during cycle analysis. */
+    /// The set of symbols on the current use-def path.
+    /// Used during cycle analysis.
     pub use_def_symbol_set: HashSet<Symbol>,
-    /** The current parent symbol */
+    /// The current parent symbol
     pub parent_symbol: Option<Symbol>,
-    /** The current nested scope for symbol lookup */
+    /// The current nested scope for symbol lookup
     pub nested_scope: NestedScope,
-    /** The mapping from included files `.fppi` to their context they were included in */
+    /// The mapping from included files `.fppi` to their context they were included in
     pub include_context_map: HashMap<SourceFile, fpp_parser::IncludeParentKind>,
-    /** The mapping from type and constant symbols, expressions,
-     *  and type names to their types */
+    /// The mapping from type and constant symbols, expressions,
+    /// and type names to their types
     pub type_map: HashMap<fpp_core::Node, Arc<Type>>,
-    /** The mapping from constant symbols and expressions to their values. */
+    /// The mapping from constant symbols and expressions to their values.
     pub value_map: HashMap<fpp_core::Node, Value>,
-    /** The F Prime framework definitions found during analysis. */
+    /// The F Prime framework definitions found during analysis.
     pub framework_definitions: FrameworkDefinitions,
-    /** The interface currently being analyzed. */
+    /// The interface currently being analyzed.
     pub interface: Option<Interface>,
-    /** The mapping from interface symbols to their resolved interfaces. */
+    /// The mapping from interface symbols to their resolved interfaces.
     pub interface_map: HashMap<Symbol, Interface>,
-    /** The component currently being analyzed. */
+    /// The component currently being analyzed.
     pub component: Option<crate::semantics::Component>,
-    /** The mapping from component symbols to their completed components. */
+    /// The mapping from component symbols to their completed components.
     pub component_map: HashMap<Symbol, crate::semantics::Component>,
-    /** The component instance currently being analyzed. */
+    /// The component instance currently being analyzed.
     pub component_instance: Option<crate::semantics::ComponentInstance>,
-    /** The mapping from component instance symbols to their instances. */
+    /// The mapping from component instance symbols to their instances.
     pub component_instance_map: HashMap<Symbol, crate::semantics::ComponentInstance>,
-    /** The topology currently being analyzed. */
+    /// The topology currently being analyzed.
     pub topology: Option<crate::semantics::Topology>,
-    /** The mapping from topology symbols to their partially resolved topologies. */
+    /// The mapping from topology symbols to their partially resolved topologies.
     pub partial_topology_map: HashMap<Symbol, crate::semantics::Topology>,
-    /** The mapping from topology symbols to their fully resolved topologies. */
+    /// The mapping from topology symbols to their fully resolved topologies.
     pub topology_map: HashMap<Symbol, crate::semantics::Topology>,
-    /** The mapping from system symbols to their resolved systems. */
+    /// The mapping from system symbols to their resolved systems.
     pub system_map: HashMap<Symbol, crate::semantics::FppSystem>,
-    /** The mapping from (location specifier kind, qualified name) to the
-     *  location specifier that named it. */
+    /// The mapping from (location specifier kind, qualified name) to the
+    /// location specifier that named it.
     pub location_specifier_map: HashMap<(fpp_ast::SpecLocKind, String), SpecLocEntry>,
-    /** The list of enclosing scope (module) names on the current path. */
+    /// The list of enclosing scope (module) names on the current path.
     pub scope_name_list: Vec<String>,
-    /** The mapping from state machine symbols to their analyzed state machines. */
+    /// The mapping from state machine symbols to their analyzed state machines.
     pub state_machine_map: HashMap<Symbol, crate::semantics::state_machine::StateMachine>,
-    /** The set of symbols marked as dictionary definitions and validated by
-     *  `CheckDictionaryDefs`. */
+    /// The set of symbols marked as dictionary definitions and validated by
+    /// `CheckDictionaryDefs`.
     pub dictionary_symbol_set: HashSet<Symbol>,
 
     /** Map from an AST node id to the implied uses of FPP symbols at that node. */
     pub implied_use_map: HashMap<fpp_core::Node, ImpliedUseSet>,
 
-    /** The shared "unknown" type standing in for a type use that failed to
-     *  resolve. Created lazily on first use so that `CheckTypeUses` can give
-     *  every type name an entry in `type_map`, letting later passes read a
-     *  resolved type without handling the unresolved case. */
+    /// The shared "unknown" type standing in for a type use that failed to
+    /// resolve. Created lazily on first use so that `CheckTypeUses` can give
+    /// every type name an entry in `type_map`, letting later passes read a
+    /// resolved type without handling the unresolved case.
     unknown_type: Option<Arc<Type>>,
 }
 
 /// A recorded location specifier, keyed in `location_specifier_map`.
 #[derive(Debug, Clone)]
 pub struct SpecLocEntry {
-    /** Span of the location specifier statement */
+    /// Span of the location specifier statement
     pub spec_span: Span,
-    /** Span of the file string literal (error location + base for path resolution) */
+    /// Span of the file string literal (error location + base for path resolution)
     pub file_span: Span,
-    /** The specified (relative) path string */
+    /// The specified (relative) path string
     pub file_value: String,
-    /** Whether this is a dictionary specifier */
+    /// Whether this is a dictionary specifier
     pub is_dictionary_def: bool,
 }
 

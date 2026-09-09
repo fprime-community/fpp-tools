@@ -182,12 +182,12 @@ pub fn resolve_includes<Reader: FileReader>(
 
 /// Check the semantics of a list of translation units.
 ///
-/// The passes run in the order below. A few passes present in the reference
-/// compiler are intentionally absent (see docs/analysis-work-to-go.md):
-///   - template resolution and template interface-arg checking: the template
-///     subsystem is not ported.
+/// The passes run in the order below. A few passes are intentionally absent
+/// (see docs/analysis-work-to-go.md):
+///   - template resolution and template interface-arg checking: not
+///     implemented.
 ///   - constant-expr finalization: folded into `CheckExprTypes` /
-///     `EvalConstantExprs` in this design.
+///     `EvalConstantExprs`.
 ///   - dictionary-map construction: codegen-support only, deferred.
 pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> ControlFlow<()> {
     EnterSymbols.visit_trans_units(a, ast.iter().cloned())?;

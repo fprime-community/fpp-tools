@@ -70,8 +70,9 @@ fn type_identity_does_not_hold_for_distinct_pairs() {
             (default_abs_type(), default_enum()),
             (default_array(), default_struct()),
             (boolean(), string(None)),
-            // duplicate(String(None)) -> two unsized strings are NOT identical
-            // (Scala has no String case in areIdentical).
+            // duplicate(String(None)) -> two unsized strings are NOT identical:
+            // identical() has no String arm, so they fall through to the
+            // def_node_id comparison, which strings lack.
             (string(None), string(None)),
             (f32(), f64()),
             (i8(), u32()),
@@ -96,8 +97,6 @@ fn type_identity_does_not_hold_for_distinct_pairs() {
 
 // ---------------------------------------------------------------------------
 // "type conversion" should ...
-//
-// Scala `Type.mayBeConverted((from, to))`; Rust `Type::convert(from, to).is_ok()`.
 // ---------------------------------------------------------------------------
 
 fn may_be_converted(from: &std::sync::Arc<Type>, to: &std::sync::Arc<Type>) -> bool {
@@ -238,8 +237,6 @@ fn type_conversion_disallowed_pairs() {
 
 // ---------------------------------------------------------------------------
 // "common types" should ...
-//
-// Scala `Type.commonType(t1, t2)`; Rust `Type::common_type(&t1, &t2)`.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -521,7 +518,6 @@ fn displayable_types() {
 // ---------------------------------------------------------------------------
 // "size of" should ...
 //
-// Scala `SerializedSize.ty(a, t)`; Rust `t.serialized_size(&a)`.
 // String data size default = FW_FIXED_LENGTH_STRING_SIZE = 256; the length
 // prefix type FwSizeStoreType = U16 contributes 2 bytes.
 // ---------------------------------------------------------------------------
@@ -608,7 +604,7 @@ fn size_of_structs() {
         let string_size_10 = string_with_size(10); // 12
         let string_alias = alias_type("StringAlias", string_with_size(100), 104); // 102
 
-        // struct1: m1=array1(24)*2=48, m2=F64(8)=8, m3=enumAlias(2)=2, m4=string10(12)*3=36 => 94
+        // struct1: m1=array1(24)*2=48, m2=F64(8)=8, m3=enum_alias(2)=2, m4=string10(12)*3=36 => 94
         let struct1 = struct_ty_sized(
             "S",
             anon_struct(&[
@@ -622,7 +618,7 @@ fn size_of_structs() {
         );
         assert_eq!(struct1.serialized_size(&a), Some(94));
 
-        // struct2: m1=array2(48)=48, m2=stringAlias(102)=102, m3=struct1(94)*2=188 => 338
+        // struct2: m1=array2(48)=48, m2=string_alias(102)=102, m3=struct1(94)*2=188 => 338
         let struct2 = struct_ty_sized(
             "S2",
             anon_struct(&[
@@ -660,8 +656,7 @@ fn size_of_types_with_no_size() {
 
 // ---------------------------------------------------------------------------
 // Additional coverage: `Type` predicate/helper methods (many recurse through
-// alias types). These are not part of the Scala `TypeSpec` but exercise the
-// same `Type` surface.
+// alias types), exercising the same `Type` surface.
 // ---------------------------------------------------------------------------
 
 use crate::semantics::Value;

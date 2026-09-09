@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 thread_local! {
     /// Memoizes `id -> Node` so that repeated builder calls with the same integer
-    /// id return the same node, reproducing Scala's `AstNode.Id` identity model.
+    /// id return the same node, giving each id a stable node identity.
     static NODE_BY_ID: RefCell<HashMap<u64, fpp_core::Node>> = RefCell::new(HashMap::default());
     /// A single shared source file / span for all synthesized nodes.
     static TEST_SPAN: RefCell<Option<fpp_core::Span>> = const { RefCell::new(None) };
@@ -43,7 +43,7 @@ fn test_span() -> fpp_core::Span {
 }
 
 /// Returns the memoized node for `id`, creating it on first use. Same `id`
-/// always yields the same [`fpp_core::Node`] (mirrors Scala `AstNode.Id`).
+/// always yields the same [`fpp_core::Node`].
 fn node_for(id: u64) -> fpp_core::Node {
     NODE_BY_ID.with(|m| {
         *m.borrow_mut()
@@ -61,7 +61,7 @@ fn name_with_id(data: &str, id: u64) -> Name {
 }
 
 // ---------------------------------------------------------------------------
-// Primitive type constants (mirror Scala `Type.{I8..U64,F32,F64,Boolean,Integer}`)
+// Primitive type constants
 // ---------------------------------------------------------------------------
 
 pub fn i8() -> Arc<Type> {
@@ -112,17 +112,16 @@ fn expr_lit_int(value: &str, id: u64) -> Expr {
     }
 }
 
-/// A `string size <size>` type, mirroring Scala `stringWithSize`. The size is
-/// carried as a resolved `i128` (matching Rust's `Type::String(Option<i128>)`).
+/// A `string size <size>` type. The size is carried as a resolved `i128`
+/// (matching Rust's `Type::String(Option<i128>)`).
 pub fn string_with_size(size: i128) -> Arc<Type> {
     Arc::new(Type::String(Some(size)))
 }
 
 // ---------------------------------------------------------------------------
-// Named-type builders (mirror Scala `Types.{absType,aliasType,array,enumeration,struct}`)
+// Named-type builders
 // ---------------------------------------------------------------------------
 
-/// Mirrors Scala `absType(name, id)`.
 pub fn abs_type(name: &str, id: u64) -> Arc<Type> {
     let node = DefAbsType {
         name: name_with_id(name, id),
@@ -134,7 +133,7 @@ pub fn abs_type(name: &str, id: u64) -> Arc<Type> {
     }))
 }
 
-/// A dummy `TypeName` (Scala uses `TypeNameInt(U32)` as a placeholder).
+/// A dummy `TypeName` (`Integer(U32)`) used as a placeholder.
 fn dummy_type_name(id: u64) -> TypeName {
     TypeName {
         kind: TypeNameKind::Integer(IntegerKind::U32),
@@ -142,7 +141,6 @@ fn dummy_type_name(id: u64) -> TypeName {
     }
 }
 
-/// Mirrors Scala `aliasType(name, ty, id)`.
 pub fn alias_type(name: &str, ty: Arc<Type>, id: u64) -> Arc<Type> {
     let node = DefAliasType {
         name: name_with_id(name, id),
@@ -156,7 +154,6 @@ pub fn alias_type(name: &str, ty: Arc<Type>, id: u64) -> Arc<Type> {
     }))
 }
 
-/// Mirrors Scala `array(name, anonArray, id)`.
 pub fn array(name: &str, anon_array: Arc<Type>, id: u64) -> Arc<Type> {
     let anon = match anon_array.deref() {
         Type::AnonArray(a) => a.clone(),
@@ -181,7 +178,6 @@ pub fn array(name: &str, anon_array: Arc<Type>, id: u64) -> Arc<Type> {
     }))
 }
 
-/// Mirrors Scala `enumeration(name, repType, id)`.
 pub fn enumeration(name: &str, rep_type: IntegerKind, id: u64) -> Arc<Type> {
     let node = DefEnum {
         name: name_with_id(name, id),
@@ -202,7 +198,7 @@ pub fn struct_ty(name: &str, anon_struct: Arc<Type>, id: u64) -> Arc<Type> {
     struct_ty_sized(name, anon_struct, id, &[])
 }
 
-/// `struct` with explicit member array sizes (Scala `struct(..., sizes)`).
+/// `struct` with explicit member array sizes.
 pub fn struct_ty_sized(
     name: &str,
     anon_struct: Arc<Type>,
@@ -233,12 +229,10 @@ pub fn struct_ty_sized(
     }))
 }
 
-/// Mirrors Scala `AnonArray(size, eltType)`.
 pub fn anon_array(size: Option<usize>, elt_type: Arc<Type>) -> Arc<Type> {
     Arc::new(Type::AnonArray(AnonArrayType { size, elt_type }))
 }
 
-/// Mirrors Scala `AnonStruct(Map(...))`.
 pub fn anon_struct(members: &[(&str, Arc<Type>)]) -> Arc<Type> {
     let mut m = HashMap::default();
     for (name, ty) in members {
@@ -248,7 +242,7 @@ pub fn anon_struct(members: &[(&str, Arc<Type>)]) -> Arc<Type> {
 }
 
 // ---------------------------------------------------------------------------
-// Default named types (mirror Scala `Types.default*`)
+// Default named types
 // ---------------------------------------------------------------------------
 
 pub fn default_abs_type() -> Arc<Type> {
@@ -271,18 +265,15 @@ pub fn default_alias_type() -> Arc<Type> {
 // Structural type equality (for asserting common-type / conversion results)
 // ---------------------------------------------------------------------------
 
-/// Structural equality on `Type`, matching how the Scala tests compare types
-/// with `==` (case-class structural equality). Named types compare by
-/// definition node id (like Scala's `Type` case classes, whose `AstNode`s carry
-/// stable ids); anonymous aggregates compare structurally on members/elements.
+/// Structural equality on `Type`. Named types compare by definition node id;
+/// anonymous aggregates compare structurally on members/elements.
 pub fn types_structurally_eq(a: &Type, b: &Type) -> bool {
     match (a, b) {
         (Type::PrimitiveInt(k1), Type::PrimitiveInt(k2)) => k1 == k2,
         (Type::Float(k1), Type::Float(k2)) => k1 == k2,
         (Type::Boolean, Type::Boolean) => true,
         (Type::Integer, Type::Integer) => true,
-        // String equality in Scala compares the size AST node; our sizes are
-        // resolved i128 options, so compare those directly.
+        // Sizes are resolved i128 options, so compare those directly.
         (Type::String(s1), Type::String(s2)) => s1 == s2,
         (Type::AnonArray(a1), Type::AnonArray(a2)) => {
             a1.size == a2.size && types_structurally_eq(&a1.elt_type, &a2.elt_type)
@@ -319,7 +310,7 @@ pub fn assert_common_type_eq(actual: &Option<Arc<Type>>, expected: &Arc<Type>) {
 }
 
 // ---------------------------------------------------------------------------
-// Value builders (mirror Scala `Values`)
+// Value builders
 // ---------------------------------------------------------------------------
 
 pub fn v_i8(v: i128) -> Value {
@@ -374,7 +365,7 @@ pub fn v_string(s: &str) -> Value {
     Value::String(StringValue(s.to_string()))
 }
 
-/// An enum constant value over `default_enum()` (Scala `Values.enumeration`).
+/// An enum constant value over `default_enum()`.
 pub fn v_enum_constant(member: &str, value: i128) -> Value {
     Value::EnumConstant(EnumConstantValue::new(
         member.to_string(),
@@ -383,7 +374,7 @@ pub fn v_enum_constant(member: &str, value: i128) -> Value {
     ))
 }
 
-/// An anonymous array value of `size` copies of `v` (Scala `createAnonArray`).
+/// An anonymous array value of `size` copies of `v`.
 pub fn v_anon_array(size: usize, v: Value) -> Value {
     Value::AnonArray(AnonArrayValue {
         elements: std::iter::repeat_n(v, size).collect(),
@@ -391,7 +382,7 @@ pub fn v_anon_array(size: usize, v: Value) -> Value {
 }
 
 // ---------------------------------------------------------------------------
-// SerializedSize test analysis (mirrors the `Analysis(...)` in `TypeSpec` "size of")
+// SerializedSize test analysis
 // ---------------------------------------------------------------------------
 
 /// Builds an [`crate::Analysis`] populated with the framework definitions that
@@ -399,9 +390,8 @@ pub fn v_anon_array(size: usize, v: Value) -> Value {
 /// prefix type, 2 bytes) and `FW_FIXED_LENGTH_STRING_SIZE = 256` (the default
 /// string data size).
 ///
-/// Note: unlike the Scala test, Rust stores string sizes pre-resolved as
-/// `i128`, so no per-string `value_map` entries are needed — only the two
-/// framework definitions.
+/// Note: string sizes are pre-resolved as `i128`, so no per-string
+/// `value_map` entries are needed — only the two framework definitions.
 pub fn sizeof_test_analysis() -> crate::Analysis {
     use crate::semantics::Symbol;
     use fpp_ast::DefConstant;

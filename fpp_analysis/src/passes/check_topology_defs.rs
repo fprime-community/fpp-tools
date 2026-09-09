@@ -21,6 +21,7 @@ impl CheckTopologyDefs {
     }
 
     fn resolve(&self, a: &mut Analysis, symbol: &Symbol) {
+        // Topology is already resolved: nothing to do.
         if a.topology_map.contains_key(symbol) {
             return;
         }
@@ -35,6 +36,7 @@ impl CheckTopologyDefs {
             self.resolve(a, dep);
         }
 
+        // Visit topology members and compute the unresolved topology.
         let Some(mut top) = a.partial_topology_map.get(symbol).cloned() else {
             return;
         };

@@ -23,7 +23,7 @@ pub struct Lexer<'a> {
 
 const EOF_CHAR: char = '\0';
 
-/** Verify if a character is within the number base system */
+/// Verify if a character is within the number base system
 #[inline]
 fn is_digit_in_base(ch: char, base: i32) -> bool {
     let num = match ch {

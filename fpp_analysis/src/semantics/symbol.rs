@@ -2,8 +2,11 @@ use crate::Analysis;
 use fpp_core::Node;
 use std::sync::Arc;
 
+/// The interface for an FPP symbol
 pub trait SymbolInterface: Clone {
+    /// Gets the AST node ID of the symbol
     fn node(&self) -> Node;
+    /// Gets the unqualified name of the symbol
     fn name(&self) -> &fpp_ast::Name;
 }
 
@@ -22,6 +25,7 @@ impl From<&fpp_ast::DefModule> for DefModuleStub {
     }
 }
 
+/// A data structure that represents a definition
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Symbol {
     AbsType(Arc<fpp_ast::DefAbsType>),

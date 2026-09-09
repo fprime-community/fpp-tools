@@ -75,9 +75,13 @@ impl<'ast, S: NestedScopeState, V: Visitor<'ast, State = S>> Analyzer<'ast, V>
 {
     fn visit(&self, visitor: &V, a: &mut V::State, node: Node<'ast>) -> ControlFlow<V::Break> {
         match node {
+            // Analyze component members
             Node::DefComponent(def) => self.walk_symbol(visitor, a, a.get_symbol(def), node),
+            // Analyze enum constants
             Node::DefEnum(def) => self.walk_symbol(visitor, a, a.get_symbol(def), node),
+            // Visit translation unit members and module members
             Node::DefModule(def) => self.walk_symbol(visitor, a, a.get_symbol(def), node),
+            // Analyze state machine members
             Node::DefStateMachine(def) => self.walk_symbol(visitor, a, a.get_symbol(def), node),
             _ => match self.mode {
                 NestedAnalyzerMode::SHALLOW => ControlFlow::Continue(()),

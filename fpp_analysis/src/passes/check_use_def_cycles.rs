@@ -8,6 +8,7 @@ use fpp_ast::*;
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 
+/// Check for use-def cycles
 pub struct CheckUseDefCycles<'ast> {
     super_: UseAnalyzer<'ast, Self>,
 }

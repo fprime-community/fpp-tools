@@ -7,6 +7,7 @@ use fpp_ast::{AstNode, Expr, ExprKind, Ident, Node, QualIdent, Visitable, Visito
 use fpp_core::Spanned;
 use std::ops::{ControlFlow, Deref};
 
+/// Match uses to their definitions
 pub struct CheckUses<'ast> {
     super_: BasicUseAnalyzer<'ast, Analysis, Self>,
 }
@@ -59,6 +60,7 @@ impl<'ast> CheckUses<'ast> {
         }
     }
 
+    /// Visit a qualified identifier node and check a use
     fn visit_qual_ident_impl(
         &self,
         a: &mut Analysis,
@@ -106,6 +108,7 @@ impl<'ast> CheckUses<'ast> {
     ) {
         let sym_qualified_name = a.get_qualified_name(sym);
         let iu_name = iu_name.to_string();
+        // Check that the name of the def matches the name of the use
         if sym_qualified_name != iu_name {
             let msg = if sym_qualified_name.len() < iu_name.len() {
                 // Definition has a shorter name: the use is a member of the definition

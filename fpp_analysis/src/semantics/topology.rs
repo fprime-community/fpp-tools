@@ -35,7 +35,9 @@ pub struct PendingTopPort {
 pub struct ConnectionPattern {
     pub loc: Span,
     pub kind: ConnectionPatternKind,
+    /// The source instance.
     pub source: (ComponentInstance, Span),
+    /// The target instances.
     pub targets: Vec<(ComponentInstance, Span)>,
 }
 
@@ -212,6 +214,7 @@ impl Topology {
         underlying: PortInstanceIdentifier,
         underlying_loc: Span,
     ) -> SemanticResult {
+        // Check that the topology port is for a general port
         if matches!(underlying.port_instance, PortInstance::Internal { .. }) {
             return Err(SemanticError::InvalidPortInstance {
                 loc,

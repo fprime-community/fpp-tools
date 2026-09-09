@@ -19,6 +19,7 @@ pub trait AstNode: fpp_core::Spanned + Sized {
     fn id(&self) -> fpp_core::Node;
 }
 
+/// Translation unit
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct TransUnit(pub Vec<ModuleMember>);
 
@@ -42,7 +43,7 @@ pub struct LitString {
     pub inner_span: fpp_core::Span,
 }
 
-/** Definition name */
+/// Definition name
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct Name {
@@ -50,7 +51,7 @@ pub struct Name {
     pub data: String,
 }
 
-/** Identifier */
+/// Identifier
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct Ident {
@@ -58,12 +59,14 @@ pub struct Ident {
     pub data: String,
 }
 
+/// Float type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FloatKind {
     F32,
     F64,
 }
 
+/// Int type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntegerKind {
     U8,
@@ -88,12 +91,14 @@ pub enum TypeNameKind {
     String(Option<Expr>),
 }
 
+/// Type name
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct TypeName {
     pub kind: TypeNameKind,
 }
 
+/// A qualified identifier
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct Qualified {
@@ -101,13 +106,16 @@ pub struct Qualified {
     pub name: Ident,
 }
 
+/// A possibly-qualified identifier
 #[ast]
 #[derive(Clone, VisitorWalkable)]
 pub enum QualIdent {
+    /// An unqualified identifier
     Unqualified(Ident),
     Qualified(Qualified),
 }
 
+/// Struct member
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct StructExprMember {
@@ -152,18 +160,21 @@ pub enum ExprKind {
     },
 }
 
+/// Expression
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct Expr {
     pub kind: ExprKind,
 }
 
+/// Formal parameter kind
 #[derive(Debug, Clone)]
 pub enum FormalParamKind {
     Ref,
     Value,
 }
 
+/// Formal parameter
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct FormalParam {
@@ -173,9 +184,10 @@ pub struct FormalParam {
     pub type_name: TypeName,
 }
 
+/// Formal parameter list
 pub type FormalParamList = Vec<FormalParam>;
 
-/** Binary operation */
+/// Binary operation
 #[derive(Debug, Clone)]
 pub enum Binop {
     Add,
@@ -186,19 +198,20 @@ pub enum Binop {
     RShift,
 }
 
+/// Unary operation
 #[derive(Debug, Clone)]
 pub enum Unop {
     Minus,
 }
 
-/** Abstract type definition */
+/// Abstract type definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefAbsType {
     pub name: Name,
 }
 
-/** Aliased type definition */
+/// Aliased type definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefAliasType {
@@ -208,7 +221,7 @@ pub struct DefAliasType {
     pub is_dictionary_def: bool,
 }
 
-/** Array definition */
+/// Array definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefArray {
@@ -222,6 +235,7 @@ pub struct DefArray {
     pub is_dictionary_def: bool,
 }
 
+/// Component kind
 #[derive(Debug, Clone)]
 pub enum ComponentKind {
     Active,
@@ -229,7 +243,7 @@ pub enum ComponentKind {
     Queued,
 }
 
-/** Component definition */
+/// Component definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefComponent {
@@ -239,7 +253,7 @@ pub struct DefComponent {
     pub members: Vec<ComponentMember>,
 }
 
-/** Component instance definition */
+/// Component instance definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefComponentInstance {
@@ -257,7 +271,7 @@ pub struct DefComponentInstance {
     pub init_specs: Vec<SpecInit>,
 }
 
-/** Init specifier */
+/// Init specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecInit {
@@ -266,7 +280,7 @@ pub struct SpecInit {
     pub code: LitString,
 }
 
-/** Constant definition */
+/// Constant definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefConstant {
@@ -276,7 +290,7 @@ pub struct DefConstant {
     pub is_dictionary_def: bool,
 }
 
-/** Enum definition */
+/// Enum definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefEnum {
@@ -288,7 +302,7 @@ pub struct DefEnum {
     pub is_dictionary_def: bool,
 }
 
-/** Enum constant definition */
+/// Enum constant definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefEnumConstant {
@@ -296,7 +310,7 @@ pub struct DefEnumConstant {
     pub value: Option<Expr>,
 }
 
-/** Module definition */
+/// Module definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefModule {
@@ -304,6 +318,7 @@ pub struct DefModule {
     pub members: Vec<ModuleMember>,
 }
 
+/// Module member
 #[ast]
 #[derive(AstAnnotated, Clone, DirectWalkable)]
 pub enum ModuleMember {
@@ -325,6 +340,7 @@ pub enum ModuleMember {
     SpecLoc(SpecLoc),
 }
 
+/// Location specifier kind
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SpecLocKind {
     Component,
@@ -337,7 +353,7 @@ pub enum SpecLocKind {
     Interface,
 }
 
-/** Location specifier */
+/// Location specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecLoc {
@@ -350,6 +366,7 @@ pub struct SpecLoc {
     pub is_dictionary_def: bool,
 }
 
+/// General port instance
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecGeneralPortInstance {
@@ -363,6 +380,7 @@ pub struct SpecGeneralPortInstance {
     pub queue_full: Option<QueueFull>,
 }
 
+/// Special port instance
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecSpecialPortInstance {
@@ -376,6 +394,7 @@ pub struct SpecSpecialPortInstance {
     pub queue_full: Option<QueueFull>,
 }
 
+/// Port instance specifier
 #[ast]
 #[derive(AstAnnotated, Clone, DirectWalkable)]
 pub enum SpecPortInstance {
@@ -383,7 +402,7 @@ pub enum SpecPortInstance {
     Special(SpecSpecialPortInstance),
 }
 
-/** Interface member */
+/// Interface member
 #[ast]
 #[derive(AstAnnotated, Clone, DirectWalkable)]
 pub enum InterfaceMember {
@@ -391,7 +410,7 @@ pub enum InterfaceMember {
     SpecInterfaceImport(SpecInterfaceImport),
 }
 
-/** Interface definition */
+/// Interface definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefInterface {
@@ -399,6 +418,7 @@ pub struct DefInterface {
     pub members: Vec<InterfaceMember>,
 }
 
+/// Struct type member
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct StructTypeMember {
@@ -409,7 +429,7 @@ pub struct StructTypeMember {
     pub format: Option<LitString>,
 }
 
-/** Struct definition */
+/// Struct definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefStruct {
@@ -420,6 +440,7 @@ pub struct DefStruct {
     pub is_dictionary_def: bool,
 }
 
+/// Port definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefPort {
@@ -428,7 +449,7 @@ pub struct DefPort {
     pub return_type: Option<TypeName>,
 }
 
-/** Include specifier */
+/// Include specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecInclude {
@@ -436,7 +457,7 @@ pub struct SpecInclude {
     pub file: LitString,
 }
 
-/** Import specifier */
+/// Import specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecInterfaceImport {

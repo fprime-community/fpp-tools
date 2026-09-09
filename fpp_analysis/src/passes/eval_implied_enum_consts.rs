@@ -7,6 +7,7 @@ use fpp_ast::{DefEnum, Node, Visitor};
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 
+/// Evaluate implied enum constants
 pub struct EvalImpliedEnumConsts<'ast> {
     super_: NestedAnalyzer<'ast, Analysis, Self>,
 }

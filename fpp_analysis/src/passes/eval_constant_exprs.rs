@@ -18,6 +18,7 @@ use rustc_hash::FxHashMap as HashMap;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
+/// Compute the values of constant symbols and expressions
 pub struct EvalConstantExprs<'ast> {
     super_: UseAnalyzer<'ast, Self>,
 }
@@ -284,7 +285,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     }
                     Some(_) => {
                         // If the entire dot expression was already resolved by
-                        // a constantUse, the value will already be in this map
+                        // a constant_use, the value will already be in this map
                         // No further work is needed
                     }
                 }
@@ -365,10 +366,15 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                 // serialized size.
                 FinalizeTypeDefs::new().ty(a, type_name);
                 if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
+                    // Get the finalized type. For a type with a definition,
+                    // the finalized type is mapped to the definition in the
+                    // type map; otherwise the type is already the finalized
+                    // type.
                     let finalized = match ty.def_node_id() {
                         Some(def_node) => a.type_map.get(&def_node).cloned().unwrap_or(ty),
                         None => ty,
                     };
+                    // Use the finalized type to compute the size
                     if let Some(size) = finalized.serialized_size(a) {
                         a.value_map
                             .insert(node.node_id, Value::Integer(IntegerValue(size)));

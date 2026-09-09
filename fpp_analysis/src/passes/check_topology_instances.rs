@@ -30,6 +30,7 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         node: &'ast DefTopology,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
+        // Topology is already in the map: nothing to do.
         if a.partial_topology_map.contains_key(&symbol) {
             return ControlFlow::Continue(());
         }
@@ -41,6 +42,7 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
             node.span(),
             node.implements.clone(),
         ));
+        // Visit topology members and compute the unresolved topology.
         let _ = node.walk(a, self);
         if let Some(top) = a.topology.take() {
             a.partial_topology_map.insert(symbol, top);

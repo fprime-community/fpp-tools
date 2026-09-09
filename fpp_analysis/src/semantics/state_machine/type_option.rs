@@ -107,18 +107,23 @@ impl TypeOption {
     }
 }
 
+/// Tests for the type-option rules used to type state-machine signals,
+/// actions, and guards. These follow the FPP spec section "Type Options"
+/// (docs/spec/Type-Options.adoc): "Conversion of Type Options" and
+/// "Computing a Common Type Option".
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::semantics::test_helpers::*;
     use fpp_ast::IntegerKind;
 
+    // Convenience: wrap a type as Some(t)
     fn some(t: Arc<Type>) -> TypeOptionT {
         Some(t)
     }
 
     /// Structural equality on type options: `None`/`None` and `Some`/`Some`
-    /// with structurally-equal types (mirrors Scala `==` on `Option[Type]`).
+    /// with structurally-equal types.
     fn option_eq(a: &TypeOptionT, b: &TypeOptionT) -> bool {
         match (a, b) {
             (None, None) => true,

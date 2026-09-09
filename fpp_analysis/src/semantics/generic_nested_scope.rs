@@ -3,6 +3,8 @@ use crate::semantics::generic_name_symbol_map::GenericNameSymbolMap;
 use fpp_util::EnumMap;
 use std::marker::PhantomData;
 
+/// A stack of scopes, from outermost to innermost. Each level is identified by the
+/// symbol whose scope is open there, with `None` marking the outermost (global) scope.
 #[derive(Debug, Clone)]
 pub struct GenericNestedScope<NG: Copy, S: SymbolInterface, M: EnumMap<NG, GenericNameSymbolMap<S>>>(
     Vec<Option<S>>,
@@ -13,6 +15,7 @@ pub struct GenericNestedScope<NG: Copy, S: SymbolInterface, M: EnumMap<NG, Gener
 impl<NG: Copy, S: SymbolInterface, M: EnumMap<NG, GenericNameSymbolMap<S>>>
     GenericNestedScope<NG, S, M>
 {
+    /// Create an empty nested scope, containing only the outermost scope
     pub fn new() -> Self {
         Self(vec![None], Default::default(), Default::default())
     }
@@ -22,6 +25,7 @@ impl<NG: Copy, S: SymbolInterface, M: EnumMap<NG, GenericNameSymbolMap<S>>>
         self.0.push(Some(symbol));
     }
 
+    /// Pop a scope off the stack
     pub fn pop(&mut self) {
         self.0.pop();
     }
@@ -32,6 +36,7 @@ impl<NG: Copy, S: SymbolInterface, M: EnumMap<NG, GenericNameSymbolMap<S>>>
         self.0.iter().rev().find_map(predicate)
     }
 
+    /// Get the innermost scope
     pub fn current(&self) -> &Option<S> {
         self.0.last().unwrap()
     }

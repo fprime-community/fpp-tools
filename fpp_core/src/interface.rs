@@ -260,14 +260,14 @@ impl<E: DiagnosticEmitter> CompilerInterface for RefContainer<'_, E> {
 }
 
 pub(crate) trait CompilerInterface {
-    /** Ast Node related functions */
+    /// Ast Node related functions
     fn node_add(&self, span: &Span) -> Node;
     fn node_span(&self, node: &Node) -> Span;
     fn node_pre_annotation(&self, node: &Node) -> Vec<String>;
     fn node_post_annotation(&self, node: &Node) -> Vec<String>;
     fn node_add_annotation(&self, node: &Node, pre: Vec<String>, post: Vec<String>);
 
-    /** Source file related functions */
+    /// Source file related functions
     fn file_new(&self, uri: &str, content: String, parent: Option<SourceFile>) -> SourceFile;
     fn file_uri(&self, file: &SourceFile) -> String;
     fn file_parent(&self, file: &SourceFile) -> Option<SourceFile>;
@@ -275,7 +275,7 @@ pub(crate) trait CompilerInterface {
     fn file_lines(&self, file: &SourceFile) -> Ref<'_, LineIndex>;
     fn file_len(&self, file: &SourceFile) -> usize;
 
-    /** Span related functions */
+    /// Span related functions
     fn span_add(
         &self,
         file: SourceFile,
@@ -289,10 +289,10 @@ pub(crate) trait CompilerInterface {
     fn span_file(&self, s: &Span) -> SourceFile;
     fn span_include_span(&self, s: &Span) -> Option<Span>;
 
-    /** Diagnostic related functions */
+    /// Diagnostic related functions
     fn diagnostic_emit(&self, diag: Diagnostic);
 
-    /** Garbage collection related functions */
+    /// Garbage collection related functions
     fn garbage_collection_start(&self);
     fn garbage_collection_finish(&self) -> GarbageCollectionSet;
     fn garbage_collection_cleanup(&self, gc: &GarbageCollectionSet);

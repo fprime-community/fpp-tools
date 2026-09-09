@@ -1,6 +1,6 @@
 use crate::*;
 
-/** Topology definition */
+/// Topology definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefTopology {
@@ -11,7 +11,7 @@ pub struct DefTopology {
     pub implements: Vec<QualIdent>,
 }
 
-/** System definition */
+/// System definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefSystem {
@@ -19,6 +19,7 @@ pub struct DefSystem {
     pub topology: QualIdent,
 }
 
+/// Topology member
 #[ast]
 #[derive(AstAnnotated, Clone, DirectWalkable)]
 pub enum TopologyMember {
@@ -30,12 +31,14 @@ pub enum TopologyMember {
     SpecTlmPacketSet(SpecTlmPacketSet),
 }
 
+/// Component instance specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecInstance {
     pub instance: QualIdent,
 }
 
+/// Port instance identifier
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct PortInstanceIdentifier {
@@ -43,6 +46,7 @@ pub struct PortInstanceIdentifier {
     pub port_name: Ident,
 }
 
+/// Connection
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct Connection {
@@ -65,6 +69,7 @@ pub enum ConnectionPatternKind {
     Time,
 }
 
+/// Connection graph specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecDirectConnectionGraph {
@@ -72,6 +77,7 @@ pub struct SpecDirectConnectionGraph {
     pub connections: Vec<Connection>,
 }
 
+/// Connection graph specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecPatternConnectionGraph {
@@ -81,6 +87,7 @@ pub struct SpecPatternConnectionGraph {
     pub targets: Vec<QualIdent>,
 }
 
+/// Telemetry channel identifier
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct TlmChannelIdentifier {
@@ -88,6 +95,7 @@ pub struct TlmChannelIdentifier {
     pub channel_name: Ident,
 }
 
+/// Topology port specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecTopPort {
@@ -95,6 +103,7 @@ pub struct SpecTopPort {
     pub underlying_port: PortInstanceIdentifier,
 }
 
+/// Telemetry packet set specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecTlmPacketSet {
@@ -103,6 +112,7 @@ pub struct SpecTlmPacketSet {
     pub omitted: Vec<TlmChannelIdentifier>,
 }
 
+/// Telemetry packet set member
 #[ast]
 #[derive(AstAnnotated, Clone, DirectWalkable)]
 pub enum TlmPacketSetMember {
@@ -110,6 +120,7 @@ pub enum TlmPacketSetMember {
     SpecTlmPacket(SpecTlmPacket),
 }
 
+/// Telemetry packet specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecTlmPacket {
@@ -119,6 +130,7 @@ pub struct SpecTlmPacket {
     pub members: Vec<TlmPacketMember>,
 }
 
+/// Telemetry packet member
 #[ast]
 #[derive(DirectWalkable, Clone)]
 pub enum TlmPacketMember {

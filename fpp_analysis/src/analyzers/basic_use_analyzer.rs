@@ -10,7 +10,7 @@ use std::ops::{ControlFlow, Deref};
 /// An extension of the standard [Visitor] trait that allows analyzing uses of symbols
 /// [BasicUseAnalyzer] or [super::UseAnalyzer] should be used in your pass for this to work properly
 pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
-    /** A use of a component definition */
+    /// A use of a component definition
     fn component_use(
         &self,
         a: &mut Self::State,
@@ -23,7 +23,7 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /** A use of an interface instance (topology def or component instance def) */
+    /// A use of an interface instance (topology def or component instance def)
     fn interface_instance_use(
         &self,
         a: &mut Self::State,
@@ -36,7 +36,7 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /** A use of a constant definition or enumerated constant definition */
+    /// A use of a constant definition or enumerated constant definition
     fn constant_use(
         &self,
         a: &mut Self::State,
@@ -49,7 +49,7 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /** A use of a port definition */
+    /// A use of a port definition
     fn port_use(
         &self,
         a: &mut Self::State,
@@ -62,7 +62,7 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /** An implied use of a port definition (from a special port instance) */
+    /// An implied use of a port definition (from a special port instance)
     fn implied_port_use(
         &self,
         a: &mut Self::State,
@@ -72,7 +72,7 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         self.port_use(a, node, name)
     }
 
-    /** An implied use of a type definition (e.g. `FwSizeStoreType` for strings) */
+    /// An implied use of a type definition (e.g. `FwSizeStoreType` for strings)
     fn implied_type_use(
         &self,
         a: &mut Self::State,
@@ -85,8 +85,8 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /** An implied use of a constant definition (e.g. `FW_FIXED_LENGTH_STRING_SIZE`
-     * for default-size strings) */
+    /// An implied use of a constant definition (e.g. `FW_FIXED_LENGTH_STRING_SIZE`
+    /// for default-size strings)
     fn implied_constant_use(
         &self,
         a: &mut Self::State,
@@ -99,7 +99,7 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /** A use of an interface definition */
+    /// A use of an interface definition
     fn interface_use(
         &self,
         a: &mut Self::State,
@@ -112,7 +112,7 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /** A use of a type definition */
+    /// A use of a type definition
     fn type_use(
         &self,
         a: &mut Self::State,
@@ -125,7 +125,7 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /** A use of a state machine definition*/
+    /// A use of a state machine definition
     fn state_machine_use(
         &self,
         a: &mut Self::State,
@@ -139,6 +139,8 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
     }
 }
 
+/// Basic use analysis
+/// Assumes all qualified identifiers are constant uses
 pub struct BasicUseAnalyzer<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> {
     super_: NestedAnalyzer<'ast, S, V>,
     phantom_data: PhantomData<S>,
@@ -160,6 +162,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
         }
     }
 
+    /// Gets a qualified name from a dot expression
     pub(crate) fn expr_to_qualified_name(&self, e: &Expr) -> Option<QualifiedName> {
         fn name_opt(e: &Expr, mut qualifier: VecDeque<String>) -> Option<QualifiedName> {
             match &e.kind {
@@ -189,6 +192,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                 ci.walk(a, visitor)
             }
             Node::DefTopology(t) => {
+                // Visit port interface uses in the implements clause
                 for i in &t.implements {
                     visitor.interface_use(a, i, i.into())?;
                 }

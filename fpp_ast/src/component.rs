@@ -1,5 +1,6 @@
 use crate::*;
 
+/// Component member
 #[ast]
 #[derive(AstAnnotated, Clone, DirectWalkable)]
 pub enum ComponentMember {
@@ -31,7 +32,7 @@ pub enum InputPortKind {
     Sync,
 }
 
-/** Queue full behavior */
+/// Queue full behavior
 #[derive(Debug, Clone)]
 pub enum QueueFull {
     Assert,
@@ -40,6 +41,7 @@ pub enum QueueFull {
     Hook,
 }
 
+/// Command specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecCommand {
@@ -53,6 +55,7 @@ pub struct SpecCommand {
     pub queue_full: Option<QueueFull>,
 }
 
+/// Container specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecContainer {
@@ -61,6 +64,7 @@ pub struct SpecContainer {
     pub default_priority: Option<Expr>,
 }
 
+/// Event severity
 #[derive(Debug, Clone)]
 pub enum EventSeverity {
     ActivityHigh,
@@ -79,6 +83,7 @@ pub struct EventThrottle {
     pub every: Option<Expr>,
 }
 
+/// Event specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecEvent {
@@ -92,7 +97,7 @@ pub struct SpecEvent {
     pub throttle: Option<EventThrottle>,
 }
 
-/** Internal port specifier */
+/// Internal port specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecInternalPort {
@@ -103,6 +108,7 @@ pub struct SpecInternalPort {
     pub queue_full: Option<QueueFull>,
 }
 
+/// Parameter specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecParam {
@@ -116,12 +122,14 @@ pub struct SpecParam {
     pub is_external: bool,
 }
 
+/// General port instance kind
 #[derive(Debug, Clone)]
 pub enum GeneralPortInstanceKind {
     Input(InputPortKind),
     Output,
 }
 
+/// Special port instance kind
 #[derive(Debug, Clone)]
 pub enum SpecialPortInstanceKind {
     CommandRecv,
@@ -160,6 +168,7 @@ impl std::fmt::Display for SpecialPortInstanceKind {
     }
 }
 
+/// Port matching specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecPortMatching {
@@ -167,6 +176,7 @@ pub struct SpecPortMatching {
     pub port2: Ident,
 }
 
+/// Record specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecRecord {
@@ -177,6 +187,7 @@ pub struct SpecRecord {
     pub id: Option<Expr>,
 }
 
+/// State machine instance spec
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecStateMachineInstance {
@@ -187,12 +198,14 @@ pub struct SpecStateMachineInstance {
     pub queue_full: Option<QueueFull>,
 }
 
+/// Telemetry update
 #[derive(Debug, Clone)]
 pub enum TlmChannelUpdate {
     Always,
     OnChange,
 }
 
+/// Telemetry limit kind
 #[derive(Debug, Clone)]
 pub enum TlmChannelLimitKind {
     Red,
@@ -200,6 +213,7 @@ pub enum TlmChannelLimitKind {
     Yellow,
 }
 
+/// Telemetry limit
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct TlmChannelLimit {
@@ -208,6 +222,7 @@ pub struct TlmChannelLimit {
     pub value: Expr,
 }
 
+/// Telemetry channel specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecTlmChannel {

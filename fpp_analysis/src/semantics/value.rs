@@ -6,6 +6,7 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
+/// An FPP value
 #[derive(Debug, Clone)]
 pub enum Value {
     PrimitiveInteger(PrimitiveIntegerValue),
@@ -34,6 +35,7 @@ impl Value {
         )
     }
 
+    /// Convert this value to a type
     pub fn convert(&self, ty_a: &Arc<Type>) -> Option<Value> {
         match (self.convert_impl(ty_a), self.is_promotable_to_aggregate()) {
             (Some(value), _) => Some(value),
@@ -85,6 +87,7 @@ impl Value {
         }
     }
 
+    /// Convert this value to a distinct type
     fn convert_impl(&self, ty_a: &Arc<Type>) -> Option<Value> {
         let ty = Type::underlying_type(ty_a);
 
@@ -216,6 +219,7 @@ impl Value {
         }
     }
 
+    /// Generic binary operation
     fn binop(
         &self,
         other: &Value,
@@ -312,6 +316,7 @@ impl Value {
         }
     }
 
+    /// Add two values
     pub fn add(&self, other: &Value) -> MathResult {
         // String concatenation
         if let (Value::String(StringValue(left)), Value::String(StringValue(right))) = (self, other)
@@ -325,6 +330,7 @@ impl Value {
         )
     }
 
+    /// Divide one value by another
     pub fn div(&self, other: &Value) -> MathResult {
         self.binop(
             other,
@@ -345,6 +351,7 @@ impl Value {
         )
     }
 
+    /// Multiply two values
     pub fn mul(&self, other: &Value) -> MathResult {
         self.binop(
             other,
@@ -353,6 +360,7 @@ impl Value {
         )
     }
 
+    /// Subtract one value from another
     pub fn sub(&self, other: &Value) -> MathResult {
         self.binop(
             other,
@@ -387,9 +395,9 @@ impl Value {
             Value::Array(ArrayValue { ty, .. }) => ty.clone(),
             Value::Struct(StructValue { ty, .. }) => ty.clone(),
             Value::AnonArray(AnonArrayValue { elements }) => {
-                // Mirrors Scala `AnonArray.getType`, which reads the element type
-                // from the first element (an anon-array value is never empty in
-                // practice, since it is built from a non-empty literal).
+                // Reads the element type from the first element (an anon-array
+                // value is never empty in practice, since it is built from a
+                // non-empty literal).
                 let elt_type = elements
                     .first()
                     .map(|e| e.get_type())
@@ -412,8 +420,9 @@ impl Value {
     }
 
     /// Whether this value is zero, for purposes of division. Floats use an
-    /// epsilon comparison (Scala `Float.EPSILON`).
+    /// epsilon comparison.
     pub fn is_zero(&self) -> bool {
+        // Epsilon for nearness to zero
         const EPSILON: f64 = 0.0000001;
         match self {
             Value::PrimitiveInteger(PrimitiveIntegerValue { value, .. })
@@ -450,13 +459,13 @@ impl Value {
     }
 
     /// Left-shifts an integer value by another. Returns `None` unless both
-    /// operands are integers or enums (Scala `<<`).
+    /// operands are integers or enums.
     pub fn shl(&self, other: &Value) -> Option<Value> {
         self.int_shift_op(other, |v, s| v << s)
     }
 
     /// Right-shifts an integer value by another. Returns `None` unless both
-    /// operands are integers or enums (Scala `>>`).
+    /// operands are integers or enums.
     pub fn shr(&self, other: &Value) -> Option<Value> {
         self.int_shift_op(other, |v, s| v >> s)
     }
@@ -534,7 +543,7 @@ impl Value {
 }
 
 /// Truncates an integer to the width and signedness of `kind`, wrapping modulo
-/// the type's range (mirrors Scala `PrimitiveInt.truncate`).
+/// the type's range.
 fn truncate_int(value: i128, kind: IntegerKind) -> i128 {
     match kind {
         IntegerKind::I8 => value as i8 as i128,
@@ -578,46 +587,46 @@ pub enum MathError {
 
 pub type MathResult = Result<Value, MathError>;
 
-/** Primitive integer values */
+/// Primitive integer values
 #[derive(Debug, Clone)]
 pub struct PrimitiveIntegerValue {
     pub value: i128,
     pub kind: fpp_ast::IntegerKind,
 }
 
-/** Integer values */
+/// Integer values
 #[derive(Debug, Clone)]
 pub struct IntegerValue(pub i128);
 
-/** Floating-point values */
+/// Floating-point values
 #[derive(Debug, Clone)]
 pub struct FloatValue {
     pub value: f64,
     pub kind: FloatKind,
 }
 
-/** Boolean values */
+/// Boolean values
 #[derive(Debug, Clone)]
 pub struct BooleanValue(pub bool);
 
-/** String values */
+/// String values
 #[derive(Debug, Clone)]
 pub struct StringValue(pub String);
 
-/** Anonymous array values */
+/// Anonymous array values
 #[derive(Debug, Clone)]
 pub struct AnonArrayValue {
     pub elements: Vec<Value>,
 }
 
-/** Array values */
+/// Array values
 #[derive(Debug, Clone)]
 pub struct ArrayValue {
     pub anon_array: AnonArrayValue,
     pub ty: Arc<Type>,
 }
 
-/** Enum constant values */
+/// Enum constant values
 #[derive(Debug, Clone)]
 pub struct EnumConstantValue {
     pub value: (String, i128),
@@ -649,17 +658,20 @@ impl EnumConstantValue {
     }
 }
 
+/// Anonymous struct values
 #[derive(Debug, Clone)]
 pub struct AnonStructValue {
     pub members: HashMap<String, Value>,
 }
 
+/// Struct values
 #[derive(Debug, Clone)]
 pub struct StructValue {
     pub anon_struct: AnonStructValue,
     pub ty: Arc<Type>,
 }
 
+/// An abstract type
 #[derive(Debug, Clone)]
 pub struct AbsTypeValue {
     pub ty: Arc<Type>,

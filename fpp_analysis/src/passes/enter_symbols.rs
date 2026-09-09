@@ -6,6 +6,7 @@ use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
+/// Enter symbols into their scopes
 pub struct EnterSymbols;
 
 impl EnterSymbols {

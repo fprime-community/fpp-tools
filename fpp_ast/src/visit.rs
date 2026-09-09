@@ -124,6 +124,7 @@ pub trait Visitor<'ast>: Sized {
         node.walk(a, self)
     }
 
+    /// Visit a list of translation units in sequence, threading state
     fn visit_trans_units(
         &self,
         a: &mut Self::State,

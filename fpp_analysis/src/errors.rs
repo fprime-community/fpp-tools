@@ -7,8 +7,10 @@ pub struct SymbolUse {
     pub use_loc: Span,
 }
 
+/// A semantic error
 #[derive(Debug)]
 pub enum SemanticError {
+    /// Redefined symbol
     RedefinedSymbol {
         /// Name of the symbol being redefined
         name: String,
@@ -17,36 +19,43 @@ pub enum SemanticError {
         /// Location of the previous symbol that is clashing
         prev_loc: Span,
     },
+    /// Undefined symbol
     UndefinedSymbol {
         ng: String,
         name: String,
         loc: Span,
     },
+    /// Use-def cycle
     UseDefCycle {
         loc: Span,
         cycle: Vec<SymbolUse>,
     },
+    /// Invalid symbol
     InvalidSymbol {
         symbol_name: String,
         msg: String,
         loc: Span,
         def_loc: Span,
     },
+    /// Invalid type
     InvalidType {
         loc: Span,
         msg: String,
     },
+    /// Invalid qualifier
     InvalidQualifier {
         loc: Span,
         msg: String,
         def_loc: Span,
         def_msg: String,
     },
+    /// Duplicate struct member
     DuplicateStructMember {
         name: String,
         loc: Span,
         prev_loc: Span,
     },
+    /// Duplicate parameter
     DuplicateParameter {
         name: String,
         loc: Span,
@@ -57,6 +66,7 @@ pub enum SemanticError {
         msg: String,
         err: Box<TypeConversionError>,
     },
+    /// Empty array
     EmptyArray {
         loc: Span,
     },
@@ -66,22 +76,27 @@ pub enum SemanticError {
     EnumConstantShouldBeExplicit {
         loc: Span,
     },
+    /// Duplicate enum value
     DuplicateEnumConstant {
         value: i128,
         loc: Span,
         prev_loc: Span,
     },
+    /// Invalid integer value
     InvalidIntValue {
         loc: Span,
         v: Option<i128>,
         msg: String,
     },
+    /// Division by zero
     DivisionByZero {
         loc: Span,
     },
+    /// Invalid shift amount
     InvalidShiftAmount {
         loc: Span,
     },
+    /// A member-selection expression names a member that does not exist on the type
     InvalidTypeForMemberSelection {
         loc: Span,
         member: String,
@@ -107,30 +122,37 @@ pub enum SemanticError {
         value_size: usize,
         type_size: i128,
     },
+    /// Invalid array size
     InvalidArraySize {
         loc: Span,
         size: i128,
     },
+    /// Invalid priority specifier
     InvalidPriority {
         loc: Span,
     },
+    /// Invalid queue full specifier
     InvalidQueueFull {
         loc: Span,
     },
+    /// Invalid special port
     InvalidSpecialPort {
         loc: Span,
         msg: String,
     },
+    /// Invalid port instance
     InvalidPortInstance {
         loc: Span,
         msg: String,
         def_loc: Span,
     },
+    /// Duplicate interface
     DuplicateInterface {
         name: String,
         loc: Span,
         prev_loc: Span,
     },
+    /// Duplicate port instance
     DuplicatePortInstance {
         name: String,
         loc: Span,
@@ -138,49 +160,59 @@ pub enum SemanticError {
         prev_loc: Span,
         prev_import_locs: Vec<Span>,
     },
+    /// Error while importing an interface
     InterfaceImport {
         loc: Span,
         inner: Box<SemanticError>,
     },
+    /// Passive async input
     PassiveAsync {
         loc: Span,
         import_locs: Vec<Span>,
     },
+    /// Duplicate opcode value
     DuplicateOpcodeValue {
         value: String,
         loc: Span,
         prev_loc: Span,
     },
+    /// Duplicate ID value
     DuplicateIdValue {
         value: String,
         loc: Span,
         prev_loc: Span,
     },
+    /// Duplicate state machine instance
     DuplicateStateMachineInstance {
         name: String,
         loc: Span,
         prev_loc: Span,
     },
+    /// Duplicate telemetry channel limit
     DuplicateLimit {
         loc: Span,
         prev_loc: Span,
     },
+    /// Duplicate name in dictionary
     DuplicateDictionaryName {
         kind: String,
         name: String,
         loc: Span,
         prev_loc: Span,
     },
+    /// Duplicate init specifier
     DuplicateInitSpecifier {
         phase: i128,
         loc: Span,
         prev_loc: Span,
     },
+    /// Missing port
     MissingPort {
         loc: Span,
         spec_msg: String,
         port_msg: String,
     },
+    /// Missing async input
     MissingAsync {
         kind: String,
         loc: Span,
@@ -188,36 +220,44 @@ pub enum SemanticError {
     PassiveStateMachine {
         loc: Span,
     },
+    /// Invalid data products
     InvalidDataProducts {
         loc: Span,
         msg: String,
     },
+    /// Invalid command
     InvalidCommand {
         loc: Span,
         msg: String,
     },
+    /// Invalid event
     InvalidEvent {
         loc: Span,
         msg: String,
     },
+    /// Invalid internal port
     InvalidInternalPort {
         loc: Span,
         msg: String,
     },
+    /// Invalid port matching
     InvalidPortMatching {
         loc: Span,
         msg: String,
     },
+    /// Invalid telemetry channel identifier name
     InvalidTlmChannelName {
         loc: Span,
         name: String,
         component_name: String,
     },
+    /// Invalid component instance definition
     InvalidDefComponentInstance {
         name: String,
         loc: Span,
         msg: String,
     },
+    /// Overlapping ID ranges
     OverlappingIdRanges {
         base_id1: i128,
         name1: String,
@@ -227,6 +267,7 @@ pub enum SemanticError {
         name2: String,
         loc2: Span,
     },
+    /// Duplicate instance
     DuplicateInstance {
         name: String,
         loc: Span,
@@ -243,11 +284,13 @@ pub enum SemanticError {
         name: String,
         msg: String,
     },
+    /// Invalid interface instance
     InvalidInterfaceInstance {
         loc: Span,
         instance_name: String,
         top_name: String,
     },
+    /// Invalid connection
     InvalidConnection {
         loc: Span,
         msg: String,
@@ -256,17 +299,20 @@ pub enum SemanticError {
         from_port_def_loc: Option<Span>,
         to_port_def_loc: Option<Span>,
     },
+    /// Invalid port instance identifier
     InvalidPortInstanceId {
         loc: Span,
         port_name: String,
         instance_type: String,
         interface_name: String,
     },
+    /// Invalid port kind
     InvalidPortKind {
         loc: Span,
         msg: String,
         spec_loc: Span,
     },
+    /// Invalid port number
     InvalidPortNumber {
         loc: Span,
         port_number: i128,
@@ -277,6 +323,7 @@ pub enum SemanticError {
     MissingPortMatching {
         loc: Span,
     },
+    /// Incorrect location specifiers
     IncorrectLocationPath {
         /// Location of the file string literal in the location specifier
         loc: Span,
@@ -285,6 +332,7 @@ pub enum SemanticError {
         /// Location of the actual definition (in the translation unit)
         actual_loc: Span,
     },
+    /// Inconsistent location specifiers
     InconsistentLocationPath {
         /// Location of the first specifier's file string literal
         loc: Span,
@@ -295,29 +343,34 @@ pub enum SemanticError {
         /// The path named by the second specifier
         prev_path: String,
     },
+    /// Incorrect dictionary specifier in location specifier
     IncorrectDictionarySpecifier {
         /// Location of the location specifier
         loc: Span,
         /// Location of the actual definition
         def_loc: Span,
     },
+    /// Inconsistent dictionary specifiers in location specifiers
     InconsistentDictionarySpecifier {
         /// Location of the location specifier
         loc: Span,
         /// Location of the previous specifier
         prev_loc: Span,
     },
+    /// Duplicate output port
     DuplicateOutputConnection {
         loc: Span,
         port_num: i128,
         prev_loc: Span,
     },
+    /// Too many output ports
     TooManyOutputPorts {
         loc: Span,
         num_ports: i128,
         array_size: i128,
         instance_loc: Span,
     },
+    /// Mismatched port numbers
     MismatchedPortNumbers {
         p1_loc: Span,
         p1_number: i128,
@@ -325,6 +378,7 @@ pub enum SemanticError {
         p2_number: i128,
         matching_loc: Span,
     },
+    /// Implicit duplicate connection at matched port
     ImplicitDuplicateConnectionAtMatchedPort {
         loc: Span,
         port: String,
@@ -333,20 +387,24 @@ pub enum SemanticError {
         matching_loc: Span,
         prev_loc: Span,
     },
+    /// Matched port numbering could not find a valid port number
     NoPortAvailableForMatchedNumbering {
         loc1: Span,
         loc2: Span,
         matching_loc: Span,
     },
+    /// Missing connection
     MissingConnection {
         loc: Span,
         matching_loc: Span,
     },
+    /// Duplicate matched connection
     DuplicateMatchedConnection {
         loc: Span,
         prev_loc: Span,
         matching_loc: Span,
     },
+    /// Duplicate connection at matched port
     DuplicateConnectionAtMatchedPort {
         loc: Span,
         port: String,
@@ -354,21 +412,26 @@ pub enum SemanticError {
         prev_loc: Span,
         matching_loc: Span,
     },
+    /// Invalid connection pattern
     InvalidPattern {
         loc: Span,
         msg: String,
     },
+    /// A port is missing from a port interface
     PortInterfaceMissingPort {
         loc: Span,
     },
+    /// A port does not match an expected signature
     PortInterfaceInvalidPort {
         loc: Span,
         def_loc: Span,
     },
+    /// Error while checking whether an instance implements an interface
     InterfaceImplements {
         loc: Span,
         inner: Box<SemanticError>,
     },
+    /// Duplicate pattern
     DuplicatePattern {
         kind: String,
         loc: Span,
@@ -418,9 +481,11 @@ pub enum SemanticError {
     },
 }
 
+/// The result of a compilation step
 pub type SemanticResult<T = ()> = Result<T, SemanticError>;
 
 impl SemanticError {
+    /// Print the error
     pub fn emit(self) {
         Into::<Diagnostic>::into(self).emit();
     }

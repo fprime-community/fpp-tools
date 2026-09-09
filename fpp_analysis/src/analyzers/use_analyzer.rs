@@ -5,6 +5,8 @@ use crate::semantics::Symbol;
 use fpp_ast::{AstNode, ExprKind, Node, Visitable};
 use std::ops::ControlFlow;
 
+/// Analyze uses
+/// This analyzer assumes that CheckUses has already been run to populate the use-def map
 pub struct UseAnalyzer<'ast, V: UseAnalysisPass<'ast, Analysis>> {
     super_: BasicUseAnalyzer<'ast, Analysis, V>,
 }
@@ -30,6 +32,7 @@ impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Analyzer<'ast, V> for UseAnalyzer
                 match &expr.kind {
                     ExprKind::Dot { e, .. } => {
                         match a.use_def_map.get(&expr.id()) {
+                            // expr is a use, so it must be a constant use
                             Some(Symbol::Constant(_) | Symbol::EnumConstant(_)) => {
                                 let use_name = self
                                     .super_
@@ -42,6 +45,7 @@ impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Analyzer<'ast, V> for UseAnalyzer
                                 // Analyze the left-hand expression representing the struct value
                                 e.visit(a, visitor)
                             }
+                            // Some other kind of symbol, which should not occur here
                             Some(_) => ControlFlow::Continue(()),
                         }
                     }

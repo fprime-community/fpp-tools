@@ -19,6 +19,8 @@ use rustc_hash::FxHashMap as HashMap;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
+/// Compute and check expression types, except for array sizes
+/// and default values
 pub struct CheckExprTypes<'ast> {
     super_: UseAnalyzer<'ast, Self>,
 }
@@ -400,7 +402,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                     .emit(),
                 }
             }
-            ExprKind::Ident(_) => {} // already handled by constantUse
+            ExprKind::Ident(_) => {} // already handled by constant_use
             ExprKind::LiteralBool(_) => {
                 a.type_map.insert(node.node_id, Arc::new(Type::Boolean));
             }
@@ -684,6 +686,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
             // Enum symbol: if this is in scope, then we are in
             // the enum definition, so it already has a type
             Symbol::EnumConstant(_) => {}
+            // Invalid use of a symbol in an expression
             _ => {
                 SemanticError::InvalidSymbol {
                     symbol_name: symbol.name().data.clone(),

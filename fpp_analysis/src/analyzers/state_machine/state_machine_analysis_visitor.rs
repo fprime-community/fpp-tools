@@ -59,15 +59,14 @@ pub trait StateMachineAnalysisVisitor {
         self.default(sma)
     }
 
-    /// Analyze a state definition. The default behavior comes from
-    /// `StateAnalyzer`: push the state name onto the scope name list, visit
-    /// the members, and restore the scope name list.
+    /// Analyze a state definition: push the state name onto the scope name
+    /// list, visit the members, and restore the scope name list.
     fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
         self.state_analyzer_def_state(sma, node)
     }
 
-    /// The `StateAnalyzer` implementation of `def_state`, available to
-    /// passes that override `def_state` and need to call `super`.
+    /// The default implementation of `def_state`, available to passes that
+    /// override `def_state` and need to invoke the default behavior directly.
     fn state_analyzer_def_state(
         &self,
         sma: &mut StateMachineAnalysis,

@@ -142,7 +142,9 @@ impl Ord for InterfaceInstance {
 /// A resolved FPP port instance identifier.
 #[derive(Debug, Clone)]
 pub struct PortInstanceIdentifier {
+    /// The interface instance.
     pub interface_instance: InterfaceInstance,
+    /// The port instance.
     pub port_instance: PortInstance,
 }
 
@@ -158,6 +160,7 @@ impl PartialOrd for PortInstanceIdentifier {
     }
 }
 impl Ord for PortInstanceIdentifier {
+    /// Compare two port instance identifiers.
     fn cmp(&self, other: &Self) -> Ordering {
         self.qualified_name().cmp(&other.qualified_name())
     }
@@ -268,11 +271,13 @@ impl Endpoint {
     /// component-instance port.
     pub fn get_underlying_endpoint(&self, a: &Analysis) -> Endpoint {
         match &self.port.interface_instance {
+            // This endpoint is already a component instance
             InterfaceInstance::Component(_) => self.clone(),
             InterfaceInstance::Topology(_) => {
                 let Some(top) = self.port.interface_instance.as_topology(a) else {
                     return self.clone();
                 };
+                // Look up the mapping for this port instance
                 let name = self.port.port_instance.get_unqualified_name();
                 match top.port_map.get(name) {
                     Some(tp) => {
@@ -282,6 +287,7 @@ impl Endpoint {
                             port_number: self.port_number,
                             topology_port: Some(Box::new(self.clone())),
                         };
+                        // Recursively resolve the endpoint to a component instance
                         next.get_underlying_endpoint(a)
                     }
                     None => self.clone(),
@@ -311,7 +317,9 @@ impl Endpoint {
 /// A resolved FPP connection.
 #[derive(Debug, Clone)]
 pub struct Connection {
+    /// The from endpoint.
     pub from: Endpoint,
+    /// The to endpoint.
     pub to: Endpoint,
     pub is_unmatched: bool,
 }
@@ -328,6 +336,7 @@ impl PartialOrd for Connection {
     }
 }
 impl Ord for Connection {
+    /// Compare two connections.
     fn cmp(&self, other: &Self) -> Ordering {
         self.from
             .cmp(&other.from)

@@ -1,5 +1,6 @@
 use crate::*;
 
+/// State machine definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefStateMachine {
@@ -7,6 +8,7 @@ pub struct DefStateMachine {
     pub members: Option<Vec<StateMachineMember>>,
 }
 
+/// State machine member
 #[ast]
 #[derive(AstAnnotated, Clone, DirectWalkable)]
 pub enum StateMachineMember {
@@ -25,7 +27,7 @@ pub enum StateMachineMember {
     SpecInitialTransition(SpecInitialTransition),
 }
 
-/** Action definition */
+/// Action definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefAction {
@@ -33,7 +35,7 @@ pub struct DefAction {
     pub type_name: Option<TypeName>,
 }
 
-/** Choice definition */
+/// Choice definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefChoice {
@@ -43,7 +45,7 @@ pub struct DefChoice {
     pub else_transition: TransitionExpr,
 }
 
-/** Guard definition */
+/// Guard definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefGuard {
@@ -51,7 +53,7 @@ pub struct DefGuard {
     pub type_name: Option<TypeName>,
 }
 
-/** Transition expression */
+/// Transition expression
 #[ast]
 #[derive(Debug, Clone, VisitorWalkable)]
 pub struct TransitionExpr {
@@ -59,7 +61,7 @@ pub struct TransitionExpr {
     pub target: QualIdent,
 }
 
-/** Signal definition */
+/// Signal definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefSignal {
@@ -67,6 +69,7 @@ pub struct DefSignal {
     pub type_name: Option<TypeName>,
 }
 
+/// State definition
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct DefState {
@@ -74,6 +77,7 @@ pub struct DefState {
     pub members: Vec<StateMember>,
 }
 
+/// State member
 #[ast]
 #[derive(AstAnnotated, Clone, DirectWalkable)]
 pub enum StateMember {
@@ -86,28 +90,28 @@ pub enum StateMember {
     SpecStateTransition(SpecStateTransition),
 }
 
-/** Initial state specifier */
+/// Initial state specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecInitialTransition {
     pub transition: TransitionExpr,
 }
 
-/** State entry specifier */
+/// State entry specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecStateEntry {
     pub actions: DoExpr,
 }
 
-/** State exit specifier */
+/// State exit specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecStateExit {
     pub actions: DoExpr,
 }
 
-/** Transition specifier */
+/// Transition specifier
 #[ast]
 #[derive(AstAnnotated, Clone, VisitorWalkable)]
 pub struct SpecStateTransition {
@@ -122,7 +126,7 @@ pub struct DoExpr {
     pub actions: Vec<Ident>,
 }
 
-/** Transition or do within transition specifier */
+/// Transition or do within transition specifier
 #[derive(Debug, Clone, DirectWalkable)]
 pub enum TransitionOrDo {
     Transition(TransitionExpr),

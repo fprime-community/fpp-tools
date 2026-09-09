@@ -42,6 +42,7 @@ pub enum FormatPart {
     FormatReplacement(FormatReplacementField),
 }
 
+/// An FPP presentation format
 #[derive(Debug, Clone)]
 pub struct Format(pub Vec<FormatPart>);
 
@@ -80,6 +81,7 @@ impl Format {
                     FormatReplacementKind::Rational { kind, precision } => {
                         match *precision {
                             None => {}
+                            // The maximum allowed precision is 100
                             Some(precision) if precision > 100 => {
                                 SemanticError::FormatStringInvalidPrecision {
                                     loc: format_spec.span,
@@ -142,6 +144,7 @@ impl Format {
     }
 }
 
+/// Parses a format string into a format
 struct FormatParser<'a> {
     parent_span: fpp_core::Span,
     pos: BytePos,

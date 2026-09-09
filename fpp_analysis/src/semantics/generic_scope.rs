@@ -4,6 +4,7 @@ use crate::semantics::generic_name_symbol_map::GenericNameSymbolMap;
 use fpp_util::EnumMap;
 use std::marker::PhantomData;
 
+/// A generic collection of name-symbol maps, one for each name group
 #[derive(Debug, Clone, Copy)]
 pub struct GenericScope<NG, S: SymbolInterface, M: EnumMap<NG, GenericNameSymbolMap<S>>>(
     M,
@@ -31,6 +32,7 @@ impl<NG, S: SymbolInterface, M: EnumMap<NG, GenericNameSymbolMap<S>>> GenericSco
         self.0.get_mut(name_group).put(symbol)
     }
 
+    /// Get the name-symbol map for a name group
     pub fn get_group(&self, name_group: NG) -> &GenericNameSymbolMap<S> {
         self.0.get(name_group)
     }

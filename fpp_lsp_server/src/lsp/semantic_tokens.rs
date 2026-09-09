@@ -137,7 +137,20 @@ impl SemanticTokensState {
             result_id: Some(id),
             data: vec![],
         };
-        self.raw.sort_by(|a, b| a.0.ordering(b.0));
+
+        // The semantic token stream forbids overlapping ranges.
+        self.raw
+            .sort_by(|(a, _), (b, _)| a.start().cmp(&b.start()).then(b.end().cmp(&a.end())));
+        let mut deduped: Vec<(TextRange, SemanticTokenKind)> = Vec::with_capacity(self.raw.len());
+        let mut last_end = TextRange::default().end();
+        for (range, kind) in self.raw {
+            if range.start() < last_end {
+                continue;
+            }
+            last_end = range.end();
+            deduped.push((range, kind));
+        }
+        self.raw = deduped;
 
         let mut last = LineCol { line: 0, col: 0 };
 
@@ -193,19 +206,17 @@ impl SemanticTokensState {
 
                 let delta_line = line - last.line;
                 let delta_start = if delta_line == 0 {
-                    // Same line, offset the start position
-
-                    assert!(
-                        start_col > last.col || tokens.data.is_empty(),
-                        "semantic tokens overlap: {}:{} (last) | {}:{}..{}:{} ({:?})",
-                        last.line,
-                        last.col,
-                        line,
-                        start_col,
-                        line,
-                        end_col,
-                        kind
-                    );
+                    // Same line, offset the start position. The dedup above
+                    // guarantees non-overlapping, start-ordered ranges, so this
+                    // invariant should always hold
+                    if !(start_col > last.col || tokens.data.is_empty()) {
+                        debug_assert!(
+                            false,
+                            "semantic tokens overlap: {}:{} (last) | {}:{}..{}:{} ({:?})",
+                            last.line, last.col, line, start_col, line, end_col, kind
+                        );
+                        continue;
+                    }
 
                     start_col - last.col
                 } else {

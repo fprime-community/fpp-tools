@@ -16,6 +16,7 @@ pub enum Direction {
 }
 
 impl Direction {
+    /// Show a direction option.
     pub fn show(dir: &Option<Direction>) -> &'static str {
         match dir {
             Some(Direction::Input) => "input",
@@ -86,6 +87,7 @@ pub enum GeneralKind {
 /// An FPP port instance.
 #[derive(Debug, Clone)]
 pub enum PortInstance {
+    /// A general port instance.
     General {
         node_id: Node,
         loc: Span,
@@ -95,6 +97,7 @@ pub enum PortInstance {
         ty: PortInstanceType,
         import_locs: Vec<Span>,
     },
+    /// A special port instance.
     Special {
         node_id: Node,
         loc: Span,
@@ -124,6 +127,7 @@ pub enum PortInstance {
 }
 
 impl PortInstance {
+    /// Gets the unqualified name of the port instance.
     pub fn get_unqualified_name(&self) -> &str {
         match self {
             PortInstance::General { name, .. }
@@ -133,6 +137,7 @@ impl PortInstance {
         }
     }
 
+    /// Gets the location of the port instance.
     pub fn get_loc(&self) -> Span {
         match self {
             PortInstance::General { loc, .. }
@@ -142,6 +147,7 @@ impl PortInstance {
         }
     }
 
+    /// Gets the node ID of the port instance.
     pub fn get_node_id(&self) -> Node {
         match self {
             PortInstance::General { node_id, .. }
@@ -151,6 +157,7 @@ impl PortInstance {
         }
     }
 
+    /// Gets the size of the port array.
     pub fn get_array_size(&self) -> i128 {
         match self {
             PortInstance::General { size, .. } => *size,
@@ -159,6 +166,7 @@ impl PortInstance {
         }
     }
 
+    /// Gets the direction of the port instance.
     pub fn get_direction(&self) -> Option<Direction> {
         match self {
             PortInstance::General { kind, .. } => Some(match kind {
@@ -176,6 +184,7 @@ impl PortInstance {
         }
     }
 
+    /// Gets the type of the port instance.
     pub fn get_type(&self) -> Option<PortInstanceType> {
         match self {
             PortInstance::General { ty, .. } => Some(ty.clone()),
@@ -185,6 +194,7 @@ impl PortInstance {
         }
     }
 
+    /// Gets the special kind of the port instance, if any.
     pub fn get_special_kind(&self) -> Option<SpecialPortInstanceKind> {
         match self {
             PortInstance::Special { kind, .. } => Some(kind.clone()),
@@ -281,6 +291,10 @@ impl PortInstance {
         }
     }
 
+    /// Gets the locations of the import specifiers (if this port was imported).
+    /// The first item is the import of the parent interface. The final item is
+    /// the import into the component. All the in-between locs are for imports
+    /// into other interfaces.
     pub fn get_import_locs(&self) -> &[Span] {
         match self {
             PortInstance::General { import_locs, .. }
@@ -296,6 +310,7 @@ impl PortInstance {
             PortInstance::General { import_locs, .. }
             | PortInstance::Special { import_locs, .. }
             | PortInstance::Internal { import_locs, .. } => import_locs.push(import_loc),
+            // Topology ports cannot be imported.
             PortInstance::Topology { .. } => {}
         }
         clone
@@ -321,19 +336,24 @@ impl PortInstance {
             specifier.kind,
             GeneralPortInstanceKind::Input(InputPortKind::Async)
         ) {
+            // Check the priority specifier
             if let Some(priority) = &specifier.priority {
                 return Err(SemanticError::InvalidPriority {
                     loc: priority.span(),
                 });
             }
+            // Check the queue full specifier
             if specifier.queue_full.is_some() {
                 return Err(SemanticError::InvalidQueueFull { loc });
             }
         }
 
+        // Get the size
         let size = a.get_array_size_opt(&specifier.size)?;
+        // Get the priority
         let priority = a.get_big_int_value_opt(&specifier.priority);
 
+        // Get the type
         let ty = match &specifier.port {
             Some(qid) => match a.use_def_map.get(&qid.id()) {
                 Some(symbol @ Symbol::Port(_)) => PortInstanceType::DefPort(symbol.clone()),
@@ -392,6 +412,7 @@ impl PortInstance {
         };
 
         let kind_string = specifier.kind.to_string();
+        // Check the input kind
         match (&specifier.input_kind, &specifier.kind) {
             (Some(_), SpecialPortInstanceKind::ProductRecv) => {}
             (Some(_), _) => {
@@ -410,16 +431,19 @@ impl PortInstance {
         }
 
         if !matches!(specifier.input_kind, Some(InputPortKind::Async)) {
+            // Check the priority specifier
             if let Some(priority) = &specifier.priority {
                 return Err(SemanticError::InvalidPriority {
                     loc: priority.span(),
                 });
             }
+            // Check the queue full specifier
             if specifier.queue_full.is_some() {
                 return Err(SemanticError::InvalidQueueFull { loc });
             }
         }
 
+        // Get the priority
         let priority = a.get_big_int_value_opt(&specifier.priority);
         let queue_full = match specifier.kind {
             SpecialPortInstanceKind::ProductRecv => {
@@ -466,6 +490,7 @@ impl PortInstance {
     }
 }
 
+/// Checks general async input port specifiers.
 fn check_general_async_input(instance: &PortInstance) -> SemanticResult {
     if let PortInstance::General {
         loc,
@@ -487,8 +512,11 @@ fn check_general_async_input(instance: &PortInstance) -> SemanticResult {
 /// A set of port instances (shared by interfaces and components).
 #[derive(Debug, Clone)]
 pub struct PortInterface {
+    /// The type of interface instance this port interface represents.
     pub instance_type: String,
+    /// The map from port names to port instances.
     pub port_map: HashMap<String, PortInstance>,
+    /// The map from special port kinds to special port instances.
     pub special_port_map: HashMap<String, PortInstance>,
 }
 
@@ -570,9 +598,11 @@ impl PortInterface {
     /// Check that `self` implements `other`: every port (general and special)
     /// in `other` exists in `self` with a matching signature.
     pub fn implements(&self, other: &PortInterface) -> SemanticResult {
+        // Check all the ports in `other` to make sure they exist and match `self`
         for (name, pi) in &other.port_map {
             match self.port_map.get(name) {
                 Some(found) => {
+                    // Port exists, make sure it matches theirs
                     if !found.signature_eq(pi) {
                         return Err(SemanticError::PortInterfaceInvalidPort {
                             loc: found.get_loc(),
@@ -588,6 +618,7 @@ impl PortInterface {
         for (kind, pi) in &other.special_port_map {
             match self.special_port_map.get(kind) {
                 Some(found) => {
+                    // The port exists, make sure it's the same as theirs
                     if !found.signature_eq(pi) {
                         return Err(SemanticError::PortInterfaceInvalidPort {
                             loc: found.get_loc(),
@@ -630,9 +661,11 @@ impl PortInterface {
 /// An FPP interface.
 #[derive(Debug, Clone)]
 pub struct Interface {
+    /// The symbol defining the interface.
     pub symbol: Symbol,
     /// Imported interfaces: symbol -> (import node, import location).
     pub import_map: HashMap<Symbol, (Node, Span)>,
+    /// The port interface of the component.
     pub port_interface: PortInterface,
 }
 
@@ -645,6 +678,7 @@ impl Interface {
         }
     }
 
+    /// Add a port instance.
     pub fn add_port_instance(&self, instance: PortInstance) -> SemanticResult<Interface> {
         let pi = self.port_interface.add_port_instance(instance)?;
         let mut result = self.clone();

@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 /// Structural equality on `Value` (which does not derive `PartialEq`).
 ///
-/// Mirrors how the Scala `ValueSpec` compares values with case-class `==`.
 /// Floats use exact `f64` equality because every test uses whole/half numbers.
 fn values_eq(a: &Value, b: &Value) -> bool {
     match (a, b) {
@@ -80,8 +79,7 @@ fn members_eq(m1: &FxHashMap<String, Value>, m2: &FxHashMap<String, Value>) -> b
             .all(|(name, v1)| m2.get(name).is_some_and(|v2| values_eq(v1, v2)))
 }
 
-/// The anon-struct value `{ a = U32(0), b = String("") }`
-/// (mirrors Scala `Values.anonStruct`).
+/// The anon-struct value `{ a = U32(0), b = String("") }`.
 fn anon_struct_val() -> Value {
     let mut m: FxHashMap<String, Value> = FxHashMap::default();
     m.insert("a".to_string(), v_u32(0));
@@ -89,8 +87,7 @@ fn anon_struct_val() -> Value {
     Value::AnonStruct(AnonStructValue { members: m })
 }
 
-/// The array value `[ I32(0), I32(0), I32(0) ]: A` (mirrors Scala
-/// `Values.array = Array(defaultAnonArray3I32, Types.defaultArray)`).
+/// The array value `[ I32(0), I32(0), I32(0) ]: A`.
 fn array_val() -> Value {
     Value::Array(ArrayValue {
         anon_array: AnonArrayValue {
@@ -100,9 +97,7 @@ fn array_val() -> Value {
     })
 }
 
-/// The struct value `{ a = U32(0), b = String("") }: S` (mirrors Scala
-/// `Values.struct = Struct(anonStruct, structType)`, where
-/// `structType = struct("S", anonStructType, 3)`).
+/// The struct value `{ a = U32(0), b = String("") }: S`.
 fn struct_val() -> Value {
     let mut m: FxHashMap<String, Value> = FxHashMap::default();
     m.insert("a".to_string(), v_u32(0));
@@ -114,8 +109,7 @@ fn struct_val() -> Value {
 }
 
 /// Drives a table of `(lhs, rhs, expected)` cases through a binary op.
-/// `Some(v)` means the Scala `Some(v)` result (`Ok` with `values_eq`);
-/// `None` means the Scala `None` result (`Err`).
+/// `Some(v)` means `Ok` (checked with `values_eq`); `None` means `Err`.
 #[track_caller]
 fn check_binop(
     op_name: &str,
@@ -260,8 +254,6 @@ fn value_div() {
 
 // ---------------------------------------------------------------------------
 // "convert to type" should ...
-//
-// Scala `value.convertToType(t)`; Rust `value.convert(&t)`.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -335,8 +327,8 @@ fn value_convert_to_type() {
 }
 
 // ---------------------------------------------------------------------------
-// Additional coverage: conversion paths and `Display` not reached by the
-// direct ValueSpec port above.
+// Additional coverage: conversion paths and `Display` not otherwise
+// exercised by the cases above.
 // ---------------------------------------------------------------------------
 
 /// A scalar promotes to a *named* array/struct target, yielding a `Value::Array`
@@ -468,10 +460,9 @@ fn value_display() {
 }
 
 // ---------------------------------------------------------------------------
-// "getType" should ...
+// "get_type" should ...
 //
-// Scala `value.getType`; Rust `value.get_type()`. Compared with
-// `types_structurally_eq`.
+// Compared with `types_structurally_eq`.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -533,7 +524,6 @@ fn value_get_type() {
 // ---------------------------------------------------------------------------
 // "lshift" / "rshift" should ...
 //
-// Scala `<<` / `>>`; Rust `value.shl(&other)` / `value.shr(&other)`.
 // `Some(v)` => `Some` (compared with `values_eq`); `None` => `None`.
 // ---------------------------------------------------------------------------
 
