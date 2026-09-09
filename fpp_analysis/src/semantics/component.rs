@@ -548,11 +548,7 @@ impl Component {
     }
 
     /// Add a command
-    pub fn add_command(
-        &self,
-        opcode_opt: Option<i128>,
-        command: Command,
-    ) -> SemanticResult<Component> {
+    pub fn add_command(&mut self, opcode_opt: Option<i128>, command: Command) -> SemanticResult {
         let opcode = opcode_opt.unwrap_or(self.default_opcode);
         if let Some(prev) = self.command_map.get(&opcode) {
             return Err(SemanticError::DuplicateOpcodeValue {
@@ -561,17 +557,13 @@ impl Component {
                 prev_loc: prev.loc,
             });
         }
-        let mut c = self.clone();
-        c.command_map.insert(opcode, command);
-        c.default_opcode = opcode + 1;
-        Ok(c)
+        self.command_map.insert(opcode, command);
+        self.default_opcode = opcode + 1;
+        Ok(())
     }
 
     /// Add a state machine instance
-    pub fn add_state_machine_instance(
-        &self,
-        instance: StateMachineInstance,
-    ) -> SemanticResult<Component> {
+    pub fn add_state_machine_instance(&mut self, instance: StateMachineInstance) -> SemanticResult {
         if let Some(prev) = self.state_machine_instance_map.get(&instance.name) {
             return Err(SemanticError::DuplicateStateMachineInstance {
                 name: instance.name.clone(),
@@ -579,93 +571,74 @@ impl Component {
                 prev_loc: prev.loc,
             });
         }
-        let mut c = self.clone();
-        c.state_machine_instance_map
+        self.state_machine_instance_map
             .insert(instance.name.clone(), instance);
-        Ok(c)
+        Ok(())
     }
 
     /// Add a data product container
-    pub fn add_container(
-        &self,
-        id_opt: Option<i128>,
-        container: Container,
-    ) -> SemanticResult<Component> {
-        let (map, next) = add_element_to_id_map(
-            &self.container_map,
+    pub fn add_container(&mut self, id_opt: Option<i128>, container: Container) -> SemanticResult {
+        let next = add_element_to_id_map(
+            &mut self.container_map,
             id_opt.unwrap_or(self.default_container_id),
             container,
             |c| c.loc,
         )?;
-        let mut c = self.clone();
-        c.container_map = map;
-        c.default_container_id = next;
-        Ok(c)
+        self.default_container_id = next;
+        Ok(())
     }
 
     /// Add an event
-    pub fn add_event(&self, id_opt: Option<i128>, event: Event) -> SemanticResult<Component> {
-        let (map, next) = add_element_to_id_map(
-            &self.event_map,
+    pub fn add_event(&mut self, id_opt: Option<i128>, event: Event) -> SemanticResult {
+        let next = add_element_to_id_map(
+            &mut self.event_map,
             id_opt.unwrap_or(self.default_event_id),
             event,
             |e| e.loc,
         )?;
-        let mut c = self.clone();
-        c.event_map = map;
-        c.default_event_id = next;
-        Ok(c)
+        self.default_event_id = next;
+        Ok(())
     }
 
     /// Add a data product record
-    pub fn add_record(&self, id_opt: Option<i128>, record: Record) -> SemanticResult<Component> {
-        let (map, next) = add_element_to_id_map(
-            &self.record_map,
+    pub fn add_record(&mut self, id_opt: Option<i128>, record: Record) -> SemanticResult {
+        let next = add_element_to_id_map(
+            &mut self.record_map,
             id_opt.unwrap_or(self.default_record_id),
             record,
             |r| r.loc,
         )?;
-        let mut c = self.clone();
-        c.record_map = map;
-        c.default_record_id = next;
-        Ok(c)
+        self.default_record_id = next;
+        Ok(())
     }
 
     /// Add a telemetry channel
-    pub fn add_tlm_channel(
-        &self,
-        id_opt: Option<i128>,
-        channel: TlmChannel,
-    ) -> SemanticResult<Component> {
+    pub fn add_tlm_channel(&mut self, id_opt: Option<i128>, channel: TlmChannel) -> SemanticResult {
         let name = channel.name.clone();
-        let (map, next) = add_element_to_id_map(
-            &self.tlm_channel_map,
+        let next = add_element_to_id_map(
+            &mut self.tlm_channel_map,
             id_opt.unwrap_or(self.default_tlm_channel_id),
             channel.clone(),
             |t| t.loc,
         )?;
-        let mut c = self.clone();
-        c.tlm_channel_map = map;
         // Add the channel to the channel name map. If there is a duplicate
         // name, we will catch it later when we check all the dictionary
         // elements.
-        c.tlm_channel_name_map.insert(name, channel);
-        c.default_tlm_channel_id = next;
-        Ok(c)
+        self.tlm_channel_name_map.insert(name, channel);
+        self.default_tlm_channel_id = next;
+        Ok(())
     }
 
     /// Add a parameter
-    pub fn add_param(&self, id_opt: Option<i128>, param: Param) -> SemanticResult<Component> {
+    pub fn add_param(&mut self, id_opt: Option<i128>, param: Param) -> SemanticResult {
         // Update the parameter map and the default parameter ID.
-        let (map, next) = add_element_to_id_map(
-            &self.param_map,
+        let next = add_element_to_id_map(
+            &mut self.param_map,
             id_opt.unwrap_or(self.default_param_id),
             param.clone(),
             |p| p.loc,
         )?;
-        let mut c = self.clone();
-        c.param_map = map;
-        c.default_param_id = next;
+        self.default_param_id = next;
         // Add the implicit set and save commands.
         let upper = param.name.to_uppercase();
         let set_command = Command {
@@ -678,36 +651,32 @@ impl Component {
             name: format!("{}_PRM_SAVE", upper),
             kind: None,
         };
-        let c = c.add_command(Some(param.set_opcode), set_command)?;
-        let c = c.add_command(Some(param.save_opcode), save_command)?;
-        Ok(c)
+        self.add_command(Some(param.set_opcode), set_command)?;
+        self.add_command(Some(param.save_opcode), save_command)?;
+        Ok(())
     }
 
     /// Add a port instance
-    pub fn add_port_instance(&self, instance: PortInstance) -> SemanticResult<Component> {
+    pub fn add_port_instance(&mut self, instance: PortInstance) -> SemanticResult {
         let pi = self.port_interface.add_port_instance(instance)?;
-        let mut c = self.clone();
-        c.port_interface = pi;
-        Ok(c)
+        self.port_interface = pi;
+        Ok(())
     }
 
     pub fn add_imported_interface(
-        &self,
+        &mut self,
         interface: &crate::semantics::Interface,
         import_loc: Span,
-    ) -> SemanticResult<Component> {
+    ) -> SemanticResult {
         let pi = self
             .port_interface
             .add_imported_interface(interface, import_loc)?;
-        let mut c = self.clone();
-        c.port_interface = pi;
-        Ok(c)
+        self.port_interface = pi;
+        Ok(())
     }
 
-    pub fn add_spec_port_matching(&self, node: Arc<SpecPortMatching>) -> Component {
-        let mut c = self.clone();
-        c.spec_port_matching_list.push(node);
-        c
+    pub fn add_spec_port_matching(&mut self, node: Arc<SpecPortMatching>) {
+        self.spec_port_matching_list.push(node);
     }
 
     /// Complete a component definition.
@@ -938,12 +907,12 @@ impl Component {
 }
 
 /// Add an element to an id map, returning the updated map and the next default id
-fn add_element_to_id_map<T: Clone>(
-    map: &HashMap<i128, T>,
+fn add_element_to_id_map<T>(
+    map: &mut HashMap<i128, T>,
     id: i128,
     element: T,
     get_loc: impl Fn(&T) -> Span,
-) -> SemanticResult<(HashMap<i128, T>, i128)> {
+) -> SemanticResult<i128> {
     if let Some(prev) = map.get(&id) {
         return Err(SemanticError::DuplicateIdValue {
             value: display_id_value(id),
@@ -951,9 +920,8 @@ fn add_element_to_id_map<T: Clone>(
             prev_loc: get_loc(prev),
         });
     }
-    let mut m = map.clone();
-    m.insert(id, element);
-    Ok((m, id + 1))
+    map.insert(id, element);
+    Ok(id + 1)
 }
 
 /// Checks for duplicate names in dictionary.
