@@ -3,7 +3,7 @@
 # yields one wheel per platform for CPython >= 3.10. The generated type stub
 # (`python/fpp_python/__init__.pyi`) and `py.typed` marker ship alongside.
 [build-system]
-requires = ["maturin>=1.7,<2.0"]
+requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
 
 [project]

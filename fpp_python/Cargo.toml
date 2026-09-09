@@ -1,6 +1,5 @@
 # Native PyO3 bindings to the FPP compiler, packaged as the `fpp_python` wheel
-# (import `fpp_python`). Built with maturin; ships an `abi3` extension usable on
-# CPython >= 3.10. Not published to crates.io — the distribution is the wheel.
+# `import fpp_python`
 [package]
 name = "fpp_python"
 description = "Native Python bindings to the FPP compiler (PyO3)"
@@ -36,12 +35,12 @@ bindgen = ["dep:syn", "dep:serde_json", "dep:rustdoc-json", "dep:rustdoc-types"]
 stubgen = []
 
 [dependencies]
-# abi3-py310: a single wheel per platform covers CPython >= 3.10.
-pyo3 = { version = "0.25", features = ["abi3-py310", "multiple-pymethods"] }
-
-# Generates `__init__.pyi` from the actual pyclasses (single source of truth).
-# 0.13.x is the release line built against pyo3 0.25; 0.14+ requires pyo3 0.26.
-pyo3-stub-gen = "0.13"
+# abi3-py310: a single wheel per platform covers CPython >= 3.10. 0.29 supports
+# CPython up to 3.15.
+pyo3 = { version = "0.29", features = ["abi3-py310", "multiple-pymethods"] }
+pyo3-stub-gen = { version = "0.23", default-features = false, features = [
+    "infer_signature",
+] }
 
 # Attribute macros that remove wrapper boilerplate (in-workspace proc-macro crate).
 fpp_python_macros = { path = "../fpp_python_macros", version = "=0.0.0" }

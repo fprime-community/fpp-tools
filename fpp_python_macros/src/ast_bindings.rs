@@ -625,7 +625,7 @@ fn child_item_ty(conv: &ChildConv) -> TokenStream {
 fn child_build(conv: &ChildConv, model_tok: &TokenStream, id_tok: TokenStream) -> TokenStream {
     match conv {
         ChildConv::Node(t) => quote! {
-            Model::build(#model_tok, py, #id_tok)?.into_bound(py).into_any().downcast_into::<#t>()?.unbind()
+            Model::build(#model_tok, py, #id_tok)?.into_bound(py).into_any().cast_into::<#t>()?.unbind()
         },
         ChildConv::Union(r) => quote! {
             #r(Model::build(#model_tok, py, #id_tok)?.into_any())
@@ -854,7 +854,7 @@ fn emit_visitor_method(py_name: &str, param_ty: &proc_macro2::Ident) -> TokenStr
     let py_method = format!("visit_{}", py_name);
     quote! {
         #[pyo3(name = #py_method)]
-        fn #fn_id(slf: PyRef<'_, Self>, node: &Bound<'_, #param_ty>) -> PyResult<PyObject> {
+        fn #fn_id(slf: PyRef<'_, Self>, node: &Bound<'_, #param_ty>) -> PyResult<Py<PyAny>> {
             NodeVisitor::delegate_to_generic_visit(slf, node.as_any())
         }
     }
@@ -1011,7 +1011,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
             }
         }
         kind_wrappers.push(quote! {
-            pub struct #refty(PyObject);
+            pub struct #refty(Py<PyAny>);
             pyo3_stub_gen::impl_stub_type!(#refty = #(#variant_wids)|*);
             impl<'py> IntoPyObject<'py> for #refty {
                 type Target = PyAny;
@@ -1040,7 +1040,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
         }
         let refty = union_ref_ident(name);
         union_wrappers.push(quote! {
-            pub struct #refty(PyObject);
+            pub struct #refty(Py<PyAny>);
             pyo3_stub_gen::impl_stub_type!(#refty = #(#members)|*);
             impl<'py> IntoPyObject<'py> for #refty {
                 type Target = PyAny;
@@ -1081,7 +1081,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
         register_calls.push(quote!(m.add_class::<#ety>()?;));
         leaf_defs.push(quote! {
             #[gen_stub_pyclass_enum]
-            #[pyclass(eq, eq_int, frozen, hash)]
+            #[pyclass(eq, eq_int, frozen, hash, skip_from_py_object)]
             #[derive(Clone, Copy, PartialEq, Eq, Hash)]
             pub enum #ety { #(#variant_ids,)* }
             impl ::std::convert::From<&fpp_ast::#nat> for #ety {

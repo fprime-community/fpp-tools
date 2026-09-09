@@ -90,7 +90,7 @@ impl NodeVisitor {
 
     /// Invoke `self.generic_visit(node)` *through Python*, so a subclass's
     /// `generic_visit` override applies.
-    fn call_generic_visit(this: &Bound<'_, Self>, node: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+    fn call_generic_visit(this: &Bound<'_, Self>, node: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         Ok(this.call_method1("generic_visit", (node,))?.unbind())
     }
 
@@ -101,7 +101,7 @@ impl NodeVisitor {
     pub(crate) fn delegate_to_generic_visit(
         slf: PyRef<'_, Self>,
         node: &Bound<'_, PyAny>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         Self::call_generic_visit(&Self::into_bound(slf), node)
     }
 }
@@ -122,7 +122,7 @@ impl NodeVisitor {
     /// method, falling back to `generic_visit` when there is none.
     ///
     /// Returns whatever the dispatched method returned.
-    fn visit(slf: PyRef<'_, Self>, node: &Bound<'_, AstNode>) -> PyResult<PyObject> {
+    fn visit(slf: PyRef<'_, Self>, node: &Bound<'_, AstNode>) -> PyResult<Py<PyAny>> {
         let method = format!("visit_{}", node.get_type().name()?);
         let this = Self::into_bound(slf);
         match this.getattr(method.as_str()) {
@@ -141,7 +141,7 @@ impl NodeVisitor {
     /// `fpp_ast::Visitor::super_visit`. Children are the AST nodes reached
     /// through `node`'s fields (see `AstNode.children`); values returned by the
     /// children are discarded.
-    fn generic_visit(slf: PyRef<'_, Self>, node: &Bound<'_, AstNode>) -> PyResult<PyObject> {
+    fn generic_visit(slf: PyRef<'_, Self>, node: &Bound<'_, AstNode>) -> PyResult<Py<PyAny>> {
         let py = slf.py();
         // `AstNode` is `frozen`, so reading its fields needs no borrow guard —
         // nothing is held across the re-entrant `visit` calls below.

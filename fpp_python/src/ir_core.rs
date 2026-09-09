@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 /// A resolved source location (0-indexed line/column, matching `fpp_core`).
 #[gen_stub_pyclass]
-#[pyclass(frozen, get_all)]
+#[pyclass(frozen, get_all, skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct Loc {
     pub uri: String,
@@ -49,7 +49,7 @@ impl Loc {
 /// actually read, and `__eq__`/`__hash__` operate on the raw handle — so a `Span`
 /// is a cheap, context-free value usable as a `dict` key.
 #[gen_stub_pyclass]
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 #[derive(Clone)]
 pub struct Span {
     data: Arc<ModelData>,
@@ -104,7 +104,7 @@ impl Span {
     }
 
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
-        match other.downcast::<Span>() {
+        match other.cast::<Span>() {
             Ok(o) => self.span == o.borrow().span,
             Err(_) => false,
         }
@@ -162,15 +162,7 @@ impl<K: pyo3_stub_gen::PyStubType, V: pyo3_stub_gen::PyStubType> pyo3_stub_gen::
     for DictStub<K, V>
 {
     fn type_output() -> pyo3_stub_gen::TypeInfo {
-        let k = K::type_output();
-        let v = V::type_output();
-        let mut import = k.import;
-        import.extend(v.import);
-        import.insert("builtins".into());
-        pyo3_stub_gen::TypeInfo {
-            name: format!("builtins.dict[{}, {}]", k.name, v.name),
-            import,
-        }
+        pyo3_stub_gen::TypeInfo::dict_of::<K, V>()
     }
 }
 

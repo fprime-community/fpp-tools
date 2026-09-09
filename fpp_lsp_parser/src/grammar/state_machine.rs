@@ -261,14 +261,12 @@ fn transition_or_do(p: &mut Parser) {
             // Do expr
             m.abandon(p);
         }
+    } else if p.eat(ENTER_KW) {
+        qual_ident(p);
+        m.complete(p, TRANSITION_EXPR);
     } else {
-        if p.eat(ENTER_KW) {
-            qual_ident(p);
-            m.complete(p, TRANSITION_EXPR);
-        } else {
-            m.abandon(p);
-            p.error("expected transition or do expression")
-        }
+        m.abandon(p);
+        p.error("expected transition or do expression")
     }
 }
 

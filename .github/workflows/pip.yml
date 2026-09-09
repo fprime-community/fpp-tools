@@ -37,10 +37,6 @@ jobs:
             dir: fpp_format
           - name: fprime-fpp-python
             dir: fpp_python
-    # Harmless for the `bin` packages; lets the abi3 `fpp_python` build proceed on
-    # a runner Python newer than the pinned pyo3 knows about.
-    env:
-      PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

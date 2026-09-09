@@ -260,13 +260,7 @@ impl Shape {
         match self {
             Shape::Bool | Shape::I128 | Shape::F64 => quote!(*#vref),
             Shape::Usize => quote!((*#vref as i128)),
-            // `to_string` accepts both `&String` (owned fields) and `&str`
-            // (method returns like `PortInstance::get_unqualified_name`).
             Shape::Str => quote!((#vref).to_string()),
-            // The dense id of a node. A node absent from the id table — one never
-            // recorded during the walk — yields `0`, conflating "unrecorded" with
-            // the node whose id is 0. Left as-is (the id type stays `u32`); every
-            // node reachable through the semantic layer is recorded in practice.
             Shape::Node => quote!(#data.ids.get(#vref).copied().unwrap_or(0)),
             // `#vref` is a `&Span`; clone the backing model, deref the `Copy` span.
             Shape::Span => {
@@ -286,10 +280,6 @@ impl Shape {
                 }
             }
             Shape::RewrapRef(name, variant) => {
-                // Build through the union's dispatching builder (which boxes the
-                // concrete subclass at runtime), then downcast to that subclass —
-                // the native value is statically this variant's payload, so the
-                // downcast is infallible. Mirrors the `AstDef` downcast pattern.
                 let build = union_build_fn(name);
                 let sub = rewrap_subclass(reg, name, variant);
                 let info = reg
@@ -311,7 +301,7 @@ impl Shape {
                     #built
                         .into_bound(py)
                         .into_any()
-                        .downcast_into::<crate::sem::#sub>()?
+                        .cast_into::<crate::sem::#sub>()?
                         .unbind()
                 }
             }
@@ -327,7 +317,7 @@ impl Shape {
                 crate::model::Model::build(#model, py, #vref.node_id)?
                     .into_bound(py)
                     .into_any()
-                    .downcast_into::<crate::ast::#id>()?
+                    .cast_into::<crate::ast::#id>()?
                     .unbind()
             },
             Shape::Opt(s) => {
@@ -1688,7 +1678,7 @@ fn emit_union_identity(u: &UnionDecl) -> TokenStream {
         Identity::None => quote!(),
         Identity::Node => quote! {
             fn __eq__(&self, other: &::pyo3::Bound<'_, ::pyo3::PyAny>) -> bool {
-                match other.downcast::<#base>() {
+                match other.cast::<#base>() {
                     ::std::result::Result::Ok(o) => self.#accessor == o.borrow().#accessor,
                     ::std::result::Result::Err(_) => false,
                 }
@@ -1699,7 +1689,7 @@ fn emit_union_identity(u: &UnionDecl) -> TokenStream {
         },
         Identity::Identical(eq_fn, node_id) => quote! {
             fn __eq__(&self, other: &::pyo3::Bound<'_, ::pyo3::PyAny>) -> bool {
-                match other.downcast::<#base>() {
+                match other.cast::<#base>() {
                     ::std::result::Result::Ok(o) => {
                         #native::#eq_fn(&self.#accessor, &o.borrow().#accessor)
                     }
@@ -1834,7 +1824,7 @@ fn emit_union(
     // The `*Ref` return newtype: runtime object is the concrete subclass; its
     // stub type renders as the union alias.
     let ref_newtype = quote! {
-        pub struct #ref_ty(pub ::pyo3::PyObject);
+        pub struct #ref_ty(pub ::pyo3::Py<::pyo3::PyAny>);
         impl<'py> ::pyo3::IntoPyObject<'py> for #ref_ty {
             type Target = ::pyo3::PyAny;
             type Output = ::pyo3::Bound<'py, ::pyo3::PyAny>;
@@ -1945,7 +1935,7 @@ fn emit_entity_identity(e: &EntityDecl, field: &Ident) -> Vec<TokenStream> {
         EntityIdentity::None => Vec::new(),
         EntityIdentity::Node => vec![quote! {
             fn __eq__(&self, other: &::pyo3::Bound<'_, ::pyo3::PyAny>) -> bool {
-                match other.downcast::<#py>() {
+                match other.cast::<#py>() {
                     ::std::result::Result::Ok(o) => self.#field == o.borrow().#field,
                     ::std::result::Result::Err(_) => false,
                 }
@@ -1956,7 +1946,7 @@ fn emit_entity_identity(e: &EntityDecl, field: &Ident) -> Vec<TokenStream> {
         }],
         EntityIdentity::QualifiedName(method) => vec![quote! {
             fn __eq__(&self, other: &::pyo3::Bound<'_, ::pyo3::PyAny>) -> bool {
-                match other.downcast::<#py>() {
+                match other.cast::<#py>() {
                     ::std::result::Result::Ok(o) => {
                         self.#field.#method() == o.borrow().#field.#method()
                     }
@@ -1972,7 +1962,7 @@ fn emit_entity_identity(e: &EntityDecl, field: &Ident) -> Vec<TokenStream> {
         }],
         EntityIdentity::RawHandle => vec![quote! {
             fn __eq__(&self, other: &::pyo3::Bound<'_, ::pyo3::PyAny>) -> bool {
-                match other.downcast::<#py>() {
+                match other.cast::<#py>() {
                     ::std::result::Result::Ok(o) => self.#field == o.borrow().#field,
                     ::std::result::Result::Err(_) => false,
                 }
@@ -2134,7 +2124,7 @@ fn emit_leaf_enum(e: &LeafEnumDecl) -> (TokenStream, TokenStream) {
     });
     let def = quote! {
         #[::pyo3_stub_gen::derive::gen_stub_pyclass_enum]
-        #[::pyo3::pyclass(eq, eq_int, frozen, hash)]
+        #[::pyo3::pyclass(eq, eq_int, frozen, hash, skip_from_py_object)]
         #[derive(Clone, Copy, PartialEq, Eq, Hash)]
         pub enum #py {
             #(#variant_idents),*

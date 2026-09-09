@@ -28,10 +28,12 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 /// stub render `str | list[str]` instead of the `Any` a bare `Bound<PyAny>` gives.
 pub struct Paths(Vec<String>);
 
-impl<'py> FromPyObject<'py> for Paths {
-    fn extract_bound(obj: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> FromPyObject<'_, 'py> for Paths {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
         // Before the iterable protocol: a `str` is itself iterable, over its chars.
-        if let Ok(s) = obj.downcast::<PyString>() {
+        if let Ok(s) = obj.cast::<PyString>() {
             return Ok(Paths(vec![s.extract()?]));
         }
         let mut paths = Vec::new();
@@ -46,10 +48,7 @@ impl<'py> FromPyObject<'py> for Paths {
 
 impl pyo3_stub_gen::PyStubType for Paths {
     fn type_output() -> pyo3_stub_gen::TypeInfo {
-        pyo3_stub_gen::TypeInfo {
-            name: "builtins.str | builtins.list[builtins.str]".into(),
-            import: ["builtins".into()].into_iter().collect(),
-        }
+        pyo3_stub_gen::TypeInfo::builtin("str") | pyo3_stub_gen::TypeInfo::list_of::<String>()
     }
 }
 
@@ -159,7 +158,7 @@ fn run_off_gil(
     sources: Vec<(String, String)>,
     depth: Depth,
 ) -> PyResult<(ModelData, Vec<OwnedDiagnostic>)> {
-    py.allow_threads(move || catch_unwind(AssertUnwindSafe(move || run_pipeline(sources, depth))))
+    py.detach(move || catch_unwind(AssertUnwindSafe(move || run_pipeline(sources, depth))))
         .map_err(|_| PyRuntimeError::new_err("internal FPP compiler panic"))
 }
 
