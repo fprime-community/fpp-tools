@@ -2,7 +2,7 @@
 //! the `fpp_analysis` semantic layer (emitted by the `bindgen` binary into
 //! `fpp_python/src/sem/defs.rs`) into the read-only PyO3 wrappers for the
 //! semantic data structures — the `Symbol`/`Type`/`Value` closed-union
-//! hierarchies, the entity structs, their union `*Ref` newtypes + Python
+//! hierarchies, the entity structs, their union `*Ref`/`*Arg` newtypes + Python
 //! aliases, and the leaf-enum mirrors.
 //!
 //! This is the semantic-layer analog of `fpp_ast_bindings!` (see
@@ -86,7 +86,10 @@
 //!   `crate::ast::<Ident>` wrapper, which reborrows the live node out of its own
 //!   backing model.
 //! * `union(<Name>)` / `entity(<Name>)` — the native enum / struct behind that
-//!   declared item, read back off the supplied wrapper's stored handle.
+//!   declared item, read back off the supplied wrapper's stored handle. A `union`
+//!   accepts any member of the hierarchy (the parameter is the union's `*Arg`
+//!   newtype, which extracts a `PyRef` of the base class and renders in the `.pyi`
+//!   as the union alias, the same name the matching return renders as).
 //! * `arc(<argkind>)`, `opt(<argkind>)`, `list(<argkind>)` — `Arc<T>`, `Option<T>`,
 //!   and `Vec<T>` (which also feeds a native `&[T]`). Nested positions are always
 //!   by value.
@@ -169,6 +172,13 @@ impl Registry {
 /// The `crate::sem::<Name>Ref` return newtype for a union's Python name.
 fn union_ref_ty(name: &str) -> TokenStream {
     let id = format_ident!("{}Ref", name);
+    quote!(crate::sem::#id)
+}
+
+/// The `crate::sem::<Name>Arg` parameter newtype for a union's Python name — the
+/// input-side mirror of [`union_ref_ty`].
+fn union_arg_ty(name: &str) -> TokenStream {
+    let id = format_ident!("{}Arg", name);
     quote!(crate::sem::#id)
 }
 
@@ -494,6 +504,10 @@ impl Arg {
     /// subclass instance is accepted (and PyO3 does the type check). A `Node` arg
     /// takes the shared `AstNode` base, i.e. any node at all; an `astnode(X)` arg
     /// takes exactly `X`, because it reborrows the live node as `fpp_ast::X`.
+    ///
+    /// A union arg wraps that `PyRef` in the generated `<Union>Arg` newtype, whose
+    /// only job is to render as the union alias in the `.pyi` (`Type`, not
+    /// `TypeBase`) — extraction and the borrow it hands out are the `PyRef`'s.
     fn sig_ty(&self) -> TokenStream {
         match self {
             Arg::Scalar(s) => match s {
@@ -505,7 +519,13 @@ impl Arg {
             Arg::Node => quote!(::pyo3::PyRef<'_, crate::ast::AstNode>),
             Arg::Span => quote!(::pyo3::PyRef<'_, crate::ir_core::Span>),
             Arg::AstNode(id) => quote!(::pyo3::PyRef<'_, crate::ast::#id>),
-            Arg::Union(name) | Arg::Entity(name) => {
+            Arg::Union(name) => {
+                let arg = union_arg_ty(name);
+                quote!(#arg<'_>)
+            }
+            // An entity's Python class name IS its Rust ident (no `Base` suffix and
+            // no alias), so the `PyRef` already renders as the right name.
+            Arg::Entity(name) => {
                 let id = format_ident!("{}", name);
                 quote!(::pyo3::PyRef<'_, crate::sem::#id>)
             }
@@ -2278,6 +2298,41 @@ fn emit_union(
         }
     };
 
+    // The `*Arg` parameter newtype: the input-side mirror of `*Ref`. It extracts as
+    // (and derefs to) a `PyRef` of the base class — so any subclass instance is
+    // accepted, PyO3 does the type check, and a method body reads the stored native
+    // straight off it — but its stub type is the union alias. Without it the `.pyi`
+    // shows the same value as `Type` coming out and `TypeBase` going in.
+    //
+    // Narrowing the annotation to the alias loses nothing: `TypeBase` is itself an
+    // alias member for an `include_base` union, and for every other union the base
+    // has no constructor, so no instance of it can exist that is not a subclass.
+    let arg_ty = format_ident!("{}Arg", base);
+    let arg_newtype = quote! {
+        pub struct #arg_ty<'py>(pub ::pyo3::PyRef<'py, #base>);
+        impl<'a, 'py> ::pyo3::FromPyObject<'a, 'py> for #arg_ty<'py> {
+            type Error = ::pyo3::PyErr;
+            fn extract(
+                obj: ::pyo3::Borrowed<'a, 'py, ::pyo3::PyAny>,
+            ) -> ::pyo3::PyResult<Self> {
+                let __r = <::pyo3::PyRef<'py, #base> as ::pyo3::FromPyObject<'a, 'py>>::extract(obj)
+                    .map_err(::std::convert::Into::<::pyo3::PyErr>::into)?;
+                ::std::result::Result::Ok(Self(__r))
+            }
+        }
+        impl<'py> ::std::ops::Deref for #arg_ty<'py> {
+            type Target = #base;
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+        impl ::pyo3_stub_gen::PyStubType for #arg_ty<'_> {
+            fn type_output() -> ::pyo3_stub_gen::TypeInfo {
+                ::pyo3_stub_gen::TypeInfo::unqualified(#alias)
+            }
+        }
+    };
+
     // The `*_ref` builder wraps the concrete subclass (built by `build_*`) as the
     // `*Ref` newtype. `build_*` is generated here (default dispatch) unless the
     // union is `custom_build` (a per-hierarchy quirk lives in `crate::sem::hand`,
@@ -2342,7 +2397,7 @@ fn emit_union(
     let alias_entry = quote!(#ref_ty::union_typeinfo().name);
 
     (
-        quote! { #base_struct #(#subclass_defs)* #dispatch #ref_newtype #ref_builder #build_default },
+        quote! { #base_struct #(#subclass_defs)* #dispatch #ref_newtype #arg_newtype #ref_builder #build_default },
         vec![quote!(#base::register(m)?;)],
         Vec::new(),
         (alias_str, alias_entry),

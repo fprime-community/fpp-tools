@@ -187,6 +187,17 @@ def test_union_param(port_instances):
     assert not first.signature_eq(second)
 
 
+def test_union_param_rejects_other_hierarchy(port_instances, types):
+    """A `union(..)` param accepts any member of *its* union and nothing else.
+
+    The parameter renders as the union alias in the stub, but it still extracts a
+    `PyRef` of that union's base class, so PyO3 rejects a wrapper from another
+    hierarchy.
+    """
+    with pytest.raises(TypeError):
+        port_instances[0].signature_eq(types[0])
+
+
 def test_union_and_list_entity_params(topology, connection, port_instances):
     pi = port_instances[0]
     assert topology.get_port_number(pi, connection) == 0
