@@ -22,16 +22,9 @@ name = "stub_gen"
 required-features = ["stubgen"]
 doc = false
 
-[[bin]]
-name = "bindgen"
-path = "src/bin/bindgen/main.rs"
-required-features = ["bindgen"]
-doc = false
-
 [features]
 default = ["extension-module"]
 extension-module = ["pyo3/extension-module"]
-bindgen = ["dep:syn", "dep:serde_json", "dep:rustdoc-json", "dep:rustdoc-types"]
 stubgen = []
 
 [dependencies]
@@ -53,11 +46,8 @@ fpp_parser = { path = "../fpp_parser", version = "=0.0.0" }
 fpp_fs = { path = "../fpp_fs", version = "=0.0.0" }
 
 rustc-hash = "2"
-syn = { version = "2", features = [
-    "full",
-    "extra-traits",
-    "visit",
-], optional = true }
-serde_json = { version = "1", optional = true }
-rustdoc-types = { version = "=0.57.0", optional = true }
-rustdoc-json = { version = "0.9", optional = true }
+
+# The declaration generator that emits `src/ast/defs.rs` + `src/sem/defs.rs` is
+# NOT a target here — it lives in the standalone `fpp_python_bindgen` crate, so a
+# stale declaration cannot block the build of the tool that regenerates it. See
+# that crate's manifest.

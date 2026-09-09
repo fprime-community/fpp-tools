@@ -15,6 +15,7 @@ members = [
     "fpp_format",
     "fpp_diagram",
     "fpp_python",
+    "fpp_python_bindgen",
     "fpp_python_macros",
 ]
 

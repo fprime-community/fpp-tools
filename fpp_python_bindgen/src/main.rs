@@ -1,5 +1,9 @@
 //! The unified `fpp_python` declaration generator.
 //!
+//! Run from the workspace root (or anywhere — every default path is anchored to
+//! this crate's location, not the CWD):
+//!   cargo run -p fpp_python_bindgen
+//!
 //! One tool emits BOTH checked-in declaration files from the in-workspace
 //! compiler crates:
 //!   * `fpp_python/src/ast/defs.rs` — a `fpp_ast_bindings!` mirror of the
@@ -38,7 +42,7 @@ mod partition;
 mod sem;
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use rustdoc_types::Crate;
@@ -310,6 +314,10 @@ fn resolve_config() -> Config {
         None => None,
     };
 
+    let bindgen_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workspace = bindgen_dir.parent().unwrap_or(bindgen_dir);
+    let out_crate = workspace.join("fpp_python");
+
     let meta = cargo_metadata();
     // `--version` overrides both header stamps; otherwise each is the resolved
     // upstream-crate version (so a dependency bump trips the codegen-drift check).
@@ -324,13 +332,13 @@ fn resolve_config() -> Config {
     Config {
         fpp_src: cli_fpp_src
             .or(meta.fpp_ast_src)
-            .unwrap_or_else(|| PathBuf::from("fpp_ast/src")),
+            .unwrap_or_else(|| workspace.join("fpp_ast/src")),
         rustdoc_json: cli_rustdoc_json,
         manifest: cli_manifest
             .or(meta.fpp_analysis_manifest)
-            .unwrap_or_else(|| PathBuf::from("fpp_analysis/Cargo.toml")),
-        ast_out: cli_ast_out.unwrap_or_else(|| PathBuf::from("fpp_python/src/ast/defs.rs")),
-        sem_out: cli_sem_out.unwrap_or_else(|| PathBuf::from("fpp_python/src/sem/defs.rs")),
+            .unwrap_or_else(|| workspace.join("fpp_analysis/Cargo.toml")),
+        ast_out: cli_ast_out.unwrap_or_else(|| out_crate.join("src/ast/defs.rs")),
+        sem_out: cli_sem_out.unwrap_or_else(|| out_crate.join("src/sem/defs.rs")),
         only,
         ast_version,
         sem_version,

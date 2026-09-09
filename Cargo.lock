@@ -519,6 +519,12 @@ dependencies = [
  "pyo3",
  "pyo3-stub-gen",
  "rustc-hash 2.1.1",
+]
+
+[[package]]
+name = "fpp_python_bindgen"
+version = "0.0.0"
+dependencies = [
  "rustdoc-json",
  "rustdoc-types",
  "serde_json",

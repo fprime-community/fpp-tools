@@ -193,9 +193,25 @@ wrappers from `src/sem/defs.rs`; the small core (`pipeline`, `ir_core`,
 maturin develop            # build + install the extension into the active venv
 pytest tests/              # run the test suite
 
-# Regenerate the checked-in declarations after an `fpp_ast`/`fpp_analysis` change:
-cargo run -p fpp_python --features bindgen --bin bindgen
+make                       # regenerate declarations, then the type stub
+make help                  # list the individual codegen targets
+```
 
-# Regenerate the type stub after changing the exposed API:
+`make` wraps the two generators (see the `Makefile` for the individual targets);
+the underlying commands are:
+
+```sh
+# Regenerate the checked-in declarations after an `fpp_ast`/`fpp_analysis` change.
+# A standalone crate, so a declaration left stale by an upstream change cannot
+# block the build of the generator that fixes it:
+cargo run -p fpp_python_bindgen
+
+# Regenerate the type stub after changing the exposed API. Built WITHOUT
+# `extension-module`, so it links libpython for real — on a distro without
+# `python3-dev` this needs `RUSTFLAGS="-L $(python3 -c 'import sysconfig;
+# print(sysconfig.get_config_var("LIBPL"))')"`, which `make stubs` adds for you:
 cargo run -p fpp_python --no-default-features --features stubgen --bin stub_gen
 ```
+
+Run the declaration generator before the stub dump — the stub is derived from the
+pyclasses the declarations expand into. `make` and CI both enforce that order.
