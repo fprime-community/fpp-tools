@@ -578,39 +578,36 @@ impl Component {
 
     /// Add a data product container
     pub fn add_container(&mut self, id_opt: Option<i128>, container: Container) -> SemanticResult {
-        let (map, next) = add_element_to_id_map(
-            &self.container_map,
+        let next = add_element_to_id_map(
+            &mut self.container_map,
             id_opt.unwrap_or(self.default_container_id),
             container,
             |c| c.loc,
         )?;
-        self.container_map = map;
         self.default_container_id = next;
         Ok(())
     }
 
     /// Add an event
     pub fn add_event(&mut self, id_opt: Option<i128>, event: Event) -> SemanticResult {
-        let (map, next) = add_element_to_id_map(
-            &self.event_map,
+        let next = add_element_to_id_map(
+            &mut self.event_map,
             id_opt.unwrap_or(self.default_event_id),
             event,
             |e| e.loc,
         )?;
-        self.event_map = map;
         self.default_event_id = next;
         Ok(())
     }
 
     /// Add a data product record
     pub fn add_record(&mut self, id_opt: Option<i128>, record: Record) -> SemanticResult {
-        let (map, next) = add_element_to_id_map(
-            &self.record_map,
+        let next = add_element_to_id_map(
+            &mut self.record_map,
             id_opt.unwrap_or(self.default_record_id),
             record,
             |r| r.loc,
         )?;
-        self.record_map = map;
         self.default_record_id = next;
         Ok(())
     }
@@ -618,13 +615,12 @@ impl Component {
     /// Add a telemetry channel
     pub fn add_tlm_channel(&mut self, id_opt: Option<i128>, channel: TlmChannel) -> SemanticResult {
         let name = channel.name.clone();
-        let (map, next) = add_element_to_id_map(
-            &self.tlm_channel_map,
+        let next = add_element_to_id_map(
+            &mut self.tlm_channel_map,
             id_opt.unwrap_or(self.default_tlm_channel_id),
             channel.clone(),
             |t| t.loc,
         )?;
-        self.tlm_channel_map = map;
         // Add the channel to the channel name map. If there is a duplicate
         // name, we will catch it later when we check all the dictionary
         // elements.
@@ -636,13 +632,12 @@ impl Component {
     /// Add a parameter
     pub fn add_param(&mut self, id_opt: Option<i128>, param: Param) -> SemanticResult {
         // Update the parameter map and the default parameter ID.
-        let (map, next) = add_element_to_id_map(
-            &self.param_map,
+        let next = add_element_to_id_map(
+            &mut self.param_map,
             id_opt.unwrap_or(self.default_param_id),
             param.clone(),
             |p| p.loc,
         )?;
-        self.param_map = map;
         self.default_param_id = next;
         // Add the implicit set and save commands.
         let upper = param.name.to_uppercase();
@@ -912,12 +907,12 @@ impl Component {
 }
 
 /// Add an element to an id map, returning the updated map and the next default id
-fn add_element_to_id_map<T: Clone>(
-    map: &HashMap<i128, T>,
+fn add_element_to_id_map<T>(
+    map: &mut HashMap<i128, T>,
     id: i128,
     element: T,
     get_loc: impl Fn(&T) -> Span,
-) -> SemanticResult<(HashMap<i128, T>, i128)> {
+) -> SemanticResult<i128> {
     if let Some(prev) = map.get(&id) {
         return Err(SemanticError::DuplicateIdValue {
             value: display_id_value(id),
@@ -925,9 +920,8 @@ fn add_element_to_id_map<T: Clone>(
             prev_loc: get_loc(prev),
         });
     }
-    let mut m = map.clone();
-    m.insert(id, element);
-    Ok((m, id + 1))
+    map.insert(id, element);
+    Ok(id + 1)
 }
 
 /// Checks for duplicate names in dictionary.
