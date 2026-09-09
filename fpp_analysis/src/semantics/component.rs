@@ -635,6 +635,7 @@ impl Component {
                 prev_loc: prev.loc,
             });
         }
+        let mut command = command;
         command.opcode = opcode;
         self.command_map.insert(opcode, command);
         self.default_opcode = opcode + 1;
@@ -659,9 +660,8 @@ impl Component {
     pub fn add_container(&mut self, id_opt: Option<i128>, container: Container) -> SemanticResult {
         let mut container = container;
         container.id = id_opt.unwrap_or(self.default_container_id);
-        let next =
+        self.default_container_id =
             add_element_to_id_map(&mut self.container_map, container.id, container, |c| c.loc)?;
-        self.default_container_id = next;
         Ok(())
     }
 
@@ -669,8 +669,8 @@ impl Component {
     pub fn add_event(&mut self, id_opt: Option<i128>, event: Event) -> SemanticResult {
         let mut event = event;
         event.id = id_opt.unwrap_or(self.default_event_id);
-        let next = add_element_to_id_map(&mut self.event_map, event.id, event, |e| e.loc)?;
-        self.default_event_id = next;
+        self.default_event_id =
+            add_element_to_id_map(&mut self.event_map, event.id, event, |e| e.loc)?;
         Ok(())
     }
 
@@ -678,8 +678,8 @@ impl Component {
     pub fn add_record(&mut self, id_opt: Option<i128>, record: Record) -> SemanticResult {
         let mut record = record;
         record.id = id_opt.unwrap_or(self.default_record_id);
-        let next = add_element_to_id_map(&mut self.record_map, record.id, record, |r| r.loc)?;
-        self.default_record_id = next;
+        self.default_record_id =
+            add_element_to_id_map(&mut self.record_map, record.id, record, |r| r.loc)?;
         Ok(())
     }
 
@@ -689,13 +689,16 @@ impl Component {
         let id = id_opt.unwrap_or(self.default_tlm_channel_id);
         let mut channel = channel;
         channel.id = id;
-        let next =
-            add_element_to_id_map(&mut self.tlm_channel_map, channel.id, channel, |t| t.loc)?;
+        self.default_tlm_channel_id = add_element_to_id_map(
+            &mut self.tlm_channel_map,
+            channel.id,
+            channel.clone(),
+            |t| t.loc,
+        )?;
         // Add the channel to the channel name map. If there is a duplicate
         // name, we will catch it later when we check all the dictionary
         // elements.
         self.tlm_channel_name_map.insert(name, channel);
-        self.default_tlm_channel_id = next;
         Ok(())
     }
 
@@ -704,8 +707,7 @@ impl Component {
         // Update the parameter map and the default parameter ID.
         let mut param = param;
         param.id = id_opt.unwrap_or(self.default_param_id);
-        let next = add_element_to_id_map(&mut self.param_map, param.id, param, |p| p.loc)?;
-        self.default_param_id = next;
+
         // Add the implicit set and save commands.
         let upper = param.name.to_uppercase();
         let set_command = Command {
@@ -724,6 +726,10 @@ impl Component {
         };
         self.add_command(Some(param.set_opcode), set_command)?;
         self.add_command(Some(param.save_opcode), save_command)?;
+
+        self.default_param_id =
+            add_element_to_id_map(&mut self.param_map, param.id, param, |p| p.loc)?;
+
         Ok(())
     }
 

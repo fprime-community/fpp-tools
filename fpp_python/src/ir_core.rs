@@ -61,6 +61,38 @@ impl Span {
     pub fn new(data: Arc<ModelData>, span: fpp_core::Span) -> Self {
         Span { data, span }
     }
+
+    /// The opaque native handle, for a generated method taking a `fpp_core::Span`
+    /// parameter (the `span` argkind).
+    pub(crate) fn native_span(&self) -> fpp_core::Span {
+        self.span
+    }
+
+    /// The backing model, for the generated [`same_model`] argument guard. `Span`
+    /// keeps `data` private (unlike the wrappers, which expose it `pub(crate)`), so
+    /// the guard reaches it through here.
+    pub(crate) fn model_data(&self) -> &Arc<ModelData> {
+        &self.data
+    }
+}
+
+/// Reject a wrapper argument that came from a different [`Model`](crate::model::Model)
+/// than the receiver.
+///
+/// Every native handle a wrapper lends out — a `fpp_core::Node`/`Span`, and the node
+/// ids embedded in a cloned semantic value — is an index into *one*
+/// `CompilerContext`'s interned arenas. Feeding a handle from another model into this
+/// one's `Analysis` would resolve against unrelated data and quietly return a wrong
+/// answer (a miss, or a same-index hit on an unrelated node), so generated methods
+/// check first. The check is a pointer comparison on the shared `Arc<ModelData>`.
+pub(crate) fn same_model(recv: &Arc<ModelData>, arg: &Arc<ModelData>) -> PyResult<()> {
+    if Arc::ptr_eq(recv, arg) {
+        Ok(())
+    } else {
+        Err(pyo3::exceptions::PyValueError::new_err(
+            "argument belongs to a different model than the receiver",
+        ))
+    }
 }
 
 #[gen_stub_pymethods]

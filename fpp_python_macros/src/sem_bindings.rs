@@ -18,12 +18,13 @@
 //! # Grammar
 //!
 //! ```text
+//! traits { <path>, … }                     // traits supplying reflected methods
 //! union <PyName> native <path> handle <arc_type|value|symbol|clone> alias "<Alias>"
 //!       accessor <ident> [include_base] [custom_build] [loc_from_node]
 //!       [identity <node | identical[(<eq_fn>, <node_id_method>)]>]
 //!       [repr <variant | variant_qualified[(<method>)] | variant_unqualified[(<method>)]>] {
 //!     variants { <NativeVariant> => <Subclass> : <payloadkind>, … }
-//!     methods  { [assoc] <name> [(analysis)] -> <shape>, … }
+//!     methods  { [assoc] <name> [(<params>)] [throws] -> <shape>, … }
 //! }
 //! payload <PyName> native <path> {
 //!     fields  { <name>: <shape>, … }
@@ -53,7 +54,7 @@
 //!
 //! `payloadkind` is `unit` (no data), `payload` (fields from a matching `payload`
 //! decl), or a bare `<shape>` (a single-value variant → one `value` getter).
-//! `shape` is the conversion vocabulary: `bool i128 f64 usize str node span
+//! `shape` is the conversion vocabulary: `bool i128 f64 usize str node span unit
 //! skip`, `leaf(<path>)`, `astdef(<Ident>)`, `rewrap(<Union>::<Variant>)`,
 //! `opt(<shape>)`, `list(<shape>)`, `dict(<shape>)` (string-keyed `dict[str, V]`),
 //! `map(<key_shape>, <value_shape>)` (a real `dict[K, V]`), `tuple(<shape>, …)`,
@@ -68,13 +69,37 @@
 //! }
 //! ```
 //!
-//! A `methods` entry's parameter list is comma-separated `<name>: <argkind>`
-//! pairs (plus the legacy bare `analysis` form). `argkind` ∈ `analysis` (the
-//! injected `&self.data.analysis`, not a Python param), `symbol` / `symbol_owned`
-//! (a Python `Symbol` wrapper feeding a borrowed `&Symbol` / an owned `Symbol`
-//! param), and the scalars `i128`/`bool`/`usize`/`str` (borrowed `&str`) /
-//! `string` (owned `String`). A method with ≥1 real (non-`analysis`) param is
-//! emitted as a callable method; otherwise it is a `#[getter]` property.
+//! A `methods` entry's parameter list is comma-separated `<name>: [ref] <argkind>`
+//! pairs (plus the legacy bare `analysis` form). An `argkind` is the input peer of
+//! `shape`: where a `shape` turns a native value into a Python object, an `argkind`
+//! turns a Python object back into the native the signature wants. A leading `ref`
+//! says the native takes the value by shared reference (`&T`); without it the native
+//! takes it by value and the wrapper hands over a clone (a wrapper only ever *lends*
+//! its native, never yields a mutable one). `argkind` ∈
+//!
+//! * `analysis` — the injected `&self.data.analysis`; NOT a Python parameter.
+//! * `i128`/`bool`/`usize`/`str` (borrowed `&str`)/`string` (owned `String`) — plain
+//!   scalars, each already encoding its own pass form (so never `ref`).
+//! * `node` — a native `fpp_core::Node`, supplied by any `crate::ast::AstNode`.
+//! * `span` — a native `fpp_core::Span`, supplied by a `crate::ir_core::Span`.
+//! * `astnode(<Ident>)` — a native `fpp_ast::<Ident>`, supplied by the
+//!   `crate::ast::<Ident>` wrapper, which reborrows the live node out of its own
+//!   backing model.
+//! * `union(<Name>)` / `entity(<Name>)` — the native enum / struct behind that
+//!   declared item, read back off the supplied wrapper's stored handle.
+//! * `arc(<argkind>)`, `opt(<argkind>)`, `list(<argkind>)` — `Arc<T>`, `Option<T>`,
+//!   and `Vec<T>` (which also feeds a native `&[T]`). Nested positions are always
+//!   by value.
+//!
+//! Every wrapper-backed argkind first checks the argument shares the receiver's
+//! backing model ([`crate::ir_core::same_model`] in the generated crate): the handles
+//! a wrapper lends are indices into one compiler context, so a wrapper from another
+//! `Model` would silently resolve against unrelated data.
+//!
+//! A method with ≥1 real (non-`analysis`) param is emitted as a callable method;
+//! otherwise it is a `#[getter]` property. `throws` marks a native `Result<T, E>`
+//! return: the Python-facing shape is `T`, and `E` is raised as a `ValueError`
+//! rendered with `{:?}`.
 //!
 //! An `entity` may carry an optional
 //! `identity <node | qualified_name[(<method>)] | raw_handle>` directive (peer of
@@ -100,6 +125,9 @@ struct UnionInfo {
     native: Path,
     /// How the native value is stored / handed to the `*_ref` builder.
     handle: Handle,
+    /// The base struct's field holding the native handle. A parameter of this
+    /// union's native type reads it back off the supplied Python wrapper.
+    accessor: Ident,
     /// Native variant name → its concrete Python subclass ident. Lets a
     /// `rewrap(<Union>::<Variant>)` shape — whose native value is statically the
     /// bare payload struct of exactly this variant — refine to the concrete
@@ -107,10 +135,36 @@ struct UnionInfo {
     subclasses: std::collections::BTreeMap<String, Ident>,
 }
 
-/// Union Python name → its [`UnionInfo`]. The `*Ref` newtype and `*_ref`/`build_*`
-/// fn names are derived from the Python name (see [`union_ref_ty`]/[`union_ref_fn`]),
-/// so only the native path + handle + variant→subclass map are stored.
-type UnionReg = std::collections::BTreeMap<String, UnionInfo>;
+/// Per-entity metadata a parameter argkind needs: the pyclass field storing the
+/// native value, so an `entity(<Name>)` param can read it back off the wrapper.
+struct EntityInfo {
+    field: Ident,
+}
+
+/// Everything an emitted shape / argkind needs to resolve a reference to another
+/// declared item by its Python name. Built in [`expand`] from the declaration
+/// itself — there is no hardcoded `Type`/`Value`/`Symbol` vocabulary.
+#[derive(Default)]
+struct Registry {
+    /// Union Python name → its [`UnionInfo`]. The `*Ref` newtype and `*_ref`/`build_*`
+    /// fn names are derived from the Python name (see [`union_ref_ty`]/[`union_ref_fn`]),
+    /// so only the native path + handle + accessor + variant→subclass map are stored.
+    unions: std::collections::BTreeMap<String, UnionInfo>,
+    entities: std::collections::BTreeMap<String, EntityInfo>,
+}
+
+impl Registry {
+    fn union(&self, name: &str) -> &UnionInfo {
+        self.unions
+            .get(name)
+            .unwrap_or_else(|| panic!("unregistered union `{name}`"))
+    }
+    fn entity(&self, name: &str) -> &EntityInfo {
+        self.entities
+            .get(name)
+            .unwrap_or_else(|| panic!("unregistered entity `{name}`"))
+    }
+}
 
 /// The `crate::sem::<Name>Ref` return newtype for a union's Python name.
 fn union_ref_ty(name: &str) -> TokenStream {
@@ -134,10 +188,8 @@ fn union_build_fn(name: &str) -> TokenStream {
 /// The concrete subclass ident for a `rewrap(<Union>::<Variant>)`: the Python
 /// subclass the union's `Variant` boxes to. Panics on an unknown union/variant
 /// (a macro-authoring error — the DSL is machine-generated from the unions here).
-fn rewrap_subclass<'a>(reg: &'a UnionReg, name: &str, variant: &Ident) -> &'a Ident {
-    let info = reg
-        .get(name)
-        .unwrap_or_else(|| panic!("unregistered union `{name}`"));
+fn rewrap_subclass<'a>(reg: &'a Registry, name: &str, variant: &Ident) -> &'a Ident {
+    let info = reg.union(name);
     info.subclasses
         .get(&variant.to_string())
         .unwrap_or_else(|| panic!("union `{name}` has no variant `{variant}`"))
@@ -153,6 +205,9 @@ enum Shape {
     Node,
     /// A lazy source-span handle → `Py<crate::ir_core::Span>`, resolved on demand.
     Span,
+    /// The unit type `()` → Python `None`. Emitted for the `Ok` half of a
+    /// `Result<(), E>` return: a pure check whose only outcome is raising.
+    Unit,
     /// A registered closed union → its `*Ref` wrapper. The `String` keys the
     /// union registry (`Type`/`Value`/`Symbol`/`PortInstance`); see
     /// [`registered_union`].
@@ -199,7 +254,7 @@ impl Shape {
 
     /// The Rust return type of a getter yielding this shape. `reg` resolves a
     /// `RewrapRef`'s concrete subclass (its static native type is that payload).
-    fn ty(&self, reg: &UnionReg) -> TokenStream {
+    fn ty(&self, reg: &Registry) -> TokenStream {
         match self {
             Shape::Bool => quote!(bool),
             Shape::I128 => quote!(i128),
@@ -208,6 +263,7 @@ impl Shape {
             Shape::Str => quote!(String),
             Shape::Node => quote!(u32),
             Shape::Span => quote!(::pyo3::Py<crate::ir_core::Span>),
+            Shape::Unit => quote!(()),
             Shape::UnionRef(name) => union_ref_ty(name),
             // A rewrapped bare payload is statically the variant's concrete type,
             // so it refines to `Py<Subclass>` rather than the broad union alias.
@@ -255,7 +311,7 @@ impl Shape {
         vref: &TokenStream,
         model: &TokenStream,
         data: &TokenStream,
-        reg: &UnionReg,
+        reg: &Registry,
     ) -> TokenStream {
         match self {
             Shape::Bool | Shape::I128 | Shape::F64 => quote!(*#vref),
@@ -268,9 +324,7 @@ impl Shape {
             }
             Shape::UnionRef(name) => {
                 let f = union_ref_fn(name);
-                let info = reg
-                    .get(name)
-                    .unwrap_or_else(|| panic!("unregistered union `{name}`"));
+                let info = reg.union(name);
                 // Arc-type / symbol handles take an owned clone; value / clone
                 // handles take the native by reference.
                 if info.handle.passes_owned() {
@@ -282,9 +336,7 @@ impl Shape {
             Shape::RewrapRef(name, variant) => {
                 let build = union_build_fn(name);
                 let sub = rewrap_subclass(reg, name, variant);
-                let info = reg
-                    .get(name)
-                    .unwrap_or_else(|| panic!("unregistered union `{name}`"));
+                let info = reg.union(name);
                 let native = &info.native;
                 let built = match info.handle {
                     Handle::ArcType => {
@@ -364,6 +416,7 @@ impl Shape {
                 quote!(crate::sem::#id::build(#model, py, ::std::clone::Clone::clone(#vref))?)
             }
             Shape::Skip => quote!(()),
+            Shape::Unit => quote!(()),
         }
     }
 }
@@ -403,17 +456,210 @@ enum ScalarArg {
     StringVal,
 }
 
+/// What supplies a method parameter's native value.
+///
+/// The peer of [`Shape`] on the input side: a `Shape` turns a native value into a
+/// Python object, an `Arg` turns a Python object back into the native the signature
+/// wants. Only the read-only directions are expressible — a wrapper *lends* its
+/// stored native or hands out a clone; it never yields a mutable one.
+enum Arg {
+    /// A Python scalar received directly.
+    Scalar(ScalarArg),
+    /// A native `fpp_core::Node` handle, supplied by any `crate::ast::AstNode`
+    /// wrapper (which stores exactly that handle).
+    Node,
+    /// A native `fpp_core::Span` handle, supplied by a `crate::ir_core::Span`.
+    Span,
+    /// A native `fpp_ast::<Ident>` node, supplied by the `crate::ast::<Ident>`
+    /// wrapper, which reborrows it out of its own backing model.
+    AstNode(Ident),
+    /// A native union enum, supplied by that union's Python base class. The `String`
+    /// keys [`Registry::unions`] (its handle picks how the native is reached).
+    Union(String),
+    /// A native entity struct, supplied by that entity's Python class. The `String`
+    /// keys [`Registry::entities`].
+    Entity(String),
+    /// `Arc<inner>`.
+    Arc(Box<Arg>),
+    /// `Option<inner>`.
+    Opt(Box<Arg>),
+    /// `Vec<inner>` (also feeds a native `&[inner]`, by deref coercion).
+    List(Box<Arg>),
+}
+
+impl Arg {
+    /// The Python-facing Rust type of the parameter.
+    ///
+    /// Wrapper-backed args take a `PyRef<'_, …>` of the *base* class, so any
+    /// subclass instance is accepted (and PyO3 does the type check). A `Node` arg
+    /// takes the shared `AstNode` base, i.e. any node at all; an `astnode(X)` arg
+    /// takes exactly `X`, because it reborrows the live node as `fpp_ast::X`.
+    fn sig_ty(&self) -> TokenStream {
+        match self {
+            Arg::Scalar(s) => match s {
+                ScalarArg::I128 => quote!(i128),
+                ScalarArg::Bool => quote!(bool),
+                ScalarArg::Usize => quote!(usize),
+                ScalarArg::Str | ScalarArg::StringVal => quote!(::std::string::String),
+            },
+            Arg::Node => quote!(::pyo3::PyRef<'_, crate::ast::AstNode>),
+            Arg::Span => quote!(::pyo3::PyRef<'_, crate::ir_core::Span>),
+            Arg::AstNode(id) => quote!(::pyo3::PyRef<'_, crate::ast::#id>),
+            Arg::Union(name) | Arg::Entity(name) => {
+                let id = format_ident!("{}", name);
+                quote!(::pyo3::PyRef<'_, crate::sem::#id>)
+            }
+            // A container is transparent to the Python signature except for its own
+            // shape: an `Arc` is an implementation detail of how the native stores
+            // the value, so it adds nothing.
+            Arg::Arc(i) => i.sig_ty(),
+            Arg::Opt(i) => {
+                let inner = i.sig_ty();
+                quote!(::std::option::Option<#inner>)
+            }
+            Arg::List(i) => {
+                let inner = i.sig_ty();
+                quote!(::std::vec::Vec<#inner>)
+            }
+        }
+    }
+
+    /// Whether this arg can hand out a `&Native` borrow directly, without first
+    /// materializing an owned value. True exactly when the supplying wrapper already
+    /// *stores* the native the signature asks for.
+    fn lends_ref(&self, reg: &Registry) -> bool {
+        match self {
+            Arg::Union(_) | Arg::Entity(_) | Arg::AstNode(_) => true,
+            // Only an arc-handle union stores a real `Arc`, so only it can lend one.
+            Arg::Arc(inner) => match &**inner {
+                Arg::Union(name) => reg.union(name).handle.is_arc(),
+                _ => false,
+            },
+            // `Node`/`Span` are `Copy` handles passed by value; the containers have
+            // to be rebuilt, so neither can be borrowed out of a wrapper.
+            Arg::Scalar(_) | Arg::Node | Arg::Span | Arg::Opt(_) | Arg::List(_) => false,
+        }
+    }
+
+    /// An expression yielding the native value from the Python binding `b`.
+    ///
+    /// `owned` requests a by-value native (a clone of what the wrapper stores);
+    /// otherwise a shared borrow is produced — only valid when [`Arg::lends_ref`].
+    /// `data` is the receiver's `Arc<ModelData>` place-expr: every wrapper-backed arg
+    /// first asserts it comes from that same backing model (see
+    /// [`crate::ir_core::same_model`]). The expression may contain `?`, so it is only
+    /// valid inside a `PyResult`-returning body.
+    fn native(
+        &self,
+        b: &TokenStream,
+        data: &TokenStream,
+        owned: bool,
+        reg: &Registry,
+    ) -> TokenStream {
+        // The wrapper types all carry their backing model as a `data` field; `Span`
+        // keeps its private, so it exposes an accessor instead.
+        let guard = |d: TokenStream| quote!(crate::ir_core::same_model(&#data, #d)?;);
+        let clone_if = |owned: bool, v: TokenStream| {
+            if owned {
+                quote!(::std::clone::Clone::clone(#v))
+            } else {
+                v
+            }
+        };
+        match self {
+            // `str` names a borrowed `&str` native param, fed from the owned Python
+            // `String`. In an *owned* position (inside `opt`/`list`/`arc`, whose
+            // element is moved into the container) that borrow would point at a
+            // local, so the `String` is passed through instead — which is also the
+            // only native the container could hold, since `arg_inner` rejects a
+            // nested reference outright.
+            Arg::Scalar(ScalarArg::Str) if !owned => quote!(#b.as_str()),
+            Arg::Scalar(_) => quote!(#b),
+            Arg::Node => {
+                let g = guard(quote!(&#b.data));
+                quote!({ #g #b.node })
+            }
+            Arg::Span => {
+                let g = guard(quote!(#b.model_data()));
+                quote!({ #g #b.native_span() })
+            }
+            Arg::AstNode(id) => {
+                let g = guard(quote!(&__w.data));
+                // Reborrow through the *argument's own* backing model, never the
+                // receiver's: `node_as` downcasts on the recorded type tag, so
+                // resolving a foreign node against this model's table could pick a
+                // node of an unrelated type. The same-model guard above already
+                // rejects that, and using `__w.data` keeps the read sound even if a
+                // future caller reaches this without the guard.
+                let r = quote!({
+                    let __w = #b.as_super();
+                    #g
+                    __w.data.node_as::<::fpp_ast::#id>(__w.node)
+                });
+                clone_if(owned, r)
+            }
+            Arg::Union(name) => {
+                let info = reg.union(name);
+                let acc = &info.accessor;
+                let g = guard(quote!(&#b.data));
+                // An arc-handle base stores `Arc<Native>`, so `&Native` comes from
+                // `as_ref`; every other handle stores the native by value.
+                let v = if info.handle.is_arc() {
+                    quote!(#b.#acc.as_ref())
+                } else {
+                    quote!(&#b.#acc)
+                };
+                let v = clone_if(owned, v);
+                quote!({ #g #v })
+            }
+            Arg::Entity(name) => {
+                let field = &reg.entity(name).field;
+                let g = guard(quote!(&#b.data));
+                let v = clone_if(owned, quote!(&#b.#field));
+                quote!({ #g #v })
+            }
+            Arg::Arc(inner) => {
+                // An arc-handle union lends / clones its stored `Arc` directly.
+                if let Arg::Union(name) = &**inner {
+                    let info = reg.union(name);
+                    if info.handle.is_arc() {
+                        let acc = &info.accessor;
+                        let g = guard(quote!(&#b.data));
+                        let v = clone_if(owned, quote!(&#b.#acc));
+                        return quote!({ #g #v });
+                    }
+                }
+                // Otherwise the native is not stored behind an `Arc`, so the
+                // parameter gets a fresh one over a clone.
+                let v = inner.native(b, data, true, reg);
+                quote!(::std::sync::Arc::new(#v))
+            }
+            Arg::Opt(inner) => {
+                let iv = inner.native(&quote!(__v), data, true, reg);
+                quote!(match #b { ::std::option::Option::Some(__v) => ::std::option::Option::Some(#iv), ::std::option::Option::None => ::std::option::Option::None })
+            }
+            Arg::List(inner) => {
+                // Consumes the `Vec` parameter, so each `__v` binds by value (a
+                // `PyRef` or a scalar) rather than by reference.
+                let iv = inner.native(&quote!(__v), data, true, reg);
+                quote!({
+                    let mut __l = ::std::vec::Vec::new();
+                    for __v in #b { __l.push(#iv); }
+                    __l
+                })
+            }
+        }
+    }
+}
+
 /// How a method parameter is supplied to the native call.
 enum ArgKind {
     /// The injected `&Analysis` (context-dependent place-expr); NOT a Python
     /// parameter. Covers both the legacy bare `analysis` form and `<name>: analysis`.
     Analysis,
-    /// A Python `Symbol` wrapper feeding a native `Symbol` param. `borrowed` picks
-    /// the pass form: a borrowed `&Symbol` param takes `&#n.sym`; an owned `Symbol`
-    /// param takes a clone (`#n.sym.clone()`) — the wrapper only lends its `sym`.
-    Symbol { borrowed: bool },
-    /// A Python scalar received directly.
-    Scalar(ScalarArg),
+    /// A Python-facing parameter. `by_ref` records that the native signature takes
+    /// it by shared reference (`ref` in the DSL) rather than by value.
+    Value { arg: Arg, by_ref: bool },
 }
 
 /// A single method parameter.
@@ -426,6 +672,9 @@ struct MethodDecl {
     assoc: bool,
     name: Ident,
     params: Vec<MethodParam>,
+    /// The native returns `Result<shape, E>`: the generated method raises a
+    /// `ValueError` carrying `{:?}` of the error instead of returning it.
+    throws: bool,
     shape: Shape,
 }
 
@@ -590,6 +839,9 @@ struct AnalysisDecl {
 }
 
 struct Dsl {
+    /// `fpp_analysis` traits supplying reflected methods; each is brought into scope
+    /// with an anonymous `use` so a trait method's call site resolves.
+    traits: Vec<Path>,
     unions: Vec<UnionDecl>,
     payloads: Vec<PayloadDecl>,
     entities: Vec<EntityDecl>,
@@ -616,6 +868,7 @@ impl Parse for Shape {
             "str" => Shape::Str,
             "node" => Shape::Node,
             "span" => Shape::Span,
+            "unit" => Shape::Unit,
             "skip" => Shape::Skip,
             "opt" | "list" | "dict" => {
                 let content;
@@ -692,32 +945,85 @@ impl Parse for FieldDecl {
     }
 }
 
+impl Parse for Arg {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let kw: Ident = input.parse()?;
+        let s = kw.to_string();
+        Ok(match s.as_str() {
+            "i128" => Arg::Scalar(ScalarArg::I128),
+            "bool" => Arg::Scalar(ScalarArg::Bool),
+            "usize" => Arg::Scalar(ScalarArg::Usize),
+            "str" => Arg::Scalar(ScalarArg::Str),
+            "string" => Arg::Scalar(ScalarArg::StringVal),
+            "node" => Arg::Node,
+            "span" => Arg::Span,
+            "astnode" => {
+                let content;
+                parenthesized!(content in input);
+                Arg::AstNode(content.parse()?)
+            }
+            "union" => {
+                let content;
+                parenthesized!(content in input);
+                let name: Ident = content.parse()?;
+                Arg::Union(name.to_string())
+            }
+            "entity" => {
+                let content;
+                parenthesized!(content in input);
+                let name: Ident = content.parse()?;
+                Arg::Entity(name.to_string())
+            }
+            "arc" | "opt" | "list" => {
+                let content;
+                parenthesized!(content in input);
+                let inner: Arg = content.parse()?;
+                match s.as_str() {
+                    "arc" => Arg::Arc(Box::new(inner)),
+                    "opt" => Arg::Opt(Box::new(inner)),
+                    _ => Arg::List(Box::new(inner)),
+                }
+            }
+            other => {
+                return Err(syn::Error::new(
+                    kw.span(),
+                    format!(
+                        "unknown arg kind `{other}` (expected analysis/i128/bool/usize/str/\
+                         string/node/span/astnode(..)/union(..)/entity(..)/arc(..)/opt(..)/\
+                         list(..), optionally prefixed `ref`)"
+                    ),
+                ));
+            }
+        })
+    }
+}
+
 impl Parse for MethodParam {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let name: Ident = input.parse()?;
         if input.peek(Token![:]) {
             input.parse::<Token![:]>()?;
-            let kind_id: Ident = input.parse()?;
-            let kind = match kind_id.to_string().as_str() {
-                "analysis" => ArgKind::Analysis,
-                "symbol" => ArgKind::Symbol { borrowed: true },
-                "symbol_owned" => ArgKind::Symbol { borrowed: false },
-                "i128" => ArgKind::Scalar(ScalarArg::I128),
-                "bool" => ArgKind::Scalar(ScalarArg::Bool),
-                "str" => ArgKind::Scalar(ScalarArg::Str),
-                "string" => ArgKind::Scalar(ScalarArg::StringVal),
-                "usize" => ArgKind::Scalar(ScalarArg::Usize),
-                other => {
-                    return Err(syn::Error::new(
-                        kind_id.span(),
-                        format!(
-                            "unknown arg kind `{other}` (expected \
-                             analysis/symbol/symbol_owned/i128/bool/str/string/usize)"
-                        ),
-                    ));
-                }
+            // `analysis` is not a Python parameter, so it takes no `ref` marker.
+            if peek_kw(input, "analysis") {
+                input.parse::<Ident>()?;
+                return Ok(MethodParam {
+                    name,
+                    kind: ArgKind::Analysis,
+                });
+            }
+            // A leading `ref` means the native signature takes `&T`; without it the
+            // native takes `T` by value and the wrapper hands over a clone.
+            let by_ref = if input.peek(Token![ref]) {
+                input.parse::<Token![ref]>()?;
+                true
+            } else {
+                false
             };
-            Ok(MethodParam { name, kind })
+            let arg: Arg = input.parse()?;
+            Ok(MethodParam {
+                name,
+                kind: ArgKind::Value { arg, by_ref },
+            })
         } else {
             // Legacy bare `analysis`: the injected `&Analysis` with no `: kind`.
             if name != "analysis" {
@@ -754,12 +1060,22 @@ impl Parse for MethodDecl {
         } else {
             Vec::new()
         };
+        // `throws` marks a native `Result` return: a call-site transform (raise
+        // instead of yield), not a value conversion, so it sits here rather than
+        // inside the shape.
+        let throws = if peek_kw(input, "throws") {
+            input.parse::<Ident>()?;
+            true
+        } else {
+            false
+        };
         input.parse::<Token![->]>()?;
         let shape: Shape = input.parse()?;
         Ok(MethodDecl {
             assoc,
             name,
             params,
+            throws,
             shape,
         })
     }
@@ -1168,6 +1484,7 @@ fn parse_ident_pair_payload(
 
 impl Parse for Dsl {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut traits = Vec::new();
         let mut unions = Vec::new();
         let mut payloads = Vec::new();
         let mut entities = Vec::new();
@@ -1176,6 +1493,11 @@ impl Parse for Dsl {
         while !input.is_empty() {
             let kw: Ident = input.parse()?;
             match kw.to_string().as_str() {
+                "traits" => {
+                    let content;
+                    braced!(content in input);
+                    traits.extend(content.parse_terminated(Path::parse, Token![,])?);
+                }
                 "union" => unions.push(input.parse()?),
                 "payload" => payloads.push(input.parse()?),
                 "entity" => entities.push(input.parse()?),
@@ -1186,13 +1508,14 @@ impl Parse for Dsl {
                         kw.span(),
                         format!(
                             "unknown section `{other}` \
-                             (expected union/payload/entity/leaf_enum/analysis)"
+                             (expected traits/union/payload/entity/leaf_enum/analysis)"
                         ),
                     ));
                 }
             }
         }
         Ok(Dsl {
+            traits,
             unions,
             payloads,
             entities,
@@ -1234,6 +1557,10 @@ struct Getter {
     via_super: bool,
     extra_params: TokenStream,
     is_method: bool,
+    /// A distinct Rust fn ident, with `name` kept as the Python name via
+    /// `#[pyo3(name = …)]`. Set only to break a PyO3 symbol collision — see
+    /// [`field_getter_symbols`].
+    rust_name: Option<Ident>,
 }
 
 impl Getter {
@@ -1247,7 +1574,34 @@ impl Getter {
             via_super: false,
             extra_params: quote!(),
             is_method: false,
+            rust_name: None,
         }
+    }
+}
+
+/// The method names in one `#[pymethods]` block, for [`avoid_getter_symbol_clash`].
+fn method_name_set(methods: &[MethodDecl]) -> std::collections::BTreeSet<String> {
+    methods
+        .iter()
+        .map(|m| py_getter_ident(&m.name).to_string())
+        .collect()
+}
+
+/// Disambiguate a field getter's Rust ident when a *method* in the same
+/// `#[pymethods]` block already owns the symbol PyO3 would generate for it.
+///
+/// PyO3 derives a getter's generated item from its **Rust ident**
+/// (`__pymethod_get_<ident>__`) but a method's from its **Python name**
+/// (`__pymethod_<python_name>__`). So the getter for a field `interface` and a method
+/// `get_interface` land on the same symbol. Their Python names (`interface` and
+/// `get_interface`) do not clash and both are wanted, so the getter keeps its Python
+/// name via `#[pyo3(name = …)]` and only its Rust ident moves — which is why the
+/// rename goes on the getter rather than the method. (An *exact*-name clash is a
+/// genuine Python-attribute conflict, and the bindgen resolves that one by dropping
+/// the method.)
+fn avoid_getter_symbol_clash(g: &mut Getter, method_names: &std::collections::BTreeSet<String>) {
+    if method_names.contains(&format!("get_{}", py_getter_ident(&g.name))) {
+        g.rust_name = Some(format_ident!("{}__field", g.name));
     }
 }
 
@@ -1309,7 +1663,7 @@ fn py_getter_ident(name: &Ident) -> Ident {
 }
 
 fn getter_tokens(g: &Getter) -> TokenStream {
-    let name = py_getter_ident(&g.name);
+    let py_name = py_getter_ident(&g.name);
     let ty = &g.shape_ty;
     let body = &g.body;
     let extra = &g.extra_params;
@@ -1318,10 +1672,21 @@ fn getter_tokens(g: &Getter) -> TokenStream {
     } else {
         quote!()
     };
+    // A disambiguated Rust ident keeps the Python name via an explicit `name`.
+    let (name, rename) = match &g.rust_name {
+        Some(rust) => {
+            let lit = py_name.to_string();
+            (
+                rust.clone(),
+                quote!(#[pyo3(name = #lit)] #[allow(non_snake_case)]),
+            )
+        }
+        None => (py_name, quote!()),
+    };
     let attr = if g.is_method {
-        quote!()
+        rename
     } else {
-        quote!(#[getter])
+        quote!(#[getter] #rename)
     };
     if g.via_super {
         quote! {
@@ -1349,48 +1714,91 @@ fn getter_tokens(g: &Getter) -> TokenStream {
 fn method_arg_parts(
     params: &[MethodParam],
     analysis_access: &TokenStream,
-) -> (TokenStream, Vec<TokenStream>, bool) {
+    data: &TokenStream,
+    reg: &Registry,
+) -> MethodArgs {
     let mut sig: Vec<TokenStream> = Vec::new();
+    let mut prelude: Vec<TokenStream> = Vec::new();
     let mut call: Vec<TokenStream> = Vec::new();
     let mut has_py_param = false;
     for p in params {
-        match &p.kind {
-            ArgKind::Analysis => call.push(analysis_access.clone()),
-            ArgKind::Symbol { borrowed } => {
-                has_py_param = true;
-                let n = &p.name;
-                sig.push(quote!(#n: ::pyo3::PyRef<'_, crate::sem::Symbol>));
-                if *borrowed {
-                    call.push(quote!(&#n.sym));
-                } else {
-                    call.push(quote!(::std::clone::Clone::clone(&#n.sym)));
-                }
+        // A native param named after a Python keyword (`Connection::from`,
+        // `add_imported_interface_symbol`'s `import`) gets the same trailing
+        // underscore a keyword-named getter does: PyO3 exposes the Rust param ident
+        // as the keyword-argument name, and a bare `import`/`from` is a syntax error
+        // in the `.pyi` (and unusable as a kwarg).
+        let n = py_getter_ident(&p.name);
+        let ArgKind::Value { arg, by_ref } = &p.kind else {
+            call.push(analysis_access.clone());
+            continue;
+        };
+        has_py_param = true;
+        let ty = arg.sig_ty();
+        sig.push(quote!(#n: #ty));
+        match arg {
+            // A scalar needs no native materialization: its pass form is the token.
+            Arg::Scalar(_) => call.push(arg.native(&quote!(#n), data, false, reg)),
+            // The wrapper already stores what the signature wants — lend it as-is.
+            _ if *by_ref && arg.lends_ref(reg) => {
+                call.push(arg.native(&quote!(#n), data, false, reg));
             }
-            ArgKind::Scalar(s) => {
-                has_py_param = true;
-                let n = &p.name;
-                let (ty, pass) = match s {
-                    ScalarArg::I128 => (quote!(i128), quote!(#n)),
-                    ScalarArg::Bool => (quote!(bool), quote!(#n)),
-                    ScalarArg::Usize => (quote!(usize), quote!(#n)),
-                    ScalarArg::Str => (quote!(::std::string::String), quote!(#n.as_str())),
-                    ScalarArg::StringVal => (quote!(::std::string::String), quote!(#n)),
-                };
-                sig.push(quote!(#n: #ty));
-                call.push(pass);
+            // Otherwise build the owned native into a local first. Binding (rather
+            // than inlining) keeps a `&`-taken temporary alive across the call and
+            // keeps the generated body readable.
+            _ => {
+                let local = format_ident!("__arg_{}", n);
+                let v = arg.native(&quote!(#n), data, true, reg);
+                prelude.push(quote!(let #local = #v;));
+                call.push(if *by_ref {
+                    quote!(&#local)
+                } else {
+                    quote!(#local)
+                });
             }
         }
     }
-    let sig_ts = if sig.is_empty() {
-        quote!()
+    MethodArgs {
+        sig: if sig.is_empty() {
+            quote!()
+        } else {
+            quote!(#(, #sig)*)
+        },
+        prelude,
+        call,
+        is_method: has_py_param,
+    }
+}
+
+/// The pieces [`method_arg_parts`] derives for one method's parameter list.
+struct MethodArgs {
+    /// Extra Python-facing fn params, leading `,` included.
+    sig: TokenStream,
+    /// `let` statements materializing owned natives, emitted before the native call.
+    prelude: Vec<TokenStream>,
+    /// The native call's argument expressions, in order.
+    call: Vec<TokenStream>,
+    /// Whether any real (non-`analysis`) Python param is present — i.e. the item must
+    /// be a callable method rather than a `#[getter]` property.
+    is_method: bool,
+}
+
+/// The `let __r = <call>;` statement for a native method call, applying the `throws`
+/// transform: a native `Result` error becomes a raised `ValueError` rendered with
+/// `{:?}` (the bindgen only emits `throws` for error types that impl `Debug`).
+fn native_call_stmt(call: &TokenStream, throws: bool) -> TokenStream {
+    if throws {
+        quote! {
+            let __r = #call.map_err(|__e| {
+                ::pyo3::exceptions::PyValueError::new_err(::std::format!("{:?}", __e))
+            })?;
+        }
     } else {
-        quote!(#(, #sig)*)
-    };
-    (sig_ts, call, has_py_param)
+        quote!(let __r = #call;)
+    }
 }
 
 /// Emit the base method getters (shared by every subclass via inheritance).
-fn emit_union_methods(u: &UnionDecl, reg: &UnionReg) -> Vec<TokenStream> {
+fn emit_union_methods(u: &UnionDecl, reg: &Registry) -> Vec<TokenStream> {
     let accessor = &u.accessor;
     let native = &u.native;
     let model = quote!(&self.model);
@@ -1411,7 +1819,8 @@ fn emit_union_methods(u: &UnionDecl, reg: &UnionReg) -> Vec<TokenStream> {
     let analysis_access = quote!(&self.data.analysis);
     out.extend(u.methods.iter().map(|m| {
         let mname = &m.name;
-        let (extra, call_args, is_method) = method_arg_parts(&m.params, &analysis_access);
+        let args = method_arg_parts(&m.params, &analysis_access, &data, reg);
+        let call_args = &args.call;
         let call = if m.assoc {
             // Associated fn over `&Arc<Self>` / `&Self`, e.g. underlying_type.
             quote!(#native::#mname(&self.#accessor #(, #call_args)*))
@@ -1422,13 +1831,16 @@ fn emit_union_methods(u: &UnionDecl, reg: &UnionReg) -> Vec<TokenStream> {
         let vref = quote!((&__r));
         let expr = m.shape.expr(&vref, &model, &data, reg);
         let ty = m.shape.ty(reg);
+        let prelude = &args.prelude;
+        let call_stmt = native_call_stmt(&call, m.throws);
         // The native call may read the retained compiler context (annotations,
         // `Node::span`), so it runs under `run_ref`. This enters the context only
         // for the duration of the call/conversion; the conversion itself never
         // re-enters `run_ref` (spans resolve lazily), so nesting cannot occur.
         let body = quote! {
             ::fpp_core::run_ref(&#data.ctx, || {
-                let __r = #call;
+                #(#prelude)*
+                #call_stmt
                 Ok(#expr)
             })
         };
@@ -1438,8 +1850,11 @@ fn emit_union_methods(u: &UnionDecl, reg: &UnionReg) -> Vec<TokenStream> {
             needs_py: m.shape.needs_py(),
             body,
             via_super: false,
-            extra_params: extra,
-            is_method,
+            extra_params: args.sig,
+            is_method: args.is_method,
+            // The union base block has no field getters (subclass getters live in
+            // their own `#[pymethods]` block), so no symbol clash is possible here.
+            rust_name: None,
         })
     }));
     out
@@ -1450,7 +1865,7 @@ fn emit_subclass_getters(
     u: &UnionDecl,
     v: &VariantDecl,
     payload: Option<&PayloadDecl>,
-    reg: &UnionReg,
+    reg: &Registry,
 ) -> Vec<TokenStream> {
     let accessor = &u.accessor;
     let native = &u.native;
@@ -1464,6 +1879,11 @@ fn emit_subclass_getters(
         quote!(&base.#accessor)
     };
 
+    // A payload's own methods share the subclass's `#[pymethods]` block with its
+    // field getters, so a `get_<field>` method claims the getter's symbol.
+    let payload_methods = payload
+        .map(|p| method_name_set(&p.methods))
+        .unwrap_or_default();
     let emit_one = |gname: &Ident, shape: &Shape, field_access: &TokenStream| -> TokenStream {
         let expr = shape.expr(field_access, &model, &data, reg);
         let ty = shape.ty(reg);
@@ -1473,7 +1893,7 @@ fn emit_subclass_getters(
                 _ => unreachable!(),
             }
         };
-        getter_tokens(&Getter {
+        let mut g = Getter {
             name: gname.clone(),
             shape_ty: ty,
             needs_py: shape.needs_py(),
@@ -1481,7 +1901,10 @@ fn emit_subclass_getters(
             via_super: true,
             extra_params: quote!(),
             is_method: false,
-        })
+            rust_name: None,
+        };
+        avoid_getter_symbol_clash(&mut g, &payload_methods);
+        getter_tokens(&g)
     };
 
     match &v.payload {
@@ -1527,6 +1950,7 @@ fn emit_subclass_getters(
                     via_super: true,
                     extra_params: quote!(),
                     is_method: false,
+                    rust_name: None,
                 }));
             }
             out
@@ -1548,7 +1972,8 @@ fn emit_subclass_getters(
             let analysis_access = quote!(&base.data.analysis);
             for m in &p.methods {
                 let mname = &m.name;
-                let (extra, call_args, is_method) = method_arg_parts(&m.params, &analysis_access);
+                let args = method_arg_parts(&m.params, &analysis_access, &data, reg);
+                let call_args = &args.call;
                 let call = if m.assoc {
                     let pnative = &p.native;
                     quote!(#pnative::#mname(x #(, #call_args)*))
@@ -1558,12 +1983,15 @@ fn emit_subclass_getters(
                 let vref = quote!((&__r));
                 let expr = m.shape.expr(&vref, &model, &data, reg);
                 let ty = m.shape.ty(reg);
+                let prelude = &args.prelude;
+                let call_stmt = native_call_stmt(&call, m.throws);
                 // The native call may read the retained compiler context, so it
                 // runs under `run_ref` (see `emit_union_methods`).
                 let body = quote! {
                     match #scrut {
                         #native::#variant(x) => ::fpp_core::run_ref(&#data.ctx, || {
-                            let __r = #call;
+                            #(#prelude)*
+                            #call_stmt
                             Ok(#expr)
                         }),
                         _ => unreachable!(),
@@ -1575,8 +2003,9 @@ fn emit_subclass_getters(
                     needs_py: m.shape.needs_py(),
                     body,
                     via_super: true,
-                    extra_params: extra,
-                    is_method,
+                    extra_params: args.sig.clone(),
+                    is_method: args.is_method,
+                    rust_name: None,
                 }));
             }
             out
@@ -1711,7 +2140,7 @@ fn emit_union_identity(u: &UnionDecl) -> TokenStream {
 fn emit_union(
     u: &UnionDecl,
     payloads: &[PayloadDecl],
-    reg: &UnionReg,
+    reg: &Registry,
 ) -> (
     TokenStream,
     Vec<TokenStream>,
@@ -1921,7 +2350,7 @@ fn emit_union(
 }
 
 /// Emit a standalone `entity` item. Returns `(definition, register_call)`.
-fn emit_entity(e: &EntityDecl, reg: &UnionReg) -> (TokenStream, TokenStream) {
+fn emit_entity(e: &EntityDecl, reg: &Registry) -> (TokenStream, TokenStream) {
     match &e.handle {
         EntityHandle::Clone { field } => emit_entity_clone(e, field, reg),
     }
@@ -1979,7 +2408,7 @@ fn emit_entity_identity(e: &EntityDecl, field: &Ident) -> Vec<TokenStream> {
 
 /// Emit a standalone `clone`-handle entity: the pyclass struct, its `build`
 /// constructor, and the getter block. Returns `(definition, register_call)`.
-fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &UnionReg) -> (TokenStream, TokenStream) {
+fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStream, TokenStream) {
     let py = &e.py;
     let native = &e.native;
     let model = quote!(&self.model);
@@ -1994,6 +2423,18 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &UnionReg) -> (TokenStr
     });
 
     let mut getters: Vec<TokenStream> = Vec::new();
+    let method_names = method_name_set(&e.methods);
+    let push_field = |getters: &mut Vec<TokenStream>, f: &FieldDecl, access: TokenStream| {
+        let expr = f.shape.expr(&access, &model, &data, reg);
+        let mut g = Getter::field(
+            f.name.clone(),
+            f.shape.ty(reg),
+            f.shape.needs_py(),
+            quote!(Ok(#expr)),
+        );
+        avoid_getter_symbol_clash(&mut g, &method_names);
+        getters.push(getter_tokens(&g));
+    };
 
     // Build-time extras: plain stored scalars, read directly off `self`.
     for f in &e.extras {
@@ -2001,13 +2442,7 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &UnionReg) -> (TokenStr
             continue;
         }
         let n = &f.name;
-        let expr = f.shape.expr(&quote!((&self.#n)), &model, &data, reg);
-        getters.push(getter_tokens(&Getter::field(
-            n.clone(),
-            f.shape.ty(reg),
-            f.shape.needs_py(),
-            quote!(Ok(#expr)),
-        )));
+        push_field(&mut getters, f, quote!((&self.#n)));
     }
 
     // Native fields: projected through the stored handle.
@@ -2016,14 +2451,7 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &UnionReg) -> (TokenStr
             continue;
         }
         let n = &f.name;
-        let access = quote!((&self.#field.#n));
-        let expr = f.shape.expr(&access, &model, &data, reg);
-        getters.push(getter_tokens(&Getter::field(
-            n.clone(),
-            f.shape.ty(reg),
-            f.shape.needs_py(),
-            quote!(Ok(#expr)),
-        )));
+        push_field(&mut getters, f, quote!((&self.#field.#n)));
     }
 
     // Methods: `&self` accessors (or associated fns over `&Native`).
@@ -2033,13 +2461,16 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &UnionReg) -> (TokenStr
             continue;
         }
         let mname = &m.name;
-        let (extra, call_args, is_method) = method_arg_parts(&m.params, &analysis_access);
+        let args = method_arg_parts(&m.params, &analysis_access, &data, reg);
+        let call_args = &args.call;
         let call = if m.assoc {
             quote!(#native::#mname(&self.#field #(, #call_args)*))
         } else {
             quote!(self.#field.#mname(#(#call_args),*))
         };
         let expr = m.shape.expr(&quote!((&__r)), &model, &data, reg);
+        let prelude = &args.prelude;
+        let call_stmt = native_call_stmt(&call, m.throws);
         // The native call may read the retained compiler context, so it runs
         // under `run_ref` (see `emit_union_methods`).
         getters.push(getter_tokens(&Getter {
@@ -2048,13 +2479,15 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &UnionReg) -> (TokenStr
             needs_py: m.shape.needs_py(),
             body: quote! {
                 ::fpp_core::run_ref(&#data.ctx, || {
-                    let __r = #call;
+                    #(#prelude)*
+                    #call_stmt
                     Ok(#expr)
                 })
             },
             via_super: false,
-            extra_params: extra,
-            is_method,
+            extra_params: args.sig.clone(),
+            is_method: args.is_method,
+            rust_name: None,
         }));
     }
 
@@ -2146,12 +2579,13 @@ fn emit_leaf_enum(e: &LeafEnumDecl) -> (TokenStream, TokenStream) {
 /// getter/method per `methods {}` entry (calling `self.data.analysis.<name>(…)`), a
 /// `build_analysis` constructor, and the register call. Returns
 /// `(definition, register_call)`.
-fn emit_analysis(a: &AnalysisDecl, reg: &UnionReg) -> (TokenStream, TokenStream) {
+fn emit_analysis(a: &AnalysisDecl, reg: &Registry) -> (TokenStream, TokenStream) {
     let native = &a.native;
     let model = quote!(&self.model);
     let data = quote!(self.data);
     let analysis_access = quote!(&self.data.analysis);
     let mut getters: Vec<TokenStream> = Vec::new();
+    let method_names = method_name_set(&a.methods);
 
     // Fields: read `self.data.analysis.<name>` directly.
     for f in &a.fields {
@@ -2162,12 +2596,14 @@ fn emit_analysis(a: &AnalysisDecl, reg: &UnionReg) -> (TokenStream, TokenStream)
         let expr = f
             .shape
             .expr(&quote!((&self.data.analysis.#n)), &model, &data, reg);
-        getters.push(getter_tokens(&Getter::field(
+        let mut g = Getter::field(
             n.clone(),
             f.shape.ty(reg),
             f.shape.needs_py(),
             quote!(Ok(#expr)),
-        )));
+        );
+        avoid_getter_symbol_clash(&mut g, &method_names);
+        getters.push(getter_tokens(&g));
     }
 
     // Methods: call `self.data.analysis.<name>(<args>)`.
@@ -2176,13 +2612,16 @@ fn emit_analysis(a: &AnalysisDecl, reg: &UnionReg) -> (TokenStream, TokenStream)
             continue;
         }
         let mname = &m.name;
-        let (extra, call_args, is_method) = method_arg_parts(&m.params, &analysis_access);
+        let args = method_arg_parts(&m.params, &analysis_access, &data, reg);
+        let call_args = &args.call;
         let call = if m.assoc {
             quote!(#native::#mname(&self.data.analysis #(, #call_args)*))
         } else {
             quote!(self.data.analysis.#mname(#(#call_args),*))
         };
         let expr = m.shape.expr(&quote!((&__r)), &model, &data, reg);
+        let prelude = &args.prelude;
+        let call_stmt = native_call_stmt(&call, m.throws);
         // The native call may read the retained compiler context, so it runs
         // under `run_ref` (see `emit_union_methods`).
         getters.push(getter_tokens(&Getter {
@@ -2191,13 +2630,15 @@ fn emit_analysis(a: &AnalysisDecl, reg: &UnionReg) -> (TokenStream, TokenStream)
             needs_py: m.shape.needs_py(),
             body: quote! {
                 ::fpp_core::run_ref(&#data.ctx, || {
-                    let __r = #call;
+                    #(#prelude)*
+                    #call_stmt
                     Ok(#expr)
                 })
             },
             via_super: false,
-            extra_params: extra,
-            is_method,
+            extra_params: args.sig.clone(),
+            is_method: args.is_method,
+            rust_name: None,
         }));
     }
 
@@ -2238,29 +2679,46 @@ pub fn expand(input: TokenStream) -> TokenStream {
         Err(e) => return e.to_compile_error(),
     };
 
-    // The union registry: every declared union keyed by its Python name, so a
-    // `union(<Name>)`/`rewrap(<Name>::V)` shape resolves its native path + handle.
-    // Built purely from the declared unions — every referenced union is locally
-    // declared in this single invocation.
-    let union_reg: UnionReg = dsl
-        .unions
-        .iter()
-        .map(|u| {
-            let subclasses = u
-                .variants
-                .iter()
-                .map(|v| (v.native_variant.to_string(), v.subclass.clone()))
-                .collect();
-            (
-                u.py.to_string(),
-                UnionInfo {
-                    native: u.native.clone(),
-                    handle: u.handle,
-                    subclasses,
-                },
-            )
-        })
-        .collect();
+    // The registry: every declared union / entity keyed by its Python name, so a
+    // `union(<Name>)`/`rewrap(<Name>::V)`/`entity(<Name>)` shape or argkind resolves
+    // its native path, storage handle and stored field. Built purely from the
+    // declaration — every referenced item is locally declared in this single
+    // invocation.
+    let union_reg = Registry {
+        unions: dsl
+            .unions
+            .iter()
+            .map(|u| {
+                let subclasses = u
+                    .variants
+                    .iter()
+                    .map(|v| (v.native_variant.to_string(), v.subclass.clone()))
+                    .collect();
+                (
+                    u.py.to_string(),
+                    UnionInfo {
+                        native: u.native.clone(),
+                        handle: u.handle,
+                        accessor: u.accessor.clone(),
+                        subclasses,
+                    },
+                )
+            })
+            .collect(),
+        entities: dsl
+            .entities
+            .iter()
+            .map(|e| {
+                let EntityHandle::Clone { field } = &e.handle;
+                (
+                    e.py.to_string(),
+                    EntityInfo {
+                        field: field.clone(),
+                    },
+                )
+            })
+            .collect(),
+    };
 
     let mut defs = Vec::new();
     let mut register_calls = Vec::new();
@@ -2293,17 +2751,31 @@ pub fn expand(input: TokenStream) -> TokenStream {
         register_calls.push(reg);
     }
 
+    // Traits supplying reflected `methods {}` entries, brought into scope by path so
+    // a trait method resolves at its call site. Anonymous (`as _`) imports, so they
+    // never collide with each other or with the `SymbolInterface` import below.
+    // `#[allow(unused_imports)]`: a listed trait may also be the hand-written
+    // `SymbolInterface` import below, and a redundant anonymous import is harmless.
+    let trait_imports = dsl
+        .traits
+        .iter()
+        .map(|p| quote!(#[allow(unused_imports)] use #p as _;));
+
     quote! {
         // The single load-bearing `fpp_analysis` trait dependency of the generated
         // code: the `.node()` accessor (called by the `loc_from_node` getter and by
         // the `node` identity `__hash__`, on unions/entities and the symbol-keyed
         // scaffolding) is a `SymbolInterface` trait method, so the trait must be in
-        // scope for method resolution. The method NAME `node` is not carried as a
-        // DSL payload: it is a stable trait method, and parameterizing it would not
-        // remove this import (a trait method needs its trait imported regardless of
-        // name). A rename of the trait or of `node` is a deliberate `fpp_analysis`
-        // change that updates this one line + the `.node()` call sites together.
+        // scope for method resolution. Unlike the `traits {…}` imports above it is
+        // NOT reachable from a DSL method entry — those call sites are emitted by the
+        // macro itself — so it stays hand-written here. The method NAME `node` is
+        // likewise not a DSL payload: it is a stable trait method, and parameterizing
+        // it would not remove this import (a trait method needs its trait imported
+        // regardless of name). A rename of the trait or of `node` is a deliberate
+        // `fpp_analysis` change that updates this one line + the `.node()` call
+        // sites together.
         use fpp_analysis::semantics::SymbolInterface as _;
+        #(#trait_imports)*
         use ::pyo3::prelude::*;
 
         #(#defs)*

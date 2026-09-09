@@ -48,6 +48,9 @@ enum Shape {
     Str,
     Node,
     Span,
+    /// The unit type `()` → Python `None`. Only reachable as the `Ok` half of a
+    /// `Result<(), E>` return (a pure check that raises on failure).
+    Unit,
     /// A payload-bearing local enum → the union wrapper (by `Id`).
     Union(Id),
     /// A bare-payload-struct wrapped back into its owning union variant. Carries
@@ -78,16 +81,44 @@ impl Shape {
 // Reflected method
 // ---------------------------------------------------------------------------
 
+/// How a method parameter is supplied to the native call — the reflected mirror of
+/// the macro's argkind vocabulary. Local type references are carried by rustdoc
+/// `Id` (exactly as [`Shape`] does) so the emitted Python name is resolved *after*
+/// the closure, once name-disambiguation is known.
 #[derive(Clone)]
-enum ArgKind {
+enum Arg {
+    /// The injected `&Analysis` — a context place-expr, NOT a Python parameter.
     Analysis,
-    /// A borrowed `&Symbol` param.
-    Symbol,
-    /// An owned `Symbol` param.
-    SymbolOwned,
     /// A scalar argkind token: `i128` / `bool` / `usize` / `str` (a borrowed `&str`)
-    /// / `string` (an owned `String`).
+    /// / `string` (an owned `String`). Each token already encodes its own pass
+    /// form, so [`ArgSpec::borrowed`] is not consulted for these.
     Scalar(&'static str),
+    /// `fpp_core::Node` — the AST node handle, supplied by any `crate::ast::AstNode`
+    /// wrapper (which stores exactly this handle).
+    Node,
+    /// `fpp_core::Span` — supplied by a `crate::ir_core::Span` wrapper.
+    Span,
+    /// `fpp_ast::<Name>` — supplied by the `crate::ast::<Name>` node wrapper, which
+    /// reborrows the live AST node through its own `ModelData`.
+    AstNode(String),
+    /// A reflected local union (by `Id`) — supplied by its Python base class.
+    Union(Id),
+    /// A reflected local entity (by `Id`) — supplied by its Python class.
+    Entity(Id),
+    /// `Arc<inner>`.
+    Arc(Box<Arg>),
+    /// `Option<inner>`.
+    Opt(Box<Arg>),
+    /// `Vec<inner>` or `&[inner]`.
+    List(Box<Arg>),
+}
+
+/// A reflected parameter: what supplies it, and whether the native signature takes
+/// it by shared reference (`&T`) or by value (`T`).
+#[derive(Clone)]
+struct ArgSpec {
+    arg: Arg,
+    borrowed: bool,
 }
 
 #[derive(Clone)]
@@ -95,9 +126,16 @@ struct MethodDef {
     name: String,
     /// Associated fn whose first arg is the `&Arc<Self>` / `&Self` receiver.
     assoc: bool,
-    /// (param name, kind) in source order (the receiver is excluded).
-    params: Vec<(String, ArgKind)>,
+    /// (param name, spec) in source order (the receiver is excluded).
+    params: Vec<(String, ArgSpec)>,
     ret: Shape,
+    /// The native returns `Result<ret, E>`: the generated method raises instead of
+    /// yielding the error. Carries `E`'s last path segment for the doc comment.
+    throws: Option<String>,
+    /// The `fpp_analysis` trait this method comes from, when it is not an inherent
+    /// method. The generated code must bring that trait into scope for the call to
+    /// resolve, so the path is carried into the DSL's `traits { … }` section.
+    trait_path: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +211,10 @@ pub struct Ctx<'a> {
     /// Type-alias `Id` → its target *struct* `Id` (only for aliases whose target
     /// peels to a local struct — the "entity alias" case, e.g. `Scope`).
     alias_struct: BTreeMap<u32, Id>,
+    /// The reflection-root [`ROOT_TYPE_NAME`] struct. Resolved once in [`prepare`]
+    /// so a parameter of that type is recognized by `Id` (disambiguation-invariant)
+    /// rather than by name, and injected from context instead of taken from Python.
+    analysis_id: Option<Id>,
     /// The shared `fpp_ast` grammar classification (an owned snapshot): an
     /// `fpp_ast::X` reference is resolved against this, not a name prefix.
     ast: AstClass,
@@ -357,6 +399,47 @@ fn insert_shorter(best: &mut BTreeMap<u32, Vec<String>>, id: u32, p: Vec<String>
 // ---------------------------------------------------------------------------
 // Small rustdoc helpers
 // ---------------------------------------------------------------------------
+
+/// Whether `imp` is an impl **on** `id` — i.e. `id` is the impl's `for` type.
+///
+/// Load-bearing filter: rustdoc lists an impl under `Struct::impls` / `Enum::impls`
+/// whenever the type appears anywhere in the impl's *trait* generic arguments, not
+/// only when it is the `for` type. `fpp_analysis` has several
+/// `impl UseAnalysisPass<'ast, Analysis> for CheckUses<'ast>`-shaped pass impls, so
+/// `Analysis`'s `impls` list carries `CheckUses`' methods. Reflecting one of those
+/// would emit `self.data.analysis.<method>(…)` for a method `Analysis` does not
+/// have — a hard compile break in the generated crate. Every `X::impls` walk in
+/// this module therefore goes through here.
+fn impl_is_for(imp: &rustdoc_types::Impl, id: Id) -> bool {
+    // The `for_` type is matched WITHOUT peeling `Box`/`Arc`/`Rc`: an impl on
+    // `Arc<X>` is not an impl on `X`, and `peel_wrappers` keys on the last path
+    // segment with no locality check — so peeling here would make a local type named
+    // `Arc` (this crate has `transition_graph::Arc`) stop matching its own impls the
+    // moment it gained a type parameter, silently emptying its method/trait set.
+    match &imp.for_ {
+        Type::ResolvedPath(p) => p.id == id,
+        // An impl written `impl Trait for Self` inside the type's own scope.
+        Type::Generic(g) => g == "Self",
+        _ => false,
+    }
+}
+
+/// The `Impl`s declared **on** `id` (inherent + trait), foreign trait-arg impls
+/// filtered out by [`impl_is_for`].
+fn impls_on(ctx: &Ctx, id: Id) -> Vec<rustdoc_types::Impl> {
+    let impl_ids: Vec<Id> = match ctx.item(id).map(|it| &it.inner) {
+        Some(ItemEnum::Struct(s)) => s.impls.clone(),
+        Some(ItemEnum::Enum(e)) => e.impls.clone(),
+        _ => Vec::new(),
+    };
+    impl_ids
+        .into_iter()
+        .filter_map(|iid| match ctx.item(iid).map(|it| &it.inner) {
+            Some(ItemEnum::Impl(imp)) if impl_is_for(imp, id) => Some(imp.clone()),
+            _ => None,
+        })
+        .collect()
+}
 
 fn as_struct(it: &Item) -> Option<&Struct> {
     match &it.inner {
@@ -554,6 +637,26 @@ fn build_alias_index(ctx: &mut Ctx) {
     ctx.alias_struct = map;
 }
 
+/// Resolve a reference to a **non-generic** local type alias to its target type
+/// (following chains). `None` when `t` is not such an alias.
+///
+/// Only argument-free aliases are followed: rustdoc already expands a generic alias
+/// applied to arguments, so an alias that still carries type args here would need
+/// substitution this reflection does not model.
+fn resolve_type_alias(ctx: &Ctx, t: &Type) -> Option<Type> {
+    let Type::ResolvedPath(p) = t else {
+        return None;
+    };
+    if !ctx.is_local(p.id) || !path_type_args(&p.args).is_empty() {
+        return None;
+    }
+    let ItemEnum::TypeAlias(ta) = &ctx.item(p.id)?.inner else {
+        return None;
+    };
+    let target = ta.type_.clone();
+    Some(resolve_type_alias(ctx, &target).unwrap_or(target))
+}
+
 /// Follow a type-alias chain; if it peels to a local struct, return that struct's
 /// `Id` (the "entity alias" case). Container/primitive targets return `None`.
 fn resolve_alias_to_struct(ctx: &Ctx, alias_id: Id) -> Option<Id> {
@@ -594,6 +697,7 @@ fn classify(ctx: &mut Ctx, t: &Type, enq: &mut Vec<Id>) -> Shape {
             other => Shape::Skip(format!("primitive {other}")),
         },
         Type::BorrowedRef { type_, .. } => classify(ctx, type_, enq),
+        Type::Tuple(elems) if elems.is_empty() => Shape::Unit,
         Type::Tuple(elems) => {
             let shapes: Vec<Shape> = elems.iter().map(|e| classify(ctx, e, enq)).collect();
             if let Some(s) = shapes.iter().find(|s| s.is_skip()) {
@@ -672,7 +776,15 @@ fn classify(ctx: &mut Ctx, t: &Type, enq: &mut Vec<Id>) -> Shape {
             }
         }
         Type::Generic(g) => Shape::Skip(format!("generic {g}")),
-        Type::Slice(_) => Shape::Skip("slice".into()),
+        // `&[T]` converts exactly like `Vec<T>`: the `list` emitter only iterates.
+        Type::Slice(inner) => {
+            let s = classify(ctx, inner, enq);
+            if s.is_skip() {
+                s
+            } else {
+                Shape::List(Box::new(s))
+            }
+        }
         Type::Array { .. } => Shape::Skip("array".into()),
         Type::QualifiedPath { name, .. } => Shape::Skip(format!("qualified path {name}")),
         _ => Shape::Skip("unrecognized type".into()),
@@ -775,32 +887,24 @@ fn enum_all_unit(ctx: &Ctx, id: Id) -> bool {
 /// `impl_owner` is the type whose `impls` list is walked (the alias target for an
 /// entity alias). Deduped by name, sorted by name.
 fn methods_for(ctx: &mut Ctx, impl_owner: Id, enq: &mut Vec<Id>) -> Vec<MethodDef> {
-    let impl_ids: Vec<Id> = match ctx.item(impl_owner).map(|it| &it.inner) {
-        Some(ItemEnum::Struct(s)) => s.impls.clone(),
-        Some(ItemEnum::Enum(e)) => e.impls.clone(),
-        _ => Vec::new(),
-    };
     let mut out: BTreeMap<String, MethodDef> = BTreeMap::new();
-    for iid in impl_ids {
-        let Some(imp) = ctx.item(iid).and_then(|it| match &it.inner {
-            ItemEnum::Impl(im) => Some(im.clone()),
-            _ => None,
-        }) else {
-            continue;
-        };
+    for imp in impls_on(ctx, impl_owner) {
         // Inherent impls, or trait impls whose trait is defined in `fpp_analysis`.
         let is_trait = imp.trait_.is_some();
+        let mut trait_path = None;
         if let Some(tr) = &imp.trait_ {
             if ctx.crate_name(tr.id).as_deref() != Some("fpp_analysis") {
                 continue;
             }
+            trait_path = Some(ctx.native_path(tr.id));
         }
         for mid in &imp.items {
             // Inherent methods must be `pub`; trait-impl method items carry
             // `Default` visibility (they are accessible via the public trait).
-            let Some(m) = classify_method(ctx, impl_owner, *mid, !is_trait, enq) else {
+            let Some(mut m) = classify_method(ctx, impl_owner, *mid, !is_trait, enq) else {
                 continue;
             };
+            m.trait_path = trait_path.clone();
             out.entry(m.name.clone()).or_insert(m);
         }
     }
@@ -843,27 +947,45 @@ fn classify_method(
     // Every remaining arg must be a marshallable argkind. A param outside the
     // supported vocabulary drops the whole method — logged (matching the
     // struct/enum skip style) rather than dropped silently.
-    let mut params: Vec<(String, ArgKind)> = Vec::new();
+    let mut params: Vec<(String, ArgSpec)> = Vec::new();
     for (pname, pty) in &inputs[rest..] {
-        match arg_kind(ctx, pty) {
-            Some(ak) => params.push((pname.clone(), ak)),
-            None => {
+        match arg_spec(ctx, pty, enq) {
+            Ok(spec) => params.push((pname.clone(), spec)),
+            Err(reason) => {
                 let owner_name = ctx.last_segment(owner);
                 let desc = type_desc(pty);
                 ctx.skips.push(format!(
-                    "  skip {owner_name}.{name}(): unsupported param `{pname}: {desc}`"
+                    "  skip {owner_name}.{name}(): unsupported param `{pname}: {desc}` ({reason})"
                 ));
                 return None;
             }
         }
     }
 
+    // A `Result<T, E>` return is marshalled as a raising method: the Python-facing
+    // shape is `T`, and `E` becomes the raised exception (rendered with `{:?}`, so
+    // `E` must impl `Debug`).
+    let out = output.as_ref()?;
+    let (out, throws) = match split_result(ctx, out) {
+        Some((ok, err_desc, err_debug)) => {
+            if !err_debug {
+                let owner_name = ctx.last_segment(owner);
+                ctx.skips.push(format!(
+                    "  skip {owner_name}.{name}(): Result error type `{err_desc}` has no Debug \
+                     impl (nothing to render into the raised exception)"
+                ));
+                return None;
+            }
+            (ok, Some(err_desc))
+        }
+        None => (out.clone(), None),
+    };
+
     // Return type must classify to a non-skip shape; a computed `span` (needs the
     // live context outside a plain getter) is skipped conservatively. Either drop
     // is logged (matching the param-drop style) rather than silent — a method with
     // a valid receiver + params but an unconvertible return is a real omission.
-    let out = output.as_ref()?;
-    let ret = classify(ctx, out, enq);
+    let ret = classify(ctx, &out, enq);
     if ret.is_skip() || matches!(ret, Shape::Span) {
         let owner_name = ctx.last_segment(owner);
         let reason = if matches!(ret, Shape::Span) {
@@ -893,7 +1015,41 @@ fn classify_method(
         assoc,
         params,
         ret,
+        throws,
+        trait_path: None,
     })
+}
+
+/// Split a `Result<T, E>` return into `(T, E's display name, whether E impls Debug)`.
+/// `None` for any non-`Result` return.
+///
+/// `fpp_analysis` spells these through aliases. A *generic* alias applied to an
+/// argument (`SemanticResult<i128>`) is already expanded to `Result<…>` by rustdoc,
+/// but a *non-generic* one (`MathResult`, `TypeConversionResult`) stays a path to the
+/// alias item — so aliases are resolved here first rather than listed in a table.
+fn split_result(ctx: &Ctx, t: &Type) -> Option<(Type, String, bool)> {
+    let resolved = resolve_type_alias(ctx, t);
+    let t = resolved.as_ref().unwrap_or(t);
+    let Type::ResolvedPath(p) = t else {
+        return None;
+    };
+    // A local type named `Result` would not be `core::Result` (see the container
+    // guard in `arg_inner` for the same hazard).
+    if ctx.is_local(p.id) || p.path.rsplit("::").next().unwrap_or(&p.path) != "Result" {
+        return None;
+    }
+    let args = path_type_args(&p.args);
+    if args.len() != 2 {
+        return None;
+    }
+    let err = args[1];
+    let debug = match err {
+        Type::ResolvedPath(ep) if ctx.is_local(ep.id) => impls_debug(ctx, ep.id),
+        // A non-local error type is not reflected here, so its `Debug` impl cannot
+        // be proven from this crate's rustdoc JSON.
+        _ => false,
+    };
+    Some((args[0].clone(), type_desc(err), debug))
 }
 
 /// Whether a return shape contains an `fpp_ast` walked node anywhere (Rule R2),
@@ -937,39 +1093,174 @@ fn receiver(owner: Id, first: &(String, Type)) -> Option<(bool, usize)> {
     }
 }
 
-fn arg_kind(ctx: &Ctx, t: &Type) -> Option<ArgKind> {
-    // Preserve owned-vs-borrowed: peeling `&` loses it, and an owned `Symbol` /
-    // `String` param must marshal differently from a borrowed one (Fix E). `&str`
-    // is inherently borrowed (unsized), so it is always the borrowed `str` token.
-    let borrowed = matches!(t, Type::BorrowedRef { .. });
-    let base = match t {
-        Type::BorrowedRef { type_, .. } => type_.as_ref(),
-        other => other,
+/// Classify a method parameter into an [`ArgSpec`], pushing referenced local `Id`s
+/// onto `enq` so a type reachable ONLY as a parameter still gets a Python wrapper
+/// (without one the param could not be supplied). `Err` carries the skip reason.
+fn arg_spec(ctx: &mut Ctx, t: &Type, enq: &mut Vec<Id>) -> Result<ArgSpec, String> {
+    // Preserve owned-vs-borrowed: peeling `&` loses it, and an owned param must
+    // marshal differently from a borrowed one (the wrapper only ever *lends* its
+    // native, so an owned param takes a clone).
+    let (borrowed, base) = match t {
+        // A `&mut` param would need the wrapper to hand out a mutable native. The
+        // whole model is `frozen`/read-only, so this can never be supplied — and
+        // silently treating it as a shared borrow would emit non-compiling code.
+        Type::BorrowedRef {
+            is_mutable: true, ..
+        } => return Err(format!("&mut {} (read-only wrappers)", type_desc(t))),
+        Type::BorrowedRef { type_, .. } => (true, type_.as_ref()),
+        other => (false, other),
     };
-    match base {
+    let arg = arg_inner(ctx, base, borrowed, enq)?;
+    // Scalars encode their own pass form in the token, so they are never `ref`.
+    let borrowed = borrowed && !matches!(arg, Arg::Scalar(_) | Arg::Analysis);
+    Ok(ArgSpec { arg, borrowed })
+}
+
+/// Classify the (already `&`-peeled) parameter type. `borrowed` only distinguishes
+/// `&str` from `String`; every nested position is by value.
+fn arg_inner(ctx: &mut Ctx, t: &Type, borrowed: bool, enq: &mut Vec<Id>) -> Result<Arg, String> {
+    match t {
         Type::Primitive(p) => match p.as_str() {
-            "bool" => Some(ArgKind::Scalar("bool")),
-            "i128" => Some(ArgKind::Scalar("i128")),
-            "str" => Some(ArgKind::Scalar("str")),
+            "bool" => Ok(Arg::Scalar("bool")),
+            "i128" => Ok(Arg::Scalar("i128")),
+            // `&str` is inherently borrowed (unsized), so it is always `str`.
+            "str" => Ok(Arg::Scalar("str")),
             "i8" | "i16" | "i32" | "i64" | "isize" | "u8" | "u16" | "u32" | "u64" | "usize" => {
-                Some(ArgKind::Scalar("usize"))
+                Ok(Arg::Scalar("usize"))
             }
-            _ => None,
+            other => Err(format!("primitive {other}")),
         },
+        // `&[T]` is fed from a Python list: the `list` argkind builds a `Vec<T>`, and
+        // `&Vec<T>` deref-coerces to `&[T]`. That coercion is what makes a slice
+        // work, so it only applies behind the top-level `&` — an unsized slice nested
+        // in a container (`Arc<[T]>`) would silently become `Arc<Vec<T>>`.
+        Type::Slice(inner) if borrowed => {
+            Ok(Arg::List(Box::new(arg_inner(ctx, inner, false, enq)?)))
+        }
+        Type::Slice(_) => Err("slice nested in a container".into()),
         Type::ResolvedPath(p) => {
-            let last = p.path.rsplit("::").next().unwrap_or(&p.path);
-            match (last, ctx.crate_name(p.id).as_deref()) {
-                ("Analysis", Some("fpp_analysis")) => Some(ArgKind::Analysis),
-                ("Symbol", Some("fpp_analysis")) => Some(if borrowed {
-                    ArgKind::Symbol
-                } else {
-                    ArgKind::SymbolOwned
-                }),
-                ("String", _) => Some(ArgKind::Scalar(if borrowed { "str" } else { "string" })),
-                _ => None,
+            let last = p.path.rsplit("::").next().unwrap_or(&p.path).to_string();
+            if last == "String" {
+                return Ok(Arg::Scalar(if borrowed { "str" } else { "string" }));
+            }
+            let args = path_type_args(&p.args);
+            // Containers, by last segment — but only for types from OTHER crates.
+            // `fpp_analysis` has its own `transition_graph::Arc` (a semantic union),
+            // and a bare last-segment match would read it as `std::sync::Arc` and
+            // then fail looking for a type argument. `Box`/`Rc` are deliberately not
+            // peeled: unlike a getter shape (where the wrapper is transparent) a
+            // parameter must be rebuilt in exactly the native's own container, and no
+            // `fpp_analysis` signature uses either today.
+            if !ctx.is_local(p.id) {
+                match last.as_str() {
+                    "Arc" => {
+                        let inner = args.first().ok_or("Arc<?>")?;
+                        return Ok(Arg::Arc(Box::new(arg_inner(ctx, inner, false, enq)?)));
+                    }
+                    "Option" => {
+                        let inner = args.first().ok_or("Option<?>")?;
+                        return Ok(Arg::Opt(Box::new(arg_inner(ctx, inner, false, enq)?)));
+                    }
+                    "Vec" | "VecDeque" => {
+                        let inner = args.first().ok_or("Vec<?>")?;
+                        return Ok(Arg::List(Box::new(arg_inner(ctx, inner, false, enq)?)));
+                    }
+                    _ => {}
+                }
+            }
+            match ctx.crate_name(p.id).as_deref() {
+                Some("fpp_core") => match last.as_str() {
+                    "Node" => Ok(Arg::Node),
+                    "Span" => Ok(Arg::Span),
+                    _ => Err(format!("fpp_core::{last} (no wrapper supplies it)")),
+                },
+                // Resolve against the REAL grammar partition, exactly as `classify`
+                // does for a getter shape. Only a recorded walk node has a
+                // `crate::ast::<Name>` wrapper able to lend the native back.
+                Some("fpp_ast") => match ctx.ast.classify_ast_ref(&last) {
+                    AstRef::AstDef(name) => Ok(Arg::AstNode(name)),
+                    AstRef::Leaf(name) => Err(format!(
+                        "fpp_ast::{name} (leaf-enum mirrors are one-way: no Python -> \
+                         native conversion)"
+                    )),
+                    AstRef::Skip(reason) => Err(reason),
+                },
+                Some("fpp_analysis") => arg_local(ctx, p.id, &last, borrowed, enq),
+                Some(other) => Err(format!("{other}::{last}")),
+                None => Err(format!("unresolved {last}")),
             }
         }
-        _ => None,
+        Type::Generic(g) => Err(format!("generic {g}")),
+        Type::Array { .. } => Err("array".into()),
+        Type::Tuple(_) => Err("tuple".into()),
+        Type::QualifiedPath { name, .. } => Err(format!("qualified path {name}")),
+        _ => Err("unrecognized type".into()),
+    }
+}
+
+/// Classify a local (`fpp_analysis`) parameter type by its `Id` — the parameter-side
+/// peer of [`classify_local`].
+fn arg_local(
+    ctx: &mut Ctx,
+    id: Id,
+    last: &str,
+    borrowed: bool,
+    enq: &mut Vec<Id>,
+) -> Result<Arg, String> {
+    // The reflection root is injected from context, never passed from Python.
+    if Some(id) == ctx.analysis_id {
+        return Ok(Arg::Analysis);
+    }
+    // NOTE: deliberately no `DEF_MODULE_STUB` -> `astdef(DEF_MODULE_AST)` bridge here,
+    // unlike `classify_local`. That mapping works for a getter because the shape only
+    // reads `.node_id`, which the stub also has; a parameter would hand the native a
+    // real `fpp_ast::DefModule` where it wants a `DefModuleStub`. So the stub falls
+    // through below and a parameter of that type is skipped.
+    match ctx.kind(id) {
+        Some(ItemKind::Enum) => {
+            if enum_all_unit(ctx, id) {
+                Err(format!(
+                    "fpp_analysis::{last} (leaf-enum mirrors are one-way: no Python -> \
+                     native conversion)"
+                ))
+            } else {
+                enq.push(id);
+                Ok(Arg::Union(id))
+            }
+        }
+        Some(ItemKind::Struct) => {
+            if ctx.payload_index.contains_key(&id.0) {
+                // A bare payload struct is only reachable in Python as a union
+                // subclass, whose stored native is the whole enum; projecting the
+                // payload back out would need a variant match per call site.
+                Err(format!(
+                    "fpp_analysis::{last} (bare union payload; no standalone Python class)"
+                ))
+            } else if impls_clone(ctx, id) {
+                enq.push(id);
+                Ok(Arg::Entity(id))
+            } else {
+                Err(format!("fpp_analysis::{last} (struct has no Clone impl)"))
+            }
+        }
+        Some(ItemKind::TypeAlias) => {
+            if let Some(target) = ctx.alias_struct.get(&id.0).copied() {
+                if impls_clone(ctx, target) {
+                    enq.push(id);
+                    Ok(Arg::Entity(id))
+                } else {
+                    Err(format!("alias {last} (target struct has no Clone impl)"))
+                }
+            } else if let ItemEnum::TypeAlias(ta) = &ctx.item(id).unwrap().inner {
+                // Carry `borrowed` through: the alias is transparent, so a `&Alias`
+                // param still wants the borrowed pass form of whatever it resolves to.
+                let target = ta.type_.clone();
+                arg_inner(ctx, &target, borrowed, enq)
+            } else {
+                Err(format!("alias {last}"))
+            }
+        }
+        other => Err(format!("fpp_analysis::{last} ({other:?})")),
     }
 }
 
@@ -1096,16 +1387,7 @@ fn struct_pub_fields(ctx: &mut Ctx, sid: Id, enq: &mut Vec<Id>) -> Vec<(String, 
 /// Whether a type has a no-arg `qualified_name(&self) -> String` inherent/trait
 /// method (→ `identity qualified_name`).
 fn has_qualified_name(ctx: &Ctx, impl_owner: Id) -> bool {
-    let impl_ids: Vec<Id> = match ctx.item(impl_owner).map(|it| &it.inner) {
-        Some(ItemEnum::Struct(s)) => s.impls.clone(),
-        Some(ItemEnum::Enum(e)) => e.impls.clone(),
-        _ => Vec::new(),
-    };
-    for iid in impl_ids {
-        let Some(it) = ctx.item(iid) else { continue };
-        let ItemEnum::Impl(imp) = &it.inner else {
-            continue;
-        };
+    for imp in impls_on(ctx, impl_owner) {
         for mid in &imp.items {
             let Some(mi) = ctx.item(*mid) else { continue };
             if mi.name.as_deref() != Some("qualified_name") {
@@ -1138,7 +1420,7 @@ pub struct Reflected {
 }
 
 pub fn reflect(ctx: &mut Ctx) -> Reflected {
-    let analysis_id = find_analysis(ctx).unwrap_or_else(|| {
+    let analysis_id = ctx.analysis_id.unwrap_or_else(|| {
         panic!("reflection-root struct `fpp_analysis::{ROOT_TYPE_NAME}` not found")
     });
 
@@ -1455,6 +1737,7 @@ fn render_shape(ctx: &Ctx, names: &Names, s: &Shape) -> String {
         Shape::Str => "str".into(),
         Shape::Node => "node".into(),
         Shape::Span => "span".into(),
+        Shape::Unit => "unit".into(),
         // Every closed union is referenced generically by its Python name; the
         // macro has no per-union shorthand vocabulary to keep in sync.
         Shape::Union(id) => format!("union({})", names.union(*id)),
@@ -1480,26 +1763,42 @@ fn render_shape(ctx: &Ctx, names: &Names, s: &Shape) -> String {
     }
 }
 
+/// Render an argkind token. Local type references resolve to their (now known)
+/// Python class names, exactly as [`render_shape`] does.
+fn render_arg(names: &Names, a: &Arg) -> String {
+    match a {
+        Arg::Analysis => "analysis".into(),
+        Arg::Scalar(s) => (*s).into(),
+        Arg::Node => "node".into(),
+        Arg::Span => "span".into(),
+        Arg::AstNode(name) => format!("astnode({name})"),
+        Arg::Union(id) => format!("union({})", names.union(*id)),
+        Arg::Entity(id) => format!("entity({})", names.entity(*id)),
+        Arg::Arc(i) => format!("arc({})", render_arg(names, i)),
+        Arg::Opt(i) => format!("opt({})", render_arg(names, i)),
+        Arg::List(i) => format!("list({})", render_arg(names, i)),
+    }
+}
+
 fn render_method(ctx: &Ctx, names: &Names, m: &MethodDef) -> String {
     let assoc = if m.assoc { "assoc " } else { "" };
     let ret = render_shape(ctx, names, &m.ret);
+    // `throws` is a call-site transform (the native `Result` becomes a raise), not a
+    // value conversion, so it sits on the method rather than inside the shape.
+    let throws = if m.throws.is_some() { " throws" } else { "" };
     if m.params.is_empty() {
-        format!("{assoc}{} -> {ret},", m.name)
+        format!("{assoc}{}{throws} -> {ret},", m.name)
     } else {
         let params: Vec<String> = m
             .params
             .iter()
-            .map(|(n, k)| {
-                let kw = match k {
-                    ArgKind::Analysis => "analysis",
-                    ArgKind::Symbol => "symbol",
-                    ArgKind::SymbolOwned => "symbol_owned",
-                    ArgKind::Scalar(s) => s,
-                };
-                format!("{n}: {kw}")
+            .map(|(n, spec)| {
+                let kw = render_arg(names, &spec.arg);
+                let by_ref = if spec.borrowed { "ref " } else { "" };
+                format!("{n}: {by_ref}{kw}")
             })
             .collect();
-        format!("{assoc}{}({}) -> {ret},", m.name, params.join(", "))
+        format!("{assoc}{}({}){throws} -> {ret},", m.name, params.join(", "))
     }
 }
 
@@ -1530,6 +1829,16 @@ pub fn emit(
     let mut out = String::new();
     out.push_str(&header(version));
     out.push_str("fpp_python_macros::fpp_sem_bindings! {\n");
+
+    // --- traits whose methods are reflected (brought into scope by the macro) ---
+    let traits = reflected_traits(r);
+    if !traits.is_empty() {
+        out.push_str("    traits {\n");
+        for t in &traits {
+            out.push_str(&format!("        {t},\n"));
+        }
+        out.push_str("    }\n\n");
+    }
 
     // --- analysis root ---
     out.push_str(&format!(
@@ -1821,44 +2130,36 @@ fn find_arc_wrapped(ctx: &Ctx, ty: &Type, out: &mut BTreeSet<u32>) {
 /// clone-entity handle stores the native by value and clones it, so an entity
 /// struct without `Clone` cannot be emitted.
 fn impls_clone(ctx: &Ctx, id: Id) -> bool {
-    let impl_ids: Vec<Id> = match ctx.item(id).map(|it| &it.inner) {
-        Some(ItemEnum::Struct(s)) => s.impls.clone(),
-        Some(ItemEnum::Enum(e)) => e.impls.clone(),
-        _ => return false,
-    };
-    for iid in impl_ids {
-        let Some(ItemEnum::Impl(imp)) = ctx.item(iid).map(|it| &it.inner) else {
-            continue;
-        };
-        if let Some(tr) = &imp.trait_ {
-            if tr.path.rsplit("::").next().unwrap_or(&tr.path) == "Clone" {
-                return true;
-            }
-        }
-    }
-    false
+    impls_std_marker(ctx, id, "Clone")
+}
+
+/// Whether a local type implements the `Debug` trait (derived or hand-written).
+/// A `Result<_, E>` return is only marshallable when `E` can be rendered into the
+/// raised Python exception, which the generated code does with `{:?}`.
+fn impls_debug(ctx: &Ctx, id: Id) -> bool {
+    impls_std_marker(ctx, id, "Debug")
+}
+
+/// Whether a local type has a trait impl whose trait's last path segment is `name`.
+fn impls_std_marker(ctx: &Ctx, id: Id, name: &str) -> bool {
+    impls_on(ctx, id).iter().any(|imp| {
+        imp.trait_.as_ref().is_some_and(|tr| {
+            tr.path.rsplit("::").next().unwrap_or(&tr.path) == name
+                // These markers live in `core`; requiring a foreign crate stops a
+                // same-named `fpp_analysis` trait from satisfying the check.
+                && !ctx.is_local(tr.id)
+        })
+    })
 }
 
 /// Whether a local type implements the `fpp_analysis` `SymbolInterface` trait.
 fn impls_symbol_interface(ctx: &Ctx, id: Id) -> bool {
-    let impl_ids: Vec<Id> = match ctx.item(id).map(|it| &it.inner) {
-        Some(ItemEnum::Enum(e)) => e.impls.clone(),
-        Some(ItemEnum::Struct(s)) => s.impls.clone(),
-        _ => return false,
-    };
-    for iid in impl_ids {
-        let Some(ItemEnum::Impl(imp)) = ctx.item(iid).map(|it| &it.inner) else {
-            continue;
-        };
-        if let Some(tr) = &imp.trait_ {
-            let last = tr.path.rsplit("::").next().unwrap_or(&tr.path);
-            if last == "SymbolInterface" && ctx.crate_name(tr.id).as_deref() == Some("fpp_analysis")
-            {
-                return true;
-            }
-        }
-    }
-    false
+    impls_on(ctx, id).iter().any(|imp| {
+        imp.trait_.as_ref().is_some_and(|tr| {
+            tr.path.rsplit("::").next().unwrap_or(&tr.path) == "SymbolInterface"
+                && ctx.crate_name(tr.id).as_deref() == Some("fpp_analysis")
+        })
+    })
 }
 
 /// Walk `s`, collecting the union / entity `Id`s that appear in any map KEY
@@ -1893,6 +2194,25 @@ fn collect_key_ids(s: &Shape, ku: &mut BTreeSet<u32>, ke: &mut BTreeSet<u32>) {
         }
         _ => {}
     }
+}
+
+/// Every reflected method in the model, in emission order.
+fn all_methods(r: &Reflected) -> impl Iterator<Item = &MethodDef> {
+    r.analysis_methods
+        .iter()
+        .chain(r.unions.iter().flat_map(|u| &u.methods))
+        .chain(r.payloads.iter().flat_map(|p| &p.methods))
+        .chain(r.entities.iter().flat_map(|e| &e.methods))
+}
+
+/// The `fpp_analysis` traits the reflected methods come from. The generated code
+/// brings each into scope so a trait method's call site resolves; without this a
+/// reflected trait method would emit `self.<recv>.<m>(…)` for a method not visible
+/// there. Deduped and sorted, so the emitted section is stable.
+fn reflected_traits(r: &Reflected) -> BTreeSet<String> {
+    all_methods(r)
+        .filter_map(|m| m.trait_path.clone())
+        .collect()
 }
 
 /// Every conversion `Shape` reachable in the reflected model (analysis, unions,
@@ -1993,20 +2313,13 @@ fn has_unqualified_name(ctx: &Ctx, id: Id) -> bool {
 }
 
 fn method_names(ctx: &Ctx, id: Id) -> Vec<String> {
-    let impl_ids: Vec<Id> = match ctx.item(id).map(|it| &it.inner) {
-        Some(ItemEnum::Struct(s)) => s.impls.clone(),
-        Some(ItemEnum::Enum(e)) => e.impls.clone(),
-        _ => Vec::new(),
-    };
     let mut out = Vec::new();
-    for iid in impl_ids {
-        if let Some(ItemEnum::Impl(imp)) = ctx.item(iid).map(|it| &it.inner) {
-            for mid in &imp.items {
-                if let Some(mi) = ctx.item(*mid) {
-                    if matches!(mi.inner, ItemEnum::Function(_)) {
-                        if let Some(n) = &mi.name {
-                            out.push(n.clone());
-                        }
+    for imp in impls_on(ctx, id) {
+        for mid in &imp.items {
+            if let Some(mi) = ctx.item(*mid) {
+                if matches!(mi.inner, ItemEnum::Function(_)) {
+                    if let Some(n) = &mi.name {
+                        out.push(n.clone());
                     }
                 }
             }
@@ -2016,15 +2329,7 @@ fn method_names(ctx: &Ctx, id: Id) -> Vec<String> {
 }
 
 fn has_no_arg_method_returning_node(ctx: &Ctx, id: Id, name: &str) -> bool {
-    let impl_ids: Vec<Id> = match ctx.item(id).map(|it| &it.inner) {
-        Some(ItemEnum::Struct(s)) => s.impls.clone(),
-        Some(ItemEnum::Enum(e)) => e.impls.clone(),
-        _ => Vec::new(),
-    };
-    for iid in impl_ids {
-        let Some(ItemEnum::Impl(imp)) = ctx.item(iid).map(|it| &it.inner) else {
-            continue;
-        };
+    for imp in impls_on(ctx, id) {
         for mid in &imp.items {
             let Some(mi) = ctx.item(*mid) else { continue };
             if mi.name.as_deref() != Some(name) {
@@ -2211,12 +2516,14 @@ pub fn prepare<'a>(krate: &'a Crate, ast: AstClass) -> Ctx<'a> {
         payload_index: BTreeMap::new(),
         newtype_payloads: BTreeSet::new(),
         alias_struct: BTreeMap::new(),
+        analysis_id: None,
         ast,
         used_ast_leaves: BTreeSet::new(),
         skips: Vec::new(),
     };
     build_payload_index(&mut ctx);
     build_alias_index(&mut ctx);
+    ctx.analysis_id = find_analysis(&ctx);
     assert_fpp_core_types(&ctx);
     assert_def_module_stub(&ctx);
     ctx
@@ -2226,12 +2533,16 @@ pub fn prepare<'a>(krate: &'a Crate, ast: AstClass) -> Ctx<'a> {
 /// Python name is owned by a semantic class, so the node has no stub and is
 /// opaque as a child. Walks the reflected fields + variant payloads; method
 /// returns carrying an `astdef` were already dropped by Rule R2, so none survive
-/// there. Returns one log line per rewrite.
-pub fn apply_shadow(r: &mut Reflected, shadowed: &BTreeSet<String>) -> Vec<String> {
+/// there. Method *parameters* are also walked: an `astnode(x)` param would name the
+/// unstubbed wrapper class in the `.pyi`, so such a method is dropped whole (a
+/// parameter, unlike a field, cannot degrade to `skip`). Returns one log line per
+/// rewrite.
+pub fn apply_shadow(r: &mut Reflected, names: &Names, shadowed: &BTreeSet<String>) -> Vec<String> {
     let mut log = Vec::new();
     for (fname, sh) in &mut r.analysis_fields {
         shadow_shape(sh, shadowed, &format!("Analysis.{fname}"), &mut log);
     }
+    drop_shadowed_param_methods(&mut r.analysis_methods, "Analysis", shadowed, &mut log);
     for u in &mut r.unions {
         for v in &mut u.variants {
             let label = v.native.clone();
@@ -2247,18 +2558,63 @@ pub fn apply_shadow(r: &mut Reflected, shadowed: &BTreeSet<String>) -> Vec<Strin
                 _ => {}
             }
         }
+        let owner = names.union(u.id).to_string();
+        drop_shadowed_param_methods(&mut u.methods, &owner, shadowed, &mut log);
     }
     for p in &mut r.payloads {
         for (fname, sh) in &mut p.fields {
             shadow_shape(sh, shadowed, fname, &mut log);
         }
+        drop_shadowed_param_methods(&mut p.methods, "payload", shadowed, &mut log);
     }
     for e in &mut r.entities {
         for (fname, sh) in &mut e.fields {
             shadow_shape(sh, shadowed, fname, &mut log);
         }
+        let owner = names.entity(e.id).to_string();
+        drop_shadowed_param_methods(&mut e.methods, &owner, shadowed, &mut log);
     }
     log
+}
+
+/// Drop every method taking an `astnode(x)` parameter for a shadowed AST node `x`.
+/// The wrapper class exists at runtime but carries no stub, so naming it in a
+/// parameter position would emit a `.pyi` referencing an undeclared class.
+fn drop_shadowed_param_methods(
+    methods: &mut Vec<MethodDef>,
+    owner: &str,
+    shadowed: &BTreeSet<String>,
+    log: &mut Vec<String>,
+) {
+    let mut dropped: Vec<(String, String)> = Vec::new();
+    methods.retain(|m| {
+        match m
+            .params
+            .iter()
+            .find_map(|(_, spec)| shadowed_astnode(&spec.arg, shadowed))
+        {
+            Some(name) => {
+                dropped.push((m.name.clone(), name));
+                false
+            }
+            None => true,
+        }
+    });
+    for (m, name) in dropped {
+        log.push(format!(
+            "  shadow {owner}.{m}(): astnode({name}) param -> method dropped (name owned by a \
+             sem class, so the node wrapper has no stub)"
+        ));
+    }
+}
+
+/// The first shadowed AST-node name referenced anywhere inside an argkind.
+fn shadowed_astnode(a: &Arg, shadowed: &BTreeSet<String>) -> Option<String> {
+    match a {
+        Arg::AstNode(name) if shadowed.contains(name) => Some(name.clone()),
+        Arg::Arc(i) | Arg::Opt(i) | Arg::List(i) => shadowed_astnode(i, shadowed),
+        _ => None,
+    }
 }
 
 fn shadow_shape(s: &mut Shape, shadowed: &BTreeSet<String>, label: &str, log: &mut Vec<String>) {

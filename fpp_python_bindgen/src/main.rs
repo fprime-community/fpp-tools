@@ -93,7 +93,7 @@ fn run_full(cfg: &Config) {
     part.set_shadowed(shadowed.clone());
 
     // E: normalize the reflected model (shadowed astdef → skip).
-    for line in sem::apply_shadow(&mut reflected, &shadowed) {
+    for line in sem::apply_shadow(&mut reflected, &names, &shadowed) {
         eprintln!("{line}");
     }
 
@@ -178,7 +178,7 @@ fn run_sem_only(cfg: &Config) {
         "bindgen: derived entity-shadowed nodes = {}",
         fmt_set(&shadowed)
     );
-    for line in sem::apply_shadow(&mut reflected, &shadowed) {
+    for line in sem::apply_shadow(&mut reflected, &names, &shadowed) {
         eprintln!("{line}");
     }
 
