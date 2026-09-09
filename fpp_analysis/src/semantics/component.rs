@@ -680,7 +680,7 @@ impl Component {
         Ok(())
     }
 
-    pub fn add_spec_port_matching(&mut self, node: Arc<SpecPortMatching>) -> () {
+    pub fn add_spec_port_matching(&mut self, node: Arc<SpecPortMatching>) {
         self.spec_port_matching_list.push(node);
     }
 

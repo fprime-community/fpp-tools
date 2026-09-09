@@ -176,7 +176,8 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecPortMatching,
     ) -> ControlFlow<Self::Break> {
         update(a, |_a, component| {
-            Ok(component.add_spec_port_matching(Arc::new(node.clone())))
+            component.add_spec_port_matching(Arc::new(node.clone()));
+            Ok(())
         });
         ControlFlow::Continue(())
     }
