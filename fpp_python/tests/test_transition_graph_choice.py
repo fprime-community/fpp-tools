@@ -26,7 +26,7 @@ module M {
 
 
 def test_choice_arc_a_node_is_transition_expr():
-    m = f.analyze(SM_SRC, uri="sm_choice.fpp")
+    m = f.analyze(source=SM_SRC, uri="sm_choice.fpp")
     assert not m.has_errors, [d.message for d in m.diagnostics]
 
     (_sym, sm) = next(iter(m.analysis.state_machine_map.items()))

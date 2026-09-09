@@ -20,7 +20,7 @@ from fpp_python import (
 
 
 def _model(path: str):
-    m = f.analyze(open(path).read(), uri=path)
+    m = f.analyze(path)
     assert not m.has_errors, [d.message for d in m.diagnostics]
     return m
 
@@ -70,7 +70,7 @@ def test_command_kinds_are_union_subclasses():
       async command A_CMD
     }
     """
-    m = f.analyze(src, uri="k.fpp")
+    m = f.analyze(source=src, uri="k.fpp")
     assert not m.has_errors, [d.message for d in m.diagnostics]
     comp = _only_component(m)
     by_name = {c.name: c.kind for c in comp.command_map.values()}
@@ -129,7 +129,7 @@ def test_telemetry_and_dicts():
       telemetry CH2: F32 id 0x10
     }
     """
-    m = f.analyze(src, uri="tlm.fpp")
+    m = f.analyze(source=src, uri="tlm.fpp")
     assert not m.has_errors, [d.message for d in m.diagnostics]
     comp = _only_component(m)
     # Telemetry channels are defined; no `command` definitions (only cmd ports).
@@ -164,7 +164,7 @@ module M {
 
 
 def test_state_machine_model():
-    m = f.analyze(SM_SRC, uri="sm.fpp")
+    m = f.analyze(source=SM_SRC, uri="sm.fpp")
     assert not m.has_errors, [d.message for d in m.diagnostics]
     a = m.analysis
     (sym, sm) = next(iter(a.state_machine_map.items()))

@@ -1115,6 +1115,14 @@ fn emit_py(reg: &Registry) -> TokenStream {
         impl AstNode {
             #[getter] fn node_id(&self) -> u32 { self.data.id(self.node) }
             #[getter] fn location(&self) -> Option<Loc> { self.data.loc(self.node) }
+            /// This node's direct child nodes, in source order.
+            ///
+            /// `kind` enums and union wrappers are transparent: the children are
+            /// the AST *nodes* reached through this node's fields (so an `Expr`'s
+            /// children are the sub-expressions inside its `kind`). The typed
+            /// field getters are the precise way to reach a specific child; this
+            /// is the type-agnostic one, and is what `NodeVisitor.generic_visit`
+            /// traverses.
             #[getter] fn children(&self, py: Python<'_>) -> PyResult<Vec<Py<AstNode>>> {
                 let kids: Vec<Node> = self.data.children(self.node).to_vec();
                 kids.into_iter().map(|c| Model::build(&self.model, py, c)).collect()

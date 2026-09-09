@@ -2,7 +2,7 @@
 //!
 //! # Why raw pointers
 //!
-//! The hybrid backing keeps the parsed [`fpp_ast::TransUnit`] alive inside
+//! The hybrid backing keeps every parsed [`fpp_ast::TransUnit`] alive inside
 //! [`crate::ir_core::ModelData`] and reads AST nodes directly instead of copying
 //! them into an owned IR. A wrapper only stores the node's [`fpp_core::Node`]
 //! handle (a `Copy`, `Send + Sync` index); to reach the concrete AST struct at
@@ -10,19 +10,23 @@
 //!
 //! # Soundness
 //!
-//! `NodeRef::ptr` points **into** `ModelData::tu` (the owned, parsed AST). This
-//! is sound because:
+//! `NodeRef::ptr` points **into** the `tu` of some `ModelData::units` entry (an
+//! owned, parsed AST). This is sound because:
 //!
-//! * `tu` is never mutated after the recording walk (semantic analysis runs on a
-//!   *separate* augmented clone, never on `tu`), so no `Vec`/`Box` it owns is
-//!   ever reallocated — the heap buffers the pointers reference never move.
-//! * Moving `tu` (into `ModelData`, then into `Arc<ModelData>`, then across the
-//!   `allow_threads` boundary) only copies `Vec`/`Box` *headers*; the heap
-//!   allocations they own — where the pointed-to nodes live — stay put.
+//! * The recording walk is the **last** step of the pipeline: every AST mutation
+//!   (include resolution, and the `add_state_enums` transform for `analyze`) has
+//!   already run, and semantic analysis only takes `&TransUnit`. So no `Vec`/`Box`
+//!   an AST owns is ever reallocated after the walk — the heap buffers the
+//!   pointers reference never move.
+//! * Moving a `UnitData` (into `ModelData`, then into `Arc<ModelData>`, then
+//!   across the `allow_threads` boundary) only copies `Vec`/`Box` *headers*; the
+//!   heap allocations they own — where the pointed-to nodes live — stay put. The
+//!   same holds for the `Vec<UnitData>` itself, which is built to its final
+//!   length before the walk and only ever has its `roots` field written after.
 //! * `ModelData` is held behind `Arc` by [`crate::model::Model`], and every AST
 //!   wrapper keeps that `Model` alive through its `Py<Model>`. So for as long as
-//!   any wrapper can call [`NodeRef::downcast`], the `tu` it points into is
-//!   alive and immutable.
+//!   any wrapper can call [`NodeRef::downcast`], the AST it points into is alive
+//!   and immutable.
 //! * The `tag` is assigned together with `ptr` during the walk from the concrete
 //!   static type of the node, so `downcast::<T>()` is only ever called with the
 //!   `T` that matches `tag` (see `ModelData::node_as`).
@@ -33,7 +37,8 @@
 
 use crate::ast::NodeKind;
 
-/// A type tag plus a raw pointer to a node living inside `ModelData::tu`.
+/// A type tag plus a raw pointer to a node living inside one of
+/// `ModelData::units`.
 #[derive(Clone, Copy)]
 pub struct NodeRef {
     /// Which AST struct `ptr` points at (drives wrapper construction).

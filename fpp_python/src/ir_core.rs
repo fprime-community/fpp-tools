@@ -1,6 +1,7 @@
 //! Hand-written core of the backing: the resolved [`Loc`] and the owned
-//! [`ModelData`] — the live parsed AST, the live `fpp_analysis::Analysis`, and
-//! the live `fpp_core::CompilerContext`, all kept alive for direct reads.
+//! [`ModelData`] — the live parsed ASTs (one [`UnitData`] per translation unit),
+//! the live `fpp_analysis::Analysis`, and the live `fpp_core::CompilerContext`,
+//! all kept alive for direct reads.
 //!
 //! There is **no owned per-node IR copy** and **no owned semantic mirror**:
 //! AST wrappers read the live `fpp_ast` nodes through [`ModelData::node_as`],
@@ -173,26 +174,42 @@ impl<K: pyo3_stub_gen::PyStubType, V: pyo3_stub_gen::PyStubType> pyo3_stub_gen::
     }
 }
 
-/// A fully analyzed model: the live parsed AST and `fpp_analysis::Analysis` kept
-/// alive for direct reads, plus the `fpp_core::Node`-keyed side-tables recorded
-/// during the walk (see `crate::lower_core::Walker`).
+/// One parsed translation unit.
 ///
-/// `node_ptrs` aliases into `tu`, which is immutable for the life of this struct
-/// (see [`crate::noderef`] for the soundness argument). Everything here is
-/// `Send + Sync`, so it may live behind the `Sync` `Model` pyclass.
-pub struct ModelData {
-    /// The live parsed AST (never mutated after the walk).
+/// `uri` is the path (or `uri=` argument) the unit was parsed from. Nodes pulled
+/// in by `include` carry their own file in their span, so a unit's nodes are not
+/// all from `uri`.
+pub struct UnitData {
+    pub uri: String,
+    /// Never mutated after the walk — see [`crate::noderef`].
     pub tu: fpp_ast::TransUnit,
-    /// The live semantic analysis.
-    pub analysis: fpp_analysis::Analysis,
-    /// The live compiler context, retained so locations/annotations resolve
-    /// lazily via `run_ref` at getter time.
-    pub ctx: Arc<CompilerContext<SharedEmitter>>,
-    /// Translation-unit top-level member nodes, in source order.
+    /// Top-level member nodes, in source order.
     pub roots: Vec<Node>,
+}
+
+/// A parsed (and optionally analyzed) set of translation units: the live ASTs and
+/// `fpp_analysis::Analysis` kept alive for direct reads, plus the
+/// `fpp_core::Node`-keyed side-tables recorded during the walk (see
+/// `crate::lower_core::Walker`).
+///
+/// `node_ptrs` aliases into the `units`' ASTs, which are immutable for the life of
+/// this struct (see [`crate::noderef`] for the soundness argument). Everything
+/// here is `Send + Sync`, so it may live behind the `Sync` `Model` pyclass.
+///
+/// A syntax-only backing (from [`crate::pipeline::parse`]) carries a fresh
+/// `Analysis` that only include resolution wrote to, so `use_def`/`type_of`/
+/// `value_of` all return `None` and `by_qualified_name` is empty. It is reachable
+/// only through `SyntaxTree`, which exposes no semantic accessors.
+pub struct ModelData {
+    /// In the order they were given.
+    pub units: Vec<UnitData>,
+    pub analysis: fpp_analysis::Analysis,
+    /// Retained so locations/annotations resolve lazily via `run_ref` at getter
+    /// time.
+    pub ctx: Arc<CompilerContext<SharedEmitter>>,
     /// Dense id per node (the `.node_id` attribute), assigned in walk pre-order.
     pub ids: FxHashMap<Node, u32>,
-    /// Type-tag + raw pointer into `tu` per node.
+    /// Type-tag + raw pointer into the owning unit's `tu`, per node.
     pub node_ptrs: FxHashMap<Node, NodeRef>,
     /// Direct child nodes per node, in walk (source) order. Nodes with no
     /// children are absent. Children are the *nodes* reached from a node's

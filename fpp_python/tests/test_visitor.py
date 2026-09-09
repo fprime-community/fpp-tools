@@ -63,8 +63,12 @@ module M {
 """
 
 
+def _roots(model):
+    return [node for unit in model.ast for node in unit.members]
+
+
 def _model(src: str, uri: str = "t.fpp"):
-    m = f.analyze(src, uri=uri)
+    m = f.analyze(source=src, uri=uri)
     assert not m.has_errors, [d.message for d in m.diagnostics]
     return m
 
@@ -82,7 +86,7 @@ class _Trace(NodeVisitor):
 
 def _trace(model):
     v = _Trace()
-    for root in model.ast():
+    for root in _roots(model):
         v.visit(root)
     return v.nodes
 
@@ -97,14 +101,14 @@ def _type_names(nodes):
 
 
 def test_children_are_the_declared_members_in_source_order():
-    (mod,) = _model(MODULE_SRC).ast()
+    (mod,) = _roots(_model(MODULE_SRC))
     assert _type_names(mod.children) == ["DefConstant", "DefArray", "DefAbsType"]
 
 
 def test_children_flatten_through_kind_enums():
     # `Expr` holds an `ExprKind`; the kind is transparent, so an Expr's children
     # are the sub-expressions inside it rather than the kind wrapper.
-    (mod,) = _model(MODULE_SRC).ast()
+    (mod,) = _roots(_model(MODULE_SRC))
     expr = mod.children[0].value
     assert type(expr.kind).__name__ == "ExprBinop"
     left, right = expr.children
@@ -118,7 +122,7 @@ def test_children_are_transparent_through_unions():
     # `ComponentMember` and `SpecPortInstance` are unions; the concrete node
     # shows up as the child, never a union wrapper.
     m = _model(TOPOLOGY_SRC, uri="top.fpp")
-    (comp,) = [n for n in m.ast() if type(n).__name__ == "DefComponent"]
+    (comp,) = [n for n in _roots(m) if type(n).__name__ == "DefComponent"]
     assert _type_names(comp.children) == [
         "SpecGeneralPortInstance",
         "SpecGeneralPortInstance",
@@ -127,7 +131,7 @@ def test_children_are_transparent_through_unions():
 
 def test_childless_nodes_return_an_empty_list():
     # `type T` collapses to a name only, so it has no child nodes.
-    (mod,) = _model(MODULE_SRC).ast()
+    (mod,) = _roots(_model(MODULE_SRC))
     abs_type = mod.children[2]
     assert type(abs_type).__name__ == "DefAbsType"
     assert abs_type.children == []
@@ -136,13 +140,13 @@ def test_childless_nodes_return_an_empty_list():
 def test_a_definition_name_is_not_a_child():
     # Names are bound as plain strings by the binding, not as `Ident` nodes, so
     # `children` mirrors the typed field getters rather than the Rust walk.
-    (mod,) = _model(MODULE_SRC).ast()
+    (mod,) = _roots(_model(MODULE_SRC))
     assert mod.name == "M"
     assert "Ident" not in _type_names(mod.children)
 
 
 def test_children_preserve_node_identity():
-    (mod,) = _model(MODULE_SRC).ast()
+    (mod,) = _roots(_model(MODULE_SRC))
     assert mod.children[0] is mod.children[0]
     assert mod.children[0] is mod.members[0]
 
@@ -177,7 +181,7 @@ def test_override_receives_the_concrete_node_type():
             super().visit_DefComponent(node)
 
     v = Collect()
-    for root in _model(TOPOLOGY_SRC, uri="top.fpp").ast():
+    for root in _roots(_model(TOPOLOGY_SRC, uri="top.fpp")):
         v.visit(root)
     assert v.names == ["C"]
 
@@ -199,7 +203,7 @@ def test_super_call_descends_and_omitting_it_prunes():
 
     m = _model(TOPOLOGY_SRC, uri="top.fpp")
     deep, pruned = Deep(), Pruned()
-    for root in m.ast():
+    for root in _roots(m):
         deep.visit(root)
         pruned.visit(root)
     assert deep.ports == ["pOut", "pIn"]
@@ -217,7 +221,7 @@ def test_generic_visit_override_makes_the_pass_shallow():
         def generic_visit(self, node):
             self.hits.append(type(node).__name__)
 
-    (mod,) = _model(MODULE_SRC).ast()
+    (mod,) = _roots(_model(MODULE_SRC))
     v = Shallow()
     v.visit(mod)
     assert v.hits == ["DefModule"]
@@ -239,7 +243,7 @@ def test_shallow_pass_descends_via_the_base_generic_visit():
         def visit_DefModule(self, node):
             super().generic_visit(node)  # ...except through a module
 
-    (mod,) = _model(MODULE_SRC).ast()
+    (mod,) = _roots(_model(MODULE_SRC))
     v = Selective()
     v.visit(mod)
     assert v.hits == ["DefConstant", "DefArray", "DefAbsType"]
@@ -261,7 +265,7 @@ def test_raising_aborts_the_traversal():
         def visit_DefArray(self, node):
             raise Found(node)
 
-    (mod,) = _model(MODULE_SRC).ast()
+    (mod,) = _roots(_model(MODULE_SRC))
     v = Find()
     try:
         v.visit(mod)
@@ -293,7 +297,7 @@ def test_shadowed_node_types_are_visitable():
             super().visit_PortInstanceIdentifier(node)
 
     v = Conns()
-    for root in _model(TOPOLOGY_SRC, uri="top.fpp").ast():
+    for root in _roots(_model(TOPOLOGY_SRC, uri="top.fpp")):
         v.visit(root)
     assert v.connections == 1
     assert v.endpoints == ["pOut", "pIn"]
@@ -309,7 +313,7 @@ def test_subclass_may_define_its_own_init_signature():
 
     v = Tagged("hello", limit=3)
     assert (v.tag, v.limit) == ("hello", 3)
-    (mod,) = _model(MODULE_SRC).ast()
+    (mod,) = _roots(_model(MODULE_SRC))
     assert v.visit(mod) is None
 
 
@@ -322,7 +326,7 @@ def test_plain_visitor_traverses_without_error():
         (TOPOLOGY_SRC, "top.fpp"),
         (STATE_MACHINE_SRC, "sm.fpp"),
     ):
-        for root in _model(src, uri=uri).ast():
+        for root in _roots(_model(src, uri=uri)):
             assert v.visit(root) is None
 
 
@@ -360,7 +364,7 @@ def test_visitor_covers_exactly_the_children_closure():
     ):
         m = _model(src, uri=uri)
         visited = _trace(m)
-        closure = _children_closure(m.ast())
+        closure = _children_closure(_roots(m))
         assert len(visited) == len(closure), uri
         # Each node is reached exactly once — no node is walked twice.
         assert len({n.node_id for n in visited}) == len(visited), uri

@@ -835,10 +835,23 @@ class Loc:
     def __repr__(self) -> builtins.str: ...
 
 class Model:
+    r"""
+    A parsed and semantically analyzed set of translation units.
+    
+    Returned by `analyze`.
+    """
     @property
     def has_errors(self) -> builtins.bool: ...
     @property
     def error_count(self) -> builtins.int: ...
+    @property
+    def ast(self) -> builtins.list[TransUnit]:
+        r"""
+        The transformed AST: one `TransUnit` per input, in the order given.
+        
+        "Transformed" is the parsed units after include resolution and the
+        state-enum transform — what the analysis was actually computed from.
+        """
     @property
     def diagnostics(self) -> builtins.list[Diagnostic]:
         r"""
@@ -851,10 +864,6 @@ class Model:
         `fpp_analysis::Analysis`. Navigate the model's semantics through its
         public maps (e.g. `model.analysis.component_map`) and methods (e.g.
         `model.analysis.get_qualified_name(sym)`).
-        """
-    def ast(self) -> builtins.list[AstNode]:
-        r"""
-        The translation-unit top-level members.
         """
     def lookup(self, qualified_name:builtins.str) -> typing.Optional[Symbol]:
         r"""
@@ -900,6 +909,28 @@ class NodeVisitor:
       `generic_visit`.
     * To stop early, raise an exception — return values are not inspected.
     """
+    def __new__(cls, *args, **kwargs) -> NodeVisitor:
+        r"""
+        Accepts (and ignores) any arguments, so a subclass is free to define its
+        own `__init__` signature without forwarding to `super().__init__()`.
+        """
+    def visit(self, node:AstNode) -> typing.Any:
+        r"""
+        Visit `node` by dispatching to this visitor's `visit_<type(node).__name__>`
+        method, falling back to `generic_visit` when there is none.
+        
+        Returns whatever the dispatched method returned.
+        """
+    def generic_visit(self, node:AstNode) -> typing.Any:
+        r"""
+        Visit each of `node`'s children in source order, and return `None`.
+        
+        This is the single funnel every base `visit_<TypeName>` delegates to, so
+        overriding it hooks every node the traversal reaches — the analogue of
+        `fpp_ast::Visitor::super_visit`. Children are the AST nodes reached
+        through `node`'s fields (see `AstNode.children`); values returned by the
+        children are discarded.
+        """
     def visit_Connection(self, node:AstNode) -> typing.Any: ...
     def visit_DefAbsType(self, node:DefAbsType) -> typing.Any: ...
     def visit_DefAction(self, node:DefAction) -> typing.Any: ...
@@ -961,28 +992,6 @@ class NodeVisitor:
     def visit_TransitionExpr(self, node:TransitionExpr) -> typing.Any: ...
     def visit_TypeName(self, node:TypeName) -> typing.Any: ...
     def visit_Opaque(self, node:Opaque) -> typing.Any: ...
-    def __new__(cls, *args, **kwargs) -> NodeVisitor:
-        r"""
-        Accepts (and ignores) any arguments, so a subclass is free to define its
-        own `__init__` signature without forwarding to `super().__init__()`.
-        """
-    def visit(self, node:AstNode) -> typing.Any:
-        r"""
-        Visit `node` by dispatching to this visitor's `visit_<type(node).__name__>`
-        method, falling back to `generic_visit` when there is none.
-        
-        Returns whatever the dispatched method returned.
-        """
-    def generic_visit(self, node:AstNode) -> typing.Any:
-        r"""
-        Visit each of `node`'s children in source order, and return `None`.
-        
-        This is the single funnel every base `visit_<TypeName>` delegates to, so
-        overriding it hooks every node the traversal reaches — the analogue of
-        `fpp_ast::Visitor::super_visit`. Children are the AST nodes reached
-        through `node`'s fields (see `AstNode.children`); values returned by the
-        children are discarded.
-        """
 
 class Opaque(AstNode):
     @property
@@ -1698,6 +1707,31 @@ class Sync(CommandKindBase):
 class SyncInput(GeneralKindBase):
     ...
 
+class SyntaxTree:
+    r"""
+    A parsed set of translation units, without semantic analysis.
+    
+    Returned by `parse`. There is no `analysis` or `lookup`, and the nodes it
+    yields have no resolved symbols, types, or values (those getters return
+    `None`). Use `analyze` for semantics.
+    """
+    @property
+    def units(self) -> builtins.list[TransUnit]:
+        r"""
+        The parsed translation units, one per input, in the order given.
+        """
+    @property
+    def diagnostics(self) -> builtins.list[Diagnostic]:
+        r"""
+        The syntax diagnostics (errors, warnings, notes) emitted while parsing.
+        """
+    @property
+    def has_errors(self) -> builtins.bool: ...
+    @property
+    def error_count(self) -> builtins.int: ...
+    def __len__(self) -> builtins.int: ...
+    def __repr__(self) -> builtins.str: ...
+
 class System(SymbolBase):
     @property
     def definition(self) -> DefSystem: ...
@@ -1791,6 +1825,29 @@ class TopologyPort:
     def pii(self) -> PortInstanceIdentifier: ...
     @property
     def underlying_loc(self) -> Span: ...
+    def __repr__(self) -> builtins.str: ...
+
+class TransUnit:
+    r"""
+    One translation unit: everything parsed from a single input.
+    
+    Yielded by `SyntaxTree.units` and `Model.ast`.
+    """
+    @property
+    def uri(self) -> builtins.str:
+        r"""
+        The URI this unit was parsed from: the file path, or the `uri=` argument
+        for in-memory source.
+        
+        Nodes spliced in by `include` come from other files — read a node's
+        `location.uri` for the file it actually lives in.
+        """
+    @property
+    def members(self) -> builtins.list[AstNode]:
+        r"""
+        This unit's top-level member nodes, in source order.
+        """
+    def __len__(self) -> builtins.int: ...
     def __repr__(self) -> builtins.str: ...
 
 class TransitionBase:
@@ -1905,9 +1962,9 @@ class TypeBase:
     def serialized_size(self) -> typing.Optional[builtins.int]: ...
     @property
     def underlying_type(self) -> Type: ...
-    def __repr__(self) -> builtins.str: ...
     def __eq__(self, other:typing.Any) -> builtins.bool: ...
     def __hash__(self) -> builtins.int: ...
+    def __repr__(self) -> builtins.str: ...
 
 class TypeBoolean(TypeBase):
     ...
@@ -2097,8 +2154,33 @@ class TlmChannelUpdate(Enum):
 class Unop(Enum):
     Minus = ...
 
-def analyze(source:builtins.str, uri:builtins.str='<string>') -> Model:
+def analyze(paths:typing.Optional[builtins.str | builtins.list[builtins.str]]=None, *, source:typing.Optional[builtins.str]=None, uri:builtins.str='<string>') -> Model:
     r"""
-    Analyze FPP source text and return a [`Model`].
+    Parse and semantically analyze FPP sources, returning a `Model`.
+    
+    Takes the same inputs as `parse`, one translation unit per input, but analyzes
+    all units **together**, so a definition in one resolves uses in another.
+    
+    `model.ast` is the *transformed* AST — the parsed units after include
+    resolution and the state-enum transform — and `model.analysis` is the analysis
+    computed from it.
+    
+    Raises `OSError` if a path cannot be read, `ValueError` if no input is given.
+    """
+
+def parse(paths:typing.Optional[builtins.str | builtins.list[builtins.str]]=None, *, source:typing.Optional[builtins.str]=None, uri:builtins.str='<string>') -> SyntaxTree:
+    r"""
+    Parse FPP sources into a syntax tree, without semantic analysis.
+    
+    `paths` is a single `.fpp` file path or an iterable of them; `source` is
+    in-memory FPP text labelled `uri`. Either or both may be given, and each input
+    becomes one translation unit. `include` directives are resolved, which reads
+    the included files.
+    
+    This is the fast front end: the nodes it yields carry locations, annotations,
+    and children, but no resolved symbols, types, or values. Use `analyze` for
+    those.
+    
+    Raises `OSError` if a path cannot be read, `ValueError` if no input is given.
     """
 

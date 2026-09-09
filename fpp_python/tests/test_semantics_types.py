@@ -41,7 +41,7 @@ module M {
 
 @pytest.fixture(scope="module")
 def m():
-    model = f.analyze(SRC, uri="types.fpp")
+    model = f.analyze(source=SRC, uri="types.fpp")
     assert not model.has_errors, [d.message for d in model.diagnostics]
     return model
 

@@ -2,7 +2,8 @@
 
 `.github/workflows/python.yml` builds the extension and runs mypy over this file
 so the checked-in `fpp_python/fpp_python.pyi` stub is validated against real call
-sites. It exercises the new semantic surface: the `Analysis` root, its typed maps
+sites. It exercises both entry points — `parse` (a `SyntaxTree` of `TransUnit`s)
+and `analyze` (a `Model`) — and the semantic surface: the `Analysis` root, its typed maps
 (`dict[Symbol, Component]`, `dict[int, Command]`), the `Type` / `CommandKind`
 union base+subclass hierarchies (narrowed with `isinstance`), the lazy `Span`
 handle, the state-machine model, and the AST traversal surface (`AstNode.children`
@@ -11,10 +12,12 @@ plus a `NodeVisitor` subclass overriding typed `visit_*` methods).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Optional
 
 from fpp_python import (
     analyze,
+    parse,
     Analysis,
     Async,
     AstNode,
@@ -32,6 +35,8 @@ from fpp_python import (
     StateMachine,
     StateMachineSymbol,
     Symbol,
+    SyntaxTree,
+    TransUnit,
     Type,
 )
 
@@ -134,16 +139,33 @@ def descendant_count(node: AstNode) -> int:
     return total
 
 
+def syntax_only(paths: list[str]) -> int:
+    """`parse` yields a `SyntaxTree` of `TransUnit`s and no `Analysis`."""
+    tree: SyntaxTree = parse(paths)
+    if tree.has_errors:
+        for diag in tree.diagnostics:
+            print(diag.level, diag.message)
+        return tree.error_count
+
+    total = 0
+    for unit in tree.units:
+        uri: str = unit.uri
+        members: list[AstNode] = unit.members
+        total += len(uri) + len(members) + len(unit)
+    return total
+
+
 def main() -> int:
-    model: Model = analyze(SRC, uri="mem.fpp")
+    model: Model = analyze(source=SRC, uri="mem.fpp")
     if model.has_errors:
         for diag in model.diagnostics:
             print(diag.level, diag.message)
         return model.error_count
 
-    node_id_sum = 0
+    node_id_sum = syntax_only([str(Path(__file__).parent / "commands" / "commands.fpp")])
     visitor = CommandCollector()
-    for node in model.ast():
+    units: list[TransUnit] = model.ast
+    for node in (n for unit in units for n in unit.members):
         node_id_sum += node.node_id + descendant_count(node)
         if isinstance(node, DefConstant):
             constant_type_kind(node)
