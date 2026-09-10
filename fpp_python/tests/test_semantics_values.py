@@ -9,8 +9,8 @@ Constants are located by qualified name; their folded value is read through
 
 import pytest
 
-import fpp_python as f
-from fpp_python import (
+import fpp as f
+from fpp import (
     AnonArrayValue,
     AnonStructValue,
     EnumConstantValue,

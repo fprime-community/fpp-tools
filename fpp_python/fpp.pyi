@@ -1295,7 +1295,7 @@ class NodeVisitor:
     pre-order, in source order.
     
     ```python
-    class Components(fpp_python.NodeVisitor):
+    class Components(fpp.NodeVisitor):
         def __init__(self):
             self.names = []
     

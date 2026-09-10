@@ -1,7 +1,7 @@
 """Smoke tests for the native binding entry point and the `Analysis` root."""
 
-import fpp_python as f
-from fpp_python import Analysis
+import fpp as f
+from fpp import Analysis
 
 
 def test_analyze_ok():

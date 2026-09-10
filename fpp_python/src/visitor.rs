@@ -49,7 +49,7 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 /// pre-order, in source order.
 ///
 /// ```python
-/// class Components(fpp_python.NodeVisitor):
+/// class Components(fpp.NodeVisitor):
 ///     def __init__(self):
 ///         self.names = []
 ///

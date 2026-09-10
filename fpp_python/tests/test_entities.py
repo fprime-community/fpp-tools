@@ -7,8 +7,8 @@ curated `Model` accessor.
 
 import pytest
 
-import fpp_python as f
-from fpp_python import (
+import fpp as f
+from fpp import (
     ComponentKind,
     Direction,
     GeneralPortInstance,

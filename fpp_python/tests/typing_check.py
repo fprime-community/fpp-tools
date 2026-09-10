@@ -1,7 +1,7 @@
 """Typed usage of the native bindings, checked by mypy (not run as a test).
 
 `.github/workflows/python.yml` builds the extension and runs mypy over this file
-so the checked-in `fpp_python/fpp_python.pyi` stub is validated against real call
+so the checked-in `fpp_python/fpp.pyi` stub is validated against real call
 sites. It exercises both entry points — `parse` (a `SyntaxTree` of `TransUnit`s)
 and `analyze` (a `Model`) — and the semantic surface: the `Analysis` root, its typed maps
 (`dict[Symbol, Component]`, `dict[int, Command]`), the `Type` / `Command` /
@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
-from fpp_python import (
+from fpp import (
     analyze,
     parse,
     Analysis,

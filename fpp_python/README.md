@@ -1,7 +1,8 @@
-# fpp_python
+# fprime-fpp-python
 
-Native Python bindings to the [FPP](https://nasa.github.io/fpp/) compiler. The
-`fpp_python` extension binds **directly** to the Rust FPP compiler in-process via
+Native Python bindings to the [FPP](https://nasa.github.io/fpp/) compiler.
+Installed as `fprime-fpp-python`, imported as `fpp`. The
+`fpp` extension binds **directly** to the Rust FPP compiler in-process via
 PyO3: parsing and semantic analysis run in-process, and the AST and analysis are
 exposed as a live, navigable Python object graph.
 
@@ -23,9 +24,9 @@ extension usable on CPython ≥ 3.10.
 ## Usage
 
 ```python
-import fpp_python
+import fpp
 
-model = fpp_python.analyze(source="""
+model = fpp.analyze(source="""
 module M {
   array Arr = [4] U32
   constant answer = 6 * 7
@@ -54,10 +55,10 @@ Both entry points take the same inputs — a `.fpp` path, a list of paths, and/o
 in-memory `source=` text — and produce one **translation unit** per input:
 
 ```python
-fpp_python.analyze("Top.fpp")                     # one file
-fpp_python.analyze(["A.fpp", "B.fpp"])            # analyzed together
-fpp_python.analyze(source="constant a = 1")       # in-memory, uri="<string>"
-fpp_python.analyze(["A.fpp"], source=src, uri="patch.fpp")   # both
+fpp.analyze("Top.fpp")                     # one file
+fpp.analyze(["A.fpp", "B.fpp"])            # analyzed together
+fpp.analyze(source="constant a = 1")       # in-memory, uri="<string>"
+fpp.analyze(["A.fpp"], source=src, uri="patch.fpp")   # both
 ```
 
 A bare string is always a **path**, never source; pass `source=` for text. All
@@ -69,7 +70,7 @@ It returns a `SyntaxTree` — the units and the syntax diagnostics, and nothing
 semantic. Use it when you only need syntax:
 
 ```python
-tree = fpp_python.parse(["A.fpp", "B.fpp"])
+tree = fpp.parse(["A.fpp", "B.fpp"])
 for unit in tree.units:
     print(unit.uri, [type(m).__name__ for m in unit.members])
 ```
@@ -90,7 +91,7 @@ discriminate with `isinstance` / `match` (each subclass exposes only its own
 fields) rather than a string tag:
 
 ```python
-from fpp_python import ArrayType, PrimitiveInt, IntegerKind
+from fpp import ArrayType, PrimitiveInt, IntegerKind
 
 match arr.definition.resolved_type:
     case ArrayType() as a:
@@ -132,7 +133,7 @@ where `<TypeName>` is the node's class name — the same string as
 fields you reach are fully typed.
 
 ```python
-from fpp_python import NodeVisitor
+from fpp import NodeVisitor
 
 class Constants(NodeVisitor):
     def __init__(self):

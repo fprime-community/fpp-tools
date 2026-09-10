@@ -3,8 +3,8 @@ component sub-element maps (commands / events / params / telemetry), the
 `NonParamKind` union subclasses, and the state-machine model.
 """
 
-import fpp_python as f
-from fpp_python import (
+import fpp as f
+from fpp import (
     Async,
     Command,
     Guarded,

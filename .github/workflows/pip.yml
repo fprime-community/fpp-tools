@@ -3,7 +3,7 @@ name: Pip Packages
 # Builds pip wheels + sdists for the FPP Rust distributions:
 #   - fprime-fpp-lsp     (from fpp_lsp_server)  — executable
 #   - fprime-fpp-format  (from fpp_format)      — executable
-#   - fprime-fpp-python  (from fpp_python)      — abi3 PyO3 extension (import `fpp_python`)
+#   - fprime-fpp-python  (from fpp_python)      — abi3 PyO3 extension (import `fpp`)
 #
 # On push/PR/dispatch this only *builds* the distributions and uploads them as
 # artifacts. When a GitHub release is published it additionally publishes every

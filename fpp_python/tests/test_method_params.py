@@ -18,7 +18,7 @@ is rejected, and a field getter can coexist with a `get_<field>` method.
 
 import pytest
 
-import fpp_python as f
+import fpp as f
 
 SRC = """
 constant SIZE = 4

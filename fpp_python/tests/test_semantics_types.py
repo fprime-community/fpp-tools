@@ -11,8 +11,8 @@ is read through `symbol.definition.resolved_type`. The union is a base
 
 import pytest
 
-import fpp_python as f
-from fpp_python import (
+import fpp as f
+from fpp import (
     AnonArrayType,
     AnonStructType,
     Array,

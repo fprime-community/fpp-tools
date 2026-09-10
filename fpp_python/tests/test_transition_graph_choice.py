@@ -7,8 +7,8 @@ wrapper. This test navigates to a Choice arc and confirms `a_node` downcast
 cleanly (did not raise, and did not fall back to the opaque base).
 """
 
-import fpp_python as f
-from fpp_python import StateMachineSymbol, TransitionGraphArcChoice
+import fpp as f
+from fpp import StateMachineSymbol, TransitionGraphArcChoice
 
 # A state machine whose initial transition enters a choice, and whose choice has
 # guarded `if`/`else` transitions — so the transition graph records `Choice` arcs

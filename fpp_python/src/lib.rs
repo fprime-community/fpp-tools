@@ -39,7 +39,7 @@ use diagnostics::Diagnostic;
 use model::{Model, SyntaxTree, TransUnit};
 
 #[pymodule]
-fn fpp_python(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn fpp(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pipeline::register(m)?;
     m.add_class::<Model>()?;
     m.add_class::<SyntaxTree>()?;
@@ -54,13 +54,6 @@ fn fpp_python(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 /// Gather the pyo3-stub-gen [`StubInfo`] for this extension.
-///
-/// The inventory of `#[gen_stub_*]` submissions lives in this (`fpp_python`)
-/// crate, so this gatherer must too. The `stub_gen` binary calls it to write the
-/// stub. The output location is resolved from this crate's `pyproject.toml`
-/// (`[tool.maturin] module-name`, pure-Rust layout), which sits beside
-/// `Cargo.toml`: the stub is written as `fpp_python.pyi` and maturin ships it in
-/// the wheel as `fpp_python/__init__.pyi`.
 pub fn stub_info() -> pyo3_stub_gen::Result<pyo3_stub_gen::StubInfo> {
     let manifest_dir: &std::path::Path = env!("CARGO_MANIFEST_DIR").as_ref();
     pyo3_stub_gen::StubInfo::from_pyproject_toml(manifest_dir.join("pyproject.toml"))

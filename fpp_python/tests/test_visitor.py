@@ -7,8 +7,8 @@ default is shallow). These tests pin that contract down: what counts as a child,
 deep-vs-pruned recursion, the `generic_visit` funnel, and early exit by raising.
 """
 
-import fpp_python as f
-from fpp_python import AstNode, DefComponent, NodeVisitor
+import fpp as f
+from fpp import AstNode, DefComponent, NodeVisitor
 
 MODULE_SRC = """
 module M {

@@ -13,7 +13,7 @@
 #   make bindgen      # src/ast/defs.rs + src/sem/defs.rs   (pinned nightly)
 #   make bindgen-ast  # src/ast/defs.rs only                (stable only)
 #   make bindgen-sem  # src/sem/defs.rs only                (pinned nightly)
-#   make stubs        # fpp_python.pyi
+#   make stubs        # fpp.pyi
 #   make drift        # fail if any generated file differs from the index
 #   make ext          # build the import-only extension (what the wheel ships)
 #   make nightly      # install the pinned nightly the bindgen rustdoc needs
@@ -32,7 +32,7 @@ ROOT := $(abspath $(CRATE_DIR)/..)
 GENERATED := \
 	fpp_python/src/ast/defs.rs \
 	fpp_python/src/sem/defs.rs \
-	fpp_python/fpp_python.pyi
+	fpp_python/fpp.pyi
 
 # --- libpython linker hint (stub_gen only) ----------------------------------
 #

@@ -2,8 +2,8 @@
 
 import pytest
 
-import fpp_python as f
-from fpp_python import Model, SyntaxTree, TransUnit
+import fpp as f
+from fpp import Model, SyntaxTree, TransUnit
 
 COMMANDS = "tests/commands/commands.fpp"
 EVENTS = "tests/events/events.fpp"

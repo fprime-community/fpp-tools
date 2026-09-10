@@ -1,10 +1,5 @@
 name: Python bindings
 
-# Builds/tests the `fpp_python` PyO3 wheel and checks that its generated code is
-# in sync. Unlike the Rust jobs in `rust.yml` (which already build/clippy/test
-# the `fpp_python` cdylib via `--workspace`), these jobs exercise the Python
-# surface: the pytest suite, the codegen-drift check, and the type stub.
-
 on:
   push:
     branches: [ master ]
@@ -54,38 +49,16 @@ jobs:
   codegen:
     name: "Codegen drift"
     runs-on: ubuntu-latest
-    # Regenerates the checked-in declarations — the AST mirror
-    # (`fpp_python/src/ast/defs.rs`, a `fpp_ast_bindings!` mirror of the in-workspace
-    # `fpp_ast`) and the semantic mirror (`fpp_python/src/sem/defs.rs`, a
-    # `fpp_sem_bindings!` mirror of `fpp_analysis`) — and the type stub
-    # (`fpp_python/fpp_python.pyi`, from the annotated pyclasses via pyo3-stub-gen),
-    # and fails if any drifts. Each bindgen stamps the resolved upstream-crate
-    # version into its declaration header, so an `fpp_ast`/`fpp_analysis` change
-    # trips this until the declaration is regenerated and committed. The semantic
-    # layer is now entirely generated (`sem/defs.rs` is a full `fpp_analysis`
-    # mirror; there is no hand-authored declaration to exempt), and regenerating it
-    # shells out to nightly rustdoc, so this job installs nightly too.
+    # Regenerates the checked-in declarations to validate they are up to date
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # `stub_gen` links libpython (built with extension-module OFF), so a Python
-      # must be present for pyo3 to locate it.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      # `bindgen` reflects `fpp_analysis` from rustdoc JSON, which it produces by
-      # shelling out to nightly rustdoc — so a nightly toolchain must be present
-      # for the declaration regeneration step below.
-      #
-      # The nightly is PINNED, not floating. rustdoc's JSON schema is unstable and
-      # bumps `format_version` on its own cadence, which `bindgen` asserts against
-      # its `rustdoc-types` pin; a floating `nightly` fails the moment upstream
-      # moves past that schema (and would make this drift check non-deterministic
-      # even when it did parse). `bindgen` reads the same file, so the toolchain it
-      # invokes and the one installed here cannot diverge.
       - name: Resolve the pinned nightly
         id: nightly
         run: echo "toolchain=$(tr -d '[:space:]' < fpp_python_bindgen/nightly-toolchain)" >> "$GITHUB_OUTPUT"
@@ -95,40 +68,18 @@ jobs:
         with:
           toolchain: ${{ steps.nightly.outputs.toolchain }}
 
-      # Installed LAST on purpose: `rust-toolchain` makes each toolchain it
-      # installs the default, and the steps below must build on stable like every
-      # other job. The pinned nightly is reached only through the explicit
-      # `cargo +<toolchain>` that `bindgen` issues for rustdoc — it is a rustdoc
-      # JSON source, not this job's compiler.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # The regeneration steps drive `fpp_python/Makefile` — the same targets a
-      # contributor runs — rather than re-spelling the `cargo run` invocations here.
-      # Both generators are environment-sensitive (the bindgen needs the pinned
-      # nightly; `stub_gen` needs a libpython linker hint, see below) and the
-      # Makefile already encodes that, so duplicating the commands is how CI and
-      # local runs drift apart. Only the drift gate below is CI-specific.
-
-      # (a) Regenerate BOTH checked-in declarations (AST + semantic). Runs before
-      # the stub dump so the stub reflects the freshly-regenerated pyclasses.
       - name: Regenerate declarations
         run: make -C fpp_python bindgen
 
-      # (b) Regenerate the type stub from the annotated pyclasses. The stub-dump
-      # binary must be built WITHOUT `extension-module` (a standalone executable
-      # links libpython for real), so it needs the unversioned `libpython3.X.so`
-      # symlink on the linker path; `make stubs` probes for it and falls back to
-      # CPython's `LIBPL` config dir when the interpreter's LIBDIR lacks it.
       - name: Regenerate type stub
         run: make -C fpp_python stubs
 
-      # (c) Fail if any regenerated declaration/stub differs from what's committed.
-      # Spelled out rather than `make drift` so the failure carries a GitHub
-      # annotation.
       - name: Check for drift
         run: |
-          if ! git diff --exit-code -- fpp_python/src/ast/defs.rs fpp_python/src/sem/defs.rs fpp_python/fpp_python.pyi; then
+          if ! git diff --exit-code -- fpp_python/src/ast/defs.rs fpp_python/src/sem/defs.rs fpp_python/fpp.pyi; then
             echo "::error::checked-in declaration/stub is stale; run \`make -C fpp_python codegen\` and commit the result."
             exit 1
           fi
@@ -157,7 +108,5 @@ jobs:
           python -m pip install --upgrade pip mypy
           pip install ./fpp_python
 
-      # Type-checks a tiny typed usage file, forcing mypy to load and validate the
-      # shipped `fpp_python/__init__.pyi` stub.
       - name: Run mypy
         run: mypy fpp_python/tests/typing_check.py

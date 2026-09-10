@@ -1,4 +1,4 @@
-//! Dumps `python/fpp_python/__init__.pyi` from the pyclasses annotated with
+//! Dumps `python/fpp/__init__.pyi` from the pyclasses annotated with
 //! `#[gen_stub_pyclass]` / `#[gen_stub_pymethods]`, via pyo3-stub-gen's inventory.
 //!
 //! Build/run WITHOUT the `extension-module` feature (a standalone executable
@@ -6,14 +6,15 @@
 //!   cargo run -p fpp_python --no-default-features --features stubgen --bin stub_gen
 //!
 //! The output path is resolved from this crate's `pyproject.toml`
-//! (`module-name = fpp_python`, pure-Rust layout), so the stub lands beside
-//! `Cargo.toml` as `fpp_python.pyi`. maturin ships it in the wheel as
-//! `fpp_python/__init__.pyi`. See `fpp_python::stub_info`.
+//! (`module-name = fpp`, pure-Rust layout), so the stub lands beside `Cargo.toml`
+//! as `fpp.pyi`. maturin ships it in the wheel as `fpp/__init__.pyi`. See
+//! `fpp::stub_info` — the lib target of the `fpp_python` crate is named for the
+//! Python module it becomes, so it is `fpp`, not `fpp_python`.
 //!
 //! After generation we inject the closed-union type aliases
 //! (`Value = IntegerValue | … `), which pyo3-stub-gen cannot express as named
 //! `TypeAlias`es — the union return sites render as the alias name via a custom
-//! `PyStubType`, and these lines define it (see `fpp_python::union_aliases`).
+//! `PyStubType`, and these lines define it (see `fpp::union_aliases`).
 //!
 //! Two fixups follow, both because the aliases are injected *after* generation
 //! and so are invisible to the generator: their names are added to the emitted
@@ -24,8 +25,8 @@ use std::fs;
 use std::path::Path;
 
 fn main() -> pyo3_stub_gen::Result<()> {
-    fpp_python::stub_info()?.generate()?;
-    let stub = Path::new(env!("CARGO_MANIFEST_DIR")).join("fpp_python.pyi");
+    fpp::stub_info()?.generate()?;
+    let stub = Path::new(env!("CARGO_MANIFEST_DIR")).join("fpp.pyi");
     inject_union_aliases(&stub)?;
     Ok(())
 }
@@ -38,7 +39,7 @@ fn inject_union_aliases(path: &Path) -> std::io::Result<()> {
 
     let mut aliases = String::new();
     let mut alias_names = Vec::new();
-    for (name, rhs) in fpp_python::union_aliases() {
+    for (name, rhs) in fpp::union_aliases() {
         aliases.push_str(&format!("{name}: typing.TypeAlias = {rhs}\n"));
         alias_names.push(name);
     }

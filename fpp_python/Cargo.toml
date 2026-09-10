@@ -1,5 +1,5 @@
-# Native PyO3 bindings to the FPP compiler, packaged as the `fpp_python` wheel
-# `import fpp_python`
+# Native PyO3 bindings to the FPP compiler, packaged as the
+# `fprime-fpp-python` wheel — `import fpp`
 [package]
 name = "fpp_python"
 description = "Native Python bindings to the FPP compiler (PyO3)"
@@ -11,8 +11,8 @@ repository.workspace = true
 publish = false
 
 [lib]
-# Imported from Python as the top-level `fpp_python` module.
-name = "fpp_python"
+# Imported from Python as the top-level `fpp` module.
+name = "fpp"
 crate-type = ["cdylib", "rlib"]
 test = false
 doctest = false

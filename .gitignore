@@ -34,7 +34,7 @@ build/
 dist/
 *.egg-info/
 # Built extension modules (the wheel ships these; never commit them). The
-# checked-in `fpp_python/fpp_python.pyi` type stub is NOT matched by this.
+# checked-in `fpp_python/fpp.pyi` type stub is NOT matched by this.
 *.so
 *.pyd
 venv/

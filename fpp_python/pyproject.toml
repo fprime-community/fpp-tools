@@ -1,7 +1,7 @@
 # Built with maturin: a compiled PyO3 extension imported as the top-level
-# `fpp_python` module, which binds the Rust FPP compiler in-process. abi3-py310
+# `fpp` module, which binds the Rust FPP compiler in-process. abi3-py310
 # yields one wheel per platform for CPython >= 3.10. The generated type stub
-# (`python/fpp_python/__init__.pyi`) and `py.typed` marker ship alongside.
+# (`python/fpp/__init__.pyi`) and `py.typed` marker ship alongside.
 [build-system]
 requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
@@ -27,10 +27,6 @@ Homepage = "https://github.com/fprime-community/fpp-tools"
 Repository = "https://github.com/fprime-community/fpp-tools"
 
 [tool.maturin]
-# Pure-Rust layout: the compiled extension IS the top-level `fpp_python` module
-# (no `.py` glue, no `_native` submodule, no support code). The generated type
-# stub `fpp_python.pyi` and the `py.typed` marker sit beside `Cargo.toml` and are
-# shipped in the wheel next to the extension.
 manifest-path = "Cargo.toml"
-module-name = "fpp_python"
+module-name = "fpp"
 bindings = "pyo3"
