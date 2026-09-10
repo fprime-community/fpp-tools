@@ -49,3 +49,18 @@ fn implicit_duplicate_connection_at_matched_input_port() {
 fn duplicate_connection_at_matched_port() {
     run_test("port_numbering/duplicate_connection_at_matched_port")
 }
+
+#[test]
+fn missing_connection() {
+    run_test("port_numbering/missing_connection")
+}
+
+#[test]
+fn duplicate_instance_name() {
+    run_test("port_numbering/duplicate_instance_name")
+}
+
+#[test]
+fn matched_through_alias() {
+    run_test("port_numbering/matched_through_alias")
+}

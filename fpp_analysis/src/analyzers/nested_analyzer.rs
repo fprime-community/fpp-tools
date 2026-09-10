@@ -13,7 +13,7 @@ pub enum NestedAnalyzerMode {
 /// A basic trait that keeps state of the symbol scope we are under
 pub trait NestedScopeState {
     /// Look up a symbol given a node defining the symbol
-    fn get_symbol<N: AstNode>(&self, node: &N) -> Symbol;
+    fn get_symbol<N: AstNode>(&self, node: &N) -> Option<Symbol>;
 
     /// Enter a scope under a symbol
     fn push_scope(&mut self, symbol: Symbol);
@@ -26,7 +26,7 @@ pub trait NestedScopeState {
 }
 
 impl NestedScopeState for Analysis {
-    fn get_symbol<N: AstNode>(&self, node: &N) -> Symbol {
+    fn get_symbol<N: AstNode>(&self, node: &N) -> Option<Symbol> {
         self.get_symbol(node)
     }
 
@@ -60,13 +60,17 @@ impl<'ast, S: NestedScopeState, V: Visitor<'ast, State = S>> NestedAnalyzer<'ast
         &self,
         visitor: &V,
         a: &mut V::State,
-        symbol: Symbol,
+        symbol: Option<Symbol>,
         node: Node<'ast>,
     ) -> ControlFlow<V::Break> {
-        a.push_scope(symbol);
-        let out = node.walk(a, visitor);
-        a.pop_scope();
-        out
+        if let Some(symbol) = symbol {
+            a.push_scope(symbol);
+            let out = node.walk(a, visitor);
+            a.pop_scope();
+            out
+        } else {
+            node.walk(a, visitor)
+        }
     }
 }
 

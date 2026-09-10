@@ -1,0 +1,5 @@
+   --> [ local path prefix ]/expr/sizeof_too_large.fpp:132:21
+    |
+132 | constant tooLarge = sizeof(A127)
+    |                     ^^^^^^^^^^^^ serialized size is too large to represent
+

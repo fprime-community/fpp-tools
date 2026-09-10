@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/arith_overflow_use_chain.fpp:3:14
+  |
+3 | constant z = max + 1
+  |              ^^^^^^^ arithmetic result is too large to represent
+

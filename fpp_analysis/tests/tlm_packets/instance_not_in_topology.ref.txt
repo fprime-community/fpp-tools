@@ -1,5 +1,5 @@
  --> [ local path prefix ]/tlm_packets/instance_not_in_topology.fpp:6:7
   |
 6 |       c1.T
-  |       ^^ cannot find component instance or topology `c1` in scope
+  |       ^^^^ channel c1.T is not in the dictionary for topology T
 

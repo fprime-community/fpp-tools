@@ -54,3 +54,23 @@ fn interface_instance_not_member() {
 fn top_to_top() {
     run_test("top_ports/top_to_top")
 }
+
+#[test]
+fn unmatched_through_alias() {
+    run_test("top_ports/unmatched_through_alias")
+}
+
+#[test]
+fn implements_first_missing_port() {
+    run_test("top_ports/implements_first_missing_port")
+}
+
+#[test]
+fn implements_missing_port_import_order() {
+    run_test("top_ports/implements_missing_port_import_order")
+}
+
+#[test]
+fn implements_missing_port_beyond_four() {
+    run_test("top_ports/implements_missing_port_beyond_four")
+}

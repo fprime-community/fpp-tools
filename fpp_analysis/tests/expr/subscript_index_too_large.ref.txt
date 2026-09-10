@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/expr/subscript_index_too_large.fpp:1:24
+  |
+1 | constant a = [1, 2, 3][18446744073709551616]
+  |                        ^^^^^^^^^^^^^^^^^^^^ index value is not in the range [0, 2]
+  |
+  = note: expression evaluated to `18446744073709551616`
+

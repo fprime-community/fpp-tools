@@ -1,0 +1,14 @@
+  --> [ local path prefix ]/tlm_packets/channel_instance_not_component_instance.fpp:16:7
+   |
+16 |         Inner.T
+   |         ^^^^^ invalid use of symbol Inner: not a component instance symbol
+   |
+  ::: [ local path prefix ]/tlm_packets/channel_instance_not_component_instance.fpp:1:1
+   |
+ 1 | / topology Inner {
+ 2 | |
+ 3 | |   instance c1
+ 4 | |
+ 5 | | }
+   | |_- Inner defined here
+

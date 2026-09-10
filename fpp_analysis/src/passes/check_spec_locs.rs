@@ -31,7 +31,9 @@ pub struct CheckSpecLocs;
 
 impl CheckSpecLocs {
     fn check_spec_loc<N: AstNode + Spanned>(&self, a: &Analysis, kind: SpecLocKind, node: &N) {
-        let symbol = a.get_symbol(node);
+        let Some(symbol) = a.get_symbol(node) else {
+            return;
+        };
         let qualified_name = a.get_qualified_name(&symbol);
         let Some(entry) = a.location_specifier_map.get(&(kind, qualified_name)) else {
             return;

@@ -149,3 +149,13 @@ fn telemetry_missing_target_port() {
 fn time_ok() {
     run_test("connection_pattern/time_ok")
 }
+
+#[test]
+fn source_not_component_instance() {
+    run_test("connection_pattern/source_not_component_instance")
+}
+
+#[test]
+fn target_not_component_instance() {
+    run_test("connection_pattern/target_not_component_instance")
+}

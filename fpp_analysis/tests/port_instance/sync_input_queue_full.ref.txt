@@ -1,5 +1,5 @@
- --> [ local path prefix ]/port_instance/sync_input_queue_full.fpp:5:3
+ --> [ local path prefix ]/port_instance/sync_input_queue_full.fpp:5:24
   |
 5 |   sync input port p: P drop
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^ only async input may have queue full behavior
+  |                        ^^^^ only async input may have queue full behavior
 

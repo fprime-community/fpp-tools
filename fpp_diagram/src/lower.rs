@@ -68,7 +68,7 @@ pub fn lower_topology(a: &Analysis, name: &str) -> Result<Diagram, LowerError> {
 
     Ok(Diagram {
         kind: DiagramKind::Topology,
-        name: topology.name.clone(),
+        name: topology.qualified_name.clone(),
         nodes,
         edges,
     })
@@ -89,7 +89,7 @@ pub fn lower_connection_group(
 
     if !topology.connection_map.contains_key(group) {
         return Err(LowerError::UnknownConnectionGroup {
-            topology: topology.name.clone(),
+            topology: topology.qualified_name.clone(),
             group: group.to_string(),
         });
     }
@@ -109,7 +109,7 @@ pub fn lower_connection_group(
 
     Ok(Diagram {
         kind: DiagramKind::ConnectionGroup,
-        name: format!("{}.{}", topology.name, group),
+        name: format!("{}.{}", topology.qualified_name, group),
         nodes,
         edges,
     })
@@ -148,8 +148,8 @@ fn component_def_node(a: &Analysis, component: &Component, qualified_name: &str)
 fn instance_nodes(a: &Analysis, topology: &Topology) -> Vec<Node> {
     topology
         .component_instance_map()
-        .into_iter()
-        .filter_map(|(ci, _loc)| instance_node(a, &ci))
+        .into_keys()
+        .filter_map(|ci| instance_node(a, &ci))
         .collect()
 }
 
@@ -159,7 +159,7 @@ fn instance_node(a: &Analysis, ci: &ComponentInstance) -> Option<Node> {
     let component = a.component_map.get(&ci.component_symbol)?;
     Some(Node {
         id: ci.qualified_name.clone(),
-        name: ci.name.clone(),
+        name: ci.get_unqualified_name().to_string(),
         qualified_name: ci.qualified_name.clone(),
         class_name: Some(a.get_qualified_name(&component.symbol)),
         kind: (&component.node.kind).into(),
@@ -171,8 +171,7 @@ fn instance_node(a: &Analysis, ci: &ComponentInstance) -> Option<Node> {
 /// the node identified by `node_id`.
 fn component_ports(a: &Analysis, component: &Component, node_id: &str) -> Vec<Port> {
     let mut ports: Vec<Port> = component
-        .port_interface
-        .port_map
+        .port_map()
         .values()
         .flat_map(|pi| expand_port(a, node_id, pi))
         .collect();
@@ -220,15 +219,15 @@ fn expand_port(a: &Analysis, node_id: &str, pi: &PortInstance) -> Vec<Port> {
 /// Classify a port instance into a rendering-relevant [`ir::PortKind`].
 fn port_kind(pi: &PortInstance) -> ir::PortKind {
     match pi {
-        PortInstance::General { kind, .. } => match kind {
+        PortInstance::General(pi) => match pi.kind {
             GeneralKind::AsyncInput { .. } => ir::PortKind::Async,
             GeneralKind::GuardedInput => ir::PortKind::Guarded,
             GeneralKind::SyncInput => ir::PortKind::Sync,
             GeneralKind::Output => ir::PortKind::Output,
         },
-        PortInstance::Special { kind, .. } => ir::PortKind::Special(kind.to_string()),
-        PortInstance::Internal { .. } => ir::PortKind::Internal,
-        PortInstance::Topology { underlying, .. } => port_kind(underlying),
+        PortInstance::Special(pi) => ir::PortKind::Special(pi.node.kind.to_string()),
+        PortInstance::Internal(_) => ir::PortKind::Internal,
+        PortInstance::Topology(pi) => port_kind(&pi.underlying_port),
     }
 }
 
@@ -315,7 +314,7 @@ fn connection_edge(
 
 /// Find a fully resolved topology by its fully qualified name.
 fn find_topology<'a>(a: &'a Analysis, name: &str) -> Option<&'a Topology> {
-    a.topology_map.values().find(|t| t.name == name)
+    a.topology_map.values().find(|t| t.qualified_name == name)
 }
 
 /// Find a component by its fully qualified name.

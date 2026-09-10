@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/port_numbering/duplicate_instance_name.fpp:22:10
+   |
+22 | instance c2: C2 base id 0x400
+   |          ^^ redefinition of symbol c2
+   |
+  ::: [ local path prefix ]/port_numbering/duplicate_instance_name.fpp:20:1
+   |
+20 | instance c2: C2 base id 0x200
+   | ----------------------------- previous definition is here
+

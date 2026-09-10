@@ -1,15 +1,23 @@
- --> [ local path prefix ]/tlm_packets/channel_used_and_omitted.fpp:3:12
-  |
-3 |   instance c1
-  |            ^^ cannot find component instance or topology `c1` in scope
-
- --> [ local path prefix ]/tlm_packets/channel_used_and_omitted.fpp:8:7
-  |
-8 |       c1.T
-  |       ^^ cannot find component instance or topology `c1` in scope
-
-  --> [ local path prefix ]/tlm_packets/channel_used_and_omitted.fpp:12:5
+  --> [ local path prefix ]/tlm_packets/channel_used_and_omitted.fpp:5:3
    |
-12 |     c1.T
-   |     ^^ cannot find component instance or topology `c1` in scope
+ 5 | /   telemetry packets P {
+ 6 | |
+ 7 | |     packet P group 0 {
+ 8 | |       c1.T
+...  |
+12 | |     c1.T
+13 | |   }
+   | |___^ invalid telemetry packet set P
+   |
+   = note: telemetry channel c1.T is both used and marked omitted
+   |
+  ::: [ local path prefix ]/tlm_packets/channel_used_and_omitted.fpp:8:7
+   |
+ 8 |         c1.T
+   |         ---- used here
+   |
+  ::: [ local path prefix ]/tlm_packets/channel_used_and_omitted.fpp:12:5
+   |
+12 |       c1.T
+   |       ---- marked omitted here
 

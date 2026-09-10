@@ -1,9 +1,7 @@
- --> [ local path prefix ]/event/bad_throttle_interval_useconds.fpp:3:3
+ --> [ local path prefix ]/event/bad_throttle_interval_useconds.fpp:5:11
   |
-3 | /   event E severity activity low \
-4 | |     format "" throttle 10 \
-5 | |     every {useconds=1000000}
-  | |____________________________^ useconds must be in the range [0, 999999]
+5 |     every {useconds=1000000}
+  |           ^^^^^^^^^^^^^^^^^^ useconds must be in the range [0, 999999]
   |
   = note: expression evaluated to `1000000`
 

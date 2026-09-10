@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/command/guarded_queue_full.fpp:3:21
+  |
+3 |   guarded command C block @< A comment
+  |                     ^^^^^ only async input may have queue full behavior
+

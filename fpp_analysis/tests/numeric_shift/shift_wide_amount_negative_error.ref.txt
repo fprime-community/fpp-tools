@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/numeric_shift/shift_wide_amount_negative_error.fpp:3:12
+  |
+3 | array B = [d] U8
+  |            ^ array size must be greater than zero
+  |
+  = note: expression evaluated to `-1`
+

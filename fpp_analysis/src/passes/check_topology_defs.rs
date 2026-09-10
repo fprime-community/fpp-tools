@@ -12,7 +12,7 @@ impl CheckTopologyDefs {
         let mut symbols: Vec<(Symbol, fpp_core::Span)> = a
             .partial_topology_map
             .iter()
-            .map(|(s, t)| (s.clone(), t.loc))
+            .map(|(s, t)| (s.clone(), t.get_loc()))
             .collect();
         symbols.sort_by(|x, y| cmp_span(&x.1, &y.1));
         for (sym, _) in symbols {
@@ -36,7 +36,6 @@ impl CheckTopologyDefs {
             self.resolve(a, dep);
         }
 
-        // Visit topology members and compute the unresolved topology.
         let Some(mut top) = a.partial_topology_map.get(symbol).cloned() else {
             return;
         };
@@ -54,7 +53,6 @@ impl CheckTopologyDefs {
             }
         }
 
-        // Resolve raw patterns.
         let patterns = top.raw_patterns.clone();
         for spec in &patterns {
             match ConnectionPattern::from_spec(a, spec) {
@@ -68,7 +66,6 @@ impl CheckTopologyDefs {
             }
         }
 
-        // Run the full resolution pipeline.
         if let Err(err) = resolve_topology::resolve(a, &mut top) {
             err.emit();
         }

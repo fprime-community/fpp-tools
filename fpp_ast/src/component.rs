@@ -25,7 +25,7 @@ pub enum ComponentMember {
     SpecInterfaceImport(SpecInterfaceImport),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InputPortKind {
     Async,
     Guarded,
@@ -33,12 +33,19 @@ pub enum InputPortKind {
 }
 
 /// Queue full behavior
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum QueueFull {
     Assert,
     Block,
     Drop,
     Hook,
+}
+
+/// Queue full behavior specifier
+#[ast]
+#[derive(Debug, Clone)]
+pub struct QueueFullSpecifier {
+    pub kind: QueueFull,
 }
 
 /// Command specifier
@@ -52,7 +59,7 @@ pub struct SpecCommand {
     pub opcode: Option<Expr>,
     pub priority: Option<Expr>,
     #[visitable(ignore)]
-    pub queue_full: Option<QueueFull>,
+    pub queue_full: Option<QueueFullSpecifier>,
 }
 
 /// Container specifier
@@ -130,7 +137,7 @@ pub enum GeneralPortInstanceKind {
 }
 
 /// Special port instance kind
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SpecialPortInstanceKind {
     CommandRecv,
     CommandReg,
@@ -199,14 +206,14 @@ pub struct SpecStateMachineInstance {
 }
 
 /// Telemetry update
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TlmChannelUpdate {
     Always,
     OnChange,
 }
 
 /// Telemetry limit kind
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TlmChannelLimitKind {
     Red,
     Orange,

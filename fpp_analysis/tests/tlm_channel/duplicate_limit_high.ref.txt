@@ -1,10 +1,10 @@
- --> [ local path prefix ]/tlm_channel/duplicate_limit_high.fpp:3:39
+ --> [ local path prefix ]/tlm_channel/duplicate_limit_high.fpp:3:35
   |
 3 |   telemetry T: U32 high { red 10, red 11 }
-  |                                       ^^ duplicate limit
+  |                                   ^^^^^^ duplicate limit
   |
- ::: [ local path prefix ]/tlm_channel/duplicate_limit_high.fpp:3:31
+ ::: [ local path prefix ]/tlm_channel/duplicate_limit_high.fpp:3:27
   |
 3 |   telemetry T: U32 high { red 10, red 11 }
-  |                               -- previous occurrence is here
+  |                           ------ previous occurrence is here
 

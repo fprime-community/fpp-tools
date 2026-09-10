@@ -1,7 +1,7 @@
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
-    ComponentInstance, Direction, Interface, PortInstance, PortInstanceType, Symbol,
+    ComponentInstance, Direction, Interface, PortInstance, PortInstanceType, PortInterface, Symbol,
     SymbolInterface, Topology,
 };
 use fpp_ast::{self as ast, AstNode};
@@ -29,13 +29,13 @@ pub fn cmp_span(a: &Span, b: &Span) -> Ordering {
 pub struct TopologyInstance {
     /// The topology symbol, used to look up the resolved `Topology`.
     pub symbol: Symbol,
-    /// The fully qualified name of the topology.
+    /// The fully qualified name of the topology. Cached, because computing it
+    /// needs the enclosing module scope, which is not on the node.
     pub qualified_name: String,
-    /// The location of the topology definition.
-    pub loc: Span,
 }
 
 /// An FPP interface instance: a component instance or an imported topology.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum InterfaceInstance {
     Component(ComponentInstance),
@@ -54,7 +54,7 @@ impl InterfaceInstance {
     /// The unqualified name of the interface instance.
     pub fn unqualified_name(&self) -> String {
         match self {
-            InterfaceInstance::Component(ci) => ci.name.clone(),
+            InterfaceInstance::Component(ci) => ci.get_unqualified_name().to_string(),
             InterfaceInstance::Topology(t) => t.symbol.name().data.clone(),
         }
     }
@@ -62,8 +62,28 @@ impl InterfaceInstance {
     /// The location of the interface instance.
     pub fn get_loc(&self) -> Span {
         match self {
-            InterfaceInstance::Component(ci) => ci.loc,
-            InterfaceInstance::Topology(t) => t.loc,
+            InterfaceInstance::Component(ci) => ci.get_loc(),
+            InterfaceInstance::Topology(t) => t.symbol.node().span(),
+        }
+    }
+
+    /// The full port interface of this instance. Returns `None` if the
+    /// underlying component or topology is not (yet) resolved.
+    pub fn get_interface<'a>(&self, a: &'a Analysis) -> Option<&'a PortInterface> {
+        match self {
+            InterfaceInstance::Component(ci) => ci.get_interface(a),
+            InterfaceInstance::Topology(t) => {
+                a.topology_map.get(&t.symbol).map(|top| &top.port_interface)
+            }
+        }
+    }
+
+    /// The underlying component instance of this interface instance, or `None`
+    /// if it is a topology.
+    pub fn get_component_instance_opt(&self) -> Option<&ComponentInstance> {
+        match self {
+            InterfaceInstance::Component(ci) => Some(ci),
+            InterfaceInstance::Topology(_) => None,
         }
     }
 
@@ -84,24 +104,10 @@ impl InterfaceInstance {
         a: &Analysis,
         name: &ast::Ident,
     ) -> SemanticResult<PortInstance> {
-        match self {
-            InterfaceInstance::Component(ci) => {
-                let comp = a
-                    .component_map
-                    .get(&ci.component_symbol)
-                    .expect("component instance references a resolved component");
-                comp.port_interface
-                    .get_port_instance(&name.data, name.span(), &ci.name)
-            }
-            InterfaceInstance::Topology(t) => {
-                let top = a
-                    .topology_map
-                    .get(&t.symbol)
-                    .expect("topology instance references a resolved topology");
-                top.port_interface
-                    .get_port_instance(&name.data, name.span(), &t.symbol.name().data)
-            }
-        }
+        let interface = self
+            .get_interface(a)
+            .expect("interface instance references a resolved component or topology");
+        interface.get_port_instance(&name.data, name.span(), &self.unqualified_name())
     }
 }
 
@@ -113,8 +119,7 @@ impl InterfaceInstance {
     pub fn from_topology(top: &Topology) -> InterfaceInstance {
         InterfaceInstance::Topology(TopologyInstance {
             symbol: top.symbol.clone(),
-            qualified_name: top.name.clone(),
-            loc: top.loc,
+            qualified_name: top.qualified_name.clone(),
         })
     }
 }
@@ -169,6 +174,15 @@ impl PortInstanceIdentifier {
         format!(
             "{}.{}",
             self.interface_instance.qualified_name(),
+            self.port_instance.get_unqualified_name()
+        )
+    }
+
+    /// The unqualified name (instance unqualified name + "." + port name).
+    pub fn get_unqualified_name(&self) -> String {
+        format!(
+            "{}.{}",
+            self.interface_instance.unqualified_name(),
             self.port_instance.get_unqualified_name()
         )
     }
@@ -494,30 +508,30 @@ impl Connection {
 
     /// Whether either endpoint's port participates in a port matching on its
     /// component. Used to validate `unmatched` connections.
+    ///
+    /// Each endpoint is first resolved through any topology-port aliases, so a
+    /// connection written against a topology port that aliases a matched
+    /// component port is still recognized as match constrained.
     fn is_match_constrained(&self, a: &Analysis) -> bool {
-        let check = |ci: &ComponentInstance, pi: &PortInstance| -> bool {
+        let port_matching_exists = |ci: &ComponentInstance, pi: &PortInstance| -> bool {
             match a.component_map.get(&ci.component_symbol) {
                 Some(comp) => comp.port_matching_list.iter().any(|pm| pm.matches(pi)),
                 None => false,
             }
         };
-        match (
-            &self.from.port.interface_instance,
-            &self.to.port.interface_instance,
-        ) {
-            (InterfaceInstance::Component(from_ci), InterfaceInstance::Component(to_ci)) => {
-                check(from_ci, &self.from.port.port_instance)
-                    || check(to_ci, &self.to.port.port_instance)
+        let is_constrained_at = |endpoint: &Endpoint| -> bool {
+            let port = endpoint.get_underlying_endpoint(a).port;
+            match &port.interface_instance {
+                InterfaceInstance::Component(ci) => port_matching_exists(ci, &port.port_instance),
+                InterfaceInstance::Topology(_) => false,
             }
-            _ => false,
-        }
+        };
+        is_constrained_at(&self.from) || is_constrained_at(&self.to)
     }
 }
 
 impl Analysis {
-    /// Resolve a use node to an interface instance (component instance or
-    /// imported topology). Returns `None` if the symbol is undefined or not an
-    /// interface-instance kind (already reported by earlier passes).
+    /// Resolve a use node to an interface instance
     pub fn get_interface_instance(&self, id: fpp_core::Node) -> Option<InterfaceInstance> {
         match self.use_def_map.get(&id) {
             Some(symbol @ Symbol::ComponentInstance(_)) => self
@@ -533,13 +547,26 @@ impl Analysis {
         }
     }
 
-    /// Resolve a use node to a component instance.
-    pub fn get_component_instance(&self, id: fpp_core::Node) -> Option<ComponentInstance> {
+    // Resolve a use (by node ID) to a component instance
+    pub fn get_component_instance(
+        &self,
+        id: fpp_core::Node,
+    ) -> SemanticResult<Option<ComponentInstance>> {
         match self.use_def_map.get(&id) {
             Some(symbol @ Symbol::ComponentInstance(_)) => {
-                self.component_instance_map.get(symbol).cloned()
+                Ok(self.component_instance_map.get(symbol).cloned())
             }
-            _ => None,
+            Some(symbol) => Err(SemanticError::InvalidSymbol {
+                symbol_name: symbol.name().data.clone(),
+                msg: format!(
+                    "invalid use of symbol {}: not a component instance symbol",
+                    symbol.name().data
+                ),
+                loc: id.span(),
+                def_loc: symbol.node().span(),
+            }),
+            // Unresolved use: CheckUses already reported the error.
+            None => Ok(None),
         }
     }
 

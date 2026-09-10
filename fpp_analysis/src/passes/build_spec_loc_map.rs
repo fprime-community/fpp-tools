@@ -1,8 +1,7 @@
 use crate::Analysis;
-use crate::analysis::SpecLocEntry;
 use crate::errors::SemanticError;
 use crate::passes::check_spec_locs::resolve_spec_path;
-use crate::semantics::QualifiedName;
+use crate::semantics::{QualifiedName, SpecLocEntry};
 use fpp_ast::{DefModule, SpecLoc, Visitor, Walkable};
 use fpp_core::Spanned;
 use std::ops::ControlFlow;

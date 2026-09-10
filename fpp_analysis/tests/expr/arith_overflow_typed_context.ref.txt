@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/arith_overflow_typed_context.fpp:5:28
+  |
+5 | array A = [1] U32 default [max + 1]
+  |                            ^^^^^^^ arithmetic result is too large to represent
+

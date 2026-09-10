@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/arith_overflow_sub.fpp:3:24
+  |
+3 | constant subOverflow = min - 1
+  |                        ^^^^^^^ arithmetic result is too large to represent
+
