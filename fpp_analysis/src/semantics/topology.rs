@@ -4,65 +4,80 @@ use crate::semantics::{
     PortInterface, Symbol, SymbolInterface,
 };
 use fpp_ast::{self as ast, AstNode, ConnectionPatternKind, QualIdent};
-use fpp_core::{Node, Span, Spanned};
+use fpp_core::{Span, Spanned};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 /// A resolved topology port, aliasing an underlying port instance.
 #[derive(Debug, Clone)]
 pub struct TopologyPort {
-    pub name: String,
-    pub node_id: Node,
-    pub loc: Span,
+    pub node: Arc<ast::SpecTopPort>,
     /// The underlying port instance identifier.
     pub pii: PortInstanceIdentifier,
-    /// The location of the underlying port use.
-    pub underlying_loc: Span,
 }
 
-/// A top port collected during the topology walk, to be resolved into the port
-/// interface later (once imported topologies are resolved).
-#[derive(Debug, Clone)]
-pub struct PendingTopPort {
-    pub name: String,
-    pub node_id: Node,
-    pub loc: Span,
-    pub underlying_ast: ast::PortInstanceIdentifier,
+impl TopologyPort {
+    /// Gets the name of the topology port.
+    pub fn get_name(&self) -> &str {
+        &self.node.name.data
+    }
+
+    /// Gets the location of the topology port.
+    pub fn get_loc(&self) -> Span {
+        self.node.span()
+    }
+
+    /// Gets the location of the underlying port use.
+    pub fn get_underlying_port_loc(&self) -> Span {
+        self.node.underlying_port.span()
+    }
 }
 
 /// A resolved connection pattern.
 #[derive(Debug, Clone)]
 pub struct ConnectionPattern {
-    pub loc: Span,
-    pub kind: ConnectionPatternKind,
+    /// The AST node specifying the pattern.
+    pub node: Arc<ast::SpecPatternConnectionGraph>,
     /// The source instance.
     pub source: (ComponentInstance, Span),
-    /// The target instances.
+    /// The target instances. Scala holds a set here; this list is deduplicated
+    /// by instance, but keeps source order.
     pub targets: Vec<(ComponentInstance, Span)>,
 }
 
 impl ConnectionPattern {
+    /// Gets the location of the pattern.
+    pub fn get_loc(&self) -> Span {
+        self.node.span()
+    }
+
+    /// The kind of the pattern.
+    pub fn kind(&self) -> &ConnectionPatternKind {
+        &self.node.kind
+    }
+
     /// Build a connection pattern from its AST spec. Returns `None` if the
     /// source or any target is unresolved (already reported by CheckUses).
     pub fn from_spec(
         a: &crate::Analysis,
-        spec: &ast::SpecPatternConnectionGraph,
+        spec: &Arc<ast::SpecPatternConnectionGraph>,
     ) -> SemanticResult<Option<ConnectionPattern>> {
-        use fpp_core::Spanned;
-        let Some(source_ci) = a.get_component_instance(spec.source.id()) else {
+        let Some(source_ci) = a.get_component_instance(spec.source.id())? else {
             return Ok(None);
         };
         let source = (source_ci, spec.source.span());
-        let mut targets = Vec::new();
+        let mut targets: Vec<(ComponentInstance, Span)> = Vec::new();
         for tgt in &spec.targets {
-            let Some(ci) = a.get_component_instance(tgt.id()) else {
+            let Some(ci) = a.get_component_instance(tgt.id())? else {
                 return Ok(None);
             };
-            targets.push((ci, tgt.span()));
+            if !targets.iter().any(|(prev, _)| prev == &ci) {
+                targets.push((ci, tgt.span()));
+            }
         }
         Ok(Some(ConnectionPattern {
-            loc: spec.span(),
-            kind: spec.kind.clone(),
+            node: spec.clone(),
             source,
             targets,
         }))
@@ -75,11 +90,7 @@ pub struct Topology {
     /// The topology symbol
     pub symbol: Symbol,
     /// The fully qualified name of the topology
-    pub name: String,
-    /// The location of the topology definition
-    pub loc: Span,
-    /// The interfaces this topology implements (AST use nodes).
-    pub implements: Vec<QualIdent>,
+    pub qualified_name: String,
     /// The component instances directly declared in this topology
     pub direct_component_instances: HashMap<Symbol, Span>,
     /// The topologies directly imported into this topology
@@ -89,11 +100,11 @@ pub struct Topology {
     /// The instances of this topology, resolved across imports.
     pub instance_map: BTreeMap<InterfaceInstance, Span>,
     /// The top ports to resolve into the port interface.
-    pub ports: Vec<PendingTopPort>,
+    pub ports: Vec<Arc<ast::SpecTopPort>>,
     /// The raw direct connection graph specs, to resolve in dependency order.
     pub raw_direct_graphs: Vec<ast::SpecDirectConnectionGraph>,
     /// The raw pattern connection graph specs, to resolve in dependency order.
-    pub raw_patterns: Vec<ast::SpecPatternConnectionGraph>,
+    pub raw_patterns: Vec<Arc<ast::SpecPatternConnectionGraph>>,
     /// The resolved top ports by name.
     pub port_map: HashMap<String, TopologyPort>,
     /// The resolved port interface of the topology (from its topology ports).
@@ -117,12 +128,10 @@ pub struct Topology {
 }
 
 impl Topology {
-    pub fn new(symbol: Symbol, name: String, loc: Span, implements: Vec<QualIdent>) -> Topology {
+    pub fn new(symbol: Symbol, qualified_name: String) -> Topology {
         Topology {
             symbol,
-            name,
-            loc,
-            implements,
+            qualified_name,
             direct_component_instances: HashMap::default(),
             direct_topologies: HashMap::default(),
             transitive_import_set: HashSet::default(),
@@ -143,9 +152,33 @@ impl Topology {
         }
     }
 
+    /// The AST node defining the topology.
+    pub fn node(&self) -> &ast::DefTopology {
+        match &self.symbol {
+            Symbol::Topology(def) => def,
+            // A topology is always built from a topology symbol.
+            _ => unreachable!("topology symbol is not a topology"),
+        }
+    }
+
+    /// Gets the name of the topology.
+    pub fn get_name(&self) -> &str {
+        &self.node().name.data
+    }
+
     /// The unqualified name of the topology.
     pub fn unqualified_name(&self) -> String {
         self.symbol.name().data.clone()
+    }
+
+    /// Gets the location of the topology.
+    pub fn get_loc(&self) -> Span {
+        self.node().span()
+    }
+
+    /// The interfaces this topology implements (AST use nodes).
+    pub fn implements(&self) -> &[QualIdent] {
+        &self.node().implements
     }
 
     /// Add an interface instance symbol (component instance or imported
@@ -188,64 +221,56 @@ impl Topology {
     }
 
     /// Add a top port node to be resolved later.
-    pub fn add_port_node(&mut self, port: PendingTopPort) {
-        self.ports.push(port);
+    pub fn add_port_node(&mut self, node: Arc<ast::SpecTopPort>) {
+        self.ports.push(node);
     }
 
     /// Add a pattern, erroring on duplicate kind.
     pub fn add_pattern(&mut self, pattern: ConnectionPattern) -> SemanticResult {
-        if let Some(prev) = self.pattern_map.get(&pattern.kind) {
+        if let Some(prev) = self.pattern_map.get(pattern.kind()) {
             return Err(SemanticError::DuplicatePattern {
-                kind: pattern_kind_str(&pattern.kind),
-                loc: pattern.loc,
-                prev_loc: prev.loc,
+                kind: pattern_kind_str(pattern.kind()),
+                loc: pattern.get_loc(),
+                prev_loc: prev.get_loc(),
             });
         }
-        self.pattern_map.insert(pattern.kind.clone(), pattern);
+        self.pattern_map.insert(pattern.kind().clone(), pattern);
         Ok(())
     }
 
     /// Resolve a top port into the port interface.
     pub fn add_port(
         &mut self,
-        name: &str,
-        node_id: Node,
-        loc: Span,
-        underlying: PortInstanceIdentifier,
-        underlying_loc: Span,
+        node: Arc<ast::SpecTopPort>,
+        underlying_port: PortInstanceIdentifier,
     ) -> SemanticResult {
+        let name = node.name.data.clone();
+        let loc = node.span();
         // Check that the topology port is for a general port
-        if matches!(underlying.port_instance, PortInstance::Internal { .. }) {
+        if matches!(underlying_port.port_instance, PortInstance::Internal(_)) {
             return Err(SemanticError::InvalidPortInstance {
                 loc,
                 msg: "topology port cannot point to an internal port".to_string(),
-                def_loc: underlying.port_instance.get_loc(),
+                def_loc: underlying_port.port_instance.get_loc(),
             });
         }
-        let topology_pi = PortInstance::topology(
-            node_id,
-            loc,
-            name.to_string(),
-            underlying.port_instance.clone(),
-        );
+        let topology_pi =
+            PortInstance::topology(node.clone(), underlying_port.port_instance.clone());
         let new_interface = self.port_interface.add_port_instance(topology_pi)?;
-        if let Some(prev) = self.port_map.get(name) {
+        if let Some(prev) = self.port_map.get(&name) {
             return Err(SemanticError::DuplicatePortInstance {
-                name: name.to_string(),
+                name,
                 loc,
                 import_locs: vec![],
-                prev_loc: prev.loc,
+                prev_loc: prev.get_loc(),
                 prev_import_locs: vec![],
             });
         }
         self.port_map.insert(
-            name.to_string(),
+            name,
             TopologyPort {
-                name: name.to_string(),
-                node_id,
-                loc,
-                pii: underlying,
-                underlying_loc,
+                node,
+                pii: underlying_port,
             },
         );
         self.port_interface = new_interface;
@@ -371,14 +396,45 @@ impl Topology {
     }
 
     /// The component instances of this topology, in qualified-name order.
-    pub fn component_instance_map(&self) -> Vec<(ComponentInstance, Span)> {
+    pub fn component_instance_map(&self) -> BTreeMap<ComponentInstance, Span> {
         self.instance_map
             .iter()
-            .filter_map(|(ii, loc)| match ii {
-                InterfaceInstance::Component(ci) => Some((ci.clone(), *loc)),
-                InterfaceInstance::Topology(_) => None,
-            })
+            .filter_map(|(ii, loc)| ii.get_component_instance_opt().map(|ci| (ci.clone(), *loc)))
             .collect()
+    }
+
+    /// Looks up the location where a component instance appears in this topology.
+    pub fn look_up_component_instance_loc(&self, ci: &ComponentInstance) -> Option<Span> {
+        self.instance_map
+            .get(&InterfaceInstance::from_component_instance(ci.clone()))
+            .copied()
+    }
+
+    /// Resolve the port numbers in a connection.
+    ///
+    /// Returns a copy of `c` whose endpoints carry the port numbers that port
+    /// numbering assigned to it, so that a connection with implicit numbering
+    /// reports its resolved numbers instead of `None`.
+    pub fn resolve_numbers(&self, c: &Connection) -> Connection {
+        let from_port_number = self.get_port_number(&c.from.port.port_instance, c);
+        let to_port_number = self.get_port_number(&c.to.port.port_instance, c);
+        let mut resolved = c.clone();
+        resolved.from.port_number = from_port_number;
+        resolved.to.port_number = to_port_number;
+        resolved
+    }
+
+    /// Sort connections by their resolved port numbers.
+    ///
+    /// The returned connections are the originals, in the order given by
+    /// comparing their [`Self::resolve_numbers`] images.
+    pub fn sort_connections(&self, connections: &[Connection]) -> Vec<Connection> {
+        let mut pairs: Vec<(Connection, Connection)> = connections
+            .iter()
+            .map(|c| (c.clone(), self.resolve_numbers(c)))
+            .collect();
+        pairs.sort_by(|(_, a), (_, b)| a.cmp(b));
+        pairs.into_iter().map(|(c, _)| c).collect()
     }
 
     /// Look up an interface instance used at a location.
@@ -407,4 +463,284 @@ pub fn pattern_kind_str(kind: &ConnectionPatternKind) -> String {
         ConnectionPatternKind::Time => "time",
     }
     .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Topology;
+    use crate::semantics::{Connection, InterfaceInstance, PortInstanceIdentifier};
+    use crate::{Analysis, add_state_enums, check_semantics};
+    use fpp_core::SourceFile;
+
+    /// A topology with one output port array feeding two input ports. The
+    /// connections are written in the order (`c3` first, `c2` second) that is
+    /// the reverse of the order port numbering assigns to them, so that the
+    /// declared order and the resolved-number order differ.
+    const SRC: &str = r#"
+module M {
+
+  port P
+
+  passive component C1 {
+
+    output port pOut: [2] P
+
+  }
+
+  passive component C2 {
+
+    sync input port pIn: P
+
+  }
+
+  instance c1: C1 base id 0x100
+  instance c2: C2 base id 0x200
+  instance c3: C2 base id 0x300
+
+  topology T {
+
+    instance c1
+    instance c2
+    instance c3
+
+    connections C {
+
+      c1.pOut -> c3.pIn
+      c1.pOut -> c2.pIn
+
+    }
+
+  }
+
+}
+"#;
+
+    /// Analyze `src` and hand the resolved topology named `top_name` to `f`.
+    /// Panics if the input produced any diagnostic.
+    fn with_topology(src: &str, top_name: &str, f: impl FnOnce(&Topology)) {
+        let mut diagnostics = vec![];
+        let mut ctx =
+            fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
+        fpp_core::run(&mut ctx, || {
+            let source = SourceFile::new("topology_test.fpp", src.to_string());
+            let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
+            let mut a = Analysis::new();
+            add_state_enums(&mut ast);
+            let _ = check_semantics(&mut a, vec![&ast]);
+            let top = a
+                .topology_map
+                .values()
+                .find(|t| t.get_name() == top_name)
+                .expect("the topology was resolved");
+            f(top);
+        });
+        let output = String::from_utf8(diagnostics).expect("diagnostics are UTF-8");
+        assert_eq!(output, "", "expected no diagnostics");
+    }
+
+    /// The connections of graph `C`, in declaration order.
+    fn declared_connections(top: &Topology) -> Vec<Connection> {
+        top.connection_map
+            .get("C")
+            .expect("graph C was resolved")
+            .clone()
+    }
+
+    #[test]
+    fn resolve_numbers_fills_in_the_assigned_port_numbers() {
+        with_topology(SRC, "T", |top| {
+            let connections = declared_connections(top);
+            assert_eq!(connections.len(), 2);
+            for c in &connections {
+                // The connections are implicitly numbered, so the endpoints as
+                // written carry no port number.
+                assert_eq!(c.from.port_number, None);
+                assert_eq!(c.to.port_number, None);
+                let resolved = top.resolve_numbers(c);
+                assert_eq!(
+                    resolved.from.port_number,
+                    top.get_port_number(&c.from.port.port_instance, c)
+                );
+                assert_eq!(
+                    resolved.to.port_number,
+                    top.get_port_number(&c.to.port.port_instance, c)
+                );
+                // Both endpoints of a resolved connection have a number, and
+                // the rest of the connection is unchanged.
+                assert!(resolved.from.port_number.is_some());
+                assert_eq!(resolved.to.port_number, Some(0));
+                assert_eq!(
+                    resolved.from.port.qualified_name(),
+                    c.from.port.qualified_name()
+                );
+                assert_eq!(
+                    resolved.to.port.qualified_name(),
+                    c.to.port.qualified_name()
+                );
+            }
+            // `c1.pOut` has size 2, so the two connections get numbers 0 and 1.
+            // The one to `c2.pIn` sorts first, so it gets 0.
+            let numbers: Vec<Option<i128>> = connections
+                .iter()
+                .map(|c| top.resolve_numbers(c).from.port_number)
+                .collect();
+            assert_eq!(numbers, vec![Some(1), Some(0)]);
+        })
+    }
+
+    #[test]
+    fn sort_connections_orders_by_the_resolved_port_numbers() {
+        with_topology(SRC, "T", |top| {
+            let connections = declared_connections(top);
+            let sorted = top.sort_connections(&connections);
+            let names: Vec<String> = sorted.iter().map(|c| c.to.port.qualified_name()).collect();
+            assert_eq!(names, vec!["M.c2.pIn".to_string(), "M.c3.pIn".to_string()]);
+            // The returned connections are the originals, not their resolved
+            // images: their port numbers are still unset.
+            assert!(sorted.iter().all(|c| c.from.port_number.is_none()));
+            // Sorting is idempotent.
+            assert_eq!(top.sort_connections(&sorted), sorted);
+        })
+    }
+
+    /// A topology whose matched port numbering assigns numbers that run against
+    /// the alphabetical order of the peer instances: `pOut1` is numbered
+    /// explicitly (`d1` gets 1, `d2` gets 0), and the matched `pOut2`
+    /// connections inherit those numbers.
+    const MATCHED_SRC: &str = r#"
+module M {
+
+  port P
+
+  passive component C1 {
+
+    output port pOut1: [2] P
+
+    output port pOut2: [2] P
+
+    match pOut1 with pOut2
+
+  }
+
+  passive component C2 {
+
+    sync input port pIn: P
+
+  }
+
+  instance c1: C1 base id 0x100
+  instance d1: C2 base id 0x200
+  instance d2: C2 base id 0x300
+
+  topology U {
+
+    instance c1
+    instance d1
+    instance d2
+
+    connections C {
+
+      c1.pOut1[1] -> d1.pIn
+      c1.pOut1[0] -> d2.pIn
+      c1.pOut2 -> d2.pIn
+      c1.pOut2 -> d1.pIn
+
+    }
+
+  }
+
+}
+"#;
+
+    #[test]
+    fn sort_connections_differs_from_sorting_the_connections_as_written() {
+        with_topology(MATCHED_SRC, "U", |top| {
+            // The two implicitly numbered `pOut2` connections.
+            let connections: Vec<Connection> = declared_connections(top)
+                .into_iter()
+                .filter(|c| c.from.port.get_unqualified_name() == "c1.pOut2")
+                .collect();
+            assert_eq!(connections.len(), 2);
+            let to_names = |cs: &[Connection]| -> Vec<String> {
+                cs.iter().map(|c| c.to.port.qualified_name()).collect()
+            };
+
+            // As written, both endpoints are unnumbered, so an ordinary sort
+            // falls back to comparing the `to` port names.
+            let mut as_written = connections.clone();
+            as_written.sort();
+            assert_eq!(to_names(&as_written), vec!["M.d1.pIn", "M.d2.pIn"]);
+
+            // Matched numbering gave `-> d2.pIn` the number 0 and
+            // `-> d1.pIn` the number 1, so the resolved order is the reverse.
+            assert_eq!(
+                to_names(&top.sort_connections(&connections)),
+                vec!["M.d2.pIn", "M.d1.pIn"]
+            );
+        })
+    }
+
+    #[test]
+    fn port_instance_identifier_names() {
+        with_topology(SRC, "T", |top| {
+            let c = &declared_connections(top)[0];
+            assert_eq!(c.from.port.qualified_name(), "M.c1.pOut");
+            assert_eq!(c.from.port.get_unqualified_name(), "c1.pOut");
+            assert_eq!(c.to.port.qualified_name(), "M.c3.pIn");
+            assert_eq!(c.to.port.get_unqualified_name(), "c3.pIn");
+        })
+    }
+
+    /// A topology `A` in module `M` exposing a topology port `a`.
+    const TOP_PORT_SRC: &str = r#"
+module M {
+
+  port P
+
+  passive component C1 {
+
+    output port pOut: P
+
+  }
+
+  passive component C2 {
+
+    sync input port pIn: P
+
+  }
+
+  instance c1: C1 base id 0x100
+  instance c2: C2 base id 0x200
+
+  topology A {
+
+    instance c1
+    instance c2
+
+    port a = c1.pOut
+    port b = c2.pIn
+
+  }
+
+}
+"#;
+
+    #[test]
+    fn port_instance_identifier_names_for_a_topology_instance() {
+        with_topology(TOP_PORT_SRC, "A", |top| {
+            let interface_instance = InterfaceInstance::from_topology(top);
+            let port_instance = top
+                .port_interface
+                .get_port_instance("a", top.get_loc(), &top.unqualified_name())
+                .expect("the topology port was resolved");
+            let pii = PortInstanceIdentifier {
+                interface_instance,
+                port_instance,
+            };
+            // The interface instance is the topology `M.A`, whose unqualified
+            // name is `A`.
+            assert_eq!(pii.qualified_name(), "M.A.a");
+            assert_eq!(pii.get_unqualified_name(), "A.a");
+        })
+    }
 }

@@ -25,7 +25,7 @@ pub enum ComponentMember {
     SpecInterfaceImport(SpecInterfaceImport),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InputPortKind {
     Async,
     Guarded,
@@ -33,12 +33,29 @@ pub enum InputPortKind {
 }
 
 /// Queue full behavior
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum QueueFull {
     Assert,
     Block,
     Drop,
     Hook,
+}
+
+/// Queue full behavior specifier
+///
+/// This wraps a [QueueFull] behavior in a node so that diagnostics can point at
+/// the keyword that named the behavior. It mirrors Scala's
+/// `Option[AstNode[Ast.QueueFull]]`, which the command and port instance
+/// specifiers use. The internal port and state machine instance specifiers store
+/// a bare [QueueFull] instead, as they do in Scala.
+///
+/// It carries no child nodes, and every specifier that holds one marks the field
+/// `#[visitable(ignore)]`, so it is not part of the visitor traversal, just as
+/// Scala's `AstVisitor` has no case for a queue full node.
+#[ast]
+#[derive(Debug, Clone)]
+pub struct QueueFullSpecifier {
+    pub kind: QueueFull,
 }
 
 /// Command specifier
@@ -52,7 +69,7 @@ pub struct SpecCommand {
     pub opcode: Option<Expr>,
     pub priority: Option<Expr>,
     #[visitable(ignore)]
-    pub queue_full: Option<QueueFull>,
+    pub queue_full: Option<QueueFullSpecifier>,
 }
 
 /// Container specifier
@@ -130,7 +147,7 @@ pub enum GeneralPortInstanceKind {
 }
 
 /// Special port instance kind
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SpecialPortInstanceKind {
     CommandRecv,
     CommandReg,
@@ -199,14 +216,14 @@ pub struct SpecStateMachineInstance {
 }
 
 /// Telemetry update
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TlmChannelUpdate {
     Always,
     OnChange,
 }
 
 /// Telemetry limit kind
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TlmChannelLimitKind {
     Red,
     Orange,

@@ -49,3 +49,40 @@ fn implicit_duplicate_connection_at_matched_input_port() {
 fn duplicate_connection_at_matched_port() {
     run_test("port_numbering/duplicate_connection_at_matched_port")
 }
+
+#[test]
+fn missing_connection() {
+    run_test("port_numbering/missing_connection")
+}
+
+/// Two component instance definitions that share a qualified name, in a
+/// topology that also uses matched port numbering.
+///
+/// `ComponentInstance` compares, orders and hashes by qualified name, so
+/// `MatchedPortNumbering`'s instance-to-connection map would merge two
+/// same-named instances where Scala's structurally-keyed
+/// `Map[ComponentInstance, Connection]` keeps them apart. That is unreachable:
+/// the symbol table rejects the second definition and keeps the first, so every
+/// use of `c2` — the topology instance spec and both of its connections —
+/// resolves to one symbol, hence one instance. The only diagnostic is the
+/// redefinition; matched numbering still sees `c2` and `c3` as the two distinct
+/// remote instances of `c1.pOut`/`c1.pIn` and assigns them separate port
+/// numbers.
+#[test]
+fn duplicate_instance_name() {
+    run_test("port_numbering/duplicate_instance_name")
+}
+
+/// Matched port numbering of connections written through topology port aliases.
+///
+/// `c1`'s matched ports are reached from topology `T` through the aliases
+/// `A.aOut`/`A.aIn`. `MatchedPortNumbering` keys its instance-to-connection maps
+/// by remote *component* instance, which works only because every endpoint was
+/// rewritten from the imported topology down to the component instance owning
+/// the port before numbering ran. Were an endpoint left pointing at the imported
+/// topology, both matched connections would drop out of the maps and this
+/// diagnostic would silently disappear.
+#[test]
+fn matched_through_alias() {
+    run_test("port_numbering/matched_through_alias")
+}

@@ -1,10 +1,9 @@
 use crate::Analysis;
-use crate::semantics::{Interface, PortInstance, Symbol};
+use crate::semantics::{Interface, PortInstance, Symbol, resolve_interface};
 use fpp_ast::{
     AstNode, DefInterface, DefModule, SpecGeneralPortInstance, SpecInterfaceImport,
     SpecSpecialPortInstance, Visitor, Walkable,
 };
-use fpp_core::Span;
 use std::ops::ControlFlow;
 
 /// Check interface definitions.
@@ -14,6 +13,9 @@ impl CheckInterfaceDefs {
     /// Resolve an interface: collect its ports and imports, resolve the
     /// interfaces it directly imports, then merge them in. Results are
     /// memoized in `a.interface_map`.
+    ///
+    /// Mirrors `CheckInterfaceDefs.defInterfaceAnnotatedNode`
+    /// (analysis/CheckSemantics/CheckInterfaceDefs.scala:13).
     fn resolve(&self, a: &mut Analysis, symbol: &Symbol) {
         // Interface is already in the map: nothing to do
         if a.interface_map.contains_key(symbol) {
@@ -25,35 +27,31 @@ impl CheckInterfaceDefs {
 
         // Interface is not in the map: visit it
         let saved = a.interface.take();
-        a.interface = Some(Interface::new(symbol.clone()));
+        a.interface = Some(Interface::new(node.clone()));
         let _ = node.walk(a, self);
-        let iface = a
+        let mut iface = a
             .interface
             .take()
             .expect("interface slot is populated during the walk");
         a.interface = saved;
 
         // Resolve interfaces directly imported by iface, updating a
-        let imports: Vec<(Symbol, Span)> = iface
-            .import_map
-            .iter()
-            .map(|(s, (_, loc))| (s.clone(), *loc))
-            .collect();
-        for (import_symbol, _) in &imports {
-            self.resolve(a, import_symbol);
+        for (import_symbol, _) in iface.imports_in_source_order() {
+            self.resolve(a, &import_symbol);
         }
 
         // Use the updated analysis to resolve iface
-        let mut result = iface;
-        for (import_symbol, loc) in imports {
-            if let Some(imported) = a.interface_map.get(&import_symbol).cloned() {
-                match result.add_imported_interface(&imported, loc) {
-                    Ok(merged) => result = merged,
-                    Err(err) => err.emit(),
-                }
-            }
+        if let Err(err) = resolve_interface(&a.interface_map, &mut iface) {
+            err.emit();
         }
-        a.interface_map.insert(symbol.clone(), result);
+        // Record the interface even when an import failed, with the imports that
+        // did merge still merged in. Scala aborts the whole pass on the first
+        // failure, so nothing there ever observes a half-resolved interface;
+        // we keep checking the remaining definitions, so the map has to hold an
+        // entry (or every interface that imports this one would resolve it again
+        // and report its error again) and that entry has to keep the ports the
+        // user did write (or every use of one would draw a second error).
+        a.interface_map.insert(symbol.clone(), iface);
     }
 }
 

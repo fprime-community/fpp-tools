@@ -100,6 +100,15 @@ fn nested_default_ok() {
     run_test("array/nested_default_ok")
 }
 
+/// A nested array default over sizes large enough that materializing one copy of
+/// the element per array slot is not viable. The element is shared instead, as it
+/// is in Scala, so the cost is the sum of the nested sizes; the sharing itself is
+/// asserted in `semantics::types`'s `array_default_shares_its_repeated_element`.
+#[test]
+fn nested_default_large_ok() {
+    run_test("array/nested_default_large_ok")
+}
+
 #[test]
 fn format_alias_int_not_rational() {
     run_test("array/format_alias_int_not_rational")

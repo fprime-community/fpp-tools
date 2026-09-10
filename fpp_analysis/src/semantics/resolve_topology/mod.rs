@@ -25,34 +25,23 @@ use crate::Analysis;
 use crate::errors::SemanticResult;
 use crate::semantics::{InterfaceInstance, PortInstance, PortInstanceIdentifier, Topology};
 
-/// Fold over every (port instance identifier, port instance) pair of the
-/// topology's instances, in a deterministic order.
-pub(crate) fn for_each_port(
-    a: &Analysis,
-    t: &Topology,
-) -> Vec<(PortInstanceIdentifier, PortInstance)> {
+/// Fold over every port instance identifier of the topology's component
+/// instances, in a deterministic order. Topology-alias instances are excluded:
+/// their connections were already rewritten to the underlying component
+/// instances.
+pub(crate) fn for_each_port(a: &Analysis, t: &Topology) -> Vec<PortInstanceIdentifier> {
     let mut result = Vec::new();
-    for interface_instance in t.instance_map.keys() {
-        let port_interface = match interface_instance {
-            InterfaceInstance::Component(ci) => a
-                .component_map
-                .get(&ci.component_symbol)
-                .map(|c| &c.port_interface),
-            InterfaceInstance::Topology(top) => {
-                a.topology_map.get(&top.symbol).map(|t| &t.port_interface)
-            }
-        };
-        let Some(port_interface) = port_interface else {
+    for ci in t.component_instance_map().keys() {
+        let Some(port_interface) = ci.get_interface(a) else {
             continue;
         };
         let mut ports: Vec<(&String, &PortInstance)> = port_interface.port_map.iter().collect();
         ports.sort_by(|x, y| x.0.cmp(y.0));
         for (_, pi) in ports {
-            let pii = PortInstanceIdentifier {
-                interface_instance: interface_instance.clone(),
+            result.push(PortInstanceIdentifier {
+                interface_instance: InterfaceInstance::from_component_instance(ci.clone()),
                 port_instance: pi.clone(),
-            };
-            result.push((pii, pi.clone()));
+            });
         }
     }
     result

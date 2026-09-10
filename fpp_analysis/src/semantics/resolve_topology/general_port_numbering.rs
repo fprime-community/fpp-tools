@@ -37,8 +37,8 @@ fn number_output_port_array(t: &mut Topology, pii: &PortInstanceIdentifier) {
 /// Apply general numbering
 pub fn apply(a: &Analysis, t: &mut Topology) {
     // Fold over instances and ports
-    for (pii, pi) in for_each_port(a, t) {
-        match pi.get_direction() {
+    for pii in for_each_port(a, t) {
+        match pii.port_instance.get_direction() {
             Some(Direction::Input) => number_input_port_array(t, &pii),
             Some(Direction::Output) => number_output_port_array(t, &pii),
             None => {}

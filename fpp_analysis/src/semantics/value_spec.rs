@@ -3,7 +3,8 @@
 use super::test_helpers::*;
 use crate::semantics::{
     AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue, FloatValue,
-    IntegerValue, MathResult, PrimitiveIntegerValue, StringValue, StructValue, Type, Value,
+    IntegerValue, MathError, MathResult, PrimitiveIntegerValue, StringValue, StructValue, Type,
+    Value,
 };
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
@@ -41,16 +42,16 @@ fn values_eq(a: &Value, b: &Value) -> bool {
             Value::EnumConstant(EnumConstantValue { value: v2, .. }),
         ) => v1 == v2,
         (
-            Value::AnonArray(AnonArrayValue { elements: e1 }),
-            Value::AnonArray(AnonArrayValue { elements: e2 }),
+            Value::AnonArray(AnonArrayValue { elements: e1, .. }),
+            Value::AnonArray(AnonArrayValue { elements: e2, .. }),
         )
         | (
             Value::Array(ArrayValue {
-                anon_array: AnonArrayValue { elements: e1 },
+                anon_array: AnonArrayValue { elements: e1, .. },
                 ..
             }),
             Value::Array(ArrayValue {
-                anon_array: AnonArrayValue { elements: e2 },
+                anon_array: AnonArrayValue { elements: e2, .. },
                 ..
             }),
         ) => e1.len() == e2.len() && e1.iter().zip(e2.iter()).all(|(x, y)| values_eq(x, y)),
@@ -90,9 +91,7 @@ fn anon_struct_val() -> Value {
 /// The array value `[ I32(0), I32(0), I32(0) ]: A`.
 fn array_val() -> Value {
     Value::Array(ArrayValue {
-        anon_array: AnonArrayValue {
-            elements: vec![v_i32(0), v_i32(0), v_i32(0)],
-        },
+        anon_array: AnonArrayValue::new(vec![v_i32(0), v_i32(0), v_i32(0)]),
         ty: default_array(),
     })
 }
@@ -253,6 +252,115 @@ fn value_div() {
 }
 
 // ---------------------------------------------------------------------------
+// Integer arithmetic whose exact result does not fit in an `i128` should be
+// reported, not wrapped.
+//
+// Scala computes all of these with `BigInt` and never reports anything; `i128`
+// cannot represent the results, so the port reports `MathError::Overflow` and
+// `EvalConstantExprs` turns that into "arithmetic result is too large to
+// represent". The alternative would be a debug-build panic and a silently
+// wrapped value in release.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn value_arithmetic_reports_overflow() {
+    with_test_ctx(|| {
+        let max = v_integer(i128::MAX);
+        let min = v_integer(i128::MIN);
+
+        // add / sub / mul at either end of the range
+        assert!(matches!(max.add(&v_integer(1)), Err(MathError::Overflow)));
+        assert!(matches!(min.add(&v_integer(-1)), Err(MathError::Overflow)));
+        assert!(matches!(min.sub(&v_integer(1)), Err(MathError::Overflow)));
+        assert!(matches!(max.sub(&v_integer(-1)), Err(MathError::Overflow)));
+        assert!(matches!(max.mul(&v_integer(2)), Err(MathError::Overflow)));
+        assert!(matches!(min.mul(&v_integer(-1)), Err(MathError::Overflow)));
+
+        // `i128::MIN / -1` is the one integer division with an out-of-range result
+        assert!(matches!(min.div(&v_integer(-1)), Err(MathError::Overflow)));
+
+        // Negation of the one value with no positive counterpart
+        assert!(matches!(min.negate(), Err(MathError::Overflow)));
+
+        // The sized-integer arms overflow the same way, whatever the kind
+        assert!(matches!(
+            v_i8(i128::MAX).add(&v_i8(1)),
+            Err(MathError::Overflow)
+        ));
+        assert!(matches!(
+            v_u32(i128::MIN).negate(),
+            Err(MathError::Overflow)
+        ));
+        assert!(matches!(
+            v_enum_constant("X", i128::MIN).negate(),
+            Err(MathError::Overflow)
+        ));
+
+        // Results that do fit are still computed exactly
+        assert!(values_eq(
+            &max.sub(&v_integer(1)).unwrap(),
+            &v_integer(i128::MAX - 1)
+        ));
+        assert!(values_eq(
+            &min.div(&v_integer(2)).unwrap(),
+            &v_integer(-(1 << 126))
+        ));
+        assert!(values_eq(
+            &v_integer(i128::MIN + 1).negate().unwrap(),
+            &v_integer(i128::MAX)
+        ));
+    });
+}
+
+/// Floats saturate at infinity instead of overflowing, exactly as Scala's
+/// `Double` arithmetic does, so no arithmetic on them is reported.
+#[test]
+fn value_float_arithmetic_saturates() {
+    with_test_ctx(|| {
+        match v_f64(f64::MAX).mul(&v_f64(2.0)) {
+            Ok(Value::Float(FloatValue { value, .. })) => assert!(value.is_infinite()),
+            other => panic!("expected an infinite float, got {other:?}"),
+        }
+        match v_f64(f64::MIN).add(&v_f64(f64::MIN)) {
+            Ok(Value::Float(FloatValue { value, .. })) => {
+                assert!(value.is_infinite() && value.is_sign_negative())
+            }
+            other => panic!("expected -inf, got {other:?}"),
+        }
+    });
+}
+
+/// A divisor is tested for zero before the operator is applied, using
+/// `Value::is_zero`, so a float nearer zero than `EPSILON` is a division by
+/// zero. This mirrors `Analysis.div`.
+#[test]
+fn value_div_by_zero_uses_is_zero() {
+    with_test_ctx(|| {
+        for divisor in [v_integer(0), v_i32(0), v_enum_constant("X", 0)] {
+            assert!(matches!(
+                v_integer(1).div(&divisor),
+                Err(MathError::DivByZero)
+            ));
+            assert!(matches!(
+                v_f64(1.0).div(&divisor),
+                Err(MathError::DivByZero)
+            ));
+        }
+        // Nearer zero than EPSILON = 1e-7
+        assert!(matches!(
+            v_f64(1.0).div(&v_f64(1e-8)),
+            Err(MathError::DivByZero)
+        ));
+        assert!(matches!(
+            v_integer(1).div(&v_f64(-1e-8)),
+            Err(MathError::DivByZero)
+        ));
+        // Just outside EPSILON: an ordinary division
+        assert!(v_f64(1.0).div(&v_f64(1e-6)).is_ok());
+    });
+}
+
+// ---------------------------------------------------------------------------
 // "convert to type" should ...
 // ---------------------------------------------------------------------------
 
@@ -385,6 +493,62 @@ fn value_convert_float_source() {
     });
 }
 
+/// A float narrows to an integer through the width of an `i32`, matching Scala's
+/// `Double.intValue`: the integer part is clamped to `[i32::MIN, i32::MAX]` and a
+/// NaN goes to zero, for every integer target kind and for `Integer`.
+///
+/// `i128` is wide enough to keep more of a big float than this, but keeping it
+/// would give a different constant from the reference compiler once the value is
+/// truncated to the target kind. `fpp-to-json` on
+/// `array A = [1] I32 default [1.0e300]` / `[1] I64 default [1.0e18]` reports
+/// `2147483647` for both.
+#[test]
+fn value_convert_float_narrows_to_i32_width() {
+    with_test_ctx(|| {
+        const I32_MAX: i128 = i32::MAX as i128;
+        const I32_MIN: i128 = i32::MIN as i128;
+
+        // Saturating, not wrapping: the low bits of a wider result would make
+        // `[1] I32 default [1.0e300]` come out as -1
+        assert!(values_eq(
+            &v_f64(1.0e300).convert(&i32()).unwrap(),
+            &v_i32(I32_MAX)
+        ));
+        assert!(values_eq(
+            &v_f64(-1.0e300).convert(&i32()).unwrap(),
+            &v_i32(I32_MIN)
+        ));
+
+        // A wider target kind does not widen the conversion
+        assert!(values_eq(
+            &v_f64(1.0e18).convert(&i64()).unwrap(),
+            &v_i64(I32_MAX)
+        ));
+        assert!(values_eq(
+            &v_f64(1.0e18).convert(&integer()).unwrap(),
+            &v_integer(I32_MAX)
+        ));
+
+        // NaN and the infinities land at zero and the ends of the range
+        assert!(values_eq(
+            &v_f64(f64::NAN).convert(&i32()).unwrap(),
+            &v_i32(0)
+        ));
+        assert!(values_eq(
+            &v_f64(f64::INFINITY).convert(&integer()).unwrap(),
+            &v_integer(I32_MAX)
+        ));
+        assert!(values_eq(
+            &v_f64(f64::NEG_INFINITY).convert(&integer()).unwrap(),
+            &v_integer(I32_MIN)
+        ));
+
+        // Values inside the range round towards zero
+        assert!(values_eq(&v_f64(2.9).convert(&i32()).unwrap(), &v_i32(2)));
+        assert!(values_eq(&v_f64(-2.9).convert(&i32()).unwrap(), &v_i32(-2)));
+    });
+}
+
 /// A bool converts to `bool` and nothing else; a string converts to any string.
 #[test]
 fn value_convert_bool_and_string() {
@@ -452,6 +616,11 @@ fn value_display() {
         assert_eq!(v_bool(true).to_string(), "true");
         assert_eq!(v_string("hi").to_string(), "\"hi\"");
         assert_eq!(v_enum_constant("X", 7).to_string(), "7");
+        // The whole value, not a 32-bit slice of it
+        assert_eq!(
+            v_enum_constant("X", 0xFFFFFFFFFFFFFFFF_u64 as i128).to_string(),
+            "18446744073709551615"
+        );
         assert_eq!(v_anon_array(2, v_u32(0)).to_string(), "[array value]");
         assert_eq!(array_val().to_string(), "[array value]");
         assert_eq!(anon_struct_val().to_string(), "{struct value}");
@@ -524,24 +693,26 @@ fn value_get_type() {
 // ---------------------------------------------------------------------------
 // "lshift" / "rshift" should ...
 //
-// `Some(v)` => `Some` (compared with `values_eq`); `None` => `None`.
+// `Some(v)` => `Ok` (compared with `values_eq`); `None` => a non-shiftable
+// operand. A shift that overflows `i128` is checked separately below.
 // ---------------------------------------------------------------------------
 
 #[track_caller]
 fn check_shift(
     op_name: &str,
-    op: impl Fn(&Value, &Value) -> Option<Value>,
+    op: impl Fn(&Value, &Value) -> MathResult,
     cases: Vec<(Value, Value, Option<Value>)>,
 ) {
     for (a, b, expected) in cases {
         let got = op(&a, &b);
         match (&got, &expected) {
-            (Some(g), Some(e)) => {
+            (Ok(g), Some(e)) => {
                 assert!(values_eq(g, e), "{a} {op_name} {b}: expected {e}, got {g}")
             }
-            (None, None) => {}
-            (Some(g), None) => panic!("{a} {op_name} {b}: expected None, got {g}"),
-            (None, Some(e)) => panic!("{a} {op_name} {b}: expected {e}, got None"),
+            (Err(MathError::InvalidInputs), None) => {}
+            (Ok(g), None) => panic!("{a} {op_name} {b}: expected an error, got {g}"),
+            (Err(_), Some(e)) => panic!("{a} {op_name} {b}: expected {e}, got an error"),
+            (Err(_), None) => panic!("{a} {op_name} {b}: expected InvalidInputs"),
         }
     }
 }
@@ -553,11 +724,12 @@ fn value_lshift() {
             (v_i8(1), v_i8(2), Some(v_i8(4))),
             (v_i32(1), v_i32(3), Some(v_i32(8))),
             (v_i8(-1), v_i8(1), Some(v_i8(-2))),
-            (v_i32(1), v_integer(4), Some(v_i32(16))),
+            (v_i8(1), v_i32(2), Some(v_i8(4))),
+            (v_i32(1), v_integer(4), Some(v_integer(16))),
             (v_integer(1), v_i32(5), Some(v_integer(32))),
             (v_integer(1), v_integer(10), Some(v_integer(1024))),
             (v_enum_constant("X", 0), v_i32(3), Some(v_i32(0))),
-            (v_enum_constant("X", 0), v_integer(3), Some(v_i32(0))),
+            (v_enum_constant("X", 0), v_integer(3), Some(v_integer(0))),
             (v_i32(1), v_enum_constant("X", 0), Some(v_i32(1))),
             (v_integer(1), v_enum_constant("X", 0), Some(v_integer(1))),
             (v_i32(1), v_f32(2.0), None),
@@ -582,11 +754,12 @@ fn value_rshift() {
             (v_i8(8), v_i8(1), Some(v_i8(4))),
             (v_i32(16), v_i32(2), Some(v_i32(4))),
             (v_i8(-8), v_i8(1), Some(v_i8(-4))),
-            (v_i32(16), v_integer(2), Some(v_i32(4))),
+            (v_i8(16), v_i32(2), Some(v_i8(4))),
+            (v_i32(16), v_integer(2), Some(v_integer(4))),
             (v_integer(32), v_i32(2), Some(v_integer(8))),
             (v_integer(64), v_integer(3), Some(v_integer(8))),
             (v_enum_constant("X", 0), v_i32(1), Some(v_i32(0))),
-            (v_enum_constant("X", 0), v_integer(1), Some(v_i32(0))),
+            (v_enum_constant("X", 0), v_integer(1), Some(v_integer(0))),
             (v_i32(16), v_enum_constant("X", 0), Some(v_i32(16))),
             (v_integer(16), v_enum_constant("X", 0), Some(v_integer(16))),
             (v_i32(16), v_f32(2.0), None),
@@ -601,6 +774,48 @@ fn value_rshift() {
             (v_i32(16), struct_val(), None),
         ];
         check_shift(">>", |a, b| a.shr(b), cases);
+    });
+}
+
+/// An arbitrary-precision right shift by an amount at or beyond the width of the
+/// value saturates to `0` or `-1`, and the port reproduces that for `i128`.
+#[test]
+fn value_rshift_saturates_past_the_value_width() {
+    with_test_ctx(|| {
+        let cases: Vec<(Value, Value, Option<Value>)> = vec![
+            (v_integer(2), v_integer(200), Some(v_integer(0))),
+            (v_integer(-2), v_integer(200), Some(v_integer(-1))),
+            (v_integer(2), v_integer(255), Some(v_integer(0))),
+            (v_i32(-1), v_i32(255), Some(v_i32(-1))),
+        ];
+        check_shift(">>", |a, b| a.shr(b), cases);
+    });
+}
+
+/// A left shift whose exact result does not fit in an `i128` is reported rather
+/// than silently wrapped.
+#[test]
+fn value_lshift_reports_overflow() {
+    with_test_ctx(|| {
+        // `-1 << 127` is exactly `i128::MIN`, so it is still representable
+        assert!(matches!(
+            v_integer(-1).shl(&v_integer(127)),
+            Ok(Value::Integer(IntegerValue(i128::MIN)))
+        ));
+        // Shifting zero is zero, however large the amount
+        assert!(matches!(
+            v_integer(0).shl(&v_integer(255)),
+            Ok(Value::Integer(IntegerValue(0)))
+        ));
+        for amount in [127, 128, 200, 255] {
+            assert!(
+                matches!(
+                    v_integer(1).shl(&v_integer(amount)),
+                    Err(MathError::ShiftOverflow)
+                ),
+                "1 << {amount} should overflow"
+            );
+        }
     });
 }
 
@@ -634,9 +849,9 @@ fn value_negate() {
         assert!(values_eq(&v_i8(1).negate().unwrap(), &v_i8(-1)));
         assert!(values_eq(&v_f32(1.0).negate().unwrap(), &v_f32(-1.0)));
         assert!(values_eq(&v_integer(1).negate().unwrap(), &v_integer(-1)));
-        assert!(v_string("").negate().is_none());
-        assert!(v_anon_array(3, v_u32(0)).negate().is_none());
-        assert!(anon_struct_val().negate().is_none());
+        assert!(v_string("").negate().is_err());
+        assert!(v_anon_array(3, v_u32(0)).negate().is_err());
+        assert!(anon_struct_val().negate().is_err());
         // Enum constant negates through its rep type (default_enum rep is I32).
         assert!(values_eq(
             &v_enum_constant("X", 1).negate().unwrap(),

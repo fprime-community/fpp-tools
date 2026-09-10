@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/top_ports/implements_missing_port_import_order.fpp:22:23
+   |
+22 | topology A implements I {
+   |                       ^ port interface not implemented
+   |
+  ::: [ local path prefix ]/top_ports/implements_missing_port_import_order.fpp:10:5
+   |
+10 |     output port b1: [3] P
+   |     --------------------- port instance missing
+

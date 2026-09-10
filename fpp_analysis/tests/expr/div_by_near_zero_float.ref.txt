@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/div_by_near_zero_float.fpp:1:20
+  |
+1 | constant a = 1.0 / 0.00000001
+  |                    ^^^^^^^^^^ division by zero
+

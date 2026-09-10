@@ -1,12 +1,13 @@
 use crate::Analysis;
 use crate::errors::SemanticError;
-use crate::semantics::{PendingTopPort, Symbol, Topology};
+use crate::semantics::{Symbol, Topology};
 use fpp_ast::{
     AstNode, DefModule, DefTopology, SpecDirectConnectionGraph, SpecInstance,
     SpecPatternConnectionGraph, SpecTlmPacketSet, SpecTopPort, Visitor, Walkable,
 };
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
+use std::sync::Arc;
 
 /// Check topology instances: build the partial topology map with the component
 /// instances and imported topologies declared in each topology.
@@ -36,12 +37,7 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         }
         let name = a.get_qualified_name(&symbol);
         let prev = a.topology.take();
-        a.topology = Some(Topology::new(
-            symbol.clone(),
-            name,
-            node.span(),
-            node.implements.clone(),
-        ));
+        a.topology = Some(Topology::new(symbol.clone(), name));
         // Visit topology members and compute the unresolved topology.
         let _ = node.walk(a, self);
         if let Some(top) = a.topology.take() {
@@ -87,7 +83,7 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         node: &'ast SpecPatternConnectionGraph,
     ) -> ControlFlow<Self::Break> {
         if let Some(top) = a.topology.as_mut() {
-            top.raw_patterns.push(node.clone());
+            top.raw_patterns.push(Arc::new(node.clone()));
         }
         ControlFlow::Continue(())
     }
@@ -118,12 +114,7 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         node: &'ast SpecTopPort,
     ) -> ControlFlow<Self::Break> {
         if let Some(top) = a.topology.as_mut() {
-            top.add_port_node(PendingTopPort {
-                name: node.name.data.clone(),
-                node_id: node.node_id,
-                loc: node.span(),
-                underlying_ast: node.underlying_port.clone(),
-            });
+            top.add_port_node(Arc::new(node.clone()));
         }
         ControlFlow::Continue(())
     }

@@ -1,9 +1,7 @@
- --> [ local path prefix ]/event/bad_throttle_seconds.fpp:3:3
+ --> [ local path prefix ]/event/bad_throttle_seconds.fpp:5:11
   |
-3 | /   event E severity activity low \
-4 | |     format "" throttle 10 \
-5 | |     every {seconds=4294967295 + 1}
-  | |__________________________________^ seconds must be in the range [0, 4294967295]
+5 |     every {seconds=4294967295 + 1}
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^ seconds must be in the range [0, 4294967295]
   |
   = note: expression evaluated to `4294967296`
 

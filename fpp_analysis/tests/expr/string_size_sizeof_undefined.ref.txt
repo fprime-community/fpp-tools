@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/string_size_sizeof_undefined.fpp:4:29
+  |
+4 | type T = string size sizeof(A)
+  |                             ^ cannot find type `A` in scope
+

@@ -13,10 +13,7 @@ use std::collections::BTreeSet;
 
 // A map from component instances to connections for tracking
 // matching pairs of connections
-//
-// The Rust `ComponentInstance` does not implement hashing, so this is keyed by
-// the remote component instance's qualified name.
-type InstanceConnectionMap = HashMap<String, Connection>;
+type InstanceConnectionMap = HashMap<ComponentInstance, Connection>;
 
 // A map from port numbers to connections for tracking port
 // assignments
@@ -29,10 +26,14 @@ type PortConnectionMap = HashMap<i128, Connection>;
 struct State {
     // The port instance for port 1
     pi1: PortInstance,
+    // The map from component instances to connections for port 1
+    icm1: InstanceConnectionMap,
     // The map from port numbers to connections for port 1
     pcm1: PortConnectionMap,
     // The port instance for port 2
     pi2: PortInstance,
+    // The map from component instances to connections for port 2
+    icm2: InstanceConnectionMap,
     // The map from port numbers to connections for port 2
     pcm2: PortConnectionMap,
     // Port numbering state
@@ -66,8 +67,10 @@ impl State {
 
     fn initial(
         pi1: PortInstance,
+        icm1: InstanceConnectionMap,
         pcm1: PortConnectionMap,
         pi2: PortInstance,
+        icm2: InstanceConnectionMap,
         pcm2: PortConnectionMap,
     ) -> State {
         // Compute the used port numbers
@@ -76,8 +79,10 @@ impl State {
         used.extend(pcm2.keys().copied());
         State {
             pi1,
+            icm1,
             pcm1,
             pi2,
+            icm2,
             pcm2,
             numbering: PortNumberingState::initial(used),
         }
@@ -120,7 +125,7 @@ fn number_connection_pair(
                     // Number is already assigned at pi2: error
                     Err(SemanticError::ImplicitDuplicateConnectionAtMatchedPort {
                         loc: c2.get_loc(),
-                        port: state.pi2.get_unqualified_name().to_string(),
+                        port: state.pi2.to_string(),
                         port_num: n,
                         implying_loc: c1.get_loc(),
                         matching_loc,
@@ -142,7 +147,7 @@ fn number_connection_pair(
                     // Number is already assigned at pi1: error
                     Err(SemanticError::ImplicitDuplicateConnectionAtMatchedPort {
                         loc: c1.get_loc(),
-                        port: state.pi1.get_unqualified_name().to_string(),
+                        port: state.pi1.to_string(),
                         port_num: n,
                         implying_loc: c2.get_loc(),
                         matching_loc,
@@ -181,17 +186,15 @@ fn number_connection_pair(
 
 // For each pair of connections (c1, c2), check that numbers
 // match and/or assign numbers
-fn assign_numbers(
-    t: &mut Topology,
-    state: &mut State,
-    matching_loc: Span,
-    icm1: InstanceConnectionMap,
-    icm2: &InstanceConnectionMap,
-) -> SemanticResult {
-    let mut list1: Vec<(String, Connection)> = icm1.into_iter().collect();
+fn assign_numbers(t: &mut Topology, state: &mut State, matching_loc: Span) -> SemanticResult {
+    // Take icm1 out of the state, so that numbering it needs no copy. Nothing
+    // reads it again: the state is dropped once the matching is numbered.
+    let mut list1: Vec<(ComponentInstance, Connection)> =
+        std::mem::take(&mut state.icm1).into_iter().collect();
     list1.sort_by(|x, y| x.1.cmp(&y.1));
     for (ci, c1) in list1 {
-        let c2 = icm2
+        let c2 = state
+            .icm2
             .get(&ci)
             .expect("matching instance present in icm2")
             .clone();
@@ -251,9 +254,11 @@ fn handle_port_matching(
     ci: &ComponentInstance,
     port_matching: &PortMatching,
 ) -> SemanticResult {
-    let pi1 = port_matching.instance1.clone();
-    let pi2 = port_matching.instance2.clone();
-    let loc = port_matching.loc;
+    // A matching is between two general ports; the numbering machinery below
+    // works over any kind of port instance.
+    let pi1 = PortInstance::General(port_matching.instance1.clone());
+    let pi2 = PortInstance::General(port_matching.instance2.clone());
+    let loc = port_matching.get_loc();
 
     let pcm1 = compute_port_connection_map(t, ci, &pi1, loc)?;
     let pcm2 = compute_port_connection_map(t, ci, &pi2, loc)?;
@@ -261,8 +266,8 @@ fn handle_port_matching(
     let icm2 = compute_instance_connection_map(t, ci, &pi2, loc)?;
     check_for_missing_connections(loc, &icm1, &icm2)?;
 
-    let mut state = State::initial(pi1, pcm1, pi2, pcm2);
-    assign_numbers(t, &mut state, loc, icm1, &icm2)
+    let mut state = State::initial(pi1, icm1, pcm1, pi2, icm2, pcm2);
+    assign_numbers(t, &mut state, loc)
 }
 
 // Map remote component instances to connections at pi
@@ -283,10 +288,45 @@ fn compute_instance_connection_map(
             continue;
         }
         let pii_remote = &c.get_other_endpoint(pi).port;
-        let ci_remote = match &pii_remote.interface_instance {
-            InterfaceInstance::Component(ci_remote) => ci_remote.qualified_name.clone(),
-            InterfaceInstance::Topology(_) => continue,
+        // Every endpoint of a connection that reaches port numbering refers to a
+        // component instance, never to an imported topology, so nothing is
+        // dropped here. Scala relies on the same invariant and throws
+        // InternalError if it is violated
+        // (analysis/Semantics/ResolveTopology/MatchedPortNumbering.scala:252).
+        // The invariant holds because:
+        //
+        // 1. `resolve_partially_numbered` rewrites every local connection with
+        //    `Endpoint::get_underlying_endpoint`, which walks topology port
+        //    aliases down to the component instance owning the aliased port. It
+        //    runs before `resolve_port_numbers`, hence before this code.
+        // 2. `get_underlying_endpoint` leaves a topology endpoint alone only if
+        //    the topology is absent from `Analysis::topology_map`, or if the
+        //    aliased name is absent from `Topology::port_map`. Neither happens
+        //    for a connection that survives this far: an
+        //    `InterfaceInstance::Topology` enters `Topology::instance_map` only
+        //    once `topology_map` holds the resolved topology, and
+        //    `check_connection_instances` (also in `resolve_partially_numbered`,
+        //    ahead of the rewrite) fails the whole resolution for an endpoint
+        //    whose instance is not in `instance_map`; and `Topology::add_port`
+        //    inserts an alias into `port_interface.port_map` and `port_map`
+        //    together, while the endpoint's port instance was looked up in the
+        //    former.
+        // 3. The connections added after the rewrite already name component
+        //    instances: `resolve_imported_connections` copies them from a
+        //    dependency whose own rewrite already ran, and `pattern_resolver`
+        //    only ever builds `InterfaceInstance::from_component_instance`.
+        debug_assert!(
+            pii_remote
+                .interface_instance
+                .get_component_instance_opt()
+                .is_some(),
+            "endpoint {} should refer to a component instance, not to an imported topology",
+            pii_remote.qualified_name()
+        );
+        let Some(ci_remote) = pii_remote.interface_instance.get_component_instance_opt() else {
+            continue;
         };
+        let ci_remote = ci_remote.clone();
         match m.get(&ci_remote) {
             Some(c_prev) => {
                 return Err(SemanticError::DuplicateMatchedConnection {
@@ -323,7 +363,7 @@ fn compute_port_connection_map(
                 Some(prev_c) => {
                     return Err(SemanticError::DuplicateConnectionAtMatchedPort {
                         loc: c.get_loc(),
-                        port: pi.get_unqualified_name().to_string(),
+                        port: pi.to_string(),
                         port_num: n,
                         prev_loc: prev_c.get_loc(),
                         matching_loc,

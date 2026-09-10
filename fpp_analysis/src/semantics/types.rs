@@ -1,6 +1,7 @@
 use crate::semantics::{
-    AbsTypeValue, AnonArrayValue, AnonStructValue, BooleanValue, FloatValue, Format, IntegerValue,
-    PrimitiveIntegerValue, StringValue, StructValue, Value,
+    AbsTypeValue, AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue,
+    FloatValue, Format, IntegerValue, PrimitiveIntegerValue, StringValue, StructValue, Symbol,
+    Value,
 };
 use fpp_ast::{FloatKind, IntegerKind};
 use fpp_core::Diagnostic;
@@ -31,6 +32,18 @@ pub enum Type {
     AnonStruct(AnonStructType),
 }
 
+/// Why [`Type::serialized_size`] could not produce a size
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SerializedSizeError {
+    /// The size depends on information that is not there: a framework definition
+    /// that is not defined, a type that is not finalized, or a type with no
+    /// serialized representation at all (`Integer`, an abstract type).
+    Unavailable,
+    /// The size does not fit in an `i128`. Sizes are represented exactly here, so
+    /// an inexpressible size is reported rather than silently wrapped.
+    TooLarge,
+}
+
 impl Type {
     /// Get the underlying type
     pub fn underlying_type(ty: &Arc<Type>) -> Arc<Type> {
@@ -41,8 +54,8 @@ impl Type {
     }
 
     /// Get the default value
-    pub fn default_value(&self) -> Option<Value> {
-        match self {
+    pub fn default_value(self: &Arc<Type>) -> Option<Value> {
+        match self.deref() {
             Type::PrimitiveInt(kind) => Some(Value::PrimitiveInteger(PrimitiveIntegerValue {
                 value: 0,
                 kind: *kind,
@@ -54,13 +67,31 @@ impl Type {
             Type::String(_) => Some(Value::String(StringValue("".to_string()))),
             Type::Boolean => Some(Value::Boolean(BooleanValue(false))),
             Type::Integer => Some(Value::Integer(IntegerValue(0))),
-            Type::AliasType(ty) => ty.alias_type.default_value().clone(),
-            Type::AbsType(ty) => Some(Value::AbsType(ty.default_value.clone()?)),
-            Type::Array(array) => array.default.clone(),
-            Type::AnonArray(arr) => Some(Value::AnonArray(AnonArrayValue {
-                elements: std::iter::repeat_n(arr.elt_type.default_value()?, arr.size?).collect(),
-            })),
-            Type::Enum(ty) => ty.default.clone(),
+            Type::AliasType(ty) => ty.alias_type.default_value(),
+            // An abstract type always has a default value: the opaque value of
+            // the type itself.
+            Type::AbsType(_) => Some(Value::AbsType(AbsTypeValue { ty: self.clone() })),
+            Type::Array(array) => array.default.clone().map(Value::Array),
+            // `size` copies of the element default, sharing one element as
+            // Scala's `List.fill(size)(elt)` does (Type.scala:338-344): the
+            // element default is built once and the array holds `size`
+            // references to it, so a nested array default costs the SUM of the
+            // nested sizes rather than their PRODUCT. That matters because a
+            // legal array size is `1..=i32::MAX`
+            // (`FinalizeTypeDefs::visit_def_array` rejects anything outside the
+            // `i32` range with "value out of range" and anything `<= 0`,
+            // matching Scala's `Analysis.getArraySize`) and array element types
+            // nest, so
+            //
+            //     array Inner = [n] U8
+            //     array Outer = [n] Inner
+            //
+            // holds 2n references rather than n^2 values.
+            Type::AnonArray(arr) => Some(Value::AnonArray(AnonArrayValue::repeated(
+                arr.elt_type.default_value()?,
+                arr.size?,
+            ))),
+            Type::Enum(ty) => ty.default.clone().map(Value::EnumConstant),
             Type::Struct(def) => Some(Value::Struct(def.default.clone()?)),
             Type::AnonStruct(struct_) => {
                 let mut members = vec![];
@@ -81,6 +112,23 @@ impl Type {
             Type::AliasType(ty) => ty.alias_type.array_size(),
             Type::AnonArray(arr) => arr.size,
             Type::Array(arr) => arr.anon_array.size,
+            _ => None,
+        }
+    }
+
+    /// Get the symbol of the type definition, if any.
+    ///
+    /// The definition is held behind an `Arc`, so this is a reference-count bump
+    /// and no AST is copied. That matches Scala's `Type.getDefSymbol`, which
+    /// wraps the node reference the type already holds; callers may use the
+    /// result as a map key in a loop.
+    pub fn def_symbol(&self) -> Option<Symbol> {
+        match self {
+            Type::AbsType(ty) => Some(Symbol::AbsType(ty.node.clone())),
+            Type::AliasType(ty) => Some(Symbol::AliasType(ty.node.clone())),
+            Type::Array(ty) => Some(Symbol::Array(ty.node.clone())),
+            Type::Enum(ty) => Some(Symbol::Enum(ty.node.clone())),
+            Type::Struct(ty) => Some(Symbol::Struct(ty.node.clone())),
             _ => None,
         }
     }
@@ -197,56 +245,86 @@ impl Type {
     /// resolves string, array, and struct sizes using the F Prime framework
     /// definitions (`FwSizeStoreType`, `FW_FIXED_LENGTH_STRING_SIZE`) recorded by
     /// `CheckFrameworkDefs`. Requires the type to be finalized (array/string
-    /// sizes known); returns `None` otherwise.
-    pub fn serialized_size(&self, a: &crate::Analysis) -> Option<i128> {
+    /// sizes known).
+    ///
+    /// The size is a product over the nesting depth of the type, so it grows
+    /// faster than any single array size: 128 levels of `array A = [2] B` reach
+    /// 2^128 bytes. Scala accumulates that in a `BigInt` and reports nothing, but
+    /// an `i128` cannot hold it, so a size that does not fit is reported as
+    /// [`SerializedSizeError::TooLarge`] rather than wrapped.
+    pub fn serialized_size(&self, a: &crate::Analysis) -> Result<i128, SerializedSizeError> {
         use crate::semantics::SymbolInterface;
+        use SerializedSizeError::Unavailable;
+
+        /// `n * size`, or [`SerializedSizeError::TooLarge`]
+        fn scale(n: usize, size: i128) -> Result<i128, SerializedSizeError> {
+            (n as i128)
+                .checked_mul(size)
+                .ok_or(SerializedSizeError::TooLarge)
+        }
+
         match self {
             Type::AliasType(alias) => alias.alias_type.serialized_size(a),
-            Type::Boolean => Some(1),
-            Type::Float(FloatKind::F32) => Some(4),
-            Type::Float(FloatKind::F64) => Some(8),
-            Type::PrimitiveInt(_) => self.primitive_serialized_size(),
+            Type::Boolean => Ok(1),
+            Type::Float(FloatKind::F32) => Ok(4),
+            Type::Float(FloatKind::F64) => Ok(8),
+            Type::PrimitiveInt(_) => self.primitive_serialized_size().ok_or(Unavailable),
             Type::Enum(ty) => Type::PrimitiveInt(ty.rep_type).serialized_size(a),
             Type::Array(arr) => {
-                let n = arr.anon_array.size? as i128;
-                Some(n * arr.anon_array.elt_type.serialized_size(a)?)
+                let n = arr.anon_array.size.ok_or(Unavailable)?;
+                scale(n, arr.anon_array.elt_type.serialized_size(a)?)
             }
             Type::AnonArray(arr) => {
-                let n = arr.size? as i128;
-                Some(n * arr.elt_type.serialized_size(a)?)
+                let n = arr.size.ok_or(Unavailable)?;
+                scale(n, arr.elt_type.serialized_size(a)?)
             }
             Type::String(size) => {
-                let store_symbol = a.framework_definitions.type_map.get("FwSizeStoreType")?;
-                let store_size = a.type_map.get(&store_symbol.node())?.serialized_size(a)?;
+                let store_symbol = a
+                    .framework_definitions
+                    .type_map
+                    .get("FwSizeStoreType")
+                    .ok_or(Unavailable)?;
+                let store_size = a
+                    .type_map
+                    .get(&store_symbol.node())
+                    .ok_or(Unavailable)?
+                    .serialized_size(a)?;
                 let data_size = match size {
                     Some(n) => *n,
                     None => {
                         let c = a
                             .framework_definitions
                             .constant_map
-                            .get("FW_FIXED_LENGTH_STRING_SIZE")?;
-                        a.get_int_value(c.node())?
+                            .get("FW_FIXED_LENGTH_STRING_SIZE")
+                            .ok_or(Unavailable)?;
+                        a.get_int_value(c.node()).ok_or(Unavailable)?
                     }
                 };
-                Some(store_size + data_size)
+                store_size
+                    .checked_add(data_size)
+                    .ok_or(SerializedSizeError::TooLarge)
             }
             Type::Struct(ty) => {
                 let mut total = 0i128;
                 for (name, member_ty) in &ty.anon_struct.members {
                     let member_size = member_ty.serialized_size(a)?;
-                    let mult = ty.sizes.get(name).copied().unwrap_or(1) as i128;
-                    total += member_size * mult;
+                    let mult = ty.sizes.get(name).copied().unwrap_or(1);
+                    total = total
+                        .checked_add(scale(mult as usize, member_size)?)
+                        .ok_or(SerializedSizeError::TooLarge)?;
                 }
-                Some(total)
+                Ok(total)
             }
             Type::AnonStruct(ty) => {
                 let mut total = 0i128;
                 for member_ty in ty.members.values() {
-                    total += member_ty.serialized_size(a)?;
+                    total = total
+                        .checked_add(member_ty.serialized_size(a)?)
+                        .ok_or(SerializedSizeError::TooLarge)?;
                 }
-                Some(total)
+                Ok(total)
             }
-            Type::Integer | Type::AbsType(_) => None,
+            Type::Integer | Type::AbsType(_) => Err(Unavailable),
         }
     }
 
@@ -791,18 +869,21 @@ impl PrimitiveType for FloatKind {
 }
 
 /// An abstract type
+///
+/// As in Scala (`Type.AbsType`), the definition is held by reference: an `Arc`
+/// shared with the `Symbol` that `EnterSymbols` interned for it. `Type` is
+/// `Clone` and cloned freely, so cloning a named type must not copy its AST.
 #[derive(Debug, Clone)]
 pub struct AbsType {
     /// The AST node giving the definition
-    pub node: fpp_ast::DefAbsType,
-    pub default_value: Option<AbsTypeValue>,
+    pub node: Arc<fpp_ast::DefAbsType>,
 }
 
 /// An alias type
 #[derive(Debug, Clone)]
 pub struct AliasType {
     /// The AST node giving the definition
-    pub node: fpp_ast::DefAliasType,
+    pub node: Arc<fpp_ast::DefAliasType>,
     /// Type that this typedef points to
     pub alias_type: Arc<Type>,
 }
@@ -811,11 +892,11 @@ pub struct AliasType {
 #[derive(Debug, Clone)]
 pub struct ArrayType {
     /// The AST node giving the definition
-    pub node: fpp_ast::DefArray,
+    pub node: Arc<fpp_ast::DefArray>,
     /// The structurally equivalent anonymous array
     pub anon_array: AnonArrayType,
     /// The specified default value, if any
-    pub default: Option<Value>,
+    pub default: Option<ArrayValue>,
     /// The specified format, if any
     pub format: Option<Format>,
 }
@@ -833,18 +914,18 @@ pub struct AnonArrayType {
 #[derive(Debug, Clone)]
 pub struct EnumType {
     /// The AST node giving the definition
-    pub node: fpp_ast::DefEnum,
+    pub node: Arc<fpp_ast::DefEnum>,
     /// The representation type
     pub rep_type: IntegerKind,
     /// The default value
-    pub default: Option<Value>,
+    pub default: Option<EnumConstantValue>,
 }
 
 /// A named struct type
 #[derive(Debug, Clone)]
 pub struct StructType {
     /// The AST node giving the definition
-    pub node: fpp_ast::DefStruct,
+    pub node: Arc<fpp_ast::DefStruct>,
     /// The structurally equivalent anonymous struct type
     pub anon_struct: AnonStructType,
     /// The default value
@@ -877,6 +958,10 @@ mod tests {
         }))
     }
 
+    fn prim_int(kind: IntegerKind) -> Arc<Type> {
+        Arc::new(Type::PrimitiveInt(kind))
+    }
+
     /// Regression for the `common_type` enum arm (fidelity bug #1): the enum
     /// case must recurse on `(rep_type, t2)`, not `(rep_type, t1)`, so the
     /// *other* operand is not dropped. `enum + F64` must widen to `F64`.
@@ -888,7 +973,7 @@ mod tests {
         fpp_core::run(&mut ctx, || {
             let src = fpp_core::SourceFile::new("test", "enum E { X }".to_string());
             let span = fpp_core::Span::new(src, 0, 1, None);
-            let def_enum = fpp_ast::DefEnum {
+            let def_enum = Arc::new(fpp_ast::DefEnum {
                 name: fpp_ast::Name {
                     data: "E".to_string(),
                     node_id: fpp_core::Node::new(span),
@@ -898,7 +983,7 @@ mod tests {
                 default: None,
                 is_dictionary_def: false,
                 node_id: fpp_core::Node::new(span),
-            };
+            });
             let enum_ty = Arc::new(Type::Enum(EnumType {
                 node: def_enum,
                 rep_type: IntegerKind::I32,
@@ -929,6 +1014,115 @@ mod tests {
             matches!(ct.deref(), Type::String(None)),
             "expected String(None), got {ct}"
         );
+    }
+
+    /// An array default holds `size` references to one element value, as Scala's
+    /// `List.fill(size)(elt)` does, so a nested array default costs the SUM of
+    /// the nested sizes and not their PRODUCT.
+    ///
+    /// The pointer-identity assertions are what bound the memory: with an
+    /// independent copy per element, `array Inner = [n] U8` +
+    /// `array Outer = [n] Inner` builds n^2 values of 64 bytes each (measured
+    /// peak RSS 1.1 GB at n=4000 and 4.2 GB at n=8000, against a flat ~160 MB
+    /// for `fpp-check`), and at the size bound (n = 2^31-1) it cannot complete.
+    #[test]
+    fn array_default_shares_its_repeated_element() {
+        const N: usize = 2000;
+
+        let inner = anon_array(prim_int(IntegerKind::U8), Some(N));
+        let outer = anon_array(inner, Some(N));
+
+        let Some(Value::AnonArray(outer_default)) = outer.default_value() else {
+            panic!("expected an anonymous array default");
+        };
+        assert_eq!(outer_default.elements.len(), N);
+
+        // Every element of the outer array is the one shared inner array
+        let first = &outer_default.elements[0];
+        assert!(
+            outer_default.elements.iter().all(|e| Arc::ptr_eq(e, first)),
+            "the outer array's elements are not shared"
+        );
+
+        // ... and that inner array shares its own repeated element in turn, so
+        // the whole default holds 2N references to 2 distinct values
+        let Value::AnonArray(inner_default) = first.deref() else {
+            panic!("expected an anonymous array element");
+        };
+        assert_eq!(inner_default.elements.len(), N);
+        let inner_first = &inner_default.elements[0];
+        assert!(
+            inner_default
+                .elements
+                .iter()
+                .all(|e| Arc::ptr_eq(e, inner_first)),
+            "the inner array's elements are not shared"
+        );
+        assert!(matches!(
+            inner_first.deref(),
+            Value::PrimitiveInteger(PrimitiveIntegerValue {
+                value: 0,
+                kind: IntegerKind::U8
+            })
+        ));
+
+        // Reading the value is unaffected by the sharing
+        assert_eq!(inner_default.iter().count(), N);
+        assert!(inner_default.iter().all(|e| e.to_string() == "0"));
+        assert!(inner_default.get(N - 1).is_some());
+        assert!(inner_default.get(N).is_none());
+    }
+
+    /// A scalar promoted to an array of known size shares the promoted element
+    /// too, and an array of unknown size records it as the array's scalar.
+    #[test]
+    fn promoted_scalar_shares_its_element() {
+        const N: usize = 1000;
+        let scalar = Value::PrimitiveInteger(PrimitiveIntegerValue {
+            value: 7,
+            kind: IntegerKind::U32,
+        });
+
+        let u32_array = |size| anon_array(prim_int(IntegerKind::U32), size);
+        let Some(Value::AnonArray(promoted)) = scalar.convert(&u32_array(Some(N))) else {
+            panic!("expected an anonymous array");
+        };
+        assert_eq!(promoted.elements.len(), N);
+        let first = &promoted.elements[0];
+        assert!(promoted.elements.iter().all(|e| Arc::ptr_eq(e, first)));
+
+        // Unknown size: no elements, and the value is kept as the scalar
+        let Some(Value::AnonArray(unsized_array)) = scalar.convert(&u32_array(None)) else {
+            panic!("expected an anonymous array");
+        };
+        assert!(unsized_array.elements.is_empty());
+        assert!(unsized_array.scalar.is_some());
+    }
+
+    /// Converting and truncating an array preserve the sharing, so neither turns
+    /// a shared default back into one copy per element.
+    #[test]
+    fn array_conversion_preserves_sharing() {
+        const N: usize = 2000;
+        let u8_array = anon_array(prim_int(IntegerKind::U8), Some(N));
+        let u32_array = anon_array(prim_int(IntegerKind::U32), Some(N));
+        let value = u8_array.default_value().expect("an array default");
+
+        for converted in [
+            value.convert(&u32_array),
+            value.truncate().convert(&u8_array),
+            Some(value.truncate()),
+        ] {
+            let Some(Value::AnonArray(a)) = converted else {
+                panic!("expected an anonymous array");
+            };
+            assert_eq!(a.elements.len(), N);
+            let first = &a.elements[0];
+            assert!(
+                a.elements.iter().all(|e| Arc::ptr_eq(e, first)),
+                "sharing was not preserved"
+            );
+        }
     }
 
     /// Regression for `is_displayable` (fidelity bug #7): anonymous aggregates

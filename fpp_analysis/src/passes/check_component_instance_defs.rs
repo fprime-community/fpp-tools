@@ -22,12 +22,12 @@ impl CheckComponentInstanceDefs {
                 // base id for i1 lies in the ID range of i2
                 SemanticError::OverlappingIdRanges {
                     base_id1: i1.base_id,
-                    name1: i1.name.clone(),
-                    loc1: i1.loc,
+                    name1: i1.get_unqualified_name().to_string(),
+                    loc1: i1.get_loc(),
                     base_id2: i2.base_id,
                     max_id2: i2.max_id,
-                    name2: i2.name.clone(),
-                    loc2: i2.loc,
+                    name2: i2.get_unqualified_name().to_string(),
+                    loc2: i2.get_loc(),
                 }
                 .emit();
                 return;
@@ -38,12 +38,12 @@ impl CheckComponentInstanceDefs {
                 // Error: Base id for i2 lies in the ID range of i1
                 SemanticError::OverlappingIdRanges {
                     base_id1: i2.base_id,
-                    name1: i2.name.clone(),
-                    loc1: i2.loc,
+                    name1: i2.get_unqualified_name().to_string(),
+                    loc1: i2.get_loc(),
                     base_id2: i1.base_id,
                     max_id2: i1.max_id,
-                    name2: i1.name.clone(),
-                    loc2: i1.loc,
+                    name2: i1.get_unqualified_name().to_string(),
+                    loc2: i1.get_loc(),
                 }
                 .emit();
                 return;

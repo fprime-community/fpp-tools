@@ -10,7 +10,6 @@ use fpp_ast::{
     SpecRecord, SpecSpecialPortInstance, SpecStateMachineInstance, SpecTlmChannel, Visitor,
     Walkable,
 };
-use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -165,7 +164,7 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
                 Some(iface) => iface.clone(),
                 None => return Ok(()),
             };
-            component.add_imported_interface(&interface, node.span())
+            component.add_imported_interface(&interface, node.node_id)
         });
         ControlFlow::Continue(())
     }

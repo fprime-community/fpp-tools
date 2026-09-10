@@ -4,9 +4,10 @@ mod errors;
 use crate::passes::{
     BuildSpecLocMap, CheckComponentDefs, CheckComponentInstanceDefs, CheckDictionaryDefs,
     CheckExprTypes, CheckFrameworkConstantValues, CheckFrameworkDefs, CheckInterfaceDefs,
-    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs, CheckTopologyDefs,
-    CheckTopologyInstances, CheckTypeUses, CheckUseDefCycles, CheckUses, ConstructImpliedUseMap,
-    EnterSymbols, EvalConstantExprs, EvalImpliedEnumConsts, FinalizeTypeDefs,
+    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs, CheckTlmPacketSets,
+    CheckTopologyDefs, CheckTopologyInstances, CheckTypeUses, CheckUseDefCycles, CheckUses,
+    ConstructImpliedUseMap, EnterSymbols, EvalConstantExprs, EvalImpliedEnumConsts,
+    FinalizeTypeDefs,
 };
 pub use analysis::*;
 use fpp_ast::{MutVisitor, Visitor};
@@ -89,6 +90,9 @@ pub mod passes {
     mod check_topology_defs;
     pub use check_topology_defs::*;
 
+    mod check_tlm_packet_sets;
+    pub use check_tlm_packet_sets::*;
+
     pub(crate) mod check_spec_locs;
     pub use check_spec_locs::*;
 
@@ -132,6 +136,15 @@ pub mod semantics {
 
     mod system;
     pub use system::*;
+
+    mod tlm_channel_identifier;
+    pub use tlm_channel_identifier::*;
+
+    mod tlm_packet;
+    pub use tlm_packet::*;
+
+    pub mod tlm_packet_set;
+    pub use tlm_packet_set::TlmPacketSet;
 
     pub(crate) mod resolve_topology;
 
@@ -212,6 +225,7 @@ pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> Contr
     BuildSpecLocMap.visit_trans_units(a, ast.iter().cloned())?;
     CheckSpecLocs.visit_trans_units(a, ast.iter().cloned())?;
     CheckDictionaryDefs.visit_trans_units(a, ast.iter().cloned())?;
+    CheckTlmPacketSets::check(a);
     CheckSystemDefs.visit_trans_units(a, ast.iter().cloned())?;
 
     ControlFlow::Continue(())

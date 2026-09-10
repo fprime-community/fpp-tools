@@ -54,8 +54,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a.type_map.insert(
             node.node_id,
             Arc::new(Type::AbsType(AbsType {
-                node: node.clone(),
-                default_value: None,
+                node: a.interned_def(node),
             })),
         );
         ControlFlow::Continue(())
@@ -77,7 +76,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a.type_map.insert(
             node.node_id,
             Arc::new(Type::AliasType(AliasType {
-                node: node.clone(),
+                node: a.interned_def(node),
                 alias_type,
             })),
         );
@@ -100,7 +99,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a.type_map.insert(
             node.node_id,
             Arc::new(Type::Array(ArrayType {
-                node: node.clone(),
+                node: a.interned_def(node),
                 anon_array: AnonArrayType {
                     size: None,
                     elt_type,
@@ -148,7 +147,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         };
 
         let ty = Arc::new(Type::Enum(EnumType {
-            node: node.clone(),
+            node: a.interned_def(node),
             rep_type,
             default: None,
         }));
@@ -200,7 +199,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a.type_map.insert(
             node.node_id,
             Arc::new(Type::Struct(StructType {
-                node: node.clone(),
+                node: a.interned_def(node),
                 anon_struct: anon_ty,
                 default: None,
                 sizes: Default::default(),
@@ -240,7 +239,17 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
                 a.type_map.insert(node.node_id, ty);
                 return ControlFlow::Continue(());
             }
-            TypeNameKind::String(_) => Type::String(None),
+            TypeNameKind::String(_) => {
+                // Dispatch the implied uses of the framework definitions that a
+                // string type needs, then walk the size expression so that a
+                // type name nested inside it (`string size sizeof(T)`) is
+                // resolved too. Matches `CheckTypeUses.typeNameStringNode`,
+                // which runs `super.typeNameStringNode` (BasicUseAnalyzer ->
+                // TypeExpressionAnalyzer, which visits the size expression)
+                // before assigning the string type.
+                self.super_visit(a, Node::TypeName(node))?;
+                Type::String(None)
+            }
         };
 
         a.type_map.insert(node.node_id, Arc::new(ty));

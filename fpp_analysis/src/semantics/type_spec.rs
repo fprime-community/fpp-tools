@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::test_helpers::*;
-use crate::semantics::Type;
+use crate::semantics::{SerializedSizeError, Type};
 
 #[test]
 fn node_id_memo_identity() {
@@ -540,7 +540,7 @@ fn size_of_primitives() {
             (boolean(), 1),
         ];
         for (ty, expected) in cases {
-            assert_eq!(ty.serialized_size(&a), Some(expected), "size of {ty}");
+            assert_eq!(ty.serialized_size(&a), Ok(expected), "size of {ty}");
         }
     });
 }
@@ -553,16 +553,16 @@ fn size_of_alias_types() {
 
         // StringAlias = alias of (string size 100) -> 2 + 100 = 102
         let string_alias = alias_type("StringAlias", string_with_size(100), 104);
-        assert_eq!(string_alias.serialized_size(&a), Some(102));
+        assert_eq!(string_alias.serialized_size(&a), Ok(102));
 
         // alias of unsized string -> 2 + 256 = 258
         let string_default_alias = alias_type("StringDefaultAlias", string(None), 105);
-        assert_eq!(string_default_alias.serialized_size(&a), Some(258));
+        assert_eq!(string_default_alias.serialized_size(&a), Ok(258));
 
         // EnumAlias = alias of (enum rep U16) -> 2
         let enum1 = enumeration("E", U16, 100);
         let enum_alias = alias_type("EnumAlias", enum1, 101);
-        assert_eq!(enum_alias.serialized_size(&a), Some(2));
+        assert_eq!(enum_alias.serialized_size(&a), Ok(2));
     });
 }
 
@@ -574,10 +574,10 @@ fn size_of_arrays() {
         let _ = U16;
         // array1 = [3] I64 -> 3 * 8 = 24
         let array1 = array("A", anon_array(Some(3), i64()), 102);
-        assert_eq!(array1.serialized_size(&a), Some(24));
+        assert_eq!(array1.serialized_size(&a), Ok(24));
         // array2 = [2] array1 -> 2 * 24 = 48
         let array2 = array("A2", anon_array(Some(2), array1), 103);
-        assert_eq!(array2.serialized_size(&a), Some(48));
+        assert_eq!(array2.serialized_size(&a), Ok(48));
     });
 }
 
@@ -587,7 +587,7 @@ fn size_of_enums() {
         use fpp_ast::IntegerKind::U16;
         let a = sizeof_test_analysis();
         let enum1 = enumeration("E", U16, 100);
-        assert_eq!(enum1.serialized_size(&a), Some(2));
+        assert_eq!(enum1.serialized_size(&a), Ok(2));
     });
 }
 
@@ -616,7 +616,7 @@ fn size_of_structs() {
             110,
             &[("m1", 2), ("m3", 1), ("m4", 3)],
         );
-        assert_eq!(struct1.serialized_size(&a), Some(94));
+        assert_eq!(struct1.serialized_size(&a), Ok(94));
 
         // struct2: m1=array2(48)=48, m2=string_alias(102)=102, m3=struct1(94)*2=188 => 338
         let struct2 = struct_ty_sized(
@@ -629,7 +629,7 @@ fn size_of_structs() {
             111,
             &[("m3", 2)],
         );
-        assert_eq!(struct2.serialized_size(&a), Some(338));
+        assert_eq!(struct2.serialized_size(&a), Ok(338));
     });
 }
 
@@ -637,20 +637,77 @@ fn size_of_structs() {
 fn size_of_types_with_no_size() {
     with_test_ctx(|| {
         let a = sizeof_test_analysis();
-        assert_eq!(default_abs_type().serialized_size(&a), None);
+        assert_eq!(
+            default_abs_type().serialized_size(&a),
+            Err(SerializedSizeError::Unavailable)
+        );
 
         let arr = array("A", anon_array(Some(3), default_abs_type()), 120);
-        assert_eq!(arr.serialized_size(&a), None);
+        assert_eq!(
+            arr.serialized_size(&a),
+            Err(SerializedSizeError::Unavailable)
+        );
 
         let s = struct_ty(
             "S",
             anon_struct(&[("m1", i32()), ("m2", default_abs_type())]),
             121,
         );
-        assert_eq!(s.serialized_size(&a), None);
+        assert_eq!(s.serialized_size(&a), Err(SerializedSizeError::Unavailable));
 
         let x = alias_type("X", default_abs_type(), 122);
-        assert_eq!(x.serialized_size(&a), None);
+        assert_eq!(x.serialized_size(&a), Err(SerializedSizeError::Unavailable));
+    });
+}
+
+/// A serialized size is a product over the type's nesting depth, so it outgrows
+/// an `i128` long before any single array size runs out of room: `array A = [2]
+/// B` nested 128 deep is 2^128 bytes. Scala accumulates that in a `BigInt` and
+/// `fpp-check` accepts it; the size is reported here instead of wrapping.
+#[test]
+fn size_of_too_large_to_represent() {
+    with_test_ctx(|| {
+        let a = sizeof_test_analysis();
+
+        // 2^127 fits (it is `i128::MIN` as a bit pattern only, so stop at 126
+        // doublings of a 1-byte element and check the next one)
+        let mut ty = boolean();
+        for id in 0..126 {
+            ty = array("A", anon_array(Some(2), ty), 200 + id);
+        }
+        assert_eq!(ty.serialized_size(&a), Ok(1i128 << 126));
+
+        let too_large = array("A", anon_array(Some(2), ty.clone()), 400);
+        assert_eq!(
+            too_large.serialized_size(&a),
+            Err(SerializedSizeError::TooLarge)
+        );
+
+        // An overflow anywhere below the top is reported at the top, not lost
+        let outer = array("A", anon_array(Some(1), too_large), 401);
+        assert_eq!(
+            outer.serialized_size(&a),
+            Err(SerializedSizeError::TooLarge)
+        );
+
+        // The struct arms accumulate with the same care: two members of 2^126
+        // bytes each overflow their sum
+        let two_members = struct_ty(
+            "S",
+            anon_struct(&[("m1", ty.clone()), ("m2", ty.clone())]),
+            402,
+        );
+        assert_eq!(
+            two_members.serialized_size(&a),
+            Err(SerializedSizeError::TooLarge)
+        );
+
+        // ... and so does one member repeated, which is a product
+        let repeated_member = struct_ty_sized("S2", anon_struct(&[("m1", ty)]), 403, &[("m1", 4)]);
+        assert_eq!(
+            repeated_member.serialized_size(&a),
+            Err(SerializedSizeError::TooLarge)
+        );
     });
 }
 
@@ -743,7 +800,123 @@ fn type_default_values() {
             other => panic!("expected AnonStruct default, got {other:?}"),
         }
 
-        // Abstract type has no default value.
-        assert!(default_abs_type().default_value().is_none());
+        // An abstract type is its own default value.
+        assert!(matches!(
+            default_abs_type().default_value(),
+            Some(Value::AbsType(_))
+        ));
     });
+}
+
+// ---------------------------------------------------------------------------
+// "definition symbol" should ...
+// ---------------------------------------------------------------------------
+
+/// `Type::def_symbol` must yield the symbol that `EnterSymbols` interned for the
+/// same definition.
+///
+/// In Scala the named type cases hold the definition node by reference and
+/// `getDefSymbol` just wraps it -- `Symbol.AbsType(node)` and friends
+/// (`Type.scala:202,214,236,273,294`) -- so the symbol they produce is the
+/// symbol table's symbol, and `getDefNodeId = getDefSymbol.map(_.getNodeId)`
+/// (`Type.scala:17-20`) is free. This test pins the Rust equivalent: the symbol
+/// compares equal (`Symbol` Eq/Hash go through the AST node, which the `#[ast]`
+/// macro keys on node id alone), it works as a map key against the symbol-keyed
+/// maps, and it shares the definition's `Arc` rather than copying the AST.
+#[test]
+fn def_symbol_matches_interned_symbol() {
+    use crate::semantics::{Symbol, SymbolInterface};
+
+    let src = "\
+type T
+type A = U32
+array Arr = [3] U32
+enum E { X, Y }
+struct S { x: U32, y: F64 }
+";
+
+    let mut diagnostics = vec![];
+    let mut ctx = fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
+    fpp_core::run(&mut ctx, || {
+        let source = fpp_core::SourceFile::new("def_symbol_spec.fpp", src.to_string());
+        let ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
+        let mut a = crate::Analysis::new();
+        let _ = crate::check_semantics(&mut a, vec![&ast]);
+
+        // Every type-definition symbol the pipeline entered.
+        let type_symbols: Vec<Symbol> = a
+            .symbol_map
+            .values()
+            .filter(|s| {
+                matches!(
+                    s,
+                    Symbol::AbsType(_)
+                        | Symbol::AliasType(_)
+                        | Symbol::Array(_)
+                        | Symbol::Enum(_)
+                        | Symbol::Struct(_)
+                )
+            })
+            .cloned()
+            .collect();
+        assert_eq!(
+            type_symbols.len(),
+            5,
+            "expected one symbol per type definition, got {type_symbols:?}"
+        );
+
+        for symbol in &type_symbols {
+            let ty = a
+                .type_map
+                .get(&symbol.node())
+                .unwrap_or_else(|| panic!("no type for {}", symbol.name().data));
+
+            let def_symbol = ty
+                .def_symbol()
+                .unwrap_or_else(|| panic!("{} has no def symbol", symbol.name().data));
+
+            // Equal to the interned symbol, and therefore interchangeable with
+            // it as a key into the symbol-keyed maps.
+            assert_eq!(&def_symbol, symbol, "def symbol of {ty}");
+            assert_eq!(ty.def_node_id(), Some(symbol.node()), "def node id of {ty}");
+            assert!(
+                a.symbol_map
+                    .get(&def_symbol.node())
+                    .is_some_and(|s| s == symbol),
+                "def symbol of {ty} does not key back to the interned symbol"
+            );
+
+            // The definition is shared, not copied: the type holds the same
+            // allocation the symbol table does.
+            assert!(
+                symbols_share_def(&def_symbol, symbol),
+                "def symbol of {ty} cloned the definition instead of sharing it"
+            );
+        }
+
+        // Types with no definition have no definition symbol.
+        for ty in [i32(), f64(), boolean(), string(None), integer()] {
+            assert!(ty.def_symbol().is_none(), "{ty} must have no def symbol");
+            assert!(ty.def_node_id().is_none(), "{ty} must have no def node id");
+        }
+    });
+    assert_eq!(
+        String::from_utf8(diagnostics).expect("diagnostics are UTF-8"),
+        "",
+        "expected no diagnostics"
+    );
+}
+
+/// Whether two symbols of the same kind point at the same definition allocation.
+fn symbols_share_def(a: &crate::semantics::Symbol, b: &crate::semantics::Symbol) -> bool {
+    use crate::semantics::Symbol::*;
+    use std::sync::Arc;
+    match (a, b) {
+        (AbsType(x), AbsType(y)) => Arc::ptr_eq(x, y),
+        (AliasType(x), AliasType(y)) => Arc::ptr_eq(x, y),
+        (Array(x), Array(y)) => Arc::ptr_eq(x, y),
+        (Enum(x), Enum(y)) => Arc::ptr_eq(x, y),
+        (Struct(x), Struct(y)) => Arc::ptr_eq(x, y),
+        _ => false,
+    }
 }

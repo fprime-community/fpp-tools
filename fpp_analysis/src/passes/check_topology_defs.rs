@@ -12,7 +12,7 @@ impl CheckTopologyDefs {
         let mut symbols: Vec<(Symbol, fpp_core::Span)> = a
             .partial_topology_map
             .iter()
-            .map(|(s, t)| (s.clone(), t.loc))
+            .map(|(s, t)| (s.clone(), t.get_loc()))
             .collect();
         symbols.sort_by(|x, y| cmp_span(&x.1, &y.1));
         for (sym, _) in symbols {

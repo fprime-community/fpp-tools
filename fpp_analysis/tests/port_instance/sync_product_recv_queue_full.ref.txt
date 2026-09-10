@@ -1,5 +1,5 @@
- --> [ local path prefix ]/port_instance/sync_product_recv_queue_full.fpp:9:3
+ --> [ local path prefix ]/port_instance/sync_product_recv_queue_full.fpp:9:40
   |
 9 |   sync product recv port productRecvIn drop
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ only async input may have queue full behavior
+  |                                        ^^^^ only async input may have queue full behavior
 

@@ -46,20 +46,17 @@ impl Value {
                 match ty.deref() {
                     Type::Array(array_ty) => {
                         let elt_value = self.convert(&array_ty.anon_array.elt_type)?;
-                        let size = array_ty.anon_array.size?;
                         Some(Value::Array(ArrayValue {
-                            anon_array: AnonArrayValue {
-                                elements: std::iter::repeat_n(elt_value, size).collect(),
-                            },
+                            anon_array: promote_to_anon_array(elt_value, array_ty.anon_array.size),
                             ty: ty.clone(),
                         }))
                     }
                     Type::AnonArray(array_ty) => {
                         let elt_value = self.convert(&array_ty.elt_type)?;
-                        let size = array_ty.size?;
-                        Some(Value::AnonArray(AnonArrayValue {
-                            elements: std::iter::repeat_n(elt_value, size).collect(),
-                        }))
+                        Some(Value::AnonArray(promote_to_anon_array(
+                            elt_value,
+                            array_ty.size,
+                        )))
                     }
                     Type::Struct(struct_ty) => {
                         let mut out_value = HashMap::default();
@@ -88,6 +85,11 @@ impl Value {
     }
 
     /// Convert this value to a distinct type
+    ///
+    /// The numeric conversions never report a value that does not fit, because
+    /// neither of them can produce one: an integer widens to `f64` (losing
+    /// precision above 2^53, as it does in Scala), and a float narrows through
+    /// [`float_to_int`], which is exactly as wide as Scala's `Double.intValue`.
     fn convert_impl(&self, ty_a: &Arc<Type>) -> Option<Value> {
         let ty = Type::underlying_type(ty_a);
 
@@ -111,7 +113,7 @@ impl Value {
             Value::Float(from) => match ty.deref() {
                 Type::PrimitiveInt(to_kind) => {
                     Some(Value::PrimitiveInteger(PrimitiveIntegerValue {
-                        value: from.value as i128,
+                        value: float_to_int(from.value),
                         kind: *to_kind,
                     }))
                 }
@@ -119,7 +121,7 @@ impl Value {
                     value: from.value,
                     kind: *to_kind,
                 })),
-                Type::Integer => Some(Value::Integer(IntegerValue(from.value as i128))),
+                Type::Integer => Some(Value::Integer(IntegerValue(float_to_int(from.value)))),
                 _ => None,
             },
 
@@ -170,17 +172,23 @@ impl Value {
                     return None;
                 }
 
-                let mut elements = Vec::with_capacity(anon_array.elements.len());
-                for e in &anon_array.elements {
-                    elements.push(e.convert(&anon_array_ty.elt_type)?);
-                }
+                // As in Scala's `convertToAnonArray`, the result has no scalar:
+                // the conversion is over the elements
+                let elements =
+                    anon_array.try_map_elements(|e| e.convert(&anon_array_ty.elt_type))?;
 
                 match ty.deref() {
                     Type::Array(_) => Some(Value::Array(ArrayValue {
-                        anon_array: AnonArrayValue { elements },
+                        anon_array: AnonArrayValue {
+                            elements,
+                            scalar: None,
+                        },
                         ty: ty.clone(),
                     })),
-                    Type::AnonArray(_) => Some(Value::AnonArray(AnonArrayValue { elements })),
+                    Type::AnonArray(_) => Some(Value::AnonArray(AnonArrayValue {
+                        elements,
+                        scalar: None,
+                    })),
                     _ => None,
                 }
             }
@@ -189,17 +197,39 @@ impl Value {
                 let mut members = HashMap::default();
 
                 let to_ty = match ty.deref() {
-                    // TODO(tumbar) default values need to come from struct type?
                     Type::Struct(StructType { anon_struct, .. }) => anon_struct,
                     Type::AnonStruct(anon_struct) => anon_struct,
                     _ => return None,
                 };
 
-                for (name, ty) in &to_ty.members {
+                // The values to use for members that this value does not
+                // provide. Converting to a named struct takes them from the
+                // target type's own default value; converting to an anonymous
+                // struct takes them from the source struct's type.
+                let member_defaults: Option<&AnonStructValue> = match (ty.deref(), self) {
+                    (Type::Struct(StructType { default, .. }), _) => {
+                        default.as_ref().map(|d| &d.anon_struct)
+                    }
+                    (Type::AnonStruct(_), Value::Struct(StructValue { ty: from_ty, .. })) => {
+                        match from_ty.deref() {
+                            Type::Struct(StructType { default, .. }) => {
+                                default.as_ref().map(|d| &d.anon_struct)
+                            }
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                };
+
+                for (name, member_ty) in &to_ty.members {
                     let member_value = match anon_struct.members.get(name) {
-                        // Use the default value
-                        None => ty.default_value()?,
-                        Some(member_value) => member_value.convert(ty)?,
+                        Some(member_value) => member_value.convert(member_ty)?,
+                        // The member is absent: take the struct type's default
+                        // for it, or failing that the member type's default.
+                        None => match member_defaults.and_then(|d| d.members.get(name)) {
+                            Some(default) => default.clone(),
+                            None => member_ty.default_value()?,
+                        },
                     };
 
                     members.insert(name.clone(), member_value);
@@ -208,7 +238,7 @@ impl Value {
                 match ty.deref() {
                     Type::Struct(_) => Some(Value::Struct(StructValue {
                         anon_struct: AnonStructValue { members },
-                        ty: ty_a.clone(),
+                        ty: ty.clone(),
                     })),
                     Type::AnonStruct(_) => Some(Value::AnonStruct(AnonStructValue { members })),
                     _ => None,
@@ -326,28 +356,25 @@ impl Value {
         self.binop(
             other,
             |left, right| Ok(left + right),
-            |left, right| Ok(left + right),
+            |left, right| left.checked_add(*right).ok_or(MathError::Overflow),
         )
     }
 
     /// Divide one value by another
     pub fn div(&self, other: &Value) -> MathResult {
+        // The divisor is tested for zero before the operator is applied, so a
+        // float divisor within `EPSILON` of zero is a division by zero even
+        // though the raw `f64` division would succeed. This mirrors
+        // `Analysis.div`, which consults `Value.isZero`.
+        if other.is_zero() {
+            return Err(MathError::DivByZero);
+        }
         self.binop(
             other,
-            |left, right| {
-                if *right == 0.0 {
-                    Err(MathError::DivByZero)
-                } else {
-                    Ok(left / right)
-                }
-            },
-            |left, right| {
-                if *right == 0 {
-                    Err(MathError::DivByZero)
-                } else {
-                    Ok(left / right)
-                }
-            },
+            |left, right| Ok(left / right),
+            // `i128::MIN / -1` is the one integer division whose exact result is
+            // out of range
+            |left, right| left.checked_div(*right).ok_or(MathError::Overflow),
         )
     }
 
@@ -356,7 +383,7 @@ impl Value {
         self.binop(
             other,
             |left, right| Ok(left * right),
-            |left, right| Ok(left * right),
+            |left, right| left.checked_mul(*right).ok_or(MathError::Overflow),
         )
     }
 
@@ -365,7 +392,7 @@ impl Value {
         self.binop(
             other,
             |left, right| Ok(left - right),
-            |left, right| Ok(left - right),
+            |left, right| left.checked_sub(*right).ok_or(MathError::Overflow),
         )
     }
 
@@ -394,18 +421,24 @@ impl Value {
             Value::AbsType(AbsTypeValue { ty }) => ty.clone(),
             Value::Array(ArrayValue { ty, .. }) => ty.clone(),
             Value::Struct(StructValue { ty, .. }) => ty.clone(),
-            Value::AnonArray(AnonArrayValue { elements }) => {
-                // Reads the element type from the first element (an anon-array
-                // value is never empty in practice, since it is built from a
-                // non-empty literal).
-                let elt_type = elements
-                    .first()
-                    .map(|e| e.get_type())
-                    .unwrap_or_else(|| Arc::new(Type::Integer));
-                Arc::new(Type::AnonArray(AnonArrayType {
-                    size: Some(elements.len()),
-                    elt_type,
-                }))
+            Value::AnonArray(AnonArrayValue { elements, scalar }) => {
+                // The element type comes from the first element. A value
+                // promoted to an array of unknown size has no elements, only a
+                // scalar, and so has unknown size too.
+                match (elements.first(), scalar) {
+                    (Some(elt), _) => Arc::new(Type::AnonArray(AnonArrayType {
+                        size: Some(elements.len()),
+                        elt_type: elt.get_type(),
+                    })),
+                    (None, Some(scalar)) => Arc::new(Type::AnonArray(AnonArrayType {
+                        size: None,
+                        elt_type: scalar.get_type(),
+                    })),
+                    (None, None) => Arc::new(Type::AnonArray(AnonArrayType {
+                        size: Some(0),
+                        elt_type: Arc::new(Type::Integer),
+                    })),
+                }
             }
             Value::AnonStruct(AnonStructValue { members }) => {
                 let member_types = members
@@ -433,19 +466,23 @@ impl Value {
         }
     }
 
-    /// Negates a value. Returns `None` for values that cannot be negated
-    /// (strings, booleans, aggregates). Enums negate through their integer
+    /// Negates a value, preserving its kind. Reports
+    /// [`MathError::InvalidInputs`] for values that cannot be negated (strings,
+    /// booleans, aggregates) and [`MathError::Overflow`] for `i128::MIN`, whose
+    /// negation is out of range. Enums negate through their integer
     /// representation type.
-    pub fn negate(&self) -> Option<Value> {
+    pub fn negate(&self) -> MathResult {
         match self {
             Value::PrimitiveInteger(PrimitiveIntegerValue { value, kind }) => {
-                Some(Value::PrimitiveInteger(PrimitiveIntegerValue {
-                    value: -value,
+                Ok(Value::PrimitiveInteger(PrimitiveIntegerValue {
+                    value: value.checked_neg().ok_or(MathError::Overflow)?,
                     kind: *kind,
                 }))
             }
-            Value::Integer(IntegerValue(value)) => Some(Value::Integer(IntegerValue(-value))),
-            Value::Float(FloatValue { value, kind }) => Some(Value::Float(FloatValue {
+            Value::Integer(IntegerValue(value)) => Ok(Value::Integer(IntegerValue(
+                value.checked_neg().ok_or(MathError::Overflow)?,
+            ))),
+            Value::Float(FloatValue { value, kind }) => Ok(Value::Float(FloatValue {
                 value: -value,
                 kind: *kind,
             })),
@@ -454,43 +491,61 @@ impl Value {
                 kind: v.ty().rep_type,
             })
             .negate(),
-            _ => None,
+            _ => Err(MathError::InvalidInputs),
         }
     }
 
-    /// Left-shifts an integer value by another. Returns `None` unless both
-    /// operands are integers or enums.
-    pub fn shl(&self, other: &Value) -> Option<Value> {
-        self.int_shift_op(other, |v, s| v << s)
+    /// Left-shift an integer value
+    pub fn shl(&self, other: &Value) -> MathResult {
+        self.int_shift_op(other, ShiftDirection::Left)
     }
 
-    /// Right-shifts an integer value by another. Returns `None` unless both
-    /// operands are integers or enums.
-    pub fn shr(&self, other: &Value) -> Option<Value> {
-        self.int_shift_op(other, |v, s| v >> s)
+    /// Right-shift an integer value
+    pub fn shr(&self, other: &Value) -> MathResult {
+        self.int_shift_op(other, ShiftDirection::Right)
     }
 
-    /// Shared implementation for `<<`/`>>`. The left operand's kind is preserved
-    /// (a `PrimitiveInt` stays that kind, an `Integer` stays `Integer`); enums
-    /// are converted to their representation type first.
-    fn int_shift_op(&self, other: &Value, op: impl Fn(i128, u32) -> i128) -> Option<Value> {
-        let shift = u32::try_from(other.as_shift_int()?).ok()?;
+    /// Shift-only binary operation.
+    ///
+    /// The left operand determines the result: a `PrimitiveInteger` keeps its kind
+    /// when the shift amount is also a `PrimitiveInteger` (or an enum constant,
+    /// which is first converted to its representation type) but degrades to
+    /// `Integer` when the amount is an `Integer`; an `Integer` always stays an
+    /// `Integer`. Anything else is not shiftable.
+    fn int_shift_op(&self, other: &Value, dir: ShiftDirection) -> MathResult {
         match self {
-            Value::PrimitiveInteger(PrimitiveIntegerValue { value, kind }) => {
-                Some(Value::PrimitiveInteger(PrimitiveIntegerValue {
-                    value: op(*value, shift),
+            Value::PrimitiveInteger(PrimitiveIntegerValue { value, kind }) => match other {
+                // A primitive-int (or enum-constant) amount preserves the left
+                // operand's kind, whatever the amount's own kind is
+                Value::PrimitiveInteger(PrimitiveIntegerValue { value: amount, .. })
+                | Value::EnumConstant(EnumConstantValue {
+                    value: (_, amount), ..
+                }) => Ok(Value::PrimitiveInteger(PrimitiveIntegerValue {
+                    value: shift_int(*value, *amount, dir)?,
                     kind: *kind,
-                }))
-            }
-            Value::Integer(IntegerValue(value)) => {
-                Some(Value::Integer(IntegerValue(op(*value, shift))))
-            }
+                })),
+                // An unsized-integer amount yields an unsized integer
+                Value::Integer(IntegerValue(amount)) => Ok(Value::Integer(IntegerValue(
+                    shift_int(*value, *amount, dir)?,
+                ))),
+                _ => Err(MathError::InvalidInputs),
+            },
+            Value::Integer(IntegerValue(value)) => match other {
+                Value::Integer(IntegerValue(amount))
+                | Value::PrimitiveInteger(PrimitiveIntegerValue { value: amount, .. })
+                | Value::EnumConstant(EnumConstantValue {
+                    value: (_, amount), ..
+                }) => Ok(Value::Integer(IntegerValue(shift_int(
+                    *value, *amount, dir,
+                )?))),
+                _ => Err(MathError::InvalidInputs),
+            },
             Value::EnumConstant(v) => Value::PrimitiveInteger(PrimitiveIntegerValue {
                 value: v.value.1,
                 kind: v.ty().rep_type,
             })
-            .int_shift_op(other, op),
-            _ => None,
+            .int_shift_op(other, dir),
+            _ => Err(MathError::InvalidInputs),
         }
     }
 
@@ -512,13 +567,9 @@ impl Value {
                 },
                 kind: *kind,
             }),
-            Value::AnonArray(AnonArrayValue { elements }) => Value::AnonArray(AnonArrayValue {
-                elements: elements.iter().map(|e| e.truncate()).collect(),
-            }),
+            Value::AnonArray(anon_array) => Value::AnonArray(anon_array.truncate()),
             Value::Array(ArrayValue { anon_array, ty }) => Value::Array(ArrayValue {
-                anon_array: AnonArrayValue {
-                    elements: anon_array.elements.iter().map(|e| e.truncate()).collect(),
-                },
+                anon_array: anon_array.truncate(),
                 ty: ty.clone(),
             }),
             Value::AnonStruct(AnonStructValue { members }) => Value::AnonStruct(AnonStructValue {
@@ -544,6 +595,11 @@ impl Value {
 
 /// Truncates an integer to the width and signedness of `kind`, wrapping modulo
 /// the type's range.
+///
+/// Wrapping is the operation itself here, not an accident of the `i128`
+/// representation: Scala's `Value.PrimitiveInt.truncate` reduces the `BigInt`
+/// modulo `2^width` (adjusting into range for the unsigned kinds) and every
+/// truncated value fits in an `i128`, so no result is inexpressible.
 fn truncate_int(value: i128, kind: IntegerKind) -> i128 {
     match kind {
         IntegerKind::I8 => value as i8 as i128,
@@ -554,6 +610,61 @@ fn truncate_int(value: i128, kind: IntegerKind) -> i128 {
         IntegerKind::U16 => value as u16 as i128,
         IntegerKind::U32 => value as u32 as i128,
         IntegerKind::U64 => value as u64 as i128,
+    }
+}
+
+/// Narrows a float to an integer value, rounding towards zero.
+///
+/// The result is the float's integer part clamped to the range of an `i32`, with
+/// a NaN going to zero. That is the width Scala narrows to:
+/// `Value.Float.convertToDistinctType` builds both `PrimitiveInt(value.intValue,
+/// kind)` and `Integer(value.intValue)` from `Double.intValue`, which is
+/// `Double.toInt` and so saturates at `Int.MinValue`/`Int.MaxValue`. Keeping
+/// more of the value than that (an `i128` is wide enough to) would give a
+/// different constant from the reference compiler, since a subsequent
+/// [`Value::truncate`] to the target kind reduces the retained bits modulo the
+/// kind's width: `array A = [1] I32 default [1.0e300]` is `2147483647` in Scala,
+/// but `-1` if the conversion saturates at `i128::MAX` instead.
+fn float_to_int(value: f64) -> i128 {
+    // `as` on a float is a saturating cast in Rust, so this cannot trap however
+    // large the float is
+    value as i32 as i128
+}
+
+/// The direction of a shift operation
+#[derive(Copy, Clone)]
+enum ShiftDirection {
+    Left,
+    Right,
+}
+
+/// Shifts `value` by `amount` bits in the direction given by `dir`.
+///
+/// Right shifts are arithmetic, and an amount at or beyond the width of `i128`
+/// saturates to `0` (non-negative values) or `-1` (negative values), which is what
+/// an arbitrary-precision arithmetic shift by any larger amount produces. A left
+/// shift whose mathematical result does not fit in `i128` reports
+/// [`MathError::ShiftOverflow`].
+fn shift_int(value: i128, amount: i128, dir: ShiftDirection) -> Result<i128, MathError> {
+    // The constant evaluator rejects a negative shift amount before applying the
+    // operator, so this guard is only reachable from direct callers of the
+    // `Value` layer
+    if amount < 0 {
+        return Err(MathError::InvalidInputs);
+    }
+    match dir {
+        ShiftDirection::Right => Ok(value >> (amount.min(127) as u32)),
+        // Shifting zero is zero for any amount, however large
+        ShiftDirection::Left if value == 0 => Ok(0),
+        ShiftDirection::Left => {
+            let amount = u32::try_from(amount).map_err(|_| MathError::ShiftOverflow)?;
+            let shifted = value.checked_shl(amount).ok_or(MathError::ShiftOverflow)?;
+            if (shifted >> amount) == value {
+                Ok(shifted)
+            } else {
+                Err(MathError::ShiftOverflow)
+            }
+        }
     }
 }
 
@@ -568,10 +679,11 @@ impl fmt::Display for Value {
             Value::Float(FloatValue { value, .. }) => f.write_fmt(format_args!("{value}")),
             Value::Boolean(BooleanValue(value)) => f.write_fmt(format_args!("{value}")),
             Value::String(StringValue(value)) => f.write_fmt(format_args!("\"{value}\"")),
-            Value::EnumConstant(EnumConstantValue { value, .. }) => {
-                let vi = value.1 as i32;
-                f.write_fmt(format_args!("{vi}"))
-            }
+            // The whole value, not a 32-bit slice of it: a `U64` enum's
+            // constants do not fit in an `i32`
+            Value::EnumConstant(EnumConstantValue {
+                value: (_, value), ..
+            }) => f.write_fmt(format_args!("{value}")),
             Value::AnonArray(_) => f.write_str("[array value]"),
             Value::Array(_) => f.write_str("[array value]"),
             Value::AnonStruct(_) => f.write_str("{struct value}"),
@@ -580,9 +692,19 @@ impl fmt::Display for Value {
     }
 }
 
+#[derive(Debug)]
 pub enum MathError {
     InvalidInputs,
     DivByZero,
+    /// The mathematical result of an addition, subtraction, multiplication,
+    /// division, or negation does not fit in an `i128`. Values are represented
+    /// exactly here, so an inexpressible result is reported rather than
+    /// silently wrapped.
+    Overflow,
+    /// The mathematical result of a left shift does not fit in an `i128`. Values
+    /// are represented exactly here, so an inexpressible result is reported
+    /// rather than silently wrapped.
+    ShiftOverflow,
 }
 
 pub type MathResult = Result<Value, MathError>;
@@ -614,9 +736,110 @@ pub struct BooleanValue(pub bool);
 pub struct StringValue(pub String);
 
 /// Anonymous array values
+///
+/// The elements are held behind `Arc`s so that repeated elements are stored
+/// once, as they are in Scala, where `Value.AnonArray` holds a `List[Value]` of
+/// references to immutable values (`Type.getDefaultValue` builds an array
+/// default with `List.fill(size)(elt)`). A `Value` is immutable once built, so
+/// sharing is unobservable, and it is what keeps a nested array default costing
+/// the SUM of the nested sizes rather than their PRODUCT.
 #[derive(Debug, Clone)]
 pub struct AnonArrayValue {
-    pub elements: Vec<Value>,
+    /// The elements, in order. Use [`AnonArrayValue::iter`] to read them as
+    /// `&Value`.
+    pub elements: Vec<Arc<Value>>,
+    /// The single element that this value was promoted from, when the array
+    /// size was not known.
+    pub scalar: Option<Arc<Value>>,
+}
+
+impl AnonArrayValue {
+    /// An anonymous array value with the given elements
+    pub fn new(elements: Vec<Value>) -> AnonArrayValue {
+        AnonArrayValue {
+            elements: elements.into_iter().map(Arc::new).collect(),
+            scalar: None,
+        }
+    }
+
+    /// An anonymous array value of `size` copies of one element
+    ///
+    /// The element is stored once, so this costs one pointer per element rather
+    /// than one deep copy per element.
+    // Every element pointing at the same `Arc` is the point: a `Value` is
+    // immutable once built, and sharing is what keeps a nested array default
+    // costing the sum of the nested sizes rather than their product.
+    #[allow(clippy::rc_clone_in_vec_init)]
+    pub fn repeated(elt: Value, size: usize) -> AnonArrayValue {
+        AnonArrayValue {
+            elements: vec![Arc::new(elt); size],
+            scalar: None,
+        }
+    }
+
+    /// A single element promoted to an anonymous array value of unknown size:
+    /// the element is recorded as the array's scalar and there are no elements
+    pub fn promoted(elt: Value) -> AnonArrayValue {
+        AnonArrayValue {
+            elements: vec![],
+            scalar: Some(Arc::new(elt)),
+        }
+    }
+
+    /// The elements, as `&Value`
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &Value> {
+        self.elements.iter().map(|e| e.deref())
+    }
+
+    /// The element at `index`, if any
+    pub fn get(&self, index: usize) -> Option<&Value> {
+        self.elements.get(index).map(|e| e.deref())
+    }
+
+    /// Applies `f` to each element, preserving sharing: elements that are one
+    /// shared value map to one shared result. A repeated element (an array
+    /// default) is therefore mapped once, whatever the array's size. Returns
+    /// `None` as soon as `f` does.
+    fn try_map_elements(
+        &self,
+        mut f: impl FnMut(&Value) -> Option<Value>,
+    ) -> Option<Vec<Arc<Value>>> {
+        let mut out = Vec::with_capacity(self.elements.len());
+        // The last element mapped, and its result. Repeated elements are all the
+        // same `Arc`, so a single-entry cache is enough to keep them shared.
+        let mut last: Option<(&Arc<Value>, Arc<Value>)> = None;
+        for e in &self.elements {
+            let shared = match &last {
+                Some((prev, mapped)) if Arc::ptr_eq(prev, e) => Some(mapped.clone()),
+                _ => None,
+            };
+            let mapped = match shared {
+                Some(mapped) => mapped,
+                None => {
+                    let mapped = Arc::new(f(e)?);
+                    last = Some((e, mapped.clone()));
+                    mapped
+                }
+            };
+            out.push(mapped);
+        }
+
+        Some(out)
+    }
+
+    /// Applies an infallible `f` to each element, preserving sharing
+    fn map_elements(&self, mut f: impl FnMut(&Value) -> Value) -> Vec<Arc<Value>> {
+        self.try_map_elements(|v| Some(f(v)))
+            .expect("an infallible mapping cannot fail")
+    }
+
+    /// Truncates elementwise, preserving sharing
+    fn truncate(&self) -> AnonArrayValue {
+        AnonArrayValue {
+            elements: self.map_elements(|e| e.truncate()),
+            scalar: self.scalar.as_ref().map(|s| Arc::new(s.truncate())),
+        }
+    }
 }
 
 /// Array values
@@ -675,4 +898,13 @@ pub struct StructValue {
 #[derive(Debug, Clone)]
 pub struct AbsTypeValue {
     pub ty: Arc<Type>,
+}
+
+/// Promotes a single element value to an anonymous array value. If the array
+/// size is not known, the element is recorded as the array's scalar instead.
+fn promote_to_anon_array(elt: Value, size: Option<usize>) -> AnonArrayValue {
+    match size {
+        Some(size) => AnonArrayValue::repeated(elt, size),
+        None => AnonArrayValue::promoted(elt),
+    }
 }

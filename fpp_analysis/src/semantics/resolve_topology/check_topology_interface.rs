@@ -6,7 +6,7 @@ use fpp_core::Spanned;
 
 /// Check a topology implements all the interfaces that are listed in the AST
 pub fn check(a: &Analysis, t: &Topology) -> SemanticResult {
-    for impl_use in &t.implements {
+    for impl_use in t.implements() {
         let Some(iface) = a.get_interface(impl_use.id()) else {
             continue;
         };

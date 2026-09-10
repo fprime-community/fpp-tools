@@ -188,6 +188,12 @@ pub enum SemanticError {
         loc: Span,
         prev_loc: Span,
     },
+    /// Duplicate telemetry packet set
+    DuplicateTlmPacketSet {
+        name: String,
+        loc: Span,
+        prev_loc: Span,
+    },
     /// Duplicate telemetry channel limit
     DuplicateLimit {
         loc: Span,
@@ -283,6 +289,20 @@ pub enum SemanticError {
         loc: Span,
         name: String,
         msg: String,
+    },
+    /// Invalid telemetry packet set, reported against one of its channels
+    InvalidTlmPacketSetChannel {
+        loc: Span,
+        name: String,
+        msg: String,
+        /// Locations explaining the error, rendered as span notes
+        notes: Vec<(Span, String)>,
+    },
+    /// A telemetry channel identifier that names no channel of the topology
+    ChannelNotInDictionary {
+        loc: Span,
+        channel_name: String,
+        top_name: String,
     },
     /// Invalid interface instance
     InvalidInterfaceInstance {
@@ -694,9 +714,14 @@ impl From<SemanticError> for Diagnostic {
                     .iter()
                     .fold(diag, |diag, l| diag.span_note(*l, "port imported from here"));
                 let diag = diag.span_note(prev_loc, "previous instance is here");
-                prev_import_locs
-                    .iter()
-                    .fold(diag, |diag, l| diag.span_note(*l, "port imported from here"))
+                // Scala labels this group distinctly ("previous instance imported
+                // from here") and prints it reversed, while printing the chain
+                // above it in order (util/Error.scala:108,113-114). Both chains
+                // are built by appending, so the reversal is Scala's own
+                // asymmetry; reproduce it so the two compilers agree.
+                prev_import_locs.iter().rev().fold(diag, |diag, l| {
+                    diag.span_note(*l, "previous instance imported from here")
+                })
             }
             SemanticError::InterfaceImport { loc, inner } => {
                 let diag: Diagnostic = (*inner).into();
@@ -742,6 +767,16 @@ impl From<SemanticError> for Diagnostic {
                 format!("duplicate state machine instance {}", name),
             )
             .span_note(prev_loc, "previous occurrence is here"),
+            SemanticError::DuplicateTlmPacketSet {
+                name,
+                loc,
+                prev_loc,
+            } => Diagnostic::new(
+                loc,
+                Level::Error,
+                format!("duplicate telemetry packet set {}", name),
+            )
+            .span_note(prev_loc, "previous set is here"),
             SemanticError::DuplicateLimit { loc, prev_loc } => {
                 Diagnostic::new(loc, Level::Error, "duplicate limit")
                     .span_note(prev_loc, "previous occurrence is here")
@@ -846,6 +881,34 @@ impl From<SemanticError> for Diagnostic {
                 format!("invalid telemetry packet set {}", name),
             )
             .note(msg),
+            SemanticError::InvalidTlmPacketSetChannel {
+                loc,
+                name,
+                msg,
+                notes,
+            } => {
+                let diag = Diagnostic::new(
+                    loc,
+                    Level::Error,
+                    format!("invalid telemetry packet set {}", name),
+                )
+                .note(msg);
+                notes
+                    .into_iter()
+                    .fold(diag, |diag, (loc, note)| diag.span_note(loc, note))
+            }
+            SemanticError::ChannelNotInDictionary {
+                loc,
+                channel_name,
+                top_name,
+            } => Diagnostic::new(
+                loc,
+                Level::Error,
+                format!(
+                    "channel {} is not in the dictionary for topology {}",
+                    channel_name, top_name
+                ),
+            ),
             SemanticError::InvalidInterfaceInstance {
                 loc,
                 instance_name,

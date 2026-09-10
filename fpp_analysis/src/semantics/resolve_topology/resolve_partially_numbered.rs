@@ -29,7 +29,7 @@ fn check_connection_instances(t: &Topology) -> SemanticResult {
 /// Check that connection instances are legal
 fn check_port_instances(t: &Topology) -> SemanticResult {
     for i in t.port_map.values() {
-        t.look_up_instance_at(&i.pii.interface_instance, i.underlying_loc)?;
+        t.look_up_instance_at(&i.pii.interface_instance, i.get_underlying_port_loc())?;
     }
     Ok(())
 }
@@ -72,11 +72,7 @@ fn compute_transitive_imports(a: &Analysis, t: &mut Topology) {
 fn resolve_patterns(a: &Analysis, t: &mut Topology) -> SemanticResult {
     let patterns: Vec<ConnectionPattern> = t.pattern_map.values().cloned().collect();
     for p in patterns {
-        let instances: Vec<ComponentInstance> = t
-            .component_instance_map()
-            .into_iter()
-            .map(|(ci, _)| ci)
-            .collect();
+        let instances: Vec<ComponentInstance> = t.component_instance_map().into_keys().collect();
         check_pattern_instances(t, &p)?;
         let connections = pattern_resolver::resolve(a, &p, &instances)?;
         for (name, c) in connections {

@@ -1,0 +1,22 @@
+  --> [ local path prefix ]/port_numbering/matched_through_alias.fpp:50:5
+   |
+50 |     A.aOut -> c2.pIn
+   |     ^^^^^^ no port available for matched numbering
+   |
+  ::: [ local path prefix ]/port_numbering/matched_through_alias.fpp:50:5
+   |
+50 |     A.aOut -> c2.pIn
+   |     ------ matched connections are specified here
+   |
+  ::: [ local path prefix ]/port_numbering/matched_through_alias.fpp:51:5
+   |
+51 |     c2.pOut -> A.aIn
+   |     ------- matched connections are specified here
+   |
+  ::: [ local path prefix ]/port_numbering/matched_through_alias.fpp:8:3
+   |
+ 8 |   match pOut with pIn
+   |   ------------------- port matching is specified here
+   |
+   = note: to be available, a port number must be in bounds and unassigned at each of the matched ports
+

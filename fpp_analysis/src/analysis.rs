@@ -3,7 +3,7 @@ use crate::semantics::{
     FrameworkDefinitions, ImpliedUseSet, IntegerValue, Interface, NameGroup, NestedScope, Scope,
     Symbol, SymbolInterface, Type, UseDefMatching, Value,
 };
-use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull};
+use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier};
 use fpp_core::{SourceFile, Span, Spanned};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
@@ -62,6 +62,10 @@ pub struct Analysis {
     pub topology_map: HashMap<Symbol, crate::semantics::Topology>,
     /// The mapping from system symbols to their resolved systems.
     pub system_map: HashMap<Symbol, crate::semantics::FppSystem>,
+    /// The mapping from deployment topology symbols to their telemetry packet
+    /// sets, by packet set name. The Scala implementation stores these on the
+    /// dictionary of the topology; dictionary construction is not ported.
+    pub tlm_packet_set_map: HashMap<Symbol, HashMap<String, crate::semantics::TlmPacketSet>>,
     /// The mapping from (location specifier kind, qualified name) to the
     /// location specifier that named it.
     pub location_specifier_map: HashMap<(fpp_ast::SpecLocKind, String), SpecLocEntry>,
@@ -83,6 +87,39 @@ pub struct Analysis {
     /// every type name an entry in `type_map`, letting later passes read a
     /// resolved type without handling the unresolved case.
     unknown_type: Option<Arc<Type>>,
+}
+
+/// A type definition that [`crate::passes::EnterSymbols`] interns into a
+/// [`Symbol`].
+///
+/// The semantic [`Type`] for a type definition holds the definition behind the
+/// same `Arc` that the symbol table holds, mirroring Scala, where
+/// `Symbol.AbsType(aNode)` and `Type.AbsType(aNode)` share one `aNode`.
+pub trait InternedDef: fpp_ast::AstNode + Clone {
+    /// Borrows the interned definition out of `symbol`, if `symbol` names one of
+    /// this kind.
+    fn from_symbol(symbol: &Symbol) -> Option<&Arc<Self>>;
+}
+
+macro_rules! impl_interned_def {
+    ($($ty:ident => $variant:ident),* $(,)?) => {
+        $(impl InternedDef for fpp_ast::$ty {
+            fn from_symbol(symbol: &Symbol) -> Option<&Arc<Self>> {
+                match symbol {
+                    Symbol::$variant(def) => Some(def),
+                    _ => None,
+                }
+            }
+        })*
+    };
+}
+
+impl_interned_def! {
+    DefAbsType => AbsType,
+    DefAliasType => AliasType,
+    DefArray => Array,
+    DefEnum => Enum,
+    DefStruct => Struct,
 }
 
 /// A recorded location specifier, keyed in `location_specifier_map`.
@@ -135,6 +172,7 @@ impl Analysis {
             partial_topology_map: Default::default(),
             topology_map: Default::default(),
             system_map: Default::default(),
+            tlm_packet_set_map: Default::default(),
             location_specifier_map: Default::default(),
             scope_name_list: Vec::new(),
             state_machine_map: Default::default(),
@@ -159,17 +197,48 @@ impl Analysis {
         }
         let node_id = fpp_core::Node::new(span);
         let ty = Arc::new(Type::AbsType(crate::semantics::AbsType {
-            node: fpp_ast::DefAbsType {
+            node: Arc::new(fpp_ast::DefAbsType {
                 node_id,
                 name: fpp_ast::Name {
                     node_id,
                     data: "<unknown>".to_string(),
                 },
-            },
-            default_value: None,
+            }),
         }));
         self.unknown_type = Some(ty.clone());
         ty
+    }
+
+    /// The `Arc` holding a type definition, for storing in its semantic
+    /// [`Type`].
+    ///
+    /// `EnterSymbols` already interned an `Arc` of the definition in
+    /// `symbol_map`, so reuse that allocation instead of deep-copying the AST:
+    /// `Type` is `Clone` and cloned freely, and `Type::def_symbol` hands the
+    /// `Arc` straight back out as a `Symbol`. The clone fallback covers
+    /// definitions that no symbol was entered for (there are none in the pass
+    /// pipeline, but a synthesized definition need not be in `symbol_map`).
+    pub fn interned_def<D: InternedDef>(&self, node: &D) -> Arc<D> {
+        match self.symbol_map.get(&node.id()).and_then(D::from_symbol) {
+            Some(def) => def.clone(),
+            None => Arc::new(node.clone()),
+        }
+    }
+
+    /// Gets the finalized type of a type-name use node.
+    ///
+    /// `FinalizeTypeDefs` rewrites the type recorded for a type DEFINITION
+    /// node; the type names that use it keep the type they were given by
+    /// `CheckTypeUses`, which may not be finalized yet (an array whose size is
+    /// not yet known, a struct with no default value). Resolve the use through
+    /// its definition node, so callers see the same finalized type that Scala's
+    /// `typeMap` holds for a type name.
+    pub fn get_finalized_type(&self, node: fpp_core::Node) -> Option<Arc<Type>> {
+        let ty = self.type_map.get(&node)?.clone();
+        match ty.def_node_id() {
+            Some(def_node) => Some(self.type_map.get(&def_node).cloned().unwrap_or(ty)),
+            None => Some(ty),
+        }
     }
 
     /// Get an integer value for an AST node from the value map, if present.
@@ -286,6 +355,12 @@ impl Analysis {
     /// Get a queue full behavior, defaulting to `Assert`.
     pub fn get_queue_full(opt: &Option<QueueFull>) -> QueueFull {
         opt.clone().unwrap_or(QueueFull::Assert)
+    }
+
+    /// Get the queue full behavior named by an optional queue full specifier,
+    /// defaulting to `Assert`.
+    pub fn get_specified_queue_full(opt: &Option<QueueFullSpecifier>) -> QueueFull {
+        Self::get_queue_full(&opt.as_ref().map(|spec| spec.kind.clone()))
     }
 
     /// Count the number of ref parameters in a formal parameter list.

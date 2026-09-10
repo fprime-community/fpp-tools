@@ -4,7 +4,7 @@ use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
 use crate::errors::SemanticError;
 use crate::semantics::{
     AliasType, AnonArrayType, AnonStructType, ArrayType, ArrayValue, Format, IntegerValue,
-    StructType, Symbol, SymbolInterface, Type, Value,
+    StructType, StructValue, Symbol, SymbolInterface, Type, Value,
 };
 use fpp_ast::{
     AstNode, DefAliasType, DefArray, DefEnum, DefStruct, Expr, Node, TransUnit, TypeName,
@@ -100,8 +100,20 @@ impl<'ast> FinalizeTypeDefs<'ast> {
             _ => {}
         }
 
-        // `CheckTypeUses` gives every type name an entry, so this is always set.
-        a.type_map.get(&node.node_id).cloned().unwrap()
+        // `CheckTypeUses` normally gives every type name it reaches an entry.
+        // Fall back to the shared unknown type rather than assuming that: this
+        // is called on demand from `EvalConstantExprs` for `sizeof` operands,
+        // which can sit in positions that no earlier pass visited, and a
+        // missing entry must degrade to an unknown type, not abort the
+        // compiler (which would also take down `fpp_lsp_server`).
+        match a.type_map.get(&node.node_id).cloned() {
+            Some(ty) => ty,
+            None => {
+                let ty = a.unknown_type(node.span());
+                a.type_map.insert(node.node_id, ty.clone());
+                ty
+            }
+        }
     }
 }
 
@@ -137,6 +149,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             return ControlFlow::Continue(());
         }
 
+        let def = a.interned_def(node);
         a.visited_symbol_set.insert(symbol);
         // Finalize the referenced type
         let ty = self.ty(a, &node.type_name);
@@ -144,7 +157,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         a.type_map.insert(
             node.node_id,
             Arc::new(Type::AliasType(AliasType {
-                node: node.clone(),
+                node: def,
                 alias_type: ty,
             })),
         );
@@ -162,6 +175,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             return ControlFlow::Continue(());
         }
 
+        let def = a.interned_def(node);
         a.visited_symbol_set.insert(symbol);
         // Finalize the element type
         let elt_type = self.ty(a, &node.elt_type);
@@ -197,11 +211,28 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             elt_type: elt_type.clone(),
         };
 
-        let anon_array_ty = Type::AnonArray(anon_array.clone());
+        let anon_array_ty = Arc::new(Type::AnonArray(anon_array.clone()));
+
+        // The array type without its default value or format. The default value
+        // refers to this type, as it does in the Scala implementation, where the
+        // default and the format are copied in together afterwards.
+        let mut array_ty = ArrayType {
+            node: def,
+            anon_array,
+            default: None,
+            format: None,
+        };
+        let array_ty_a = Arc::new(Type::Array(array_ty.clone()));
 
         // Compute the default value
-        let default = match &node.default {
-            None => anon_array_ty.default_value(),
+        array_ty.default = match &node.default {
+            None => match anon_array_ty.default_value() {
+                Some(Value::AnonArray(anon_array)) => Some(ArrayValue {
+                    anon_array,
+                    ty: array_ty_a.clone(),
+                }),
+                _ => None,
+            },
             Some(default) => match a.value_map.get(&default.node_id).cloned() {
                 None => None,
                 Some(default_v) => {
@@ -217,26 +248,23 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
                         }
                         .emit();
                     }
-                    default_v.convert(&Arc::new(anon_array_ty))
+                    match default_v.convert(&array_ty_a) {
+                        Some(Value::Array(v)) => Some(v),
+                        _ => None,
+                    }
                 }
             },
         };
 
         // Compute the format
-        let format = node
+        array_ty.format = node
             .format
             .as_ref()
             .map(|format| Format::new(format, vec![(elt_type.clone(), node.elt_type.span())]));
 
-        let ty = Type::Array(ArrayType {
-            node: node.clone(),
-            anon_array,
-            default,
-            format,
-        });
-
         // Update the array type in the type map
-        a.type_map.insert(node.node_id, Arc::new(ty));
+        a.type_map
+            .insert(node.node_id, Arc::new(Type::Array(array_ty)));
         ControlFlow::Continue(())
     }
 
@@ -253,7 +281,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             _ => panic!("expected enum type"),
         };
 
-        enum_ty.default = match &node.default {
+        let default_value = match &node.default {
             None => {
                 // Choose the first value
                 match node.constants.first() {
@@ -262,6 +290,10 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
                 }
             }
             Some(def) => a.value_map.get(&def.node_id).cloned(),
+        };
+        enum_ty.default = match default_value {
+            Some(Value::EnumConstant(v)) => Some(v),
+            _ => None,
         };
 
         a.type_map
@@ -280,10 +312,11 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             return ControlFlow::Continue(());
         }
 
+        let def = a.interned_def(node);
         a.visited_symbol_set.insert(symbol);
 
         let mut ty = StructType {
-            node: node.clone(),
+            node: def,
             anon_struct: AnonStructType {
                 members: Default::default(),
             },
@@ -333,6 +366,28 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
                 );
             }
         }
+
+        // Compute the default value. The value refers to the struct type
+        // without its own default, as it does in the Scala implementation.
+        let struct_ty_a = Arc::new(Type::Struct(ty.clone()));
+        ty.default = match &node.default {
+            // The convertibility of an explicit default is checked by
+            // `CheckExprTypes`; store the converted value.
+            Some(default) => match a.value_map.get(&default.node_id).cloned() {
+                Some(default_v) => match default_v.convert(&struct_ty_a) {
+                    Some(Value::Struct(v)) => Some(v),
+                    _ => None,
+                },
+                None => None,
+            },
+            None => match Arc::new(Type::AnonStruct(ty.anon_struct.clone())).default_value() {
+                Some(Value::AnonStruct(anon_struct)) => Some(StructValue {
+                    anon_struct,
+                    ty: struct_ty_a,
+                }),
+                _ => None,
+            },
+        };
 
         // Update the struct type in the type map
         a.type_map.insert(node.node_id, Arc::new(Type::Struct(ty)));

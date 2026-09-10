@@ -123,14 +123,11 @@ pub fn string_with_size(size: i128) -> Arc<Type> {
 // ---------------------------------------------------------------------------
 
 pub fn abs_type(name: &str, id: u64) -> Arc<Type> {
-    let node = DefAbsType {
+    let node = Arc::new(DefAbsType {
         name: name_with_id(name, id),
         node_id: node_for(id),
-    };
-    Arc::new(Type::AbsType(crate::semantics::AbsType {
-        node,
-        default_value: None,
-    }))
+    });
+    Arc::new(Type::AbsType(crate::semantics::AbsType { node }))
 }
 
 /// A dummy `TypeName` (`Integer(U32)`) used as a placeholder.
@@ -142,12 +139,12 @@ fn dummy_type_name(id: u64) -> TypeName {
 }
 
 pub fn alias_type(name: &str, ty: Arc<Type>, id: u64) -> Arc<Type> {
-    let node = DefAliasType {
+    let node = Arc::new(DefAliasType {
         name: name_with_id(name, id),
         type_name: dummy_type_name(id),
         is_dictionary_def: false,
         node_id: node_for(id),
-    };
+    });
     Arc::new(Type::AliasType(crate::semantics::AliasType {
         node,
         alias_type: ty,
@@ -161,7 +158,7 @@ pub fn array(name: &str, anon_array: Arc<Type>, id: u64) -> Arc<Type> {
     };
     let size_expr = expr_lit_int("1", id.wrapping_add(2_000_000));
     let elt_type_name = dummy_type_name(id.wrapping_add(3_000_000));
-    let node = DefArray {
+    let node = Arc::new(DefArray {
         name: name_with_id(name, id),
         size: size_expr,
         elt_type: elt_type_name,
@@ -169,7 +166,7 @@ pub fn array(name: &str, anon_array: Arc<Type>, id: u64) -> Arc<Type> {
         format: None,
         is_dictionary_def: false,
         node_id: node_for(id),
-    };
+    });
     Arc::new(Type::Array(ArrayType {
         node,
         anon_array: anon,
@@ -179,14 +176,14 @@ pub fn array(name: &str, anon_array: Arc<Type>, id: u64) -> Arc<Type> {
 }
 
 pub fn enumeration(name: &str, rep_type: IntegerKind, id: u64) -> Arc<Type> {
-    let node = DefEnum {
+    let node = Arc::new(DefEnum {
         name: name_with_id(name, id),
         type_name: None,
         constants: vec![],
         default: None,
         is_dictionary_def: false,
         node_id: node_for(id),
-    };
+    });
     Arc::new(Type::Enum(EnumType {
         node,
         rep_type,
@@ -209,13 +206,13 @@ pub fn struct_ty_sized(
         Type::AnonStruct(s) => s.clone(),
         other => panic!("struct_ty() expects an AnonStruct, got {other:?}"),
     };
-    let node = DefStruct {
+    let node = Arc::new(DefStruct {
         name: name_with_id(name, id),
         members: vec![],
         default: None,
         is_dictionary_def: false,
         node_id: node_for(id),
-    };
+    });
     let mut size_map = HashMap::default();
     for (n, s) in sizes {
         size_map.insert((*n).to_string(), *s);
@@ -331,6 +328,12 @@ pub fn v_i32(v: i128) -> Value {
         kind: IntegerKind::I32,
     })
 }
+pub fn v_i64(v: i128) -> Value {
+    Value::PrimitiveInteger(PrimitiveIntegerValue {
+        value: v,
+        kind: IntegerKind::I64,
+    })
+}
 pub fn v_u8(v: i128) -> Value {
     Value::PrimitiveInteger(PrimitiveIntegerValue {
         value: v,
@@ -374,11 +377,9 @@ pub fn v_enum_constant(member: &str, value: i128) -> Value {
     ))
 }
 
-/// An anonymous array value of `size` copies of `v`.
+/// An anonymous array value of `size` copies of `v`, sharing the one element.
 pub fn v_anon_array(size: usize, v: Value) -> Value {
-    Value::AnonArray(AnonArrayValue {
-        elements: std::iter::repeat_n(v, size).collect(),
-    })
+    Value::AnonArray(AnonArrayValue::repeated(v, size))
 }
 
 // ---------------------------------------------------------------------------
@@ -405,10 +406,9 @@ pub fn sizeof_test_analysis() -> crate::Analysis {
         Type::AliasType(al) => al.node.clone(),
         _ => unreachable!(),
     };
-    a.framework_definitions.type_map.insert(
-        "FwSizeStoreType".to_string(),
-        Symbol::AliasType(Arc::new(store_def)),
-    );
+    a.framework_definitions
+        .type_map
+        .insert("FwSizeStoreType".to_string(), Symbol::AliasType(store_def));
     a.type_map.insert(node_for(store_id), store_ty);
 
     // FW_FIXED_LENGTH_STRING_SIZE = 256

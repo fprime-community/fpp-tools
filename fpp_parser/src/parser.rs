@@ -1091,25 +1091,7 @@ impl<'a> Parser<'a> {
 
         let priority = self.opt_expr(Priority)?;
 
-        let queue_full = match self.peek(0) {
-            Keyword(Assert) => {
-                self.next();
-                Some(QueueFull::Assert)
-            }
-            Keyword(Block) => {
-                self.next();
-                Some(QueueFull::Block)
-            }
-            Keyword(Drop) => {
-                self.next();
-                Some(QueueFull::Drop)
-            }
-            Keyword(Hook) => {
-                self.next();
-                Some(QueueFull::Hook)
-            }
-            _ => None,
-        };
+        let queue_full = self.opt_queue_full_kind()?;
 
         Ok(SpecStateMachineInstance {
             node_id: self.node(first.span()),
@@ -1513,7 +1495,7 @@ impl<'a> Parser<'a> {
         let name = self.name()?;
         let params = self.formal_param_list()?;
         let priority = self.opt_expr(Priority)?;
-        let queue_full = self.opt_queue_full()?;
+        let queue_full = self.opt_queue_full_kind()?;
         Ok(SpecInternalPort {
             node_id: self.node(first.span()),
             name,
@@ -1852,12 +1834,7 @@ impl<'a> Parser<'a> {
             _ => None,
         };
 
-        let queue_full = match self.peek(0) {
-            Keyword(Assert) | Keyword(Block) | Keyword(Drop) | Keyword(Hook) => {
-                Some(self.queue_full()?)
-            }
-            _ => None,
-        };
+        let queue_full = self.opt_queue_full()?;
 
         Ok(SpecPortInstance::General(SpecGeneralPortInstance {
             node_id: self.node(first),
@@ -2080,7 +2057,8 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn opt_queue_full(&mut self) -> ParseResult<Option<QueueFull>> {
+    /// Parses an optional queue full specifier node.
+    fn opt_queue_full(&mut self) -> ParseResult<Option<QueueFullSpecifier>> {
         match self.peek(0) {
             Keyword(Assert) | Keyword(Block) | Keyword(Drop) | Keyword(Hook) => {
                 Ok(Some(self.queue_full()?))
@@ -2089,7 +2067,29 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn queue_full(&mut self) -> ParseResult<QueueFull> {
+    /// Parses a queue full specifier node, whose span covers only the keyword
+    /// that names the behavior.
+    fn queue_full(&mut self) -> ParseResult<QueueFullSpecifier> {
+        let first = self.current_span()?;
+        let kind = self.queue_full_kind()?;
+        Ok(QueueFullSpecifier {
+            node_id: self.node(first),
+            kind,
+        })
+    }
+
+    /// Parses an optional bare queue full behavior, for the specifiers that do
+    /// not wrap it in a node.
+    fn opt_queue_full_kind(&mut self) -> ParseResult<Option<QueueFull>> {
+        match self.peek(0) {
+            Keyword(Assert) | Keyword(Block) | Keyword(Drop) | Keyword(Hook) => {
+                Ok(Some(self.queue_full_kind()?))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn queue_full_kind(&mut self) -> ParseResult<QueueFull> {
         let out = match self.peek(0) {
             Keyword(Assert) => Ok(QueueFull::Assert),
             Keyword(Block) => Ok(QueueFull::Block),

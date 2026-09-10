@@ -122,7 +122,7 @@ fn raw_direct_graphs_expose_group_names_for_codelens() {
         let topology = a
             .topology_map
             .values()
-            .find(|t| t.name == "Sys")
+            .find(|t| t.qualified_name == "Sys")
             .expect("topology Sys resolved");
 
         let group_names: Vec<&str> = topology

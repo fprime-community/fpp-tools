@@ -6,8 +6,8 @@ use crate::errors::SemanticError;
 use crate::passes::FinalizeTypeDefs;
 use crate::semantics::{
     AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue, FloatValue,
-    IntegerValue, MathError, PrimitiveIntegerValue, QualifiedName, StringValue, StructValue,
-    Symbol, SymbolInterface, Type, Value,
+    IntegerValue, MathError, PrimitiveIntegerValue, QualifiedName, SerializedSizeError,
+    StringValue, StructValue, Symbol, SymbolInterface, Type, Value,
 };
 use fpp_ast::{
     Binop, DefConstant, DefEnum, DefEnumConstant, Expr, ExprKind, Node, TransUnit, Unop, Visitable,
@@ -165,18 +165,13 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     out.push(val.clone())
                 }
 
-                a.value_map.insert(
-                    node.node_id,
-                    Value::AnonArray(AnonArrayValue { elements: out }),
-                );
+                a.value_map
+                    .insert(node.node_id, Value::AnonArray(AnonArrayValue::new(out)));
             }
             ExprKind::ArraySubscript { e1, e2 } => {
                 let elements = match a.value_map.get(&e1.node_id) {
-                    Some(Value::AnonArray(AnonArrayValue { elements })) => elements,
-                    Some(Value::Array(ArrayValue {
-                        anon_array: AnonArrayValue { elements },
-                        ..
-                    })) => elements,
+                    Some(Value::AnonArray(anon_array))
+                    | Some(Value::Array(ArrayValue { anon_array, .. })) => anon_array,
                     _ => return ControlFlow::Continue(()),
                 };
 
@@ -195,19 +190,22 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                         msg: "index value may not be negative".to_string(),
                     }
                     .emit();
-                } else if index as usize >= elements.len() {
+                } else if index >= elements.elements.len() as i128 {
+                    // Compare in i128, as Scala compares in BigInt: narrowing the
+                    // index to usize first would accept any index congruent to an
+                    // in-bounds one modulo the pointer width.
                     SemanticError::InvalidIntValue {
                         loc: e2.span(),
                         v: Some(index),
                         msg: format!(
                             "index value is not in the range [0, {}]",
-                            elements.len() - 1
+                            elements.elements.len().saturating_sub(1)
                         ),
                     }
                     .emit();
                 } else {
-                    a.value_map
-                        .insert(node.node_id, elements[index as usize].clone());
+                    let element = elements.get(index as usize).expect("in bounds").clone();
+                    a.value_map.insert(node.node_id, element);
                 }
             }
             ExprKind::Binop { left, right, op } => {
@@ -221,41 +219,57 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     Some(v) => v,
                 };
 
-                match op {
+                let val = match op {
                     Binop::LShift | Binop::RShift => {
-                        if let (Some(lhs), Some(shift)) =
+                        // A shift checks its amount before applying the operator.
+                        // Both operands must be integers; a non-integer operand has
+                        // already been reported by the type checker.
+                        let (Some(_), Some(shift)) =
                             (left_val.as_shift_int(), right_val.as_shift_int())
-                        {
-                            if !(0..=255).contains(&shift) {
-                                SemanticError::InvalidShiftAmount { loc: right.span() }.emit();
-                            } else if let Some(v) = match op {
-                                Binop::LShift => lhs.checked_shl(shift as u32),
-                                _ => lhs.checked_shr(shift as u32),
-                            } {
-                                a.value_map
-                                    .insert(node.node_id, Value::Integer(IntegerValue(v)));
-                            }
-                        }
-                    }
-                    _ => {
-                        let val = match op {
-                            Binop::Add => left_val.add(right_val),
-                            Binop::Div => left_val.div(right_val),
-                            Binop::Mul => left_val.mul(right_val),
-                            Binop::Sub => left_val.sub(right_val),
-                            Binop::LShift | Binop::RShift => unreachable!(),
+                        else {
+                            return ControlFlow::Continue(());
                         };
 
-                        match val {
-                            Ok(val) => {
-                                a.value_map.insert(node.node_id, val);
-                            }
-                            Err(MathError::DivByZero) => {
-                                SemanticError::DivisionByZero { loc: right.span() }.emit();
-                            }
-                            Err(MathError::InvalidInputs) => {}
+                        if !(0..=255).contains(&shift) {
+                            SemanticError::InvalidShiftAmount { loc: right.span() }.emit();
+                            return ControlFlow::Continue(());
+                        }
+
+                        match op {
+                            Binop::LShift => left_val.shl(right_val),
+                            _ => left_val.shr(right_val),
                         }
                     }
+                    Binop::Add => left_val.add(right_val),
+                    Binop::Div => left_val.div(right_val),
+                    Binop::Mul => left_val.mul(right_val),
+                    Binop::Sub => left_val.sub(right_val),
+                };
+
+                match val {
+                    Ok(val) => {
+                        a.value_map.insert(node.node_id, val);
+                    }
+                    Err(MathError::DivByZero) => {
+                        SemanticError::DivisionByZero { loc: right.span() }.emit();
+                    }
+                    Err(MathError::ShiftOverflow) => {
+                        SemanticError::InvalidIntValue {
+                            loc: node.span(),
+                            v: None,
+                            msg: "shift result is too large to represent".to_string(),
+                        }
+                        .emit();
+                    }
+                    Err(MathError::Overflow) => {
+                        SemanticError::InvalidIntValue {
+                            loc: node.span(),
+                            v: None,
+                            msg: "arithmetic result is too large to represent".to_string(),
+                        }
+                        .emit();
+                    }
+                    Err(MathError::InvalidInputs) => {}
                 }
             }
             ExprKind::Dot { e, id } => {
@@ -375,9 +389,22 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                         None => ty,
                     };
                     // Use the finalized type to compute the size
-                    if let Some(size) = finalized.serialized_size(a) {
-                        a.value_map
-                            .insert(node.node_id, Value::Integer(IntegerValue(size)));
+                    match finalized.serialized_size(a) {
+                        Ok(size) => {
+                            a.value_map
+                                .insert(node.node_id, Value::Integer(IntegerValue(size)));
+                        }
+                        // The size is unknown here; a type whose size is never
+                        // knowable is reported by `CheckExprTypes`
+                        Err(SerializedSizeError::Unavailable) => {}
+                        Err(SerializedSizeError::TooLarge) => {
+                            SemanticError::InvalidIntValue {
+                                loc: node.span(),
+                                v: None,
+                                msg: "serialized size is too large to represent".to_string(),
+                            }
+                            .emit();
+                        }
                     }
                 }
             }
@@ -395,14 +422,27 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                 );
             }
             ExprKind::Unop { op, e } => {
+                // Negation preserves the operand's kind, as `Value.unary_-`
+                // does in Scala (`Analysis.neg`)
                 if let (Unop::Minus, Some(v)) = (op, a.value_map.get(&e.node_id)) {
-                    match v.mul(&Value::Integer(IntegerValue(-1))) {
+                    match v.negate() {
                         Ok(v) => {
                             a.value_map.insert(node.node_id, v);
                         }
                         Err(MathError::InvalidInputs) => {}
+                        Err(MathError::Overflow) => {
+                            SemanticError::InvalidIntValue {
+                                loc: node.span(),
+                                v: None,
+                                msg: "arithmetic result is too large to represent".to_string(),
+                            }
+                            .emit();
+                        }
                         Err(MathError::DivByZero) => {
                             panic!("unexpected div by zero")
+                        }
+                        Err(MathError::ShiftOverflow) => {
+                            panic!("unexpected shift overflow")
                         }
                     }
                 }
