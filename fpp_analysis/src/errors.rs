@@ -714,9 +714,6 @@ impl From<SemanticError> for Diagnostic {
                     .iter()
                     .fold(diag, |diag, l| diag.span_note(*l, "port imported from here"));
                 let diag = diag.span_note(prev_loc, "previous instance is here");
-                // The previous instance's import chain is printed in reverse,
-                // while the chain above it is printed in order. Both chains are
-                // built by appending, so this asymmetry is deliberate.
                 prev_import_locs.iter().rev().fold(diag, |diag, l| {
                     diag.span_note(*l, "previous instance imported from here")
                 })

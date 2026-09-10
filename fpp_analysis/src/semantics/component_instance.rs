@@ -177,23 +177,7 @@ impl ComponentInstance {
 /// The URI scheme that `fpp_lsp_server` uses to identify on-disk source files.
 const FILE_URI_SCHEME: &str = "file://";
 
-/// Gets the implementation file of a component instance: the path written in the
-/// `at` specifier, resolved against the directory of the source file that
-/// specifies it, then lexically normalized (`.` components dropped, `..`
-/// cancelled against the preceding name).
-///
-/// The result is stated in the same frame of reference as that source file's
-/// URI: absolute when the URI is absolute, relative to the process working
-/// directory when the URI is relative, and a `file://` URI when the source is
-/// one. A source URI with no directory part (a bare file name, or the `<stdin>`
-/// pseudo-URI) contributes no directory, so the specifier path is used as
-/// written. An absolute specifier path replaces the directory outright.
-///
-/// The path is deliberately not absolutized. The drivers pass source paths
-/// through unchanged, and the LSP server caches an `Analysis` and reuses it
-/// across requests, so interning the process working directory into stored
-/// analysis data would silently misdescribe the model whenever that directory
-/// is not the one the paths were given against.
+/// Resolves the file of a component instance
 fn get_file(node: &LitString) -> String {
     let uri = node.span().file().uri();
     // The LSP server names source files by `file://` URI. Resolve inside the

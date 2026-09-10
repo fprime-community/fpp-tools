@@ -532,9 +532,7 @@ impl Connection {
 }
 
 impl Analysis {
-    /// Resolve a use node to an interface instance (component instance or
-    /// imported topology). Returns `None` if the symbol is undefined or its
-    /// definition is not resolved yet.
+    /// Resolve a use node to an interface instance
     pub fn get_interface_instance(&self, id: fpp_core::Node) -> Option<InterfaceInstance> {
         match self.use_def_map.get(&id) {
             Some(symbol @ Symbol::ComponentInstance(_)) => self
@@ -550,13 +548,7 @@ impl Analysis {
         }
     }
 
-    /// Resolve a use (by node ID) to a component instance. Returns `Ok(None)`
-    /// for an unresolved use (already reported by `CheckUses`) and an error if
-    /// the use resolves to a symbol that is not a component instance.
-    ///
-    /// A topology name lives in the same name group as a component instance
-    /// name, so `CheckUses` accepts a topology wherever a component instance is
-    /// expected; this is where that is rejected.
+    // Resolve a use (by node ID) to a component instance
     pub fn get_component_instance(
         &self,
         id: fpp_core::Node,

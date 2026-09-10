@@ -494,8 +494,6 @@ fn check_interval_member(
 #[derive(Debug, Clone)]
 pub struct StateMachineInstance {
     pub node: Arc<SpecStateMachineInstance>,
-    /// The state machine this is an instance of. Storing the definition node
-    /// rather than a general symbol keeps `get_sm_kind` total.
     pub state_machine: Arc<fpp_ast::DefStateMachine>,
     pub priority: Option<i128>,
     pub queue_full: QueueFull,

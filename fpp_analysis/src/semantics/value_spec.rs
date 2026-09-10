@@ -255,16 +255,6 @@ fn value_div() {
     });
 }
 
-// ---------------------------------------------------------------------------
-// Integer arithmetic whose exact result does not fit in an `i128` should be
-// reported, not wrapped.
-//
-// `i128` cannot represent the results, so `MathError::Overflow` is reported and
-// `EvalConstantExprs` turns that into "arithmetic result is too large to
-// represent". The alternative would be a debug-build panic and a silently
-// wrapped value in release.
-// ---------------------------------------------------------------------------
-
 #[test]
 fn value_arithmetic_reports_overflow() {
     with_test_ctx(|| {
@@ -496,14 +486,6 @@ fn value_convert_float_source() {
     });
 }
 
-/// A float narrows to an integer through the width of an `i32`: the integer part
-/// is clamped to `[i32::MIN, i32::MAX]` and a NaN goes to zero, for every integer
-/// target kind and for `Integer`.
-///
-/// `i128` is wide enough to keep more of a big float than this, but keeping it
-/// would change the constant once the value is truncated to the target kind:
-/// `array A = [1] I32 default [1.0e300]` and `[1] I64 default [1.0e18]` are both
-/// `2147483647`.
 #[test]
 fn value_convert_float_narrows_to_i32_width() {
     with_test_ctx(|| {

@@ -289,29 +289,7 @@ fn compute_instance_connection_map(
         }
         let pii_remote = &c.get_other_endpoint(pi).port;
         // Every endpoint of a connection that reaches port numbering refers to a
-        // component instance, never to an imported topology, so nothing is
-        // dropped here. The invariant holds because:
-        //
-        // 1. `resolve_partially_numbered` rewrites every local connection with
-        //    `Endpoint::get_underlying_endpoint`, which walks topology port
-        //    aliases down to the component instance owning the aliased port. It
-        //    runs before `resolve_port_numbers`, hence before this code.
-        // 2. `get_underlying_endpoint` leaves a topology endpoint alone only if
-        //    the topology is absent from `Analysis::topology_map`, or if the
-        //    aliased name is absent from `Topology::port_map`. Neither happens
-        //    for a connection that survives this far: an
-        //    `InterfaceInstance::Topology` enters `Topology::instance_map` only
-        //    once `topology_map` holds the resolved topology, and
-        //    `check_connection_instances` (also in `resolve_partially_numbered`,
-        //    ahead of the rewrite) fails the whole resolution for an endpoint
-        //    whose instance is not in `instance_map`; and `Topology::add_port`
-        //    inserts an alias into `port_interface.port_map` and `port_map`
-        //    together, while the endpoint's port instance was looked up in the
-        //    former.
-        // 3. The connections added after the rewrite already name component
-        //    instances: `resolve_imported_connections` copies them from a
-        //    dependency whose own rewrite already ran, and `pattern_resolver`
-        //    only ever builds `InterfaceInstance::from_component_instance`.
+        // component instance (after flattenning)
         debug_assert!(
             pii_remote
                 .interface_instance

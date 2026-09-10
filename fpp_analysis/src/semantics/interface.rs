@@ -767,16 +767,6 @@ impl PortInterface {
     }
 
     /// The entries of the port map, in the order they were added.
-    ///
-    /// The port map is a hash map, whose iteration order is neither insertion
-    /// order, source order, nor name order. Any check that reports only its
-    /// first offending port has to impose an order of its own, or which
-    /// diagnostic it produces depends on hash layout.
-    ///
-    /// Insertion order is not source order. A port is added when the interface
-    /// that carries it is merged, so an imported port is added after the
-    /// importing interface's own ports even though it is *defined* earlier —
-    /// often in another file, where source order is not even well defined.
     fn ports_in_insertion_order(&self) -> impl Iterator<Item = (&String, &PortInstance)> {
         Self::in_insertion_order(&self.port_order, &self.port_map)
     }
@@ -831,10 +821,6 @@ impl PortInterface {
 
     /// Merge in every port of `interface`, marking each as imported through
     /// `import_node`.
-    ///
-    /// The first port that fails to merge ends the merge, and its error is
-    /// reported: which port that is depends on the order we walk `interface`'s
-    /// port map, so we walk it in insertion order. See
     /// [`PortInterface::ports_in_insertion_order`].
     pub fn add_imported_interface(
         &self,
@@ -878,10 +864,6 @@ impl PortInterface {
 
     /// Check that `self` implements `other`: every port (general and special)
     /// in `other` exists in `self` with a matching signature.
-    ///
-    /// Only the first offending port is reported, so which port that is depends
-    /// on the iteration order of `other`'s maps; we walk both maps in insertion
-    /// order. See [`PortInterface::ports_in_insertion_order`].
     pub fn implements(&self, other: &PortInterface) -> SemanticResult {
         // Check all the ports in `other` to make sure they exist and match `self`
         for (name, pi) in other.ports_in_insertion_order() {
@@ -1022,19 +1004,6 @@ impl Interface {
 }
 
 /// Resolve `interface` in place by merging in the interfaces it imports.
-///
-/// The first import that fails to merge ends the merge: exactly one error is
-/// reported per interface, and it is the error of the first offending import in
-/// source order.
-///
-/// On failure the imports merged before the offending one stay merged into
-/// `interface`. Checking continues after the error, so dropping the successful
-/// imports would delete ports the user did write and draw a second round of
-/// errors against them.
-///
-/// `interface_map` normally holds every interface that `interface` imports. An
-/// entry is absent only when the imported interface itself failed to resolve,
-/// and that failure has already been reported, so we skip it rather than panic.
 pub fn resolve_interface(
     interface_map: &HashMap<Symbol, Interface>,
     interface: &mut Interface,
