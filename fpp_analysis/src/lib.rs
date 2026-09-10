@@ -144,9 +144,10 @@ pub mod semantics {
     pub use tlm_packet::*;
 
     pub mod tlm_packet_set;
-    pub use tlm_packet_set::TlmPacketSet;
+    pub use tlm_packet_set::*;
 
-    pub(crate) mod resolve_topology;
+    pub mod resolve_topology;
+    pub use resolve_topology::*;
 
     mod connection;
     pub use connection::*;
@@ -169,11 +170,18 @@ pub mod semantics {
     mod format;
     pub use format::*;
 
+    pub mod state_machine;
+    pub use state_machine::*;
+
+    pub mod spec_loc;
+    pub use spec_loc::*;
+
+    pub mod interned_def;
+    pub use interned_def::*;
+
     mod generic_name_symbol_map;
     mod generic_nested_scope;
     mod generic_scope;
-
-    pub mod state_machine;
 
     #[cfg(test)]
     mod format_spec;

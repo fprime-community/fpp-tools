@@ -1,7 +1,7 @@
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
     FrameworkDefinitions, ImpliedUseSet, IntegerValue, Interface, NameGroup, NestedScope, Scope,
-    Symbol, SymbolInterface, Type, UseDefMatching, Value,
+    SpecLocEntry, Symbol, SymbolInterface, Type, UseDefMatching, Value,
 };
 use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier};
 use fpp_core::{SourceFile, Span, Spanned};
@@ -88,52 +88,6 @@ pub struct Analysis {
     unknown_type: Option<Arc<Type>>,
 }
 
-/// A type definition that [`crate::passes::EnterSymbols`] interns into a
-/// [`Symbol`].
-///
-/// The semantic [`Type`] for a type definition holds the definition behind the
-/// same `Arc` that the symbol table holds, so the symbol and the type share one
-/// definition node.
-pub trait InternedDef: fpp_ast::AstNode + Clone {
-    /// Borrows the interned definition out of `symbol`, if `symbol` names one of
-    /// this kind.
-    fn from_symbol(symbol: &Symbol) -> Option<&Arc<Self>>;
-}
-
-macro_rules! impl_interned_def {
-    ($($ty:ident => $variant:ident),* $(,)?) => {
-        $(impl InternedDef for fpp_ast::$ty {
-            fn from_symbol(symbol: &Symbol) -> Option<&Arc<Self>> {
-                match symbol {
-                    Symbol::$variant(def) => Some(def),
-                    _ => None,
-                }
-            }
-        })*
-    };
-}
-
-impl_interned_def! {
-    DefAbsType => AbsType,
-    DefAliasType => AliasType,
-    DefArray => Array,
-    DefEnum => Enum,
-    DefStruct => Struct,
-}
-
-/// A recorded location specifier, keyed in `location_specifier_map`.
-#[derive(Debug, Clone)]
-pub struct SpecLocEntry {
-    /// Span of the location specifier statement
-    pub spec_span: Span,
-    /// Span of the file string literal (error location + base for path resolution)
-    pub file_span: Span,
-    /// The specified (relative) path string
-    pub file_value: String,
-    /// Whether this is a dictionary specifier
-    pub is_dictionary_def: bool,
-}
-
 impl Default for Analysis {
     fn default() -> Self {
         Self::new()
@@ -206,22 +160,6 @@ impl Analysis {
         })));
         self.unknown_type = Some(ty.clone());
         ty
-    }
-
-    /// The `Arc` holding a type definition, for storing in its semantic
-    /// [`Type`].
-    ///
-    /// `EnterSymbols` already interned an `Arc` of the definition in
-    /// `symbol_map`, so reuse that allocation instead of deep-copying the AST:
-    /// `Type` is `Clone` and cloned freely, and `Type::def_symbol` hands the
-    /// `Arc` straight back out as a `Symbol`. The clone fallback covers
-    /// definitions that no symbol was entered for (there are none in the pass
-    /// pipeline, but a synthesized definition need not be in `symbol_map`).
-    pub fn interned_def<D: InternedDef>(&self, node: &D) -> Arc<D> {
-        match self.symbol_map.get(&node.id()).and_then(D::from_symbol) {
-            Some(def) => def.clone(),
-            None => Arc::new(node.clone()),
-        }
     }
 
     /// Gets the finalized type of a type-name use node.
