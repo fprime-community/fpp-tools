@@ -1845,11 +1845,7 @@ fn native_call_stmt(call: &TokenStream, throws: bool) -> TokenStream {
 /// dereference (`bool`, `span`) do not — so the marker is threaded from the
 /// bindgen rather than guessed here.
 fn ret_vref(ret_ref: bool) -> TokenStream {
-    if ret_ref {
-        quote!(__r)
-    } else {
-        quote!((&__r))
-    }
+    if ret_ref { quote!(__r) } else { quote!((&__r)) }
 }
 
 /// Emit the base method getters (shared by every subclass via inheritance).

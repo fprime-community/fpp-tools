@@ -528,10 +528,10 @@ const RESERVED_TYPE_NAMES: &[&str] = &[
 fn peel_wrappers(t: &Type) -> &Type {
     if let Type::ResolvedPath(p) = t {
         let last = p.path.rsplit("::").next().unwrap_or(&p.path);
-        if WRAPPERS.contains(&last) {
-            if let Some(inner) = path_type_args(&p.args).into_iter().next() {
-                return peel_wrappers(inner);
-            }
+        if WRAPPERS.contains(&last)
+            && let Some(inner) = path_type_args(&p.args).into_iter().next()
+        {
+            return peel_wrappers(inner);
         }
     }
     t
@@ -579,10 +579,11 @@ fn single_tuple_local_struct(ctx: &Ctx, v: &Variant) -> Option<Id> {
     let fid = fields[0]?;
     let ft = struct_field_ty(ctx.item(fid)?)?;
     let peeled = peel_wrappers(ft);
-    if let Type::ResolvedPath(p) = peeled {
-        if ctx.is_local(p.id) && matches!(ctx.kind(p.id), Some(ItemKind::Struct)) {
-            return Some(p.id);
-        }
+    if let Type::ResolvedPath(p) = peeled
+        && ctx.is_local(p.id)
+        && matches!(ctx.kind(p.id), Some(ItemKind::Struct))
+    {
+        return Some(p.id);
     }
     None
 }
@@ -715,30 +716,30 @@ fn classify(ctx: &mut Ctx, t: &Type, enq: &mut Vec<Id>) -> Shape {
         Type::ResolvedPath(p) => {
             let last = p.path.rsplit("::").next().unwrap_or(&p.path).to_string();
             // Containers (detected by last segment, any crate).
-            if WRAPPERS.contains(&last.as_str()) {
-                if let Some(inner) = path_type_args(&p.args).into_iter().next() {
-                    return classify(ctx, inner, enq);
-                }
+            if WRAPPERS.contains(&last.as_str())
+                && let Some(inner) = path_type_args(&p.args).into_iter().next()
+            {
+                return classify(ctx, inner, enq);
             }
-            if last == "Option" {
-                if let Some(inner) = path_type_args(&p.args).into_iter().next() {
-                    let s = classify(ctx, inner, enq);
-                    return if s.is_skip() {
-                        s
-                    } else {
-                        Shape::Opt(Box::new(s))
-                    };
-                }
+            if last == "Option"
+                && let Some(inner) = path_type_args(&p.args).into_iter().next()
+            {
+                let s = classify(ctx, inner, enq);
+                return if s.is_skip() {
+                    s
+                } else {
+                    Shape::Opt(Box::new(s))
+                };
             }
-            if LISTS.contains(&last.as_str()) {
-                if let Some(inner) = path_type_args(&p.args).into_iter().next() {
-                    let s = classify(ctx, inner, enq);
-                    return if s.is_skip() {
-                        s
-                    } else {
-                        Shape::List(Box::new(s))
-                    };
-                }
+            if LISTS.contains(&last.as_str())
+                && let Some(inner) = path_type_args(&p.args).into_iter().next()
+            {
+                let s = classify(ctx, inner, enq);
+                return if s.is_skip() {
+                    s
+                } else {
+                    Shape::List(Box::new(s))
+                };
             }
             if MAPS.contains(&last.as_str()) {
                 let args = path_type_args(&p.args);
@@ -1313,19 +1314,18 @@ fn variant_payload(ctx: &mut Ctx, v: &Variant, enq: &mut Vec<Id>) -> VariantPayl
             };
             let peeled = peel_wrappers(&ft).clone();
             // A local struct payload (not the DefModuleStub bridge).
-            if let Type::ResolvedPath(p) = &peeled {
-                if ctx.is_local(p.id)
-                    && matches!(ctx.kind(p.id), Some(ItemKind::Struct))
-                    && ctx.last_segment(p.id) != DEF_MODULE_STUB
-                {
-                    if ctx.newtype_payloads.contains(&p.id.0) {
-                        // Single-field tuple struct → inline as a `newtype`.
-                        let f0 = newtype_field_shape(ctx, p.id, enq);
-                        return VariantPayload::Newtype(f0);
-                    }
-                    enq.push(p.id);
-                    return VariantPayload::Struct(p.id);
+            if let Type::ResolvedPath(p) = &peeled
+                && ctx.is_local(p.id)
+                && matches!(ctx.kind(p.id), Some(ItemKind::Struct))
+                && ctx.last_segment(p.id) != DEF_MODULE_STUB
+            {
+                if ctx.newtype_payloads.contains(&p.id.0) {
+                    // Single-field tuple struct → inline as a `newtype`.
+                    let f0 = newtype_field_shape(ctx, p.id, enq);
+                    return VariantPayload::Newtype(f0);
                 }
+                enq.push(p.id);
+                return VariantPayload::Struct(p.id);
             }
             // A single-value variant (scalar / leaf / astdef / union / …).
             VariantPayload::Value(classify(ctx, &ft, enq))
@@ -1741,7 +1741,7 @@ pub fn resolve_names(ctx: &Ctx, r: &Reflected) -> Names {
 // Emit
 // ---------------------------------------------------------------------------
 
-fn render_shape(ctx: &Ctx, names: &Names, s: &Shape) -> String {
+fn render_shape(names: &Names, s: &Shape) -> String {
     match s {
         Shape::Bool => "bool".into(),
         Shape::I128 => "i128".into(),
@@ -1761,15 +1761,15 @@ fn render_shape(ctx: &Ctx, names: &Names, s: &Shape) -> String {
         Shape::LeafEnum(id) => format!("leaf(crate::sem::{})", names.entity(*id)),
         Shape::LeafAst(name) => format!("leaf(crate::ast::{name})"),
         Shape::AstDef(name) => format!("astdef({name})"),
-        Shape::Opt(s) => format!("opt({})", render_shape(ctx, names, s)),
-        Shape::List(s) => format!("list({})", render_shape(ctx, names, s)),
+        Shape::Opt(s) => format!("opt({})", render_shape(names, s)),
+        Shape::List(s) => format!("list({})", render_shape(names, s)),
         Shape::Map(k, v) => format!(
             "map({}, {})",
-            render_shape(ctx, names, k),
-            render_shape(ctx, names, v)
+            render_shape(names, k),
+            render_shape(names, v)
         ),
         Shape::Tuple(v) => {
-            let parts: Vec<String> = v.iter().map(|e| render_shape(ctx, names, e)).collect();
+            let parts: Vec<String> = v.iter().map(|e| render_shape(names, e)).collect();
             format!("tuple({})", parts.join(", "))
         }
         Shape::Skip(_) => "skip".into(),
@@ -1793,12 +1793,12 @@ fn render_arg(names: &Names, a: &Arg) -> String {
     }
 }
 
-fn render_method(ctx: &Ctx, names: &Names, m: &MethodDef) -> String {
+fn render_method(names: &Names, m: &MethodDef) -> String {
     let assoc = if m.assoc { "assoc " } else { "" };
     // `ref` on the return is the peer of `ref` on a param: it records the native's
     // pass form, which the shape itself does not carry.
     let by_ref = if m.ret_ref { "ref " } else { "" };
-    let ret = format!("{by_ref}{}", render_shape(ctx, names, &m.ret));
+    let ret = format!("{by_ref}{}", render_shape(names, &m.ret));
     // `throws` is a call-site transform (the native `Result` becomes a raise), not a
     // value conversion, so it sits on the method rather than inside the shape.
     let throws = if m.throws.is_some() { " throws" } else { "" };
@@ -1818,19 +1818,13 @@ fn render_method(ctx: &Ctx, names: &Names, m: &MethodDef) -> String {
     }
 }
 
-fn log_skips(
-    ctx: &Ctx,
-    names: &Names,
-    prefix: &str,
-    fields: &[(String, Shape)],
-    out: &mut Vec<String>,
-) {
+fn log_skips(names: &Names, prefix: &str, fields: &[(String, Shape)], out: &mut Vec<String>) {
     for (fname, sh) in fields {
         if let Shape::Skip(reason) = sh {
             out.push(format!("  skip {prefix}.{fname}: {reason}"));
         } else if let Shape::Map(k, _) = sh {
             let _ = k;
-            let _ = render_shape(ctx, names, sh);
+            let _ = render_shape(names, sh);
         }
     }
 }
@@ -1868,14 +1862,14 @@ pub fn emit(
         }
         out.push_str(&format!(
             "            {fname}: {},\n",
-            render_shape(ctx, names, sh)
+            render_shape(names, sh)
         ));
     }
     out.push_str("        }\n");
     if !r.analysis_methods.is_empty() {
         out.push_str("        methods {\n");
         for m in &r.analysis_methods {
-            out.push_str(&format!("            {}\n", render_method(ctx, names, m)));
+            out.push_str(&format!("            {}\n", render_method(names, m)));
         }
         out.push_str("        }\n");
     }
@@ -1915,10 +1909,10 @@ pub fn emit(
 
 /// The py name of a payload = the subclass name of the variant that owns it.
 fn payload_name(ctx: &Ctx, names: &Names, sid: Id) -> String {
-    if let Some((uid, variant)) = ctx.payload_index.get(&sid.0) {
-        if let Some(n) = names.subclass.get(&(uid.0, variant.clone())) {
-            return n.clone();
-        }
+    if let Some((uid, variant)) = ctx.payload_index.get(&sid.0)
+        && let Some(n) = names.subclass.get(&(uid.0, variant.clone()))
+    {
+        return n.clone();
     }
     ctx.last_segment(sid)
 }
@@ -2163,14 +2157,13 @@ fn find_arc_wrapped(ctx: &Ctx, ty: &Type, out: &mut BTreeSet<u32>) {
         Type::ResolvedPath(p) => {
             let last = p.path.rsplit("::").next().unwrap_or(&p.path);
             let args = path_type_args(&p.args);
-            if last == "Arc" {
-                if let Some(inner) = args.first() {
-                    if let Type::ResolvedPath(ip) = peel_wrappers(inner) {
-                        if ctx.is_local(ip.id) && matches!(ctx.kind(ip.id), Some(ItemKind::Enum)) {
-                            out.insert(ip.id.0);
-                        }
-                    }
-                }
+            if last == "Arc"
+                && let Some(inner) = args.first()
+                && let Type::ResolvedPath(ip) = peel_wrappers(inner)
+                && ctx.is_local(ip.id)
+                && matches!(ctx.kind(ip.id), Some(ItemKind::Enum))
+            {
+                out.insert(ip.id.0);
             }
             for a in args {
                 find_arc_wrapped(ctx, a, out);
@@ -2378,12 +2371,11 @@ fn method_names(ctx: &Ctx, id: Id) -> Vec<String> {
     let mut out = Vec::new();
     for imp in impls_on(ctx, id) {
         for mid in &imp.items {
-            if let Some(mi) = ctx.item(*mid) {
-                if matches!(mi.inner, ItemEnum::Function(_)) {
-                    if let Some(n) = &mi.name {
-                        out.push(n.clone());
-                    }
-                }
+            if let Some(mi) = ctx.item(*mid)
+                && matches!(mi.inner, ItemEnum::Function(_))
+                && let Some(n) = &mi.name
+            {
+                out.push(n.clone());
             }
         }
     }
@@ -2400,12 +2392,13 @@ fn has_no_arg_method_returning_node(ctx: &Ctx, id: Id, name: &str) -> bool {
             let ItemEnum::Function(f) = &mi.inner else {
                 continue;
             };
-            if f.sig.inputs.len() == 1 && f.sig.inputs[0].0 == "self" {
-                if let Some(Type::ResolvedPath(p)) = &f.sig.output {
-                    let last = p.path.rsplit("::").next().unwrap_or(&p.path);
-                    if last == "Node" && ctx.crate_name(p.id).as_deref() == Some("fpp_core") {
-                        return true;
-                    }
+            if f.sig.inputs.len() == 1
+                && f.sig.inputs[0].0 == "self"
+                && let Some(Type::ResolvedPath(p)) = &f.sig.output
+            {
+                let last = p.path.rsplit("::").next().unwrap_or(&p.path);
+                if last == "Node" && ctx.crate_name(p.id).as_deref() == Some("fpp_core") {
+                    return true;
                 }
             }
         }
@@ -2429,8 +2422,8 @@ fn emit_union(ctx: &Ctx, names: &Names, u: &UnionDef, out: &mut String, skips: &
             .unwrap_or_else(|| v.native.clone());
         let kind = match &v.payload {
             VariantPayload::Unit => "unit".to_string(),
-            VariantPayload::Value(sh) => render_shape(ctx, names, sh),
-            VariantPayload::Newtype(sh) => format!("newtype({})", render_shape(ctx, names, sh)),
+            VariantPayload::Value(sh) => render_shape(names, sh),
+            VariantPayload::Newtype(sh) => format!("newtype({})", render_shape(names, sh)),
             VariantPayload::Struct(_) => "payload".to_string(),
             VariantPayload::StructVariant(fs) => {
                 let parts: Vec<String> = fs
@@ -2439,7 +2432,7 @@ fn emit_union(ctx: &Ctx, names: &Names, u: &UnionDef, out: &mut String, skips: &
                         if let Shape::Skip(reason) = sh {
                             skips.push(format!("  skip {py}::{}.{n}: {reason}", v.native));
                         }
-                        format!("{n}: {}", render_shape(ctx, names, sh))
+                        format!("{n}: {}", render_shape(names, sh))
                     })
                     .collect();
                 format!("struct {{ {} }}", parts.join(", "))
@@ -2455,7 +2448,7 @@ fn emit_union(ctx: &Ctx, names: &Names, u: &UnionDef, out: &mut String, skips: &
         out.push_str(&format!("            {} => {sub} : {kind},\n", v.native));
     }
     out.push_str("        }\n");
-    emit_methods(ctx, names, &u.methods, out);
+    emit_methods(names, &u.methods, out);
     out.push_str("    }\n\n");
 }
 
@@ -2478,11 +2471,11 @@ fn emit_payload(
         }
         out.push_str(&format!(
             "            {fname}: {},\n",
-            render_shape(ctx, names, sh)
+            render_shape(names, sh)
         ));
     }
     out.push_str("        }\n");
-    emit_methods(ctx, names, &p.methods, out);
+    emit_methods(names, &p.methods, out);
     out.push_str("    }\n\n");
 }
 
@@ -2510,22 +2503,22 @@ fn emit_entity(ctx: &Ctx, names: &Names, e: &EntityDef, out: &mut String, skips:
             }
             out.push_str(&format!(
                 "            {fname}: {},\n",
-                render_shape(ctx, names, sh)
+                render_shape(names, sh)
             ));
         }
         out.push_str("        }\n");
     }
-    emit_methods(ctx, names, &e.methods, out);
+    emit_methods(names, &e.methods, out);
     out.push_str("    }\n\n");
 }
 
-fn emit_methods(ctx: &Ctx, names: &Names, methods: &[MethodDef], out: &mut String) {
+fn emit_methods(names: &Names, methods: &[MethodDef], out: &mut String) {
     if methods.is_empty() {
         return;
     }
     out.push_str("        methods {\n");
     for m in methods {
-        out.push_str(&format!("            {}\n", render_method(ctx, names, m)));
+        out.push_str(&format!("            {}\n", render_method(names, m)));
     }
     out.push_str("        }\n");
 }
