@@ -1,6 +1,8 @@
 use fpp_core::{Node, Span, Spanned};
 use std::sync::Arc;
 
+use crate::Analysis;
+
 /// The interface for an FPP symbol
 pub trait SymbolInterface: Clone {
     /// Gets the AST node ID of the symbol

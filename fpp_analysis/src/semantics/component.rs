@@ -269,9 +269,6 @@ pub struct Param {
     pub set_opcode: i128,
     pub save_opcode: i128,
     pub is_external: bool,
-    /// The resolved id of this parameter in its component's parameter dictionary.
-    /// Assigned when the parameter is added to the id map.
-    pub id: i128,
 }
 
 impl Param {
@@ -325,8 +322,6 @@ impl Param {
                 set_opcode,
                 save_opcode,
                 is_external: node.is_external,
-                // Overwritten with the resolved id when added to the id map.
-                id: 0,
             },
             default2,
         ))
@@ -751,8 +746,6 @@ impl Component {
                 prev_loc: prev.get_loc(),
             });
         }
-        let mut command = command;
-        command.opcode = opcode;
         self.command_map.insert(opcode, command);
         self.default_opcode = opcode + 1;
         Ok(())
@@ -813,7 +806,7 @@ impl Component {
         let name = channel.get_name().to_string();
         let next = add_element_to_id_map(
             &mut self.tlm_channel_map,
-            channel.id,
+            id_opt.unwrap_or(self.default_tlm_channel_id),
             channel.clone(),
             TlmChannel::get_loc,
         )?;
@@ -821,6 +814,7 @@ impl Component {
         // name, we will catch it later when we check all the dictionary
         // elements.
         self.tlm_channel_name_map.insert(name, channel);
+        self.default_tlm_channel_id = next;
         Ok(())
     }
 

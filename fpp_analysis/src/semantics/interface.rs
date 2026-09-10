@@ -821,7 +821,6 @@ impl PortInterface {
 
     /// Merge in every port of `interface`, marking each as imported through
     /// `import_node`.
-    /// [`PortInterface::ports_in_insertion_order`].
     pub fn add_imported_interface(
         &self,
         interface: &Interface,

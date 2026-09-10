@@ -129,6 +129,13 @@ struct MethodDef {
     /// (param name, spec) in source order (the receiver is excluded).
     params: Vec<(String, ArgSpec)>,
     ret: Shape,
+    /// The native returns `&T`, not an owned `T` — `ret` describes `T` either way
+    /// ([`classify`] peels the reference), so the DSL carries the distinction as a
+    /// `ref` marker on the return. The macro converts *from* a `&native`: without
+    /// this the call's `&T` would be referenced again, and a conversion that goes
+    /// through a trait impl (`leaf`) or a dereference (`bool`, `span`) does not see
+    /// through the extra `&`.
+    ret_ref: bool,
     /// The native returns `Result<ret, E>`: the generated method raises instead of
     /// yielding the error. Carries `E`'s last path segment for the doc comment.
     throws: Option<String>,
@@ -1015,6 +1022,12 @@ fn classify_method(
         assoc,
         params,
         ret,
+        // Only the OUTERMOST reference is recorded: a nested one
+        // (`Option<&Leaf>`) reaches the shape through the container's own
+        // conversion, which cannot be told to expect one fewer `&`. No such
+        // signature is reflected today, and one would fail to compile rather than
+        // marshal wrongly.
+        ret_ref: matches!(out, Type::BorrowedRef { .. }),
         throws,
         trait_path: None,
     })
@@ -1782,7 +1795,10 @@ fn render_arg(names: &Names, a: &Arg) -> String {
 
 fn render_method(ctx: &Ctx, names: &Names, m: &MethodDef) -> String {
     let assoc = if m.assoc { "assoc " } else { "" };
-    let ret = render_shape(ctx, names, &m.ret);
+    // `ref` on the return is the peer of `ref` on a param: it records the native's
+    // pass form, which the shape itself does not carry.
+    let by_ref = if m.ret_ref { "ref " } else { "" };
+    let ret = format!("{by_ref}{}", render_shape(ctx, names, &m.ret));
     // `throws` is a call-site transform (the native `Result` becomes a raise), not a
     // value conversion, so it sits on the method rather than inside the shape.
     let throws = if m.throws.is_some() { " throws" } else { "" };
@@ -2027,7 +2043,7 @@ fn assert_def_module_stub(ctx: &Ctx) {
 /// FAIL LOUD if a union that *structurally* requires a special handle would be
 /// emitted as a plain `clone` (the silent-downgrade hazard behind [finding #1]).
 /// Two independent structural signals gate the check:
-///   * arc-shared — the enum is stored behind `Arc<…>` somewhere in `fpp_analysis`
+///   * arc-shared — the enum is handed across the `fpp_analysis` API behind `Arc<…>`
 ///     (only `Type` today); such a union MUST use the `arc_type` handle.
 ///   * symbol-keyed — the enum implements `SymbolInterface` AND keys one of the
 ///     root `Analysis` struct's own map fields (only `Symbol` today; the nested
@@ -2039,7 +2055,8 @@ fn assert_def_module_stub(ctx: &Ctx) {
 /// match in [`union_directives`] trips one of these and aborts the generator with a
 /// clear message, instead of silently shipping a broken binding.
 pub fn assert_special_union_handles(ctx: &Ctx, r: &Reflected) {
-    let arc_ids = arc_wrapped_enum_ids(ctx);
+    let arc_ids = arc_api_enum_ids(ctx);
+    assert_arc_signal_live(ctx, r, &arc_ids);
     let mut analysis_key_unions: BTreeSet<u32> = BTreeSet::new();
     let mut analysis_key_entities: BTreeSet<u32> = BTreeSet::new();
     for (_, sh) in &r.analysis_fields {
@@ -2050,9 +2067,9 @@ pub fn assert_special_union_handles(ctx: &Ctx, r: &Reflected) {
         let native = ctx.native_path(u.id);
         if arc_ids.contains(&u.id.0) && handle != "arc_type" {
             panic!(
-                "union `{native}` is stored behind Arc<…> but was classified as \
-                 `{handle}` — add it to the special-union mapping in `union_directives` \
-                 (arc_type handle)"
+                "union `{native}` is handed across the fpp_analysis API behind Arc<…> but \
+                 was classified as `{handle}` — add it to the special-union mapping in \
+                 `union_directives` (arc_type handle)"
             );
         }
         if impls_symbol_interface(ctx, u.id)
@@ -2073,14 +2090,59 @@ pub fn assert_special_union_handles(ctx: &Ctx, r: &Reflected) {
     }
 }
 
-/// Local enum `Id`s that appear behind an `Arc<…>` anywhere in `fpp_analysis`
-/// (struct fields, enum-variant fields, fn signatures, type aliases) — the
-/// structural signal for the `arc_type` handle.
-fn arc_wrapped_enum_ids(ctx: &Ctx) -> BTreeSet<u32> {
+/// FAIL LOUD if the arc-shared signal in [`arc_api_enum_ids`] no longer fires for
+/// the one union that is known to need the `arc_type` handle. That signal is
+/// narrowed to public fn/alias positions, so an `fpp_analysis` refactor that moved
+/// `Arc<Type>` entirely out of them (onto a trait, or behind private helpers) would
+/// leave the arc guard testing nothing — and the next union to need `arc_type` would
+/// then be downgraded to `clone` silently, which is exactly what the guard exists to
+/// prevent. `Type`'s presence in the reflected model is `assert_core_unions_present`'s
+/// job; this asserts only that the *signal* still sees it.
+fn assert_arc_signal_live(ctx: &Ctx, r: &Reflected, arc_ids: &BTreeSet<u32>) {
+    const ARC_UNION_NATIVE: &str = "fpp_analysis::semantics::Type";
+    let ty = r
+        .unions
+        .iter()
+        .find(|u| ctx.native_path(u.id) == ARC_UNION_NATIVE);
+    if let Some(ty) = ty {
+        assert!(
+            arc_ids.contains(&ty.id.0),
+            "the arc-shared signal no longer detects `{ARC_UNION_NATIVE}` — \
+             `Arc<{ARC_UNION_NATIVE}>` has left every public fn signature / type alias \
+             in fpp_analysis, so `arc_api_enum_ids` is now blind and the arc arm of \
+             `assert_special_union_handles` guards nothing; widen the signal to \
+             wherever the Arc moved"
+        );
+    }
+}
+
+/// Local enum `Id`s that `fpp_analysis` hands across its API behind an `Arc<…>`
+/// (fn signatures and type aliases) — the structural signal for the `arc_type`
+/// handle: the binding has to hold the same `Arc` the API gave it, or the shared
+/// identity the handle exposes (`Type.identical`) is lost.
+///
+/// Deliberately NOT every `Arc<…>` position in the crate. Two kinds of `Arc` are
+/// *not* API identity, and counting them would abort the generator on a union that
+/// is classified correctly:
+///   * STRUCT FIELDS — a field can be internal structural sharing
+///     (`AnonArrayValue::elements: Vec<Arc<Value>>` stores one allocation for the
+///     repeated elements of an array default) while every `Value` the API hands out
+///     is still by value. The reflection peels those `Arc`s away.
+///   * PRIVATE fns — the rustdoc JSON is built with `document_private_items`, so
+///     the index carries crate-internal helpers (`AnonArrayValue::map_elements ->
+///     Vec<Arc<Value>>`) whose signatures are not API the binding can ever see.
+///
+/// Restricting to `Visibility::Public` also drops trait methods (rustdoc gives
+/// those `Default` visibility, indistinguishable from private here), so the signal
+/// would go blind if `Arc<Type>` ever appeared *only* on a trait. [`Type`'s own
+/// arc-ness is asserted by the caller](assert_arc_signal_live) to catch that.
+fn arc_api_enum_ids(ctx: &Ctx) -> BTreeSet<u32> {
     let mut out = BTreeSet::new();
     for it in ctx.krate.index.values() {
+        if !is_public(it) {
+            continue;
+        }
         match &it.inner {
-            ItemEnum::StructField(t) => find_arc_wrapped(ctx, t, &mut out),
             ItemEnum::TypeAlias(a) => find_arc_wrapped(ctx, &a.type_, &mut out),
             ItemEnum::Function(f) => {
                 for (_, t) in &f.sig.inputs {

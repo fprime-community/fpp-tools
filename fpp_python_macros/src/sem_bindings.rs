@@ -102,7 +102,10 @@
 //! A method with ≥1 real (non-`analysis`) param is emitted as a callable method;
 //! otherwise it is a `#[getter]` property. `throws` marks a native `Result<T, E>`
 //! return: the Python-facing shape is `T`, and `E` is raised as a `ValueError`
-//! rendered with `{:?}`.
+//! rendered with `{:?}`. A return shape may itself be prefixed `ref`
+//! (`kind -> ref leaf(…)`), marking a native that returns `&T`: the shape still
+//! describes `T`, but the conversion receives the returned reference itself rather
+//! than a reference to it.
 //!
 //! An `entity` may carry an optional
 //! `identity <node | qualified_name[(<method>)] | raw_handle>` directive (peer of
@@ -695,6 +698,10 @@ struct MethodDecl {
     /// The native returns `Result<shape, E>`: the generated method raises a
     /// `ValueError` carrying `{:?}` of the error instead of returning it.
     throws: bool,
+    /// The native returns `&T` rather than an owned `T` (`ref` in the DSL). Shapes
+    /// convert *from* a `&native`, so the call's result is handed to the conversion
+    /// as-is instead of being referenced again — see [`ret_vref`].
+    ret_ref: bool,
     shape: Shape,
 }
 
@@ -1090,12 +1097,22 @@ impl Parse for MethodDecl {
             false
         };
         input.parse::<Token![->]>()?;
+        // A leading `ref` means the native returns `&T`; without it the return is
+        // owned. Either way the shape describes `T` — only the number of `&`s the
+        // conversion sees differs.
+        let ret_ref = if input.peek(Token![ref]) {
+            input.parse::<Token![ref]>()?;
+            true
+        } else {
+            false
+        };
         let shape: Shape = input.parse()?;
         Ok(MethodDecl {
             assoc,
             name,
             params,
             throws,
+            ret_ref,
             shape,
         })
     }
@@ -1817,6 +1834,24 @@ fn native_call_stmt(call: &TokenStream, throws: bool) -> TokenStream {
     }
 }
 
+/// The `vref` for a method's return value: the `&native` that [`Shape::expr`]
+/// converts from.
+///
+/// `__r` is the native call's result, so an owned return needs one `&` while a
+/// `ref` return already *is* the reference. Getting this wrong is not always a
+/// compile error — the shapes that convert through auto-deref (`str`, `list`,
+/// `map`) accept the extra `&&` silently, while the ones that convert through a
+/// trait (`leaf`, whose `From<&Native>` impl does not auto-deref) or a
+/// dereference (`bool`, `span`) do not — so the marker is threaded from the
+/// bindgen rather than guessed here.
+fn ret_vref(ret_ref: bool) -> TokenStream {
+    if ret_ref {
+        quote!(__r)
+    } else {
+        quote!((&__r))
+    }
+}
+
 /// Emit the base method getters (shared by every subclass via inheritance).
 fn emit_union_methods(u: &UnionDecl, reg: &Registry) -> Vec<TokenStream> {
     let accessor = &u.accessor;
@@ -1848,7 +1883,7 @@ fn emit_union_methods(u: &UnionDecl, reg: &Registry) -> Vec<TokenStream> {
             // `&self` method (the Arc/enum derefs to the receiver).
             quote!(self.#accessor.#mname(#(#call_args),*))
         };
-        let vref = quote!((&__r));
+        let vref = ret_vref(m.ret_ref);
         let expr = m.shape.expr(&vref, &model, &data, reg);
         let ty = m.shape.ty(reg);
         let prelude = &args.prelude;
@@ -2000,7 +2035,7 @@ fn emit_subclass_getters(
                 } else {
                     quote!(x.#mname(#(#call_args),*))
                 };
-                let vref = quote!((&__r));
+                let vref = ret_vref(m.ret_ref);
                 let expr = m.shape.expr(&vref, &model, &data, reg);
                 let ty = m.shape.ty(reg);
                 let prelude = &args.prelude;
@@ -2523,7 +2558,7 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStr
         } else {
             quote!(self.#field.#mname(#(#call_args),*))
         };
-        let expr = m.shape.expr(&quote!((&__r)), &model, &data, reg);
+        let expr = m.shape.expr(&ret_vref(m.ret_ref), &model, &data, reg);
         let prelude = &args.prelude;
         let call_stmt = native_call_stmt(&call, m.throws);
         // The native call may read the retained compiler context, so it runs
@@ -2674,7 +2709,7 @@ fn emit_analysis(a: &AnalysisDecl, reg: &Registry) -> (TokenStream, TokenStream)
         } else {
             quote!(self.data.analysis.#mname(#(#call_args),*))
         };
-        let expr = m.shape.expr(&quote!((&__r)), &model, &data, reg);
+        let expr = m.shape.expr(&ret_vref(m.ret_ref), &model, &data, reg);
         let prelude = &args.prelude;
         let call_stmt = native_call_stmt(&call, m.throws);
         // The native call may read the retained compiler context, so it runs

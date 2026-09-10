@@ -198,13 +198,16 @@ fpp_python_macros::fpp_ast_bindings! {
         name: Ident,
     }
 
+    node QueueFullSpecifier {
+        kind: QueueFull,
+    }
+
     node SpecCommand {
         kind: InputPortKind,
         name: str(data),
         params: [FormalParam],
         opcode: Expr?,
         priority: Expr?,
-        queue_full: QueueFull?,
     }
 
     node SpecContainer {
@@ -233,7 +236,6 @@ fpp_python_macros::fpp_ast_bindings! {
         size: Expr?,
         port: QualIdent?,
         priority: Expr?,
-        queue_full: QueueFull?,
     }
 
     node SpecInclude {
@@ -304,7 +306,6 @@ fpp_python_macros::fpp_ast_bindings! {
         kind: SpecialPortInstanceKind,
         name: str(data),
         priority: Expr?,
-        queue_full: QueueFull?,
     }
 
     node SpecStateEntry {

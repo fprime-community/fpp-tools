@@ -151,8 +151,6 @@ impl ComponentInstance {
             get_active_attribute(a, &name, &component_kind, "priority", &node.priority, false)?;
         let cpu =
             get_active_attribute(a, &name, &component_kind, "CPU affinity", &node.cpu, false)?;
-        let impl_type = node.impl_type.as_ref().map(|s| s.data.clone());
-        let file = node.file.as_ref().map(|s| s.data.clone());
 
         let Some(symbol) = a.get_symbol(node) else {
             return Ok(None);
