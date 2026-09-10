@@ -3,17 +3,20 @@
 # The two generators are plain `cargo run`s, but each needs a specific feature
 # set — and `stub_gen` needs a linker hint on distros that ship libpython
 # without the `-dev` package — so the invocations live here instead of in
-# muscle memory. Mirrors the "Codegen drift" job in
-# `.github/workflows/python.yml`; keep the two in sync.
+# muscle memory. The "Codegen drift" job in `.github/workflows/python.yml` calls
+# these targets rather than re-spelling the commands, so CI and a local run
+# cannot diverge; that job adds only the pinned-nightly install and a GitHub
+# annotation on the drift failure.
 #
 #   make              # = make codegen
 #   make codegen      # regenerate both declarations, then the type stub
-#   make bindgen      # src/ast/defs.rs + src/sem/defs.rs   (needs nightly)
+#   make bindgen      # src/ast/defs.rs + src/sem/defs.rs   (pinned nightly)
 #   make bindgen-ast  # src/ast/defs.rs only                (stable only)
-#   make bindgen-sem  # src/sem/defs.rs only                (needs nightly)
+#   make bindgen-sem  # src/sem/defs.rs only                (pinned nightly)
 #   make stubs        # fpp_python.pyi
 #   make drift        # fail if any generated file differs from the index
 #   make ext          # build the import-only extension (what the wheel ships)
+#   make nightly      # install the pinned nightly the bindgen rustdoc needs
 #
 # Overridable: CARGO, PYTHON, CARGO_FLAGS (e.g. `make stubs CARGO_FLAGS=--release`).
 
@@ -65,8 +68,13 @@ endif
 BINDGEN := cd $(ROOT) && $(CARGO) run -p fpp_python_bindgen $(CARGO_FLAGS)
 STUBGEN := cd $(ROOT) && $(STUBGEN_ENV) $(CARGO) run -p fpp_python $(CARGO_FLAGS) --no-default-features --features stubgen --bin stub_gen
 
+# The exact nightly whose rustdoc JSON schema matches the generator's
+# `rustdoc-types` pin. Single-sourced from the file the bindgen itself reads (and
+# the CI job installs), so none of the three can drift apart.
+NIGHTLY := $(shell tr -d '[:space:]' < $(ROOT)/fpp_python_bindgen/nightly-toolchain)
+
 .DEFAULT_GOAL := codegen
-.PHONY: codegen bindgen bindgen-ast bindgen-sem stubs drift ext help
+.PHONY: codegen bindgen bindgen-ast bindgen-sem stubs drift ext nightly help
 
 # Declarations first, then the stub: the stub is dumped from the pyclasses the
 # declarations expand into, so a stub built before them reflects the old model.
@@ -75,7 +83,9 @@ codegen:
 	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) bindgen
 	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) stubs
 
-# Full run: reflects `fpp_analysis` through `cargo +nightly rustdoc`.
+# Full run: reflects `fpp_analysis` through the PINNED nightly's rustdoc (see
+# `nightly` below). Not any nightly — rustdoc's JSON schema is unstable, and the
+# generator asserts the `format_version` it emits against its `rustdoc-types` pin.
 bindgen:
 	$(BINDGEN)
 
@@ -99,5 +109,13 @@ drift:
 ext:
 	cd $(ROOT) && $(CARGO) build -p fpp_python $(CARGO_FLAGS) --lib
 
+# One-time setup for `bindgen`/`bindgen-sem`. `--profile minimal` is enough:
+# rustdoc ships inside the `rustc` component.
+nightly:
+	rustup toolchain install $(NIGHTLY) --profile minimal
+
+# Echoes the target list from the header comment. Matched by prefix, not by line
+# number: the previous `sed -n '9,18p'` silently printed the wrong window every
+# time a line was added above it.
 help:
-	@sed -n '9,18p' $(lastword $(MAKEFILE_LIST)) | sed 's/^# \{0,1\}//'
+	@grep -E '^#   ' $(lastword $(MAKEFILE_LIST)) | sed 's/^# \{0,1\}//'

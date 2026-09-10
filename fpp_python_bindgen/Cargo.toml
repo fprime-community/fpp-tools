@@ -30,7 +30,9 @@ doc = false
 # Reflection inputs only: `fpp_ast` source parsing (syn) and the nightly rustdoc
 # JSON of `fpp_analysis` (rustdoc-json to produce it, rustdoc-types to model it).
 # `rustdoc-types` is pinned exactly — `main.rs` asserts the JSON `format_version`
-# matches, so a mismatched bump fails loudly rather than mis-parsing.
+# matches, so a mismatched bump fails loudly rather than mis-parsing. Its partner
+# pin is the toolchain that emits that JSON (`nightly-toolchain`, whose nightly
+# emits format_version 57); bump the two together or the assert trips.
 syn = { version = "2", features = ["full", "extra-traits", "visit"] }
 serde_json = "1"
 rustdoc-types = "=0.57.0"

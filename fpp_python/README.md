@@ -193,6 +193,7 @@ wrappers from `src/sem/defs.rs`; the small core (`pipeline`, `ir_core`,
 maturin develop            # build + install the extension into the active venv
 pytest tests/              # run the test suite
 
+make nightly               # one-time: install the nightly the bindgen needs
 make                       # regenerate declarations, then the type stub
 make help                  # list the individual codegen targets
 ```
@@ -215,3 +216,15 @@ cargo run -p fpp_python --no-default-features --features stubgen --bin stub_gen
 
 Run the declaration generator before the stub dump — the stub is derived from the
 pyclasses the declarations expand into. `make` and CI both enforce that order.
+
+The declaration generator reflects `fpp_analysis` from rustdoc JSON, so it shells
+out to a nightly `rustdoc` — an **exact** nightly, recorded in
+`fpp_python_bindgen/nightly-toolchain` and installed by `make nightly`. rustdoc's
+JSON schema is unstable and bumps its `format_version` on its own cadence, so a
+floating `nightly` would break the generator the next time upstream moved (and
+could reshape `sem/defs.rs` enough to trip the drift check even when it parsed).
+The generator asserts the emitted `format_version` against its `rustdoc-types`
+pin and names both pins if they disagree; to move to a newer nightly, bump that
+file and the `rustdoc-types` pin in `fpp_python_bindgen/Cargo.toml` together, then
+regenerate and commit. `FPP_BINDGEN_TOOLCHAIN` overrides the toolchain for a
+one-off run.

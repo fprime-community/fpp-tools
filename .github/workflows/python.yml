@@ -64,7 +64,7 @@ jobs:
     # trips this until the declaration is regenerated and committed. The semantic
     # layer is now entirely generated (`sem/defs.rs` is a full `fpp_analysis`
     # mirror; there is no hand-authored declaration to exempt), and regenerating it
-    # shells out to `cargo +nightly rustdoc`, so this job installs nightly too.
+    # shells out to nightly rustdoc, so this job installs nightly too.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,37 +76,66 @@ jobs:
         with:
           python-version: "3.12"
 
+      # `bindgen` reflects `fpp_analysis` from rustdoc JSON, which it produces by
+      # shelling out to nightly rustdoc — so a nightly toolchain must be present
+      # for the declaration regeneration step below.
+      #
+      # The nightly is PINNED, not floating. rustdoc's JSON schema is unstable and
+      # bumps `format_version` on its own cadence, which `bindgen` asserts against
+      # its `rustdoc-types` pin; a floating `nightly` fails the moment upstream
+      # moves past that schema (and would make this drift check non-deterministic
+      # even when it did parse). `bindgen` reads the same file, so the toolchain it
+      # invokes and the one installed here cannot diverge.
+      - name: Resolve the pinned nightly
+        id: nightly
+        run: echo "toolchain=$(tr -d '[:space:]' < fpp_python_bindgen/nightly-toolchain)" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned nightly Rust (for bindgen rustdoc)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.nightly.outputs.toolchain }}
+
+      # Installed LAST on purpose: `rust-toolchain` makes each toolchain it
+      # installs the default, and the steps below must build on stable like every
+      # other job. The pinned nightly is reached only through the explicit
+      # `cargo +<toolchain>` that `bindgen` issues for rustdoc — it is a rustdoc
+      # JSON source, not this job's compiler.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # `bindgen` reflects `fpp_analysis` from rustdoc JSON, which it produces via
-      # `cargo +nightly rustdoc` — so a nightly toolchain must be present for the
-      # declaration regeneration step below.
-      - name: Install nightly Rust (for bindgen rustdoc)
-        uses: dtolnay/rust-toolchain@nightly
+      # The regeneration steps drive `fpp_python/Makefile` — the same targets a
+      # contributor runs — rather than re-spelling the `cargo run` invocations here.
+      # Both generators are environment-sensitive (the bindgen needs the pinned
+      # nightly; `stub_gen` needs a libpython linker hint, see below) and the
+      # Makefile already encodes that, so duplicating the commands is how CI and
+      # local runs drift apart. Only the drift gate below is CI-specific.
 
       # (a) Regenerate BOTH checked-in declarations (AST + semantic). Runs before
       # the stub dump so the stub reflects the freshly-regenerated pyclasses.
       - name: Regenerate declarations
-        run: cargo run -p fpp_python_bindgen
+        run: make -C fpp_python bindgen
 
       # (b) Regenerate the type stub from the annotated pyclasses. The stub-dump
       # binary must be built WITHOUT `extension-module` (a standalone executable
-      # links libpython), hence `--no-default-features --features stubgen`.
+      # links libpython for real), so it needs the unversioned `libpython3.X.so`
+      # symlink on the linker path; `make stubs` probes for it and falls back to
+      # CPython's `LIBPL` config dir when the interpreter's LIBDIR lacks it.
       - name: Regenerate type stub
-        run: cargo run -p fpp_python --no-default-features --features stubgen --bin stub_gen
+        run: make -C fpp_python stubs
 
       # (c) Fail if any regenerated declaration/stub differs from what's committed.
+      # Spelled out rather than `make drift` so the failure carries a GitHub
+      # annotation.
       - name: Check for drift
         run: |
           if ! git diff --exit-code -- fpp_python/src/ast/defs.rs fpp_python/src/sem/defs.rs fpp_python/fpp_python.pyi; then
-            echo "::error::checked-in declaration/stub is stale; run \`cargo run -p fpp_python_bindgen\` and \`cargo run -p fpp_python --no-default-features --features stubgen --bin stub_gen\`, then commit the result."
+            echo "::error::checked-in declaration/stub is stale; run \`make -C fpp_python codegen\` and commit the result."
             exit 1
           fi
 
       # Prove the regenerated code still compiles as the import-only extension.
       - name: Build native extension
-        run: cargo build -p fpp_python --lib
+        run: make -C fpp_python ext
 
   mypy:
     name: "Mypy"

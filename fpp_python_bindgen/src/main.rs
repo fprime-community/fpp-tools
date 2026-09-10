@@ -33,6 +33,14 @@
 //! `--only ast` runs A + F (no nightly), reusing the committed `shadowed {…}` line.
 //! `--only sem` runs A + B..E + G, validating that every `leaf(crate::ast::X)` it
 //! emits already has a Python-enum mirror in the committed `ast/defs.rs`.
+//!
+//! # Toolchain
+//!
+//! Phase B needs a nightly `rustdoc`, pinned exactly by
+//! `fpp_python_bindgen/nightly-toolchain` ([`NIGHTLY_TOOLCHAIN`]) because the
+//! rustdoc JSON schema is unstable. Install it once with
+//! `rustup toolchain install $(cat fpp_python_bindgen/nightly-toolchain)`; set
+//! `FPP_BINDGEN_TOOLCHAIN` to override.
 
 // `name` fields on the partition def structs are retained for debugging.
 #![allow(dead_code)]
@@ -228,20 +236,43 @@ fn fmt_set(set: &BTreeSet<String>) -> String {
     format!("{{{}}}", items.join(", "))
 }
 
+/// The nightly toolchain rustdoc JSON is generated with, single-sourced from
+/// `fpp_python_bindgen/nightly-toolchain` so the CI job that installs it and this
+/// tool that invokes it cannot disagree.
+///
+/// The rustdoc JSON schema is unstable and bumps `format_version` on its own
+/// cadence, so a floating `nightly` would break `sem/defs.rs` generation the next
+/// time it moved — and, worse, could silently reshape the output and trip the
+/// drift check. The pin is exact for the same reason `rustdoc-types` is: the two
+/// must be bumped together (see [`load_krate`]).
+const NIGHTLY_TOOLCHAIN: &str = include_str!("../nightly-toolchain");
+
+/// The pinned nightly, or the `FPP_BINDGEN_TOOLCHAIN` override.
+fn nightly_toolchain() -> String {
+    std::env::var("FPP_BINDGEN_TOOLCHAIN").unwrap_or_else(|_| NIGHTLY_TOOLCHAIN.trim().to_string())
+}
+
 /// Load + parse the rustdoc JSON, asserting its schema version. With
-/// `--rustdoc-json` the file is read directly; otherwise nightly rustdoc is
-/// invoked via the `rustdoc-json` crate over the resolved `fpp_analysis` manifest.
+/// `--rustdoc-json` the file is read directly; otherwise the pinned nightly
+/// rustdoc is invoked via the `rustdoc-json` crate over the resolved
+/// `fpp_analysis` manifest.
 fn load_krate(cfg: &Config) -> Crate {
+    let toolchain = nightly_toolchain();
     let json = match &cfg.rustdoc_json {
         Some(p) => std::fs::read_to_string(p)
             .unwrap_or_else(|e| panic!("read rustdoc JSON {}: {e}", p.display())),
         None => {
             let path = rustdoc_json::Builder::default()
-                .toolchain("nightly")
+                .toolchain(&toolchain)
                 .manifest_path(&cfg.manifest)
                 .document_private_items(true)
                 .build()
-                .unwrap_or_else(|e| panic!("rustdoc-json build failed: {e}"));
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "rustdoc-json build failed with toolchain `{toolchain}`: {e}\n\
+                         install it with `rustup toolchain install {toolchain}`"
+                    )
+                });
             std::fs::read_to_string(&path)
                 .unwrap_or_else(|e| panic!("read rustdoc JSON {}: {e}", path.display()))
         }
@@ -251,10 +282,14 @@ fn load_krate(cfg: &Config) -> Crate {
     assert_eq!(
         krate.format_version,
         rustdoc_types::FORMAT_VERSION,
-        "rustdoc JSON format_version {} != rustdoc_types::FORMAT_VERSION {} — pin the \
-         `rustdoc-types` version to the emitting nightly",
+        "rustdoc JSON format_version {} != rustdoc_types::FORMAT_VERSION {} — the emitting \
+         toolchain and the schema model disagree.\n\
+         Expected the pinned nightly (`fpp_python_bindgen/nightly-toolchain`: {}); to move to a \
+         newer nightly, bump that file AND the `rustdoc-types` pin in \
+         `fpp_python_bindgen/Cargo.toml` together, then regenerate.",
         krate.format_version,
-        rustdoc_types::FORMAT_VERSION
+        rustdoc_types::FORMAT_VERSION,
+        NIGHTLY_TOOLCHAIN.trim(),
     );
     krate
 }
