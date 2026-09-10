@@ -6,8 +6,6 @@ use std::sync::Arc;
 /// An FPP system.
 ///
 /// Records the system definition and the deployment topology it names.
-/// (Dictionary construction is not part of this analyzer, so unlike the Scala
-/// implementation no dictionary is tracked here.)
 #[derive(Debug, Clone)]
 pub struct FppSystem {
     /// The AST node defining the system.

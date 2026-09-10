@@ -255,8 +255,7 @@ fn value_div() {
 // Integer arithmetic whose exact result does not fit in an `i128` should be
 // reported, not wrapped.
 //
-// Scala computes all of these with `BigInt` and never reports anything; `i128`
-// cannot represent the results, so the port reports `MathError::Overflow` and
+// `i128` cannot represent the results, so `MathError::Overflow` is reported and
 // `EvalConstantExprs` turns that into "arithmetic result is too large to
 // represent". The alternative would be a debug-build panic and a silently
 // wrapped value in release.
@@ -312,8 +311,8 @@ fn value_arithmetic_reports_overflow() {
     });
 }
 
-/// Floats saturate at infinity instead of overflowing, exactly as Scala's
-/// `Double` arithmetic does, so no arithmetic on them is reported.
+/// Floats saturate at infinity instead of overflowing, so no arithmetic on them
+/// is reported.
 #[test]
 fn value_float_arithmetic_saturates() {
     with_test_ctx(|| {
@@ -332,7 +331,7 @@ fn value_float_arithmetic_saturates() {
 
 /// A divisor is tested for zero before the operator is applied, using
 /// `Value::is_zero`, so a float nearer zero than `EPSILON` is a division by
-/// zero. This mirrors `Analysis.div`.
+/// zero.
 #[test]
 fn value_div_by_zero_uses_is_zero() {
     with_test_ctx(|| {
@@ -493,15 +492,14 @@ fn value_convert_float_source() {
     });
 }
 
-/// A float narrows to an integer through the width of an `i32`, matching Scala's
-/// `Double.intValue`: the integer part is clamped to `[i32::MIN, i32::MAX]` and a
-/// NaN goes to zero, for every integer target kind and for `Integer`.
+/// A float narrows to an integer through the width of an `i32`: the integer part
+/// is clamped to `[i32::MIN, i32::MAX]` and a NaN goes to zero, for every integer
+/// target kind and for `Integer`.
 ///
 /// `i128` is wide enough to keep more of a big float than this, but keeping it
-/// would give a different constant from the reference compiler once the value is
-/// truncated to the target kind. `fpp-to-json` on
-/// `array A = [1] I32 default [1.0e300]` / `[1] I64 default [1.0e18]` reports
-/// `2147483647` for both.
+/// would change the constant once the value is truncated to the target kind:
+/// `array A = [1] I32 default [1.0e300]` and `[1] I64 default [1.0e18]` are both
+/// `2147483647`.
 #[test]
 fn value_convert_float_narrows_to_i32_width() {
     with_test_ctx(|| {
@@ -616,7 +614,7 @@ fn value_display() {
         assert_eq!(v_bool(true).to_string(), "true");
         assert_eq!(v_string("hi").to_string(), "\"hi\"");
         assert_eq!(v_enum_constant("X", 7).to_string(), "7");
-        // The whole value, not a 32-bit slice of it
+        // An enum constant wider than 32 bits displays in full
         assert_eq!(
             v_enum_constant("X", 0xFFFFFFFFFFFFFFFF_u64 as i128).to_string(),
             "18446744073709551615"
@@ -778,7 +776,7 @@ fn value_rshift() {
 }
 
 /// An arbitrary-precision right shift by an amount at or beyond the width of the
-/// value saturates to `0` or `-1`, and the port reproduces that for `i128`.
+/// value saturates to `0` or `-1`, which an `i128` shift reproduces.
 #[test]
 fn value_rshift_saturates_past_the_value_width() {
     with_test_ctx(|| {

@@ -153,10 +153,6 @@ impl TlmPacketSet {
 
 /// A telemetry channel entry of a topology: the component instance that
 /// provides the channel, and the channel itself.
-///
-/// The Scala implementation stores these in `Dictionary.tlmChannelEntryMap`,
-/// built by `ConstructDictionary`. Dictionary construction is not ported, so
-/// the entries are computed on demand here.
 pub struct TlmChannelEntry(pub ComponentInstance, pub TlmChannel);
 
 impl TlmChannelEntry {

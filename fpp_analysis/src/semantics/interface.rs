@@ -87,9 +87,6 @@ pub enum GeneralKind {
 }
 
 /// A general port instance.
-///
-/// Mirrors Scala's `PortInstance.General`
-/// (analysis/Semantics/PortInstance.scala:136).
 #[derive(Debug, Clone)]
 pub struct GeneralPortInstance {
     /// The specifier defining the port instance.
@@ -105,9 +102,6 @@ pub struct GeneralPortInstance {
 }
 
 /// A special port instance.
-///
-/// Mirrors Scala's `PortInstance.Special`
-/// (analysis/Semantics/PortInstance.scala:188).
 #[derive(Debug, Clone)]
 pub struct SpecialPortInstance {
     /// The specifier defining the port instance.
@@ -124,9 +118,6 @@ pub struct SpecialPortInstance {
 
 /// An internal port instance. Internal ports cannot be imported, so they carry
 /// no import specifiers.
-///
-/// Mirrors Scala's `PortInstance.Internal`
-/// (analysis/Semantics/PortInstance.scala:222).
 #[derive(Debug, Clone)]
 pub struct InternalPortInstance {
     /// The specifier defining the port instance.
@@ -138,9 +129,6 @@ pub struct InternalPortInstance {
 }
 
 /// A topology port aliasing an underlying port instance.
-///
-/// Mirrors Scala's `PortInstance.Topology`
-/// (analysis/Semantics/PortInstance.scala:164).
 #[derive(Debug, Clone)]
 pub struct TopologyPortInstance {
     /// The specifier defining the topology port.
@@ -152,9 +140,7 @@ pub struct TopologyPortInstance {
 /// An FPP port instance.
 ///
 /// The payload of each variant is its own struct, so that code which requires a
-/// particular kind of port instance can say so in its types. This mirrors
-/// Scala, where `PortInstance` is a sealed trait and each variant is usable as a
-/// type of its own (analysis/Semantics/PortInstance.scala:25).
+/// particular kind of port instance can say so in its types.
 #[derive(Debug, Clone)]
 pub enum PortInstance {
     /// A general port instance.
@@ -169,10 +155,6 @@ pub enum PortInstance {
 
 /// The connection signature of a port instance: the parts of it that must agree
 /// for one port instance to stand in for another.
-///
-/// Mirrors Scala's `PortInstanceSignature`
-/// (analysis/Semantics/PortInstance.scala:8), which is defined over the whole
-/// `PortInstance` trait and so applies to every variant.
 #[derive(Debug, PartialEq, Eq)]
 struct PortInstanceSignature {
     direction: Option<Direction>,
@@ -716,9 +698,7 @@ fn get_import_locs(import_node_ids: &[Node]) -> Vec<Span> {
 }
 
 // A port instance shows as its unqualified name, except for a topology port,
-// which also shows the port it aliases. Mirrors Scala's
-// `PortInstance.toString` (analysis/Semantics/PortInstance.scala:27) and
-// `PortInstance.Topology.toString` (:184).
+// which also shows the port it aliases.
 
 impl std::fmt::Display for GeneralPortInstance {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -793,12 +773,6 @@ impl PortInterface {
     /// first offending port has to impose an order of its own, or which
     /// diagnostic it produces depends on hash layout.
     ///
-    /// Scala's `portMap` is an immutable `Map`, which iterates in insertion
-    /// order while it holds at most four entries. Past four entries its order
-    /// is a function of the key hashes, so no port ordering reproduces it;
-    /// insertion order matches Scala exactly in the small case and is at least
-    /// deterministic in the large one, which is the best available answer.
-    ///
     /// Insertion order is not source order. A port is added when the interface
     /// that carries it is merged, so an imported port is added after the
     /// importing interface's own ports even though it is *defined* earlier —
@@ -860,11 +834,8 @@ impl PortInterface {
     ///
     /// The first port that fails to merge ends the merge, and its error is
     /// reported: which port that is depends on the order we walk `interface`'s
-    /// port map, so we walk it in insertion order, as Scala's fold over
-    /// `interface.portInterface.portMap.values.toList` does. See
-    /// [`PortInterface::ports_in_insertion_order`] and
-    /// `PortInterface.addImportedInterface`
-    /// (analysis/Semantics/PortInterface.scala:90).
+    /// port map, so we walk it in insertion order. See
+    /// [`PortInterface::ports_in_insertion_order`].
     pub fn add_imported_interface(
         &self,
         interface: &Interface,
@@ -909,11 +880,8 @@ impl PortInterface {
     /// in `other` exists in `self` with a matching signature.
     ///
     /// Only the first offending port is reported, so which port that is depends
-    /// on the iteration order of `other`'s maps. Scala folds over
-    /// `other.portMap.toList` and `other.specialPortMap.toList`, so we walk
-    /// both maps in insertion order; see
-    /// [`PortInterface::ports_in_insertion_order`]. Mirrors
-    /// `PortInterface.implements` (analysis/Semantics/PortInterface.scala:22).
+    /// on the iteration order of `other`'s maps; we walk both maps in insertion
+    /// order. See [`PortInterface::ports_in_insertion_order`].
     pub fn implements(&self, other: &PortInterface) -> SemanticResult {
         // Check all the ports in `other` to make sure they exist and match `self`
         for (name, pi) in other.ports_in_insertion_order() {
@@ -1009,8 +977,7 @@ impl Interface {
     }
 
     /// Merge in every port of `interface`. On failure `self` is left unchanged,
-    /// as in Scala, where a failed `PortInterface.addImportedInterface` discards
-    /// the ports it had already merged from `interface`.
+    /// discarding the ports already merged from `interface`.
     pub fn add_imported_interface(
         &mut self,
         interface: &Interface,
@@ -1043,15 +1010,6 @@ impl Interface {
 
     /// The interfaces imported by this one, as (symbol, import specifier node)
     /// pairs in source order.
-    ///
-    /// The import map is a hash map, whose iteration order is neither source
-    /// order nor name order. Scala folds over `List.from(importMap)`, and its
-    /// `importMap` is an immutable `Map`, which iterates in insertion order up
-    /// to four entries; we iterate in source order always. Here the two orders
-    /// agree: an import specifier is added as it is visited, an interface
-    /// member list may not contain an include specifier, so all of an
-    /// interface's imports come from one file, and the specifiers of one file
-    /// are visited in source order.
     pub fn imports_in_source_order(&self) -> Vec<(Symbol, Node)> {
         let mut imports: Vec<(Symbol, Node)> = self
             .import_map
@@ -1065,23 +1023,18 @@ impl Interface {
 
 /// Resolve `interface` in place by merging in the interfaces it imports.
 ///
-/// Mirrors `ResolveInterface.resolve`
-/// (analysis/Semantics/ResolveTopology/ResolveInterface.scala:9). Scala folds
-/// with `Result.foldLeft`, so the first import that fails to merge ends the
-/// fold: exactly one error is reported per interface, and it is the error of the
-/// first offending import in source order.
+/// The first import that fails to merge ends the merge: exactly one error is
+/// reported per interface, and it is the error of the first offending import in
+/// source order.
 ///
 /// On failure the imports merged before the offending one stay merged into
-/// `interface`. Scala never has to choose: a `Left` here aborts the whole pass,
-/// so nothing downstream ever reads the accumulator. We keep checking, so
-/// dropping the successful imports would delete ports the user did write and
-/// draw a second round of errors against them.
+/// `interface`. Checking continues after the error, so dropping the successful
+/// imports would delete ports the user did write and draw a second round of
+/// errors against them.
 ///
-/// `interface_map` must already hold every interface that `interface` imports;
-/// Scala applies `a.interfaceMap` directly and would throw if an entry were
-/// absent. An entry is absent here only when the imported interface itself
-/// failed to resolve, and that failure has already been reported, so we skip it
-/// rather than panic.
+/// `interface_map` normally holds every interface that `interface` imports. An
+/// entry is absent only when the imported interface itself failed to resolve,
+/// and that failure has already been reported, so we skip it rather than panic.
 pub fn resolve_interface(
     interface_map: &HashMap<Symbol, Interface>,
     interface: &mut Interface,
@@ -1277,8 +1230,8 @@ module M {
     }
 
     /// A port interface remembers the order its ports were added in, so the
-    /// checks that walk it report the same port Scala does however many ports
-    /// there are and however the hash map happens to lay them out.
+    /// checks that walk it report the same port however many ports there are
+    /// and however the hash map happens to lay them out.
     #[test]
     fn ports_are_walked_in_insertion_order() {
         with_analysis(|component, _| {
@@ -1317,7 +1270,7 @@ module M {
 
     /// `Interface::imports_in_source_order` orders the imports by the location
     /// of the import specifier, not by the iteration order of the hash map, so
-    /// `resolve_interface` merges them in the order Scala does.
+    /// `resolve_interface` merges them in source order.
     #[test]
     fn imports_are_merged_in_source_order() {
         const IMPORTS: &str = r#"

@@ -191,9 +191,9 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     }
                     .emit();
                 } else if index >= elements.elements.len() as i128 {
-                    // Compare in i128, as Scala compares in BigInt: narrowing the
-                    // index to usize first would accept any index congruent to an
-                    // in-bounds one modulo the pointer width.
+                    // Compare in i128: narrowing the index to usize first would
+                    // accept any index congruent to an in-bounds one modulo the
+                    // pointer width.
                     SemanticError::InvalidIntValue {
                         loc: e2.span(),
                         v: Some(index),
@@ -422,8 +422,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                 );
             }
             ExprKind::Unop { op, e } => {
-                // Negation preserves the operand's kind, as `Value.unary_-`
-                // does in Scala (`Analysis.neg`)
+                // Negation preserves the operand's kind
                 if let (Unop::Minus, Some(v)) = (op, a.value_map.get(&e.node_id)) {
                     match v.negate() {
                         Ok(v) => {

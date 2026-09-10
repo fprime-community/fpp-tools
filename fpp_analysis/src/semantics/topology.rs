@@ -41,8 +41,7 @@ pub struct ConnectionPattern {
     pub node: Arc<ast::SpecPatternConnectionGraph>,
     /// The source instance.
     pub source: (ComponentInstance, Span),
-    /// The target instances. Scala holds a set here; this list is deduplicated
-    /// by instance, but keeps source order.
+    /// The target instances, deduplicated by instance and kept in source order.
     pub targets: Vec<(ComponentInstance, Span)>,
 }
 

@@ -6,11 +6,7 @@ use rustc_hash::FxHashMap as HashMap;
 use std::sync::Arc;
 
 /// Construct and check the telemetry packet sets of every deployment topology.
-///
-/// The Scala implementation does this while constructing the dictionary
-/// (`ConstructDictionaryMap`), which also supplies the global channel IDs.
-/// Dictionary construction is not ported, so the channel IDs are computed
-/// directly from the instance base IDs (see `semantics::tlm_packet_set`).
+
 pub struct CheckTlmPacketSets;
 
 impl CheckTlmPacketSets {

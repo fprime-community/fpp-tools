@@ -42,16 +42,6 @@ pub enum QueueFull {
 }
 
 /// Queue full behavior specifier
-///
-/// This wraps a [QueueFull] behavior in a node so that diagnostics can point at
-/// the keyword that named the behavior. It mirrors Scala's
-/// `Option[AstNode[Ast.QueueFull]]`, which the command and port instance
-/// specifiers use. The internal port and state machine instance specifiers store
-/// a bare [QueueFull] instead, as they do in Scala.
-///
-/// It carries no child nodes, and every specifier that holds one marks the field
-/// `#[visitable(ignore)]`, so it is not part of the visitor traversal, just as
-/// Scala's `AstVisitor` has no case for a queue full node.
 #[ast]
 #[derive(Debug, Clone)]
 pub struct QueueFullSpecifier {

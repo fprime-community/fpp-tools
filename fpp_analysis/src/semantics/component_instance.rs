@@ -35,10 +35,6 @@ impl InitSpecifier {
 pub struct ComponentInstance {
     pub node: Arc<DefComponentInstance>,
     pub qualified_name: String,
-    /// The symbol of the component this instance is an instance of.
-    /// Scala stores the `Component` itself; the symbol is stored here instead,
-    /// so that the instance does not go stale as the component map is updated.
-    /// Use `get_component` to resolve it.
     pub component_symbol: Symbol,
     pub base_id: i128,
     pub max_id: i128,
@@ -56,43 +52,6 @@ impl std::fmt::Display for ComponentInstance {
     }
 }
 
-/// Component instances compare, order and hash by qualified name only.
-///
-/// Scala's `ComponentInstance` is a case class, so its `==`/`hashCode` are
-/// structural over every field, while its `compare` is
-/// `qualifiedName.toString.compare` (`analysis/Semantics/ComponentInstance.scala:19-50`).
-/// The two disagree there, and which one applies depends on the collection:
-/// `Topology.instanceMap` is a `TreeMap[InterfaceInstance, _]` ordered by
-/// `_.getQualifiedName.toString` (`analysis/Semantics/InterfaceInstance.scala:34-35`),
-/// so it keys by qualified name, whereas
-/// `MatchedPortNumbering.InstanceConnectionMap = Map[ComponentInstance, _]`
-/// (`analysis/Semantics/ResolveTopology/MatchedPortNumbering.scala:10`) is a
-/// hash map and keys structurally.
-///
-/// Keying by qualified name throughout cannot collapse two entries, because two
-/// distinct component instances are never both reachable under one qualified
-/// name:
-///
-///   * Every instance-keyed collection in this crate is filled from instances
-///     reached through a *use*: a topology's `instance_map`, a connection
-///     endpoint, or a connection-pattern source/target. Each such use is
-///     resolved through [`crate::Analysis::use_def_map`] to a single
-///     `Symbol::ComponentInstance`, and the qualified name is derived from that
-///     symbol, so one name yields one symbol, hence one instance.
-///   * Two definitions could only share a qualified name by defining the same
-///     name twice in the same scope, which `GenericNameSymbolMap::put` rejects
-///     with `SemanticError::RedefinedSymbol`, keeping the first definition. The
-///     rejected definition still lands in
-///     [`crate::Analysis::component_instance_map`] — that map is keyed by
-///     symbol, and this port keeps analysing after a diagnostic where Scala
-///     stops at the first failing pass — but it is unreachable from the scope,
-///     so no use can name it and it never enters an instance-keyed collection.
-///
-/// Qualified-name keying is additionally the right choice for the fields that
-/// legitimately differ between snapshots of one instance: `init_specifier_map`
-/// grows as `add_init_specifier` is applied, and this port stores
-/// `component_symbol` in place of Scala's embedded `Component`, so structural
-/// equality would risk splitting one logical instance across two keys.
 impl PartialEq for ComponentInstance {
     fn eq(&self, other: &Self) -> bool {
         self.qualified_name == other.qualified_name
@@ -226,29 +185,13 @@ const FILE_URI_SCHEME: &str = "file://";
 /// directory when the URI is relative, and a `file://` URI when the source is
 /// one. A source URI with no directory part (a bare file name, or the `<stdin>`
 /// pseudo-URI) contributes no directory, so the specifier path is used as
-/// written. An absolute specifier path replaces the directory outright, as
-/// Java's `Path.resolve` does.
+/// written. An absolute specifier path replaces the directory outright.
 ///
-/// Scala instead stores an absolute normalized path: `getFile` is
-/// `File.Path(loc.getRelativePath(node.data)).toString`
-/// (`analysis/Semantics/ComponentInstance.scala:129-133`) over a `Location`
-/// whose directory is already absolute, because every driver runs its input
-/// paths through `File.fromString` -> `Paths.get(s).toAbsolutePath.normalize`
-/// (`util/File.scala:61-62`, `tools/fpp/src/main/scala/fpp-check.scala:34`),
-/// with `Paths.get("").toAbsolutePath` standing in for stdin
-/// (`util/Location.scala:63-71`).
-///
-/// This port deliberately does not absolutize. Its drivers pass source paths
+/// The path is deliberately not absolutized. The drivers pass source paths
 /// through unchanged, and the LSP server caches an `Analysis` and reuses it
 /// across requests, so interning the process working directory into stored
 /// analysis data would silently misdescribe the model whenever that directory
-/// is not the one the paths were given against. No information is lost relative
-/// to Scala: Scala's own consumer re-absolutizes this string anyway, via
-/// `File.getJavaPath(ci.file)` in
-/// `codegen/CppWriter/TopologyCppWriter/TopComponentIncludes.scala:23`, and
-/// absolutizing a source-relative value there against the working directory
-/// reproduces Scala's absolute path exactly, since Scala's absolutization used
-/// that same working directory.
+/// is not the one the paths were given against.
 fn get_file(node: &LitString) -> String {
     let uri = node.span().file().uri();
     // The LSP server names source files by `file://` URI. Resolve inside the
@@ -344,18 +287,6 @@ fn get_active_attribute(
             if nonnegative {
                 Ok(Some(a.get_nonnegative_big_int_value(e.node_id, e.span())?))
             } else {
-                // Scala's unchecked getter for priority and CPU affinity is
-                // `getBigIntValueOpt` = `nodeOpt.map(node => getBigIntValue(node.id))`
-                // (`analysis/Analysis.scala:440-441`): a specified attribute
-                // always yields `Some`. `getBigIntValue`
-                // (`analysis/Analysis.scala:391-397`) destructures the
-                // converted value with `@unchecked`, so a value the earlier
-                // passes did not produce raises there rather than turning into
-                // `None`. Keep that shape — `Some` exactly when the attribute is
-                // specified — and substitute 0 for an unevaluated value, as the
-                // other integer getters on `Analysis` do. Collapsing to `None`
-                // would make "specified but not evaluatable" indistinguishable
-                // from "not specified".
                 Ok(Some(a.get_int_value(e.node_id).unwrap_or(0)))
             }
         }
@@ -463,9 +394,6 @@ mod tests {
                 get_active_attribute(&a, "c", &ComponentKind::Active, attr, node, nonnegative)
                     .unwrap_or_else(|_| panic!("{attr} is valid for an active component"))
             };
-            // Scala's `getBigIntValueOpt` yields `Some` whenever the attribute
-            // node is present, so an unevaluated value must not read back as
-            // "not specified".
             assert_eq!(attribute("priority", &e, false), Some(0));
             assert_eq!(attribute("CPU affinity", &e, false), Some(0));
             // The nonnegative path (stack size) has the same shape.

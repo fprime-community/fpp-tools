@@ -9,11 +9,10 @@ pub(crate) fn run_test(file_path: &str) {
     run_test_with(&[], file_path)
 }
 
-/// Run a test over several input files, as `fpp-check <deps> <file>` does. The
-/// dependency paths are relative to the tests directory and have no extension;
-/// the last file named is the one whose `.ref.txt` is compared.
+/// Run a test over several input files. The dependency paths are relative to the
+/// tests directory and have no extension; the last file named is the one whose
+/// `.ref.txt` is compared.
 pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
-    // Compute the path to the FPP input and .ref.txt output
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
 
@@ -37,12 +36,10 @@ pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
 
     let file_reader = FsReader {};
 
-    // Set up the compiler context to capture diagnostic messages into a buffer
     let mut diagnostics_str = vec![];
     let mut ctx =
         fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics_str));
 
-    // Parse the input and run the semantic checker on the AST
     fpp_core::run(&mut ctx, || {
         let parse = |file: &PathBuf| {
             let source_file_path = file.to_str().unwrap();
@@ -67,7 +64,6 @@ pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
         .expect("failed to convert error message to string")
         .replace(path.to_str().unwrap(), "[ local path prefix ]");
 
-    // Validate the diagnostic messages against the reference file
     match env::var("FPP_UPDATE_REF") {
         Ok(_) => {
             // Update the ref file

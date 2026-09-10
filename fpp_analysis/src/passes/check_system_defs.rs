@@ -76,8 +76,6 @@ impl<'ast> Visitor<'ast> for CheckSystemDefs {
             return ControlFlow::Continue(());
         }
 
-        // CheckTopologyDefs, which runs earlier, resolves every topology, so
-        // this lookup is total, as Scala's `Analysis.getTopology` is.
         let topology = a
             .topology_map
             .get(&topology_symbol)

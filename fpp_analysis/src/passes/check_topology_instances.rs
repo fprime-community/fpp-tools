@@ -38,7 +38,6 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         let name = a.get_qualified_name(&symbol);
         let prev = a.topology.take();
         a.topology = Some(Topology::new(symbol.clone(), name));
-        // Visit topology members and compute the unresolved topology.
         let _ = node.walk(a, self);
         if let Some(top) = a.topology.take() {
             a.partial_topology_map.insert(symbol, top);

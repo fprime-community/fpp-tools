@@ -213,9 +213,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
 
         let anon_array_ty = Arc::new(Type::AnonArray(anon_array.clone()));
 
-        // The array type without its default value or format. The default value
-        // refers to this type, as it does in the Scala implementation, where the
-        // default and the format are copied in together afterwards.
+        // The array type without its default value or format
         let mut array_ty = ArrayType {
             node: def,
             anon_array,
@@ -368,7 +366,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         }
 
         // Compute the default value. The value refers to the struct type
-        // without its own default, as it does in the Scala implementation.
+        // without its own default.
         let struct_ty_a = Arc::new(Type::Struct(ty.clone()));
         ty.default = match &node.default {
             // The convertibility of an explicit default is checked by

@@ -63,8 +63,7 @@ pub struct Analysis {
     /// The mapping from system symbols to their resolved systems.
     pub system_map: HashMap<Symbol, crate::semantics::FppSystem>,
     /// The mapping from deployment topology symbols to their telemetry packet
-    /// sets, by packet set name. The Scala implementation stores these on the
-    /// dictionary of the topology; dictionary construction is not ported.
+    /// sets, by packet set name.
     pub tlm_packet_set_map: HashMap<Symbol, HashMap<String, crate::semantics::TlmPacketSet>>,
     /// The mapping from (location specifier kind, qualified name) to the
     /// location specifier that named it.
@@ -93,8 +92,8 @@ pub struct Analysis {
 /// [`Symbol`].
 ///
 /// The semantic [`Type`] for a type definition holds the definition behind the
-/// same `Arc` that the symbol table holds, mirroring Scala, where
-/// `Symbol.AbsType(aNode)` and `Type.AbsType(aNode)` share one `aNode`.
+/// same `Arc` that the symbol table holds, so the symbol and the type share one
+/// definition node.
 pub trait InternedDef: fpp_ast::AstNode + Clone {
     /// Borrows the interned definition out of `symbol`, if `symbol` names one of
     /// this kind.
@@ -231,8 +230,7 @@ impl Analysis {
     /// node; the type names that use it keep the type they were given by
     /// `CheckTypeUses`, which may not be finalized yet (an array whose size is
     /// not yet known, a struct with no default value). Resolve the use through
-    /// its definition node, so callers see the same finalized type that Scala's
-    /// `typeMap` holds for a type name.
+    /// its definition node, so callers always see the finalized type.
     pub fn get_finalized_type(&self, node: fpp_core::Node) -> Option<Arc<Type>> {
         let ty = self.type_map.get(&node)?.clone();
         match ty.def_node_id() {

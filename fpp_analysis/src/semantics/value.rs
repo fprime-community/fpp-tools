@@ -85,11 +85,6 @@ impl Value {
     }
 
     /// Convert this value to a distinct type
-    ///
-    /// The numeric conversions never report a value that does not fit, because
-    /// neither of them can produce one: an integer widens to `f64` (losing
-    /// precision above 2^53, as it does in Scala), and a float narrows through
-    /// [`float_to_int`], which is exactly as wide as Scala's `Double.intValue`.
     fn convert_impl(&self, ty_a: &Arc<Type>) -> Option<Value> {
         let ty = Type::underlying_type(ty_a);
 
@@ -172,8 +167,8 @@ impl Value {
                     return None;
                 }
 
-                // As in Scala's `convertToAnonArray`, the result has no scalar:
-                // the conversion is over the elements
+                // The conversion is over the elements, so the result has no
+                // scalar
                 let elements =
                     anon_array.try_map_elements(|e| e.convert(&anon_array_ty.elt_type))?;
 
@@ -364,8 +359,7 @@ impl Value {
     pub fn div(&self, other: &Value) -> MathResult {
         // The divisor is tested for zero before the operator is applied, so a
         // float divisor within `EPSILON` of zero is a division by zero even
-        // though the raw `f64` division would succeed. This mirrors
-        // `Analysis.div`, which consults `Value.isZero`.
+        // though the raw `f64` division would succeed
         if other.is_zero() {
             return Err(MathError::DivByZero);
         }
@@ -515,8 +509,6 @@ impl Value {
     fn int_shift_op(&self, other: &Value, dir: ShiftDirection) -> MathResult {
         match self {
             Value::PrimitiveInteger(PrimitiveIntegerValue { value, kind }) => match other {
-                // A primitive-int (or enum-constant) amount preserves the left
-                // operand's kind, whatever the amount's own kind is
                 Value::PrimitiveInteger(PrimitiveIntegerValue { value: amount, .. })
                 | Value::EnumConstant(EnumConstantValue {
                     value: (_, amount), ..
@@ -524,7 +516,6 @@ impl Value {
                     value: shift_int(*value, *amount, dir)?,
                     kind: *kind,
                 })),
-                // An unsized-integer amount yields an unsized integer
                 Value::Integer(IntegerValue(amount)) => Ok(Value::Integer(IntegerValue(
                     shift_int(*value, *amount, dir)?,
                 ))),
@@ -597,9 +588,8 @@ impl Value {
 /// the type's range.
 ///
 /// Wrapping is the operation itself here, not an accident of the `i128`
-/// representation: Scala's `Value.PrimitiveInt.truncate` reduces the `BigInt`
-/// modulo `2^width` (adjusting into range for the unsigned kinds) and every
-/// truncated value fits in an `i128`, so no result is inexpressible.
+/// representation: every truncated value fits in an `i128`, so no result is
+/// inexpressible.
 fn truncate_int(value: i128, kind: IntegerKind) -> i128 {
     match kind {
         IntegerKind::I8 => value as i8 as i128,
@@ -616,15 +606,12 @@ fn truncate_int(value: i128, kind: IntegerKind) -> i128 {
 /// Narrows a float to an integer value, rounding towards zero.
 ///
 /// The result is the float's integer part clamped to the range of an `i32`, with
-/// a NaN going to zero. That is the width Scala narrows to:
-/// `Value.Float.convertToDistinctType` builds both `PrimitiveInt(value.intValue,
-/// kind)` and `Integer(value.intValue)` from `Double.intValue`, which is
-/// `Double.toInt` and so saturates at `Int.MinValue`/`Int.MaxValue`. Keeping
-/// more of the value than that (an `i128` is wide enough to) would give a
-/// different constant from the reference compiler, since a subsequent
+/// a NaN going to zero, whatever the width of the target kind. The `i32` width
+/// is part of the language's constant semantics, not an artifact: a subsequent
 /// [`Value::truncate`] to the target kind reduces the retained bits modulo the
-/// kind's width: `array A = [1] I32 default [1.0e300]` is `2147483647` in Scala,
-/// but `-1` if the conversion saturates at `i128::MAX` instead.
+/// kind's width, so keeping more of the value would change the constant.
+/// `array A = [1] I32 default [1.0e300]` is `2147483647`, but would be `-1` if
+/// the conversion saturated at `i128::MAX` instead.
 fn float_to_int(value: f64) -> i128 {
     // `as` on a float is a saturating cast in Rust, so this cannot trap however
     // large the float is
@@ -679,8 +666,6 @@ impl fmt::Display for Value {
             Value::Float(FloatValue { value, .. }) => f.write_fmt(format_args!("{value}")),
             Value::Boolean(BooleanValue(value)) => f.write_fmt(format_args!("{value}")),
             Value::String(StringValue(value)) => f.write_fmt(format_args!("\"{value}\"")),
-            // The whole value, not a 32-bit slice of it: a `U64` enum's
-            // constants do not fit in an `i32`
             Value::EnumConstant(EnumConstantValue {
                 value: (_, value), ..
             }) => f.write_fmt(format_args!("{value}")),
@@ -736,13 +721,7 @@ pub struct BooleanValue(pub bool);
 pub struct StringValue(pub String);
 
 /// Anonymous array values
-///
-/// The elements are held behind `Arc`s so that repeated elements are stored
-/// once, as they are in Scala, where `Value.AnonArray` holds a `List[Value]` of
-/// references to immutable values (`Type.getDefaultValue` builds an array
-/// default with `List.fill(size)(elt)`). A `Value` is immutable once built, so
-/// sharing is unobservable, and it is what keeps a nested array default costing
-/// the SUM of the nested sizes rather than their PRODUCT.
+
 #[derive(Debug, Clone)]
 pub struct AnonArrayValue {
     /// The elements, in order. Use [`AnonArrayValue::iter`] to read them as
@@ -766,9 +745,6 @@ impl AnonArrayValue {
     ///
     /// The element is stored once, so this costs one pointer per element rather
     /// than one deep copy per element.
-    // Every element pointing at the same `Arc` is the point: a `Value` is
-    // immutable once built, and sharing is what keeps a nested array default
-    // costing the sum of the nested sizes rather than their product.
     #[allow(clippy::rc_clone_in_vec_init)]
     pub fn repeated(elt: Value, size: usize) -> AnonArrayValue {
         AnonArrayValue {

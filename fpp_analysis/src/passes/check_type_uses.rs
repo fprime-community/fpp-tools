@@ -240,13 +240,6 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
                 return ControlFlow::Continue(());
             }
             TypeNameKind::String(_) => {
-                // Dispatch the implied uses of the framework definitions that a
-                // string type needs, then walk the size expression so that a
-                // type name nested inside it (`string size sizeof(T)`) is
-                // resolved too. Matches `CheckTypeUses.typeNameStringNode`,
-                // which runs `super.typeNameStringNode` (BasicUseAnalyzer ->
-                // TypeExpressionAnalyzer, which visits the size expression)
-                // before assigning the string type.
                 self.super_visit(a, Node::TypeName(node))?;
                 Type::String(None)
             }

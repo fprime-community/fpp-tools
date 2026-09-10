@@ -35,10 +35,7 @@ pub struct TopologyInstance {
 }
 
 /// An FPP interface instance: a component instance or an imported topology.
-///
-/// The component-instance variant embeds the instance, as in Scala. The size
-/// difference against the topology variant is deliberate: an imported topology
-/// is identified lazily by symbol (see [`TopologyInstance`]).
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum InterfaceInstance {
@@ -538,14 +535,6 @@ impl Analysis {
     /// Resolve a use node to an interface instance (component instance or
     /// imported topology). Returns `None` if the symbol is undefined or its
     /// definition is not resolved yet.
-    ///
-    /// Scala's `Analysis.getInterfaceInstanceSymbol` also has an
-    /// `InvalidSymbol(.., "not a component instance or topology symbol", ..)`
-    /// branch, for a use that resolves to a `Symbol.TemplateInterfaceArg` whose
-    /// value is neither. Templates are not ported, so the only symbols entered
-    /// into the `PortInterfaceInstance` name group are component instances and
-    /// topologies (`EnterSymbols::visit_def_component_instance` and
-    /// `visit_def_topology`), and that branch has no counterpart here.
     pub fn get_interface_instance(&self, id: fpp_core::Node) -> Option<InterfaceInstance> {
         match self.use_def_map.get(&id) {
             Some(symbol @ Symbol::ComponentInstance(_)) => self

@@ -72,16 +72,14 @@ impl Type {
             // the type itself.
             Type::AbsType(_) => Some(Value::AbsType(AbsTypeValue { ty: self.clone() })),
             Type::Array(array) => array.default.clone().map(Value::Array),
-            // `size` copies of the element default, sharing one element as
-            // Scala's `List.fill(size)(elt)` does (Type.scala:338-344): the
+            // `size` copies of the element default, sharing one element: the
             // element default is built once and the array holds `size`
             // references to it, so a nested array default costs the SUM of the
             // nested sizes rather than their PRODUCT. That matters because a
             // legal array size is `1..=i32::MAX`
             // (`FinalizeTypeDefs::visit_def_array` rejects anything outside the
-            // `i32` range with "value out of range" and anything `<= 0`,
-            // matching Scala's `Analysis.getArraySize`) and array element types
-            // nest, so
+            // `i32` range with "value out of range" and anything `<= 0`) and
+            // array element types nest, so
             //
             //     array Inner = [n] U8
             //     array Outer = [n] Inner
@@ -116,12 +114,10 @@ impl Type {
         }
     }
 
-    /// Get the symbol of the type definition, if any.
+    /// Get the definition symbol, if any
     ///
     /// The definition is held behind an `Arc`, so this is a reference-count bump
-    /// and no AST is copied. That matches Scala's `Type.getDefSymbol`, which
-    /// wraps the node reference the type already holds; callers may use the
-    /// result as a map key in a loop.
+    /// and no AST is copied; callers may use the result as a map key in a loop.
     pub fn def_symbol(&self) -> Option<Symbol> {
         match self {
             Type::AbsType(ty) => Some(Symbol::AbsType(ty.node.clone())),
@@ -249,9 +245,8 @@ impl Type {
     ///
     /// The size is a product over the nesting depth of the type, so it grows
     /// faster than any single array size: 128 levels of `array A = [2] B` reach
-    /// 2^128 bytes. Scala accumulates that in a `BigInt` and reports nothing, but
-    /// an `i128` cannot hold it, so a size that does not fit is reported as
-    /// [`SerializedSizeError::TooLarge`] rather than wrapped.
+    /// 2^128 bytes. An `i128` cannot hold that, so a size that does not fit is
+    /// reported as [`SerializedSizeError::TooLarge`] rather than wrapped.
     pub fn serialized_size(&self, a: &crate::Analysis) -> Result<i128, SerializedSizeError> {
         use crate::semantics::SymbolInterface;
         use SerializedSizeError::Unavailable;
@@ -869,10 +864,6 @@ impl PrimitiveType for FloatKind {
 }
 
 /// An abstract type
-///
-/// As in Scala (`Type.AbsType`), the definition is held by reference: an `Arc`
-/// shared with the `Symbol` that `EnterSymbols` interned for it. `Type` is
-/// `Clone` and cloned freely, so cloning a named type must not copy its AST.
 #[derive(Debug, Clone)]
 pub struct AbsType {
     /// The AST node giving the definition
@@ -1016,15 +1007,15 @@ mod tests {
         );
     }
 
-    /// An array default holds `size` references to one element value, as Scala's
-    /// `List.fill(size)(elt)` does, so a nested array default costs the SUM of
-    /// the nested sizes and not their PRODUCT.
+    /// An array default holds `size` references to one element value, so a
+    /// nested array default costs the SUM of the nested sizes and not their
+    /// PRODUCT.
     ///
     /// The pointer-identity assertions are what bound the memory: with an
     /// independent copy per element, `array Inner = [n] U8` +
     /// `array Outer = [n] Inner` builds n^2 values of 64 bytes each (measured
-    /// peak RSS 1.1 GB at n=4000 and 4.2 GB at n=8000, against a flat ~160 MB
-    /// for `fpp-check`), and at the size bound (n = 2^31-1) it cannot complete.
+    /// peak RSS 1.1 GB at n=4000 and 4.2 GB at n=8000), and at the size bound
+    /// (n = 2^31-1) it cannot complete.
     #[test]
     fn array_default_shares_its_repeated_element() {
         const N: usize = 2000;

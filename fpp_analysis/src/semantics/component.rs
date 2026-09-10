@@ -289,8 +289,6 @@ impl Param {
         default_opcode: i128,
     ) -> SemanticResult<(Param, i128)> {
         let param_type = a.get_finalized_type(node.type_name.node_id).unwrap();
-        // Check that the default value (if any) converts to the parameter type,
-        // then convert it.
         let mut default = None;
         if let Some(default_node) = &node.default {
             if let Some(default_ty) = a.type_map.get(&default_node.node_id)
@@ -426,19 +424,14 @@ fn check_event_throttle(
 
 /// Computes the time interval of an event throttle.
 ///
-/// Returns `None` when the interval expression has no value of the right shape.
-/// Scala destructures the interval with irrefutable patterns
-/// (analysis/Semantics/Event.scala:52,58) because CheckExprTypes has already
-/// checked that the expression converts to `{ seconds: U32, useconds: U32 }` and
-/// reported it otherwise. This port continues past errors instead of aborting,
-/// so those patterns can fail here — but only ever on an expression whose error
-/// is already reported, so there is nothing to add and nothing to say. The only
-/// diagnostics from here are the range checks, which Scala reports too.
+/// Returns `None` when the interval expression has no value of the shape
+/// `{ seconds: U32, useconds: U32 }`. That can only happen on an expression
+/// whose error CheckExprTypes already reported, so there is nothing to add here;
+/// the only diagnostics from here are the range checks.
 fn check_throttle_interval(
     a: &Analysis,
     every: &fpp_ast::Expr,
 ) -> SemanticResult<Option<TimeInterval>> {
-    // The interval's own location, as in Scala's getEveryIntervalValue.
     let loc = every.span();
     use crate::semantics::{AnonStructType, StructValue};
     let u32_ty = Arc::new(Type::PrimitiveInt(fpp_ast::IntegerKind::U32));
@@ -501,11 +494,8 @@ fn check_interval_member(
 #[derive(Debug, Clone)]
 pub struct StateMachineInstance {
     pub node: Arc<SpecStateMachineInstance>,
-    /// The state machine this is an instance of. Scala types the corresponding
-    /// field as the narrow `Symbol.StateMachine`
-    /// (analysis/Semantics/StateMachine/StateMachineInstance.scala:9), so that
-    /// `getSmKind` is total; storing the definition node it wraps gives the same
-    /// guarantee here.
+    /// The state machine this is an instance of. Storing the definition node
+    /// rather than a general symbol keeps `get_sm_kind` total.
     pub state_machine: Arc<fpp_ast::DefStateMachine>,
     pub priority: Option<i128>,
     pub queue_full: QueueFull,
@@ -608,11 +598,7 @@ pub struct Component {
     pub port_matching_list: Vec<PortMatching>,
 }
 
-/// A resolved port matching between two general port instances.
-///
-/// Mirrors Scala's `Component.PortMatching`
-/// (analysis/Semantics/Component.scala:544), whose two instances are typed as
-/// `PortInstance.General`: only a general port may be matched.
+/// A port matching. Only a general port may be matched.
 #[derive(Debug, Clone)]
 pub struct PortMatching {
     pub node: Arc<SpecPortMatching>,
@@ -665,17 +651,11 @@ impl Component {
     }
 
     /// The map from port names to port instances.
-    ///
-    /// Mirrors Scala's derived `portMap` val
-    /// (analysis/Semantics/Component.scala:47).
     pub fn port_map(&self) -> &HashMap<String, PortInstance> {
         &self.port_interface.port_map
     }
 
     /// The map from special port kinds to special port instances.
-    ///
-    /// Mirrors Scala's derived `specialPortMap` val
-    /// (analysis/Semantics/Component.scala:48).
     pub fn special_port_map(&self) -> &HashMap<SpecialPortInstanceKind, SpecialPortInstance> {
         &self.port_interface.special_port_map
     }
@@ -887,9 +867,6 @@ impl Component {
     }
 
     pub fn add_spec_port_matching(&mut self, node: Arc<SpecPortMatching>) {
-        // Prepend, so the list is in reverse source order, as in the Scala
-        // implementation. The order is user visible: it decides the order of
-        // matched port numbering and of multiple invalid-matching errors.
         self.spec_port_matching_list.insert(0, node);
     }
 
@@ -955,7 +932,6 @@ impl Component {
 
     /// Checks that component has at least one async input port or async command
     fn check_async_input(&self) -> SemanticResult {
-        // Component must have at least one async input port, async command, or SM instance.
         if self.check_no_async_input().is_err() {
             Ok(())
         } else {

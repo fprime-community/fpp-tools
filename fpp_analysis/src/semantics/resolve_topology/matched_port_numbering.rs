@@ -290,10 +290,7 @@ fn compute_instance_connection_map(
         let pii_remote = &c.get_other_endpoint(pi).port;
         // Every endpoint of a connection that reaches port numbering refers to a
         // component instance, never to an imported topology, so nothing is
-        // dropped here. Scala relies on the same invariant and throws
-        // InternalError if it is violated
-        // (analysis/Semantics/ResolveTopology/MatchedPortNumbering.scala:252).
-        // The invariant holds because:
+        // dropped here. The invariant holds because:
         //
         // 1. `resolve_partially_numbered` rewrites every local connection with
         //    `Endpoint::get_underlying_endpoint`, which walks topology port

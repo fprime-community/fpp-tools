@@ -662,8 +662,8 @@ fn size_of_types_with_no_size() {
 
 /// A serialized size is a product over the type's nesting depth, so it outgrows
 /// an `i128` long before any single array size runs out of room: `array A = [2]
-/// B` nested 128 deep is 2^128 bytes. Scala accumulates that in a `BigInt` and
-/// `fpp-check` accepts it; the size is reported here instead of wrapping.
+/// B` nested 128 deep is 2^128 bytes. Such a size is reported rather than
+/// wrapping.
 #[test]
 fn size_of_too_large_to_represent() {
     with_test_ctx(|| {
@@ -814,15 +814,6 @@ fn type_default_values() {
 
 /// `Type::def_symbol` must yield the symbol that `EnterSymbols` interned for the
 /// same definition.
-///
-/// In Scala the named type cases hold the definition node by reference and
-/// `getDefSymbol` just wraps it -- `Symbol.AbsType(node)` and friends
-/// (`Type.scala:202,214,236,273,294`) -- so the symbol they produce is the
-/// symbol table's symbol, and `getDefNodeId = getDefSymbol.map(_.getNodeId)`
-/// (`Type.scala:17-20`) is free. This test pins the Rust equivalent: the symbol
-/// compares equal (`Symbol` Eq/Hash go through the AST node, which the `#[ast]`
-/// macro keys on node id alone), it works as a map key against the symbol-keyed
-/// maps, and it shares the definition's `Arc` rather than copying the AST.
 #[test]
 fn def_symbol_matches_interned_symbol() {
     use crate::semantics::{Symbol, SymbolInterface};

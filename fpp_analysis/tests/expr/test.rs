@@ -20,9 +20,6 @@ fn div_by_zero() {
     run_test("expr/div_by_zero")
 }
 
-/// A float divisor is tested for zero with an epsilon comparison, as
-/// `Value.isZero` does, so a divisor nearer zero than `EPSILON` is a division by
-/// zero even though the raw `f64` division would succeed.
 #[test]
 fn div_by_near_zero_float() {
     run_test("expr/div_by_near_zero_float")
@@ -33,10 +30,6 @@ fn add_ok() {
     run_test("expr/add_ok")
 }
 
-/// Constant arithmetic whose exact result does not fit in an `i128`. Scala
-/// evaluates these with `BigInt` and reports nothing; this port represents
-/// values as `i128` and reports each inexpressible result rather than wrapping
-/// it (a release build would wrap silently and a debug build would panic).
 #[test]
 fn arith_overflow_error() {
     run_test("expr/arith_overflow_error")
@@ -87,9 +80,6 @@ fn sizeof_error() {
     run_test("expr/sizeof_error")
 }
 
-/// A serialized size that does not fit in an `i128`. Scala accumulates the size
-/// in a `BigInt` and reports nothing; this port reports the inexpressible size
-/// rather than wrapping it.
 #[test]
 fn sizeof_too_large() {
     run_test("expr/sizeof_too_large")

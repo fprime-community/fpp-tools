@@ -13,9 +13,6 @@ impl CheckInterfaceDefs {
     /// Resolve an interface: collect its ports and imports, resolve the
     /// interfaces it directly imports, then merge them in. Results are
     /// memoized in `a.interface_map`.
-    ///
-    /// Mirrors `CheckInterfaceDefs.defInterfaceAnnotatedNode`
-    /// (analysis/CheckSemantics/CheckInterfaceDefs.scala:13).
     fn resolve(&self, a: &mut Analysis, symbol: &Symbol) {
         // Interface is already in the map: nothing to do
         if a.interface_map.contains_key(symbol) {
@@ -44,13 +41,7 @@ impl CheckInterfaceDefs {
         if let Err(err) = resolve_interface(&a.interface_map, &mut iface) {
             err.emit();
         }
-        // Record the interface even when an import failed, with the imports that
-        // did merge still merged in. Scala aborts the whole pass on the first
-        // failure, so nothing there ever observes a half-resolved interface;
-        // we keep checking the remaining definitions, so the map has to hold an
-        // entry (or every interface that imports this one would resolve it again
-        // and report its error again) and that entry has to keep the ports the
-        // user did write (or every use of one would draw a second error).
+
         a.interface_map.insert(symbol.clone(), iface);
     }
 }

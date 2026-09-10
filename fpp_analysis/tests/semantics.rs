@@ -112,7 +112,6 @@ passive component C {{
             .expect("a red high limit");
         assert!(matches!(red_high, Value::Integer(v) if v.0 == 10));
 
-        // A channel with no update specifier defaults to Always.
         assert!(component.tlm_channel_name_map.contains_key("T"));
     });
 }
@@ -381,7 +380,6 @@ instance c: C base id 0x100 \
         // The implementation file is resolved against the directory of the file
         // that specifies it, then normalized.
         assert_eq!(instance.file.as_deref(), Some("impl/C.hpp"));
-        // The instance resolves to its component through the analysis.
         assert!(instance.get_component(a).is_some());
         assert!(instance.get_interface(a).is_some());
     });
@@ -438,12 +436,11 @@ struct S { x: T }
     });
 }
 
-/// A nested array default holds `size` references to one element value, as
-/// Scala's `List.fill(size)(elt)` does, so its cost is the SUM of the nested
-/// sizes and not their PRODUCT. Without the sharing, `array Inner = [n] U8` +
-/// `array Outer = [n] Inner` peaks at 1.1 GB of resident memory for n=4000 and
-/// 4.2 GB for n=8000, against a flat ~160 MB for `fpp-check`, and cannot
-/// complete at the top of the legal size range (n = 2^31-1).
+/// A nested array default holds `size` references to one element value, so its
+/// cost is the SUM of the nested sizes and not their PRODUCT. Without the
+/// sharing, `array Inner = [n] U8` + `array Outer = [n] Inner` peaks at 1.1 GB of
+/// resident memory for n=4000 and 4.2 GB for n=8000, and cannot complete at the
+/// top of the legal size range (n = 2^31-1).
 #[test]
 fn nested_array_default_shares_its_repeated_element() {
     const N: usize = 4000;
@@ -494,12 +491,9 @@ fn nested_array_default_shares_its_repeated_element() {
 }
 
 /// Narrowing a float to an integer element type goes through the width of an
-/// `i32`, as Scala's `Double.intValue` does, so a float beyond that range
-/// saturates at `i32::MAX` rather than keeping more of the value.
-///
-/// `fpp-to-json` on this source reports `{"PrimitiveInt": {"value": 2147483647,
-/// "kind": {"I32"}}}` and `{"value": 2147483647, "kind": {"I64"}}` for the two
-/// defaults.
+/// `i32`, so a float beyond that range saturates at `i32::MAX` rather than
+/// keeping more of the value. That holds for an `I64` element type too: its
+/// default also saturates at `i32::MAX`, keeping the `I64` kind.
 #[test]
 fn float_array_default_narrows_through_i32() {
     let src = r#"
