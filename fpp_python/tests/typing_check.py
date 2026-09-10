@@ -4,10 +4,11 @@
 so the checked-in `fpp_python/fpp_python.pyi` stub is validated against real call
 sites. It exercises both entry points — `parse` (a `SyntaxTree` of `TransUnit`s)
 and `analyze` (a `Model`) — and the semantic surface: the `Analysis` root, its typed maps
-(`dict[Symbol, Component]`, `dict[int, Command]`), the `Type` / `CommandKind`
-union base+subclass hierarchies (narrowed with `isinstance`), the lazy `Span`
-handle, the state-machine model, and the AST traversal surface (`AstNode.children`
-plus a `NodeVisitor` subclass overriding typed `visit_*` methods).
+(`dict[Symbol, Component]`, `dict[int, Command]`), the `Type` / `Command` /
+`NonParamKind` union base+subclass hierarchies (narrowed with `isinstance`), the
+resolved `Loc` and lazy `Span` location types, the state-machine model, and the AST
+traversal surface (`AstNode.children` plus a `NodeVisitor` subclass overriding typed
+`visit_*` methods).
 """
 
 from __future__ import annotations
@@ -22,13 +23,16 @@ from fpp_python import (
     Async,
     AstNode,
     Command,
-    CommandKind,
     Component,
     DefComponent,
     DefConstant,
+    Endpoint,
     IntegerKind,
+    Loc,
     Model,
     NodeVisitor,
+    NonParam,
+    NonParamKind,
     PrimitiveInt,
     Span,
     SpecCommand,
@@ -48,11 +52,21 @@ module Fw {
 }
 module M {
   constant c = 42
+  port P
   active component A {
     command recv port cmdIn
     command reg port cmdRegOut
     command resp port cmdResponseOut
     async command DO_IT(arg: U32)
+    sync input port pIn: P
+    output port pOut: P
+  }
+  instance a1: A base id 0x100 queue size 10
+  instance a2: A base id 0x200 queue size 10
+  topology T {
+    instance a1
+    instance a2
+    connections C { a1.pOut -> a2.pIn }
   }
   state machine SM {
     action a
@@ -65,10 +79,13 @@ module M {
 
 
 def command_priority(cmd: Command) -> Optional[int]:
-    """The `.kind` getter returns the `CommandKind` union (`Async | Guarded |
-    Sync`), narrowed by `isinstance` to the `Async` subclass, which alone exposes
+    """`Command` is itself a union (`NonParam | CommandParam`); narrowing to
+    `NonParam` gives a `.kind` of the `NonParamKind` union (`Async | Guarded |
+    Sync`), narrowed again to the `Async` subclass, which alone exposes
     `.priority`."""
-    kind: Optional[CommandKind] = cmd.kind
+    if not isinstance(cmd, NonParam):
+        return None
+    kind: NonParamKind = cmd.kind
     if isinstance(kind, Async):
         return kind.priority  # Optional[int], only on the Async subclass
     return None
@@ -86,25 +103,41 @@ def constant_type_kind(node: DefConstant) -> Optional[IntegerKind]:
 def analysis_detail(a: Analysis) -> int:
     """Navigate the typed semantic mirror: the component map is
     `dict[Symbol, Component]`; each component's `command_map` is
-    `dict[int, Command]` and its `loc` is a lazy `Span`."""
+    `dict[int, Command]` keyed by opcode, and its definition node carries an
+    `Optional[Loc]`."""
     total = 0
     for sym, comp in a.component_map.items():
         symbol: Symbol = sym
         component: Component = comp
         total += len(a.get_qualified_name(symbol))
-        loc: Span = component.loc
-        line: int = loc.line
-        uri: str = loc.uri
-        total += line + len(uri)
+        loc: Optional[Loc] = component.node.location
+        if loc is not None:
+            line: int = loc.line
+            uri: str = loc.uri
+            total += line + len(uri)
         commands: dict[int, Command] = component.command_map
         for opcode, cmd in commands.items():
-            total += opcode + cmd.opcode
+            total += opcode + len(cmd.name)
             prio = command_priority(cmd)
             total += prio if prio is not None else 0
     for sm_sym, sm in a.state_machine_map.items():
         machine: StateMachine = sm
         actions: list[StateMachineSymbol] = machine.actions
         total += len(actions)
+    return total
+
+
+def connection_spans(a: Analysis) -> int:
+    """`Endpoint.loc` is a lazy `Span`: the file/line resolve on demand, and
+    `resolve()` yields the concrete `Loc`."""
+    total = 0
+    for topology in a.topology_map.values():
+        for connections in topology.connection_map.values():
+            for conn in connections:
+                source: Endpoint = conn.from_
+                span: Span = source.loc
+                resolved: Loc = span.resolve()
+                total += span.line + resolved.column + len(span.uri)
     return total
 
 
@@ -175,7 +208,8 @@ def main() -> int:
     analysis: Analysis = model.analysis
     sym: Optional[Symbol] = model.lookup("M.c")
     name = analysis.get_qualified_name(sym) if sym is not None else "<none>"
-    print(name, node_id_sum + analysis_detail(analysis))
+    total = node_id_sum + analysis_detail(analysis) + connection_spans(analysis)
+    print(name, total)
     return 0
 
 

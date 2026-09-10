@@ -1,16 +1,18 @@
 """Detailed navigation of the semantic model reached through `model.analysis`:
 component sub-element maps (commands / events / params / telemetry), the
-`CommandKind` union subclasses, and the state-machine model.
+`NonParamKind` union subclasses, and the state-machine model.
 """
 
 import fpp_python as f
 from fpp_python import (
     Async,
-    CommandKind,
+    Command,
     Guarded,
     Kind,
+    Loc,
+    NonParam,
+    NonParamKind,
     QueueFull,
-    Span,
     Sync,
     Action,
     Signal,
@@ -39,13 +41,17 @@ def test_commands_from_fixture():
     assert set(cmds) == {0, 1, 0x10}
     assert cmds[0].name == "COMMAND_1"
     assert cmds[0x10].name == "COMMAND_3"
-    # Every command in this fixture is async, and carries a priority.
-    for op, cmd in cmds.items():
-        assert cmd.opcode == op
+    # Every command in this fixture is a non-param async command with a priority.
+    for cmd in cmds.values():
         assert cmd.is_async
+        assert isinstance(cmd, NonParam)
+        assert isinstance(cmd, Command)
         assert isinstance(cmd.kind, Async)
-        assert isinstance(cmd.kind, CommandKind)
-        assert isinstance(cmd.loc, Span)
+        assert isinstance(cmd.kind, NonParamKind)
+        assert isinstance(cmd.node.location, Loc)
+    # Only COMMAND_3 declares its opcode; 0 and 1 are auto-assigned.
+    assert cmds[0].node.opcode is None
+    assert cmds[0x10].node.opcode is not None
     assert cmds[0].kind.priority == 10
     assert cmds[1].kind.priority == 20
     # COMMAND_3 declares `drop`; the others default to the assert behavior.
@@ -53,7 +59,7 @@ def test_commands_from_fixture():
     assert cmds[0].kind.queue_full == QueueFull.Assert
 
 
-def test_command_kinds_are_union_subclasses():
+def test_non_param_kinds_are_union_subclasses():
     # A component with one of each command kind exercises all three subclasses.
     src = """
     module Fw {
@@ -77,7 +83,7 @@ def test_command_kinds_are_union_subclasses():
     assert isinstance(by_name["S_CMD"], Sync)
     assert isinstance(by_name["G_CMD"], Guarded)
     assert isinstance(by_name["A_CMD"], Async)
-    assert all(isinstance(k, CommandKind) for k in by_name.values())
+    assert all(isinstance(k, NonParamKind) for k in by_name.values())
 
 
 def test_events_from_fixture():
@@ -86,11 +92,11 @@ def test_events_from_fixture():
     comps = {a.get_qualified_name(s): c for s, c in a.component_map.items()}
     assert {"EventIdentifiers", "M.EventThrottling"} <= set(comps)
     events = comps["EventIdentifiers"].event_map
-    # Two explicit ids (0x10, 0x11) plus one auto-assigned (0x12).
+    # Two explicit ids (0x10, 0x11) plus one auto-assigned (0x12); the id is the key.
     assert set(events) == {0x10, 0x11, 0x12}
-    assert {e.id for e in events.values()} == {0x10, 0x11, 0x12}
     assert events[0x10].name == "Event1"
-    assert all(isinstance(e.loc, Span) for e in events.values())
+    assert {e.name for e in events.values()} == {"Event1", "Event2", "Event3"}
+    assert all(isinstance(e.node.location, Loc) for e in events.values())
 
 
 def test_params_from_fixture():
@@ -135,12 +141,17 @@ def test_telemetry_and_dicts():
     # Telemetry channels are defined; no `command` definitions (only cmd ports).
     assert comp.has_telemetry is True
     assert comp.has_commands is False
-    channels = {t.id: t.name for t in comp.tlm_channel_map.values()}
+    # `tlm_channel_map` is keyed by channel id: CH1 auto-assigns 0, CH2 declares 0x10.
+    channels = {i: t.name for i, t in comp.tlm_channel_map.items()}
     assert channels == {0: "CH1", 0x10: "CH2"}
     # The name-keyed mirror agrees.
     assert set(comp.tlm_channel_name_map) == {"CH1", "CH2"}
-    # The list accessor is opcode/id ordered.
-    assert [t.name for t in comp.tlm] == ["CH1", "CH2"]
+    assert comp.tlm_channel_name_map["CH2"].name == "CH2"
+    # Walking the id keys in order gives declaration order here.
+    assert [comp.tlm_channel_map[i].name for i in sorted(comp.tlm_channel_map)] == [
+        "CH1",
+        "CH2",
+    ]
 
 
 SM_SRC = """

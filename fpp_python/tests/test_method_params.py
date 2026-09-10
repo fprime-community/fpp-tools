@@ -83,7 +83,9 @@ def of_kind(nodes, kind):
 @pytest.fixture(scope="module")
 def a_span(m):
     """Any real `Span`, reached through a semantic getter."""
-    return next(iter(m.analysis.component_map.values())).loc
+    (top,) = m.analysis.topology_map.values()
+    (conn,) = top.connection_map["C1"]
+    return conn.from_.loc
 
 
 # --- `node`: a fpp_core::Node fed from an AstNode wrapper --------------------
