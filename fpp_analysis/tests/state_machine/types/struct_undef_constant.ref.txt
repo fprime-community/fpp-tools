@@ -3,8 +3,3 @@
 2 |   struct S { x: U32 } default { x = a }
   |                                     ^ cannot find constant `a` in scope
 
- --> [ local path prefix ]/state_machine/types/struct_undef_constant.fpp:1:15
-  |
-1 | state machine SM {
-  |               ^^ state machine must have initial transition
-

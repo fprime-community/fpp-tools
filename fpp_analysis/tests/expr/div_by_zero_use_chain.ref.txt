@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/div_by_zero_use_chain.fpp:4:18
+  |
+4 | constant z = 1 / 0
+  |                  ^ division by zero
+

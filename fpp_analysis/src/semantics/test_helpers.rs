@@ -127,7 +127,7 @@ pub fn abs_type(name: &str, id: u64) -> Arc<Type> {
         name: name_with_id(name, id),
         node_id: node_for(id),
     });
-    Arc::new(Type::AbsType(crate::semantics::AbsType { node }))
+    Arc::new(Type::AbsType(Arc::new(crate::semantics::AbsType { node })))
 }
 
 /// A dummy `TypeName` (`Integer(U32)`) used as a placeholder.
@@ -167,12 +167,12 @@ pub fn array(name: &str, anon_array: Arc<Type>, id: u64) -> Arc<Type> {
         is_dictionary_def: false,
         node_id: node_for(id),
     });
-    Arc::new(Type::Array(ArrayType {
+    Arc::new(Type::Array(Arc::new(ArrayType {
         node,
         anon_array: anon,
         default: None,
         format: None,
-    }))
+    })))
 }
 
 pub fn enumeration(name: &str, rep_type: IntegerKind, id: u64) -> Arc<Type> {
@@ -184,11 +184,11 @@ pub fn enumeration(name: &str, rep_type: IntegerKind, id: u64) -> Arc<Type> {
         is_dictionary_def: false,
         node_id: node_for(id),
     });
-    Arc::new(Type::Enum(EnumType {
+    Arc::new(Type::Enum(Arc::new(EnumType {
         node,
         rep_type,
         default: None,
-    }))
+    })))
 }
 
 pub fn struct_ty(name: &str, anon_struct: Arc<Type>, id: u64) -> Arc<Type> {
@@ -217,13 +217,37 @@ pub fn struct_ty_sized(
     for (n, s) in sizes {
         size_map.insert((*n).to_string(), *s);
     }
-    Arc::new(Type::Struct(StructType {
+    Arc::new(Type::Struct(Arc::new(StructType {
         node,
         anon_struct: anon,
         default: None,
         sizes: size_map,
         formats: HashMap::default(),
-    }))
+    })))
+}
+
+/// The named array type inside `ty`, as a value that names it holds it.
+pub fn as_array_ty(ty: &Arc<Type>) -> Arc<ArrayType> {
+    match ty.deref() {
+        Type::Array(array_ty) => array_ty.clone(),
+        other => panic!("expected an array type, got {other:?}"),
+    }
+}
+
+/// The enum type inside `ty`, as an enum-constant value holds it.
+pub fn as_enum_ty(ty: &Arc<Type>) -> Arc<EnumType> {
+    match ty.deref() {
+        Type::Enum(enum_ty) => enum_ty.clone(),
+        other => panic!("expected an enum type, got {other:?}"),
+    }
+}
+
+/// The named struct type inside `ty`, as a value that names it holds it.
+pub fn as_struct_ty(ty: &Arc<Type>) -> Arc<StructType> {
+    match ty.deref() {
+        Type::Struct(struct_ty) => struct_ty.clone(),
+        other => panic!("expected a struct type, got {other:?}"),
+    }
 }
 
 pub fn anon_array(size: Option<usize>, elt_type: Arc<Type>) -> Arc<Type> {
@@ -373,7 +397,7 @@ pub fn v_enum_constant(member: &str, value: i128) -> Value {
     Value::EnumConstant(EnumConstantValue::new(
         member.to_string(),
         value,
-        default_enum(),
+        as_enum_ty(&default_enum()),
     ))
 }
 

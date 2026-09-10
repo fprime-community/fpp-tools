@@ -23,12 +23,15 @@ pub enum Type {
     Boolean,
     /// The type of arbitrary-width integers
     Integer,
-    AbsType(AbsType),
+    /// A named type definition is held behind an `Arc`, so cloning a [`Type`]
+    /// (which every value that has a type definition does) is a reference-count
+    /// bump and never copies a definition node, a default value, or a member map
+    AbsType(Arc<AbsType>),
     AliasType(AliasType),
-    Array(ArrayType),
+    Array(Arc<ArrayType>),
     AnonArray(AnonArrayType),
-    Enum(EnumType),
-    Struct(StructType),
+    Enum(Arc<EnumType>),
+    Struct(Arc<StructType>),
     AnonStruct(AnonStructType),
 }
 
@@ -70,7 +73,7 @@ impl Type {
             Type::AliasType(ty) => ty.alias_type.default_value(),
             // An abstract type always has a default value: the opaque value of
             // the type itself.
-            Type::AbsType(_) => Some(Value::AbsType(AbsTypeValue { ty: self.clone() })),
+            Type::AbsType(ty) => Some(Value::AbsType(AbsTypeValue { ty: ty.clone() })),
             Type::Array(array) => array.default.clone().map(Value::Array),
             // `size` copies of the element default, sharing one element: the
             // element default is built once and the array holds `size`
@@ -101,6 +104,24 @@ impl Type {
                     members: HashMap::from_iter(members),
                 }))
             }
+        }
+    }
+
+    /// The anonymous array structure of an array type, named or not
+    pub fn as_anon_array(&self) -> Option<&AnonArrayType> {
+        match self {
+            Type::Array(ty) => Some(&ty.anon_array),
+            Type::AnonArray(ty) => Some(ty),
+            _ => None,
+        }
+    }
+
+    /// The anonymous struct structure of a struct type, named or not
+    pub fn as_anon_struct(&self) -> Option<&AnonStructType> {
+        match self {
+            Type::Struct(ty) => Some(&ty.anon_struct),
+            Type::AnonStruct(ty) => Some(ty),
+            _ => None,
         }
     }
 
@@ -382,112 +403,53 @@ impl Type {
             return Ok(());
         }
 
-        match (from, to) {
-            // String -> String
-            (Type::String(_), Type::String(_)) => Ok(()),
+        // String -> String
+        if let (Type::String(_), Type::String(_)) = (from, to) {
+            return Ok(());
+        }
 
-            // Array -> Array
-            (
-                Type::Array(ArrayType {
-                    anon_array: from_arr,
-                    ..
-                })
-                | Type::AnonArray(from_arr),
-                Type::Array(ArrayType {
-                    anon_array: to_arr, ..
-                })
-                | Type::AnonArray(to_arr),
-            ) => {
-                // Check the sizes match
-                match (&from_arr.size, &to_arr.size) {
-                    (Some(from_size), Some(to_size)) if from_size != to_size => {
-                        return Err(TypeConversionError::ArraySizeMismatch {
-                            from: *from_size,
-                            to: *to_size,
-                        });
-                    }
-                    _ => {}
+        // Array -> Array
+        if let (Some(from_arr), Some(to_arr)) = (from.as_anon_array(), to.as_anon_array()) {
+            // Check the sizes match
+            match (&from_arr.size, &to_arr.size) {
+                (Some(from_size), Some(to_size)) if from_size != to_size => {
+                    return Err(TypeConversionError::ArraySizeMismatch {
+                        from: *from_size,
+                        to: *to_size,
+                    });
                 }
-
-                match Type::convert(&from_arr.elt_type, &to_arr.elt_type) {
-                    Ok(()) => Ok(()),
-                    Err(err) => Err(TypeConversionError::ArrayElement(Box::new(err))),
-                }
+                _ => {}
             }
 
-            // Convert a single element to an array
-            (
-                _,
-                Type::Array(ArrayType {
-                    anon_array: to_arr, ..
-                })
-                | Type::AnonArray(to_arr),
-            ) => {
-                if !from.is_promotable_to_array() {
-                    return Err(TypeConversionError::NotPromotableToArray(Box::new(
-                        from.clone(),
-                    )));
-                }
+            return match Type::convert(&from_arr.elt_type, &to_arr.elt_type) {
+                Ok(()) => Ok(()),
+                Err(err) => Err(TypeConversionError::ArrayElement(Box::new(err))),
+            };
+        }
 
-                match Type::convert_impl(from, Type::underlying_type(&to_arr.elt_type).deref()) {
-                    Ok(_) => Ok(()),
-                    Err(err) => Err(TypeConversionError::ArrayElementDuringPromotion(Box::new(
-                        err,
-                    ))),
-                }
+        // Convert a single element to an array
+        if let Some(to_arr) = to.as_anon_array() {
+            if !from.is_promotable_to_array() {
+                return Err(TypeConversionError::NotPromotableToArray(Box::new(
+                    from.clone(),
+                )));
             }
 
-            // Struct -> Struct
-            (
-                Type::Struct(StructType {
-                    anon_struct: from_struct,
-                    ..
-                })
-                | Type::AnonStruct(from_struct),
-                Type::Struct(StructType {
-                    anon_struct: to_struct,
-                    ..
-                })
-                | Type::AnonStruct(to_struct),
-            ) => {
-                // May sure all the members in 'from' can fit into 'to'
-                for (name, from_member_ty) in &from_struct.members {
-                    match to_struct.members.get(name) {
-                        None => return Err(TypeConversionError::MissingStructMember(name.clone())),
-                        Some(to_member_ty) => match Type::convert(from_member_ty, to_member_ty) {
-                            Ok(_) => {}
-                            Err(err) => {
-                                return Err(TypeConversionError::StructMember {
-                                    name: name.clone(),
-                                    err: Box::new(err),
-                                });
-                            }
-                        },
-                    }
-                }
+            return match Type::convert_impl(from, Type::underlying_type(&to_arr.elt_type).deref()) {
+                Ok(_) => Ok(()),
+                Err(err) => Err(TypeConversionError::ArrayElementDuringPromotion(Box::new(
+                    err,
+                ))),
+            };
+        }
 
-                Ok(())
-            }
-
-            // Convert a single element to a struct
-            (
-                _,
-                Type::Struct(StructType {
-                    anon_struct: to_struct,
-                    ..
-                })
-                | Type::AnonStruct(to_struct),
-            ) => {
-                if !from.is_promotable_to_struct() {
-                    return Err(TypeConversionError::NotPromotableToStruct(Box::new(
-                        from.clone(),
-                    )));
-                }
-
-                // Make sure that 'from' can fit all members in to_struct
-                for (name, to_member_ty) in &to_struct.members {
-                    let to_member_ty_underlying = Type::underlying_type(to_member_ty);
-                    match Type::convert_impl(from, to_member_ty_underlying.deref()) {
+        // Struct -> Struct
+        if let (Some(from_struct), Some(to_struct)) = (from.as_anon_struct(), to.as_anon_struct()) {
+            // May sure all the members in 'from' can fit into 'to'
+            for (name, from_member_ty) in &from_struct.members {
+                match to_struct.members.get(name) {
+                    None => return Err(TypeConversionError::MissingStructMember(name.clone())),
+                    Some(to_member_ty) => match Type::convert(from_member_ty, to_member_ty) {
                         Ok(_) => {}
                         Err(err) => {
                             return Err(TypeConversionError::StructMember {
@@ -495,17 +457,42 @@ impl Type {
                                 err: Box::new(err),
                             });
                         }
-                    }
+                    },
                 }
-
-                Ok(())
             }
 
-            _ => Err(TypeConversionError::Mismatch {
-                from: Box::new(from.clone()),
-                to: Box::new(to.clone()),
-            }),
+            return Ok(());
         }
+
+        // Convert a single element to a struct
+        if let Some(to_struct) = to.as_anon_struct() {
+            if !from.is_promotable_to_struct() {
+                return Err(TypeConversionError::NotPromotableToStruct(Box::new(
+                    from.clone(),
+                )));
+            }
+
+            // Make sure that 'from' can fit all members in to_struct
+            for (name, to_member_ty) in &to_struct.members {
+                let to_member_ty_underlying = Type::underlying_type(to_member_ty);
+                match Type::convert_impl(from, to_member_ty_underlying.deref()) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        return Err(TypeConversionError::StructMember {
+                            name: name.clone(),
+                            err: Box::new(err),
+                        });
+                    }
+                }
+            }
+
+            return Ok(());
+        }
+
+        Err(TypeConversionError::Mismatch {
+            from: Box::new(from.clone()),
+            to: Box::new(to.clone()),
+        })
     }
 
     /// Check for type identity
@@ -577,153 +564,115 @@ impl Type {
 
         match (t1.deref(), t2.deref()) {
             // String -> String
-            (Type::String(_), Type::String(_)) => Some(Arc::new(Type::String(None))),
+            (Type::String(_), Type::String(_)) => return Some(Arc::new(Type::String(None))),
 
             // Strip off any enum wrappers over the representable type
-            (Type::Enum(EnumType { rep_type, .. }), _) => {
-                Self::common_type(&Arc::new(Type::PrimitiveInt(*rep_type)), &t2)
+            (Type::Enum(ty), _) => {
+                return Self::common_type(&Arc::new(Type::PrimitiveInt(ty.rep_type)), &t2);
             }
-            (_, Type::Enum(EnumType { rep_type, .. })) => {
-                Self::common_type(&t1, &Arc::new(Type::PrimitiveInt(*rep_type)))
-            }
-
-            // t1 + t2 are both array/anon array
-            (
-                Type::Array(ArrayType {
-                    anon_array: t1_arr, ..
-                })
-                | Type::AnonArray(t1_arr),
-                Type::Array(ArrayType {
-                    anon_array: t2_arr, ..
-                })
-                | Type::AnonArray(t2_arr),
-            ) => {
-                // Check if the sizes match
-                let size = match (t1_arr.size, t2_arr.size) {
-                    (Some(t1_size), Some(t2_size)) => {
-                        if t1_size == t2_size {
-                            Some(t1_size)
-                        } else {
-                            return None;
-                        }
-                    }
-                    _ => None,
-                };
-
-                let elt_type = Type::common_type(&t1_arr.elt_type, &t2_arr.elt_type)?;
-                Some(Arc::new(Type::AnonArray(AnonArrayType { size, elt_type })))
+            (_, Type::Enum(ty)) => {
+                return Self::common_type(&t1, &Arc::new(Type::PrimitiveInt(ty.rep_type)));
             }
 
-            // An array and a non array. Try to promote the non-array to the array
-            (
-                other,
-                Type::Array(ArrayType {
-                    anon_array: arr, ..
-                })
-                | Type::AnonArray(arr),
-            )
-            | (
-                Type::Array(ArrayType {
-                    anon_array: arr, ..
-                })
-                | Type::AnonArray(arr),
-                other,
-            ) => {
-                if other.is_promotable_to_array() {
-                    // Treat the 'other' type as an element of the array
-                    let elt_type = Type::common_type(&Arc::new(other.clone()), &arr.elt_type)?;
-
-                    // Promote the single element to an array keeping the same size
-                    Some(Arc::new(Type::AnonArray(AnonArrayType {
-                        elt_type,
-                        size: arr.size,
-                    })))
-                } else {
-                    None
-                }
-            }
-
-            // Struct -> Struct
-            (
-                Type::Struct(StructType {
-                    anon_struct: t1_struct,
-                    ..
-                })
-                | Type::AnonStruct(t1_struct),
-                Type::Struct(StructType {
-                    anon_struct: t2_struct,
-                    ..
-                })
-                | Type::AnonStruct(t2_struct),
-            ) => {
-                // For each member in t1 and t2:
-                // - If the member only exists in t1, bring it in unchanged
-                // - If the member only exists in t2, bring it in unchanged
-                // - If the member exists in _both_, find the common type of the member on both
-                //    - If there is no common type, return None
-                let mut out_members = HashMap::default();
-
-                for (name, t1_ty) in &t1_struct.members {
-                    match t2_struct.members.get(name) {
-                        None => {
-                            out_members.insert(name.clone(), t1_ty.clone());
-                        }
-                        Some(t2_ty) => {
-                            let member_common = Type::common_type(t1_ty, t2_ty)?;
-                            out_members.insert(name.clone(), member_common);
-                        }
-                    }
-                }
-
-                // Add the remaining members left over in t2
-                for (name, t2_ty) in &t2_struct.members {
-                    if !t1_struct.members.contains_key(name) {
-                        out_members.insert(name.clone(), t2_ty.clone());
-                    }
-                }
-
-                Some(Arc::new(Type::AnonStruct(AnonStructType {
-                    members: out_members,
-                })))
-            }
-
-            // A struct and a non struct. The non struct can fill every member in the struct
-            (
-                other,
-                Type::Struct(StructType {
-                    anon_struct: str, ..
-                })
-                | Type::AnonStruct(str),
-            )
-            | (
-                Type::Struct(StructType {
-                    anon_struct: str, ..
-                })
-                | Type::AnonStruct(str),
-                other,
-            ) => {
-                if other.is_promotable_to_struct() {
-                    // Build a new struct with the same members as the old one while trying
-                    // to find the common type between the single element and all the members
-                    let mut out_members = HashMap::default();
-                    let other_rc = Arc::new(other.clone());
-
-                    for (name, in_member_ty) in &str.members {
-                        let out_member_ty = Type::common_type(&other_rc, in_member_ty)?;
-                        out_members.insert(name.clone(), out_member_ty);
-                    }
-
-                    // Create a new struct with similar shape of the old struct
-                    Some(Arc::new(Type::AnonStruct(AnonStructType {
-                        members: out_members,
-                    })))
-                } else {
-                    None
-                }
-            }
-
-            _ => None,
+            _ => {}
         }
+
+        // t1 + t2 are both array/anon array
+        if let (Some(t1_arr), Some(t2_arr)) = (t1.as_anon_array(), t2.as_anon_array()) {
+            // Check if the sizes match
+            let size = match (t1_arr.size, t2_arr.size) {
+                (Some(t1_size), Some(t2_size)) => {
+                    if t1_size == t2_size {
+                        Some(t1_size)
+                    } else {
+                        return None;
+                    }
+                }
+                _ => None,
+            };
+
+            let elt_type = Type::common_type(&t1_arr.elt_type, &t2_arr.elt_type)?;
+            return Some(Arc::new(Type::AnonArray(AnonArrayType { size, elt_type })));
+        }
+
+        // An array and a non array. Try to promote the non-array to the array
+        if let Some((arr, other)) = match (t1.as_anon_array(), t2.as_anon_array()) {
+            (Some(arr), None) => Some((arr, t2.deref())),
+            (None, Some(arr)) => Some((arr, t1.deref())),
+            _ => None,
+        } {
+            if !other.is_promotable_to_array() {
+                return None;
+            }
+            // Treat the 'other' type as an element of the array
+            let elt_type = Type::common_type(&Arc::new(other.clone()), &arr.elt_type)?;
+
+            // Promote the single element to an array keeping the same size
+            return Some(Arc::new(Type::AnonArray(AnonArrayType {
+                elt_type,
+                size: arr.size,
+            })));
+        }
+
+        // Struct -> Struct
+        if let (Some(t1_struct), Some(t2_struct)) = (t1.as_anon_struct(), t2.as_anon_struct()) {
+            // For each member in t1 and t2:
+            // - If the member only exists in t1, bring it in unchanged
+            // - If the member only exists in t2, bring it in unchanged
+            // - If the member exists in _both_, find the common type of the member on both
+            //    - If there is no common type, return None
+            let mut out_members = HashMap::default();
+
+            for (name, t1_ty) in &t1_struct.members {
+                match t2_struct.members.get(name) {
+                    None => {
+                        out_members.insert(name.clone(), t1_ty.clone());
+                    }
+                    Some(t2_ty) => {
+                        let member_common = Type::common_type(t1_ty, t2_ty)?;
+                        out_members.insert(name.clone(), member_common);
+                    }
+                }
+            }
+
+            // Add the remaining members left over in t2
+            for (name, t2_ty) in &t2_struct.members {
+                if !t1_struct.members.contains_key(name) {
+                    out_members.insert(name.clone(), t2_ty.clone());
+                }
+            }
+
+            return Some(Arc::new(Type::AnonStruct(AnonStructType {
+                members: out_members,
+            })));
+        }
+
+        // A struct and a non struct. The non struct can fill every member in the struct
+        if let Some((str, other)) = match (t1.as_anon_struct(), t2.as_anon_struct()) {
+            (Some(str), None) => Some((str, t2.deref())),
+            (None, Some(str)) => Some((str, t1.deref())),
+            _ => None,
+        } {
+            if !other.is_promotable_to_struct() {
+                return None;
+            }
+            // Build a new struct with the same members as the old one while trying
+            // to find the common type between the single element and all the members
+            let mut out_members = HashMap::default();
+            let other_rc = Arc::new(other.clone());
+
+            for (name, in_member_ty) in &str.members {
+                let out_member_ty = Type::common_type(&other_rc, in_member_ty)?;
+                out_members.insert(name.clone(), out_member_ty);
+            }
+
+            // Create a new struct with similar shape of the old struct
+            return Some(Arc::new(Type::AnonStruct(AnonStructType {
+                members: out_members,
+            })));
+        }
+
+        None
     }
 }
 
@@ -975,11 +924,11 @@ mod tests {
                 is_dictionary_def: false,
                 node_id: fpp_core::Node::new(span),
             });
-            let enum_ty = Arc::new(Type::Enum(EnumType {
+            let enum_ty = Arc::new(Type::Enum(Arc::new(EnumType {
                 node: def_enum,
                 rep_type: IntegerKind::I32,
                 default: None,
-            }));
+            })));
             let f64_ty = Arc::new(Type::Float(FloatKind::F64));
 
             // enum + F64 -> F64 (widens through the rep type to the float)

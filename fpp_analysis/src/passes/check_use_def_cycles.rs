@@ -73,9 +73,13 @@ impl<'ast> CheckUseDefCycles<'ast> {
     fn visit_def_post<T: Walkable<'ast, Self>>(
         &self,
         a: &mut Analysis,
-        symbol: Symbol,
+        symbol: Option<Symbol>,
         node: &'ast T,
     ) -> ControlFlow<()> {
+        let Some(symbol) = symbol else {
+            return ControlFlow::Continue(());
+        };
+
         if a.use_def_symbol_set.contains(&symbol) {
             SemanticError::UseDefCycle {
                 loc: symbol.node().span(),

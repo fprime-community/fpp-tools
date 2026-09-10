@@ -195,7 +195,7 @@ impl Analysis {
             return ty.clone();
         }
         let node_id = fpp_core::Node::new(span);
-        let ty = Arc::new(Type::AbsType(crate::semantics::AbsType {
+        let ty = Arc::new(Type::AbsType(Arc::new(crate::semantics::AbsType {
             node: Arc::new(fpp_ast::DefAbsType {
                 node_id,
                 name: fpp_ast::Name {
@@ -203,7 +203,7 @@ impl Analysis {
                     data: "<unknown>".to_string(),
                 },
             }),
-        }));
+        })));
         self.unknown_type = Some(ty.clone());
         ty
     }
@@ -422,8 +422,10 @@ impl Analysis {
         parts.join(".")
     }
 
-    pub fn get_symbol<N: fpp_ast::AstNode>(&self, node: &N) -> Symbol {
-        self.symbol_map.get(&node.id()).unwrap().clone()
+    /// The symbol that [`crate::passes::EnterSymbols`] entered for a definition
+    /// node.
+    pub fn get_symbol<N: fpp_ast::AstNode>(&self, node: &N) -> Option<Symbol> {
+        self.symbol_map.get(&node.id()).cloned()
     }
 
     /// Resolve a use (by node ID) to a topology symbol. Returns `Ok(None)` for

@@ -152,7 +152,9 @@ impl ComponentInstance {
         let cpu =
             get_active_attribute(a, &name, &component_kind, "CPU affinity", &node.cpu, false)?;
 
-        let symbol = a.get_symbol(node);
+        let Some(symbol) = a.get_symbol(node) else {
+            return Ok(None);
+        };
         let qualified_name = a.get_qualified_name(&symbol);
         let max_id = base_id + component.get_max_id();
 

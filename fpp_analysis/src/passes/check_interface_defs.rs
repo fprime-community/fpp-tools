@@ -64,7 +64,9 @@ impl<'ast> Visitor<'ast> for CheckInterfaceDefs {
         a: &mut Self::State,
         node: &'ast DefInterface,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
         self.resolve(a, &symbol);
         ControlFlow::Continue(())
     }

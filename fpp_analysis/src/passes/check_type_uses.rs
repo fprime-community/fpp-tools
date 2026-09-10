@@ -53,9 +53,9 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
 
         a.type_map.insert(
             node.node_id,
-            Arc::new(Type::AbsType(AbsType {
+            Arc::new(Type::AbsType(Arc::new(AbsType {
                 node: a.interned_def(node),
-            })),
+            }))),
         );
         ControlFlow::Continue(())
     }
@@ -98,7 +98,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
 
         a.type_map.insert(
             node.node_id,
-            Arc::new(Type::Array(ArrayType {
+            Arc::new(Type::Array(Arc::new(ArrayType {
                 node: a.interned_def(node),
                 anon_array: AnonArrayType {
                     size: None,
@@ -106,7 +106,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
                 },
                 default: None,
                 format: None,
-            })),
+            }))),
         );
 
         ControlFlow::Continue(())
@@ -146,11 +146,11 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
             }
         };
 
-        let ty = Arc::new(Type::Enum(EnumType {
+        let ty = Arc::new(Type::Enum(Arc::new(EnumType {
             node: a.interned_def(node),
             rep_type,
             default: None,
-        }));
+        })));
 
         a.type_map.insert(node.node_id, ty.clone());
 
@@ -198,13 +198,13 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
 
         a.type_map.insert(
             node.node_id,
-            Arc::new(Type::Struct(StructType {
+            Arc::new(Type::Struct(Arc::new(StructType {
                 node: a.interned_def(node),
                 anon_struct: anon_ty,
                 default: None,
                 sizes: Default::default(),
                 formats: Default::default(),
-            })),
+            }))),
         );
 
         ControlFlow::Continue(())

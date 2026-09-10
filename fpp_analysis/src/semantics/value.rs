@@ -1,4 +1,6 @@
-use crate::semantics::{AnonArrayType, AnonStructType, ArrayType, EnumType, StructType, Type};
+use crate::semantics::{
+    AbsType, AnonArrayType, AnonStructType, ArrayType, EnumType, StructType, Type,
+};
 use fpp_ast::{FloatKind, IntegerKind};
 use rustc_hash::FxHashMap as HashMap;
 use std::fmt;
@@ -46,9 +48,10 @@ impl Value {
                 match ty.deref() {
                     Type::Array(array_ty) => {
                         let elt_value = self.convert(&array_ty.anon_array.elt_type)?;
+                        let anon_array = promote_to_anon_array(elt_value, array_ty.anon_array.size);
                         Some(Value::Array(ArrayValue {
-                            anon_array: promote_to_anon_array(elt_value, array_ty.anon_array.size),
-                            ty: ty.clone(),
+                            anon_array,
+                            ty: array_ty.clone(),
                         }))
                     }
                     Type::AnonArray(array_ty) => {
@@ -66,7 +69,7 @@ impl Value {
 
                         Some(Value::Struct(StructValue {
                             anon_struct: AnonStructValue { members: out_value },
-                            ty: ty.clone(),
+                            ty: struct_ty.clone(),
                         }))
                     }
                     Type::AnonStruct(struct_ty) => {
@@ -133,33 +136,35 @@ impl Value {
             // Values that have a type to a definition
             // Check if they are the same as the type we are trying to convert to
             Value::Array(ArrayValue { ty: from_ty, .. })
-            | Value::Struct(StructValue { ty: from_ty, .. })
-            | Value::EnumConstant(EnumConstantValue { ty: from_ty, .. })
-            | Value::AbsType(AbsTypeValue { ty: from_ty })
-                if Type::identical(&ty, &Type::underlying_type(from_ty)) =>
+                if ty.def_node_id() == Some(from_ty.node.node_id) =>
+            {
+                Some(self.clone())
+            }
+            Value::Struct(StructValue { ty: from_ty, .. })
+                if ty.def_node_id() == Some(from_ty.node.node_id) =>
+            {
+                Some(self.clone())
+            }
+            Value::EnumConstant(EnumConstantValue { ty: from_ty, .. })
+                if ty.def_node_id() == Some(from_ty.node.node_id) =>
+            {
+                Some(self.clone())
+            }
+            Value::AbsType(AbsTypeValue { ty: from_ty })
+                if ty.def_node_id() == Some(from_ty.node.node_id) =>
             {
                 Some(self.clone())
             }
 
             // Enum -> Integer
-            Value::EnumConstant(value) => {
-                let from_ty = value.ty();
-                Value::PrimitiveInteger(PrimitiveIntegerValue {
-                    value: value.value.1,
-                    kind: from_ty.rep_type,
-                })
-                .convert(ty_a)
-            }
+            Value::EnumConstant(value) => Value::PrimitiveInteger(PrimitiveIntegerValue {
+                value: value.value.1,
+                kind: value.ty.rep_type,
+            })
+            .convert(ty_a),
 
             Value::AnonArray(anon_array) | Value::Array(ArrayValue { anon_array, .. }) => {
-                let anon_array_ty = match ty.deref() {
-                    Type::Array(ArrayType {
-                        anon_array: anon_array_ty,
-                        ..
-                    })
-                    | Type::AnonArray(anon_array_ty) => anon_array_ty,
-                    _ => return None,
-                };
+                let anon_array_ty = ty.as_anon_array()?;
 
                 if let Some(n) = anon_array_ty.size
                     && n != anon_array.elements.len()
@@ -173,12 +178,12 @@ impl Value {
                     anon_array.try_map_elements(|e| e.convert(&anon_array_ty.elt_type))?;
 
                 match ty.deref() {
-                    Type::Array(_) => Some(Value::Array(ArrayValue {
+                    Type::Array(array_ty) => Some(Value::Array(ArrayValue {
                         anon_array: AnonArrayValue {
                             elements,
                             scalar: None,
                         },
-                        ty: ty.clone(),
+                        ty: array_ty.clone(),
                     })),
                     Type::AnonArray(_) => Some(Value::AnonArray(AnonArrayValue {
                         elements,
@@ -191,27 +196,18 @@ impl Value {
             Value::AnonStruct(anon_struct) | Value::Struct(StructValue { anon_struct, .. }) => {
                 let mut members = HashMap::default();
 
-                let to_ty = match ty.deref() {
-                    Type::Struct(StructType { anon_struct, .. }) => anon_struct,
-                    Type::AnonStruct(anon_struct) => anon_struct,
-                    _ => return None,
-                };
+                let to_ty = ty.as_anon_struct()?;
 
                 // The values to use for members that this value does not
                 // provide. Converting to a named struct takes them from the
                 // target type's own default value; converting to an anonymous
                 // struct takes them from the source struct's type.
                 let member_defaults: Option<&AnonStructValue> = match (ty.deref(), self) {
-                    (Type::Struct(StructType { default, .. }), _) => {
-                        default.as_ref().map(|d| &d.anon_struct)
+                    (Type::Struct(struct_ty), _) => {
+                        struct_ty.default.as_ref().map(|d| &d.anon_struct)
                     }
                     (Type::AnonStruct(_), Value::Struct(StructValue { ty: from_ty, .. })) => {
-                        match from_ty.deref() {
-                            Type::Struct(StructType { default, .. }) => {
-                                default.as_ref().map(|d| &d.anon_struct)
-                            }
-                            _ => None,
-                        }
+                        from_ty.default.as_ref().map(|d| &d.anon_struct)
                     }
                     _ => None,
                 };
@@ -231,9 +227,9 @@ impl Value {
                 }
 
                 match ty.deref() {
-                    Type::Struct(_) => Some(Value::Struct(StructValue {
+                    Type::Struct(struct_ty) => Some(Value::Struct(StructValue {
                         anon_struct: AnonStructValue { members },
-                        ty: ty.clone(),
+                        ty: struct_ty.clone(),
                     })),
                     Type::AnonStruct(_) => Some(Value::AnonStruct(AnonStructValue { members })),
                     _ => None,
@@ -281,7 +277,7 @@ impl Value {
                         value: (_, right), ..
                     },
                 ) => {
-                    if enum_value.ty().rep_type == *kind_left {
+                    if enum_value.ty.rep_type == *kind_left {
                         Ok(Value::PrimitiveInteger(PrimitiveIntegerValue {
                             value: i128_op(left, right)?,
                             kind: *kind_left,
@@ -334,7 +330,7 @@ impl Value {
             },
             Value::EnumConstant(value) => Value::PrimitiveInteger(PrimitiveIntegerValue {
                 value: value.value.1,
-                kind: value.ty().rep_type,
+                kind: value.ty.rep_type,
             })
             .binop(other, f64_op, i128_op),
             _ => Err(MathError::InvalidInputs),
@@ -411,10 +407,10 @@ impl Value {
             Value::Float(FloatValue { kind, .. }) => Arc::new(Type::Float(*kind)),
             Value::Boolean(_) => Arc::new(Type::Boolean),
             Value::String(_) => Arc::new(Type::String(None)),
-            Value::EnumConstant(v) => v.ty.clone(),
-            Value::AbsType(AbsTypeValue { ty }) => ty.clone(),
-            Value::Array(ArrayValue { ty, .. }) => ty.clone(),
-            Value::Struct(StructValue { ty, .. }) => ty.clone(),
+            Value::EnumConstant(v) => Arc::new(Type::Enum(v.ty.clone())),
+            Value::AbsType(AbsTypeValue { ty }) => Arc::new(Type::AbsType(ty.clone())),
+            Value::Array(ArrayValue { ty, .. }) => Arc::new(Type::Array(ty.clone())),
+            Value::Struct(StructValue { ty, .. }) => Arc::new(Type::Struct(ty.clone())),
             Value::AnonArray(AnonArrayValue { elements, scalar }) => {
                 // The element type comes from the first element. A value
                 // promoted to an array of unknown size has no elements, only a
@@ -482,7 +478,7 @@ impl Value {
             })),
             Value::EnumConstant(v) => Value::PrimitiveInteger(PrimitiveIntegerValue {
                 value: v.value.1,
-                kind: v.ty().rep_type,
+                kind: v.ty.rep_type,
             })
             .negate(),
             _ => Err(MathError::InvalidInputs),
@@ -533,7 +529,7 @@ impl Value {
             },
             Value::EnumConstant(v) => Value::PrimitiveInteger(PrimitiveIntegerValue {
                 value: v.value.1,
-                kind: v.ty().rep_type,
+                kind: v.ty.rep_type,
             })
             .int_shift_op(other, dir),
             _ => Err(MathError::InvalidInputs),
@@ -822,37 +818,21 @@ impl AnonArrayValue {
 #[derive(Debug, Clone)]
 pub struct ArrayValue {
     pub anon_array: AnonArrayValue,
-    pub ty: Arc<Type>,
+    pub ty: Arc<ArrayType>,
 }
 
 /// Enum constant values
 #[derive(Debug, Clone)]
 pub struct EnumConstantValue {
     pub value: (String, i128),
-    pub ty: Arc<Type>,
+    pub ty: Arc<EnumType>,
 }
 
 impl EnumConstantValue {
-    pub fn new(member_name: String, value: i128, ty: Arc<Type>) -> EnumConstantValue {
-        match ty.deref() {
-            Type::Enum(_) => (),
-            _ => {
-                panic!("expected enum type")
-            }
-        }
-
+    pub fn new(member_name: String, value: i128, ty: Arc<EnumType>) -> EnumConstantValue {
         EnumConstantValue {
             value: (member_name, value),
             ty,
-        }
-    }
-
-    pub fn ty(&self) -> &EnumType {
-        match self.ty.deref() {
-            Type::Enum(e_ty) => e_ty,
-            _ => {
-                panic!("expected enum type")
-            }
         }
     }
 }
@@ -867,13 +847,13 @@ pub struct AnonStructValue {
 #[derive(Debug, Clone)]
 pub struct StructValue {
     pub anon_struct: AnonStructValue,
-    pub ty: Arc<Type>,
+    pub ty: Arc<StructType>,
 }
 
 /// An abstract type
 #[derive(Debug, Clone)]
 pub struct AbsTypeValue {
-    pub ty: Arc<Type>,
+    pub ty: Arc<AbsType>,
 }
 
 /// Promotes a single element value to an anonymous array value. If the array

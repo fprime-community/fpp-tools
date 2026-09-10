@@ -45,7 +45,9 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         a: &mut Self::State,
         node: &'ast DefComponent,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
         let saved = a.component.take();
         a.component = Some(Component::new(symbol.clone(), Arc::new(node.clone())));
         node.walk(a, self)?;

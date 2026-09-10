@@ -31,8 +31,33 @@ fn add_ok() {
 }
 
 #[test]
-fn arith_overflow_error() {
-    run_test("expr/arith_overflow_error")
+fn arith_overflow_add() {
+    run_test("expr/arith_overflow_add")
+}
+
+#[test]
+fn arith_overflow_sub() {
+    run_test("expr/arith_overflow_sub")
+}
+
+#[test]
+fn arith_overflow_mul() {
+    run_test("expr/arith_overflow_mul")
+}
+
+#[test]
+fn arith_overflow_div() {
+    run_test("expr/arith_overflow_div")
+}
+
+#[test]
+fn arith_overflow_neg() {
+    run_test("expr/arith_overflow_neg")
+}
+
+#[test]
+fn arith_overflow_typed_context() {
+    run_test("expr/arith_overflow_typed_context")
 }
 
 #[test]
@@ -143,4 +168,29 @@ fn string_size_sizeof_undefined() {
 #[test]
 fn subscript_index_too_large() {
     run_test("expr/subscript_index_too_large")
+}
+
+#[test]
+fn div_by_zero_use_chain() {
+    run_test("expr/div_by_zero_use_chain")
+}
+
+#[test]
+fn shift_amount_use_chain() {
+    run_test("expr/shift_amount_use_chain")
+}
+
+#[test]
+fn subscript_use_chain() {
+    run_test("expr/subscript_use_chain")
+}
+
+#[test]
+fn binop_type_use_chain() {
+    run_test("expr/binop_type_use_chain")
+}
+
+#[test]
+fn arith_overflow_use_chain() {
+    run_test("expr/arith_overflow_use_chain")
 }

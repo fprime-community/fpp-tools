@@ -53,19 +53,20 @@ impl<'ast> FinalizeTypeDefs<'ast> {
         }
     }
 
-    pub(crate) fn ty(&self, a: &mut Analysis, node: &'ast TypeName) -> Arc<Type> {
+    /// Finalizes the type named by `node` and returns it.
+    pub(crate) fn ty(&self, a: &mut Analysis, node: &'ast TypeName) -> ControlFlow<(), Arc<Type>> {
         match &node.kind {
             TypeNameKind::QualIdent(q) => match a.use_def_map.get(&q.id()).cloned() {
                 None => {}
                 Some(symbol) => {
-                    let _ = match &symbol {
+                    match &symbol {
                         Symbol::AbsType(ty) => self.visit_def_abs_type(a, ty.deref()),
                         Symbol::AliasType(ty) => self.visit_def_alias_type(a, ty.deref()),
                         Symbol::Array(ty) => self.visit_def_array(a, ty.deref()),
                         Symbol::Enum(ty) => self.visit_def_enum(a, ty.deref()),
                         Symbol::Struct(ty) => self.visit_def_struct(a, ty.deref()),
                         _ => ControlFlow::Continue(()),
-                    };
+                    }?;
 
                     if let Some(def_ty) = a.type_map.get(&symbol.node()).cloned() {
                         a.type_map.insert(node.node_id, def_ty);
@@ -84,6 +85,7 @@ impl<'ast> FinalizeTypeDefs<'ast> {
                             msg: "negative string sizes are not allowed".to_string(),
                         }
                         .emit();
+                        return ControlFlow::Break(());
                     } else if size_v >= 1 << 31 {
                         SemanticError::InvalidIntValue {
                             loc: size.as_ref().unwrap().span(),
@@ -91,6 +93,7 @@ impl<'ast> FinalizeTypeDefs<'ast> {
                             msg: "string size must in range [0, 2^31)".to_string(),
                         }
                         .emit();
+                        return ControlFlow::Break(());
                     } else {
                         a.type_map
                             .insert(node.node_id, Arc::new(Type::String(Some(size_v))));
@@ -106,14 +109,14 @@ impl<'ast> FinalizeTypeDefs<'ast> {
         // which can sit in positions that no earlier pass visited, and a
         // missing entry must degrade to an unknown type, not abort the
         // compiler (which would also take down `fpp_lsp_server`).
-        match a.type_map.get(&node.node_id).cloned() {
+        ControlFlow::Continue(match a.type_map.get(&node.node_id).cloned() {
             Some(ty) => ty,
             None => {
                 let ty = a.unknown_type(node.span());
                 a.type_map.insert(node.node_id, ty.clone());
                 ty
             }
-        }
+        })
     }
 }
 
@@ -144,7 +147,9 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         a: &mut Self::State,
         node: &'ast DefAliasType,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
         if a.visited_symbol_set.contains(&symbol) {
             return ControlFlow::Continue(());
         }
@@ -152,7 +157,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         let def = a.interned_def(node);
         a.visited_symbol_set.insert(symbol);
         // Finalize the referenced type
-        let ty = self.ty(a, &node.type_name);
+        let ty = self.ty(a, &node.type_name)?;
         // Update the alias type in the type map
         a.type_map.insert(
             node.node_id,
@@ -170,7 +175,9 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         a: &mut Self::State,
         node: &'ast DefArray,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
         if a.visited_symbol_set.contains(&symbol) {
             return ControlFlow::Continue(());
         }
@@ -178,7 +185,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         let def = a.interned_def(node);
         a.visited_symbol_set.insert(symbol);
         // Finalize the element type
-        let elt_type = self.ty(a, &node.elt_type);
+        let elt_type = self.ty(a, &node.elt_type)?;
 
         let size = match self.expr_as_integer(a, &node.size) {
             None => return ControlFlow::Continue(()),
@@ -192,7 +199,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
                 msg: "value out of range".to_string(),
             }
             .emit();
-            return ControlFlow::Continue(());
+            return ControlFlow::Break(());
         }
 
         if size <= 0 {
@@ -202,7 +209,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
                 msg: "array size must be greater than zero".to_string(),
             }
             .emit();
-            return ControlFlow::Continue(());
+            return ControlFlow::Break(());
         }
 
         // Update the size and element type
@@ -220,14 +227,17 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             default: None,
             format: None,
         };
-        let array_ty_a = Arc::new(Type::Array(array_ty.clone()));
+        // The array type as it stands, for the default value to name. The
+        // default is part of the type, so the value names the type without it.
+        let array_ty_arc = Arc::new(array_ty.clone());
+        let array_ty_a = Arc::new(Type::Array(array_ty_arc.clone()));
 
         // Compute the default value
         array_ty.default = match &node.default {
             None => match anon_array_ty.default_value() {
                 Some(Value::AnonArray(anon_array)) => Some(ArrayValue {
                     anon_array,
-                    ty: array_ty_a.clone(),
+                    ty: array_ty_arc.clone(),
                 }),
                 _ => None,
             },
@@ -245,6 +255,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
                             type_size: size,
                         }
                         .emit();
+                        return ControlFlow::Break(());
                     }
                     match default_v.convert(&array_ty_a) {
                         Some(Value::Array(v)) => Some(v),
@@ -262,12 +273,14 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
 
         // Update the array type in the type map
         a.type_map
-            .insert(node.node_id, Arc::new(Type::Array(array_ty)));
+            .insert(node.node_id, Arc::new(Type::Array(Arc::new(array_ty))));
         ControlFlow::Continue(())
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
         if a.visited_symbol_set.contains(&symbol) {
             return ControlFlow::Continue(());
         }
@@ -275,7 +288,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         a.visited_symbol_set.insert(symbol);
         // `CheckTypeUses` always enters an enum type for the definition node.
         let mut enum_ty = match a.type_map.get(&node.node_id).unwrap().deref() {
-            Type::Enum(ty) => ty.clone(),
+            Type::Enum(ty) => ty.deref().clone(),
             _ => panic!("expected enum type"),
         };
 
@@ -295,7 +308,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         };
 
         a.type_map
-            .insert(node.node_id, Arc::new(Type::Enum(enum_ty)));
+            .insert(node.node_id, Arc::new(Type::Enum(Arc::new(enum_ty))));
 
         ControlFlow::Continue(())
     }
@@ -305,7 +318,9 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         a: &mut Self::State,
         node: &'ast DefStruct,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
         if a.visited_symbol_set.contains(&symbol) {
             return ControlFlow::Continue(());
         }
@@ -325,7 +340,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
 
         for member in &node.members {
             // Finalize the member's type
-            let member_ty = self.ty(a, &member.type_name);
+            let member_ty = self.ty(a, &member.type_name)?;
             ty.anon_struct
                 .members
                 .insert(member.name.data.clone(), member_ty.clone());
@@ -344,6 +359,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
                             msg: "array size must be less than 2^31".to_string(),
                         }
                         .emit();
+                        return ControlFlow::Break(());
                     }
                 }
                 Some(size) => {
@@ -353,6 +369,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
                         msg: "array size must be greater than zero".to_string(),
                     }
                     .emit();
+                    return ControlFlow::Break(());
                 }
             }
 
@@ -367,7 +384,8 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
 
         // Compute the default value. The value refers to the struct type
         // without its own default.
-        let struct_ty_a = Arc::new(Type::Struct(ty.clone()));
+        let struct_ty_arc = Arc::new(ty.clone());
+        let struct_ty_a = Arc::new(Type::Struct(struct_ty_arc.clone()));
         ty.default = match &node.default {
             // The convertibility of an explicit default is checked by
             // `CheckExprTypes`; store the converted value.
@@ -381,14 +399,15 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             None => match Arc::new(Type::AnonStruct(ty.anon_struct.clone())).default_value() {
                 Some(Value::AnonStruct(anon_struct)) => Some(StructValue {
                     anon_struct,
-                    ty: struct_ty_a,
+                    ty: struct_ty_arc,
                 }),
                 _ => None,
             },
         };
 
         // Update the struct type in the type map
-        a.type_map.insert(node.node_id, Arc::new(Type::Struct(ty)));
+        a.type_map
+            .insert(node.node_id, Arc::new(Type::Struct(Arc::new(ty))));
         ControlFlow::Continue(())
     }
 }

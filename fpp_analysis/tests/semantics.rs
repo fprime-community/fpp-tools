@@ -429,7 +429,7 @@ struct S { x: T }
                     &default.anon_array.elements[1]
                 ));
                 // The default value names the array type it belongs to.
-                assert_eq!(default.ty.def_node_id(), array.def_node_id());
+                assert_eq!(Some(default.ty.node.node_id), array.def_node_id());
             }
             other => panic!("expected an array type, got {other:?}"),
         }
@@ -692,5 +692,46 @@ constant plainInteger = 1 << 2
             "got {:?}",
             value_of("plainInteger")
         );
+    });
+}
+
+#[test]
+fn sizeof_of_a_definition_defined_later() {
+    let src = "\
+constant sizeOfS = sizeof(S)
+constant sizeOfA = sizeof(A)
+constant sizeOfE = sizeof(E)
+constant sizeOfT = sizeof(T)
+
+struct S { X: string size 20 }
+array A = [3] string
+enum E: U32 { X }
+type T = S
+
+type FwSizeStoreType = U16
+constant FW_FIXED_LENGTH_STRING_SIZE = 256
+";
+    with_analysis(src, |a| {
+        let value_of = |name: &str| {
+            let def = a
+                .symbol_map
+                .values()
+                .find_map(|s| match s {
+                    Symbol::Constant(def) if def.name.data == name => Some(def),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("the constant {name}"));
+            a.get_int_value(def.node_id)
+                .unwrap_or_else(|| panic!("a value for {name}"))
+        };
+
+        // 2 store bytes + the string's own size, not + FW_FIXED_LENGTH_STRING_SIZE
+        assert_eq!(value_of("sizeOfS"), 22);
+        // 3 unsized strings: 3 * (2 store bytes + FW_FIXED_LENGTH_STRING_SIZE),
+        // which needs that constant evaluated even though it is defined last
+        assert_eq!(value_of("sizeOfA"), 774);
+        assert_eq!(value_of("sizeOfE"), 4);
+        // Through an alias
+        assert_eq!(value_of("sizeOfT"), 22);
     });
 }

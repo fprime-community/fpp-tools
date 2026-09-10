@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/redef/module_members_after_collision.fpp:7:8
+  |
+7 | module DpCfg {
+  |        ^^^^^ redefinition of symbol DpCfg
+  |
+ ::: [ local path prefix ]/redef/module_members_after_collision.fpp:5:19
+  |
+5 | passive component DpCfg {
+  |                   ----- previous definition is here
+

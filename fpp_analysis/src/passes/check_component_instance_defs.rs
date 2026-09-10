@@ -95,8 +95,10 @@ impl<'ast> Visitor<'ast> for CheckComponentInstanceDefs {
             }
         }
 
-        if ok && let Some(ci) = a.component_instance.take() {
-            let symbol = a.get_symbol(node);
+        if ok
+            && let Some(ci) = a.component_instance.take()
+            && let Some(symbol) = a.get_symbol(node)
+        {
             a.component_instance_map.insert(symbol, ci);
         }
         a.component_instance = None;

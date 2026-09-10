@@ -30,7 +30,9 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         a: &mut Self::State,
         node: &'ast DefTopology,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
         // Topology is already in the map: nothing to do.
         if a.partial_topology_map.contains_key(&symbol) {
             return ControlFlow::Continue(());

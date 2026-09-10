@@ -1,4 +1,3 @@
-constant c = 2 >> 200
+@ ... and to -1 for a negative one
 constant d = -2 >> 200
-array A = [c] U8
 array B = [d] U8

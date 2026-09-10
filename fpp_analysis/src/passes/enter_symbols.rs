@@ -192,30 +192,30 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
                 a.symbol_map.insert(def.node_id, other.clone());
                 other.clone()
             }
-            Some(other) => {
-                // We found a non-module symbol with the same name at the current level.
-                // This is an error.
-                SemanticError::RedefinedSymbol {
-                    name: def.name.data.clone(),
-                    loc: def.name.span(),
-                    prev_loc: other.name().span(),
-                }
-                .emit();
-                a.symbol_map.insert(def.node_id, other.clone());
+            other => {
+                let name_is_free = match other {
+                    Some(other) => {
+                        SemanticError::RedefinedSymbol {
+                            name: def.name.data.clone(),
+                            loc: def.name.span(),
+                            prev_loc: other.name().span(),
+                        }
+                        .emit();
+                        false
+                    }
+                    None => true,
+                };
 
-                return ControlFlow::Continue(());
-            }
-            None => {
-                // We did not find a symbol with the same name at the current level.
-                // Create a new module symbol now.
                 let sym = Symbol::Module(Arc::new(def.into()));
                 a.symbol_map.insert(def.node_id, sym.clone());
                 a.symbol_scope_map.insert(sym.clone(), Scope::new());
 
-                for ng in NameGroup::all() {
-                    match a.symbol_put(ng, sym.clone()) {
-                        Ok(_) => {}
-                        Err(err) => err.emit(),
+                if name_is_free {
+                    for ng in NameGroup::all() {
+                        match a.symbol_put(ng, sym.clone()) {
+                            Ok(_) => {}
+                            Err(err) => err.emit(),
+                        }
                     }
                 }
 

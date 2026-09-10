@@ -35,6 +35,82 @@ impl<'ast> EvalConstantExprs<'ast> {
             super_: UseAnalyzer::new(),
         }
     }
+
+    /// Evaluates the definition that a constant use resolves to, then copies its
+    /// value to the use.
+    fn eval_constant_use(&self, a: &mut Analysis, node: fpp_core::Node) -> ControlFlow<()> {
+        let symbol = match a.use_def_map.get(&node) {
+            Some(sym @ Symbol::Constant(def)) => {
+                let sym = sym.clone();
+                def.clone().visit(a, self)?;
+                sym
+            }
+            Some(sym @ Symbol::EnumConstant(def)) => {
+                let sym = sym.clone();
+                def.clone().visit(a, self)?;
+                sym
+            }
+            _ => return ControlFlow::Continue(()),
+        };
+
+        if let Some(value) = a.value_map.get(&symbol.node()).cloned() {
+            a.value_map.insert(node, value);
+        }
+
+        ControlFlow::Continue(())
+    }
+
+    /// Whether `ty` is finalized: either it has a definition symbol that has
+    /// been visited, or it has no definition symbol at all.
+    fn type_is_finalized(a: &Analysis, ty: &Arc<Type>) -> bool {
+        match ty.def_symbol() {
+            Some(symbol) => a.visited_symbol_set.contains(&symbol),
+            None => true,
+        }
+    }
+
+    /// Finalizes `ty` unless it is already finalized.
+    fn finalize_if_needed(&self, a: &mut Analysis, ty: &Arc<Type>) -> ControlFlow<()> {
+        if Self::type_is_finalized(a, ty) {
+            return ControlFlow::Continue(());
+        }
+        self.finalize_type(a, ty)
+    }
+
+    /// Evaluates a type definition with this pass and then hands it to
+    /// `FinalizeTypeDefs`, recursing into element and member types
+    fn finalize_type(&self, a: &mut Analysis, ty: &Arc<Type>) -> ControlFlow<()> {
+        let finalize_defs = FinalizeTypeDefs::new();
+        match ty.deref() {
+            Type::AliasType(alias) => {
+                let def = alias.node.clone();
+                self.visit_def_alias_type(a, &def)?;
+                finalize_defs.visit_def_alias_type(a, &def)?;
+            }
+            Type::Array(array) => {
+                let def = array.node.clone();
+                self.visit_def_array(a, &def)?;
+                self.finalize_if_needed(a, &array.anon_array.elt_type)?;
+                finalize_defs.visit_def_array(a, &def)?;
+            }
+            Type::Enum(enum_ty) => {
+                let def = enum_ty.node.clone();
+                self.visit_def_enum(a, &def)?;
+                finalize_defs.visit_def_enum(a, &def)?;
+            }
+            Type::Struct(struct_ty) => {
+                let def = struct_ty.node.clone();
+                self.visit_def_struct(a, &def)?;
+                for member_type in struct_ty.anon_struct.members.values() {
+                    self.finalize_if_needed(a, member_type)?;
+                }
+                finalize_defs.visit_def_struct(a, &def)?;
+            }
+            _ => {}
+        }
+
+        ControlFlow::Continue(())
+    }
 }
 
 impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
@@ -91,7 +167,8 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     loc: constant.span(),
                     prev_loc: old,
                 }
-                .emit()
+                .emit();
+                return ControlFlow::Break(());
             }
         }
 
@@ -121,14 +198,12 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                 _ => panic!("expected integer value"),
             };
 
-            let ty = a.type_map.get(&node.node_id)?;
+            let Type::Enum(ty) = a.type_map.get(&node.node_id)?.deref().clone() else {
+                return None;
+            };
             a.value_map.insert(
                 node.node_id,
-                Value::EnumConstant(EnumConstantValue::new(
-                    node.name.data.clone(),
-                    value,
-                    ty.clone(),
-                )),
+                Value::EnumConstant(EnumConstantValue::new(node.name.data.clone(), value, ty)),
             );
 
             Some(())
@@ -139,6 +214,12 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
     }
 
     fn visit_expr(&self, a: &mut Self::State, node: &'ast Expr) -> ControlFlow<Self::Break> {
+        // An expression that already has a value has been evaluated, so do not
+        // evaluate it again. Mirrors `EvalConstantExprs.exprNode`.
+        if a.value_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
+
         self.super_visit(a, Node::Expr(node))?;
 
         match &node.kind {
@@ -190,6 +271,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                         msg: "index value may not be negative".to_string(),
                     }
                     .emit();
+                    return ControlFlow::Break(());
                 } else if index >= elements.elements.len() as i128 {
                     // Compare in i128: narrowing the index to usize first would
                     // accept any index congruent to an in-bounds one modulo the
@@ -203,6 +285,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                         ),
                     }
                     .emit();
+                    return ControlFlow::Break(());
                 } else {
                     let element = elements.get(index as usize).expect("in bounds").clone();
                     a.value_map.insert(node.node_id, element);
@@ -232,7 +315,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
 
                         if !(0..=255).contains(&shift) {
                             SemanticError::InvalidShiftAmount { loc: right.span() }.emit();
-                            return ControlFlow::Continue(());
+                            return ControlFlow::Break(());
                         }
 
                         match op {
@@ -252,6 +335,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     }
                     Err(MathError::DivByZero) => {
                         SemanticError::DivisionByZero { loc: right.span() }.emit();
+                        return ControlFlow::Break(());
                     }
                     Err(MathError::ShiftOverflow) => {
                         SemanticError::InvalidIntValue {
@@ -260,6 +344,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                             msg: "shift result is too large to represent".to_string(),
                         }
                         .emit();
+                        return ControlFlow::Break(());
                     }
                     Err(MathError::Overflow) => {
                         SemanticError::InvalidIntValue {
@@ -268,7 +353,10 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                             msg: "arithmetic result is too large to represent".to_string(),
                         }
                         .emit();
+                        return ControlFlow::Break(());
                     }
+                    // The operands are not numeric, which `CheckExprTypes` has
+                    // already reported and stopped on
                     Err(MathError::InvalidInputs) => {}
                 }
             }
@@ -321,7 +409,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                                 msg: format!("failed to parse hexadecimal integral value: {}", err),
                             }
                             .emit();
-                            return ControlFlow::Continue(());
+                            return ControlFlow::Break(());
                         }
                     }
                 } else {
@@ -335,7 +423,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                                 msg: format!("failed to parse integral value: {}", err),
                             }
                             .emit();
-                            return ControlFlow::Continue(());
+                            return ControlFlow::Break(());
                         }
                     }
                 };
@@ -353,7 +441,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                             msg: format!("failed to parse floating value: {}", err),
                         }
                         .emit();
-                        return ControlFlow::Continue(());
+                        return ControlFlow::Break(());
                     }
                 };
 
@@ -376,9 +464,13 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                 }
             },
             ExprKind::SizeOf(type_name) => {
-                // Finalize the referenced type on demand, then compute its
-                // serialized size.
-                FinalizeTypeDefs::new().ty(a, type_name);
+                // Evaluate and finalize the referenced type definition on demand
+                if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
+                    self.finalize_if_needed(a, &ty)?;
+                }
+                // A `string size N` type name has no definition to evaluate,
+                // but its size still has to be resolved into the type.
+                FinalizeTypeDefs::new().ty(a, type_name)?;
                 if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
                     // Get the finalized type. For a type with a definition,
                     // the finalized type is mapped to the definition in the
@@ -404,6 +496,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                                 msg: "serialized size is too large to represent".to_string(),
                             }
                             .emit();
+                            return ControlFlow::Break(());
                         }
                     }
                 }
@@ -436,6 +529,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                                 msg: "arithmetic result is too large to represent".to_string(),
                             }
                             .emit();
+                            return ControlFlow::Break(());
                         }
                         Err(MathError::DivByZero) => {
                             panic!("unexpected div by zero")
@@ -459,24 +553,15 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for EvalConstantExprs<'ast> {
         node: &'ast Expr,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        let symbol = match a.use_def_map.get(&node.node_id) {
-            Some(sym @ Symbol::Constant(def)) => {
-                let sym = sym.clone();
-                def.clone().visit(a, self)?;
-                sym
-            }
-            Some(sym @ Symbol::EnumConstant(def)) => {
-                let sym = sym.clone();
-                def.clone().visit(a, self)?;
-                sym
-            }
-            _ => return ControlFlow::Continue(()),
-        };
+        self.eval_constant_use(a, node.node_id)
+    }
 
-        if let Some(value) = a.value_map.get(&symbol.node()) {
-            a.value_map.insert(node.node_id, value.clone());
-        }
-
-        ControlFlow::Continue(())
+    fn implied_constant_use(
+        &self,
+        a: &mut Analysis,
+        node: &Expr,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.eval_constant_use(a, node.node_id)
     }
 }

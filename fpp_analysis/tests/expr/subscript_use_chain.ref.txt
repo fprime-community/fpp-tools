@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/expr/subscript_use_chain.fpp:4:18
+  |
+4 | constant z = arr[5]
+  |                  ^ index value is not in the range [0, 1]
+  |
+  = note: expression evaluated to `5`
+

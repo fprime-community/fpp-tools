@@ -154,3 +154,13 @@ fn port_module() {
 fn component() {
     run_test("redef/component")
 }
+
+#[test]
+fn module_members_after_collision() {
+    run_test("redef/module_members_after_collision")
+}
+
+#[test]
+fn module_scope_after_collision() {
+    run_test("redef/module_scope_after_collision")
+}

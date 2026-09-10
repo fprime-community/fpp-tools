@@ -92,7 +92,7 @@ fn anon_struct_val() -> Value {
 fn array_val() -> Value {
     Value::Array(ArrayValue {
         anon_array: AnonArrayValue::new(vec![v_i32(0), v_i32(0), v_i32(0)]),
-        ty: default_array(),
+        ty: as_array_ty(&default_array()),
     })
 }
 
@@ -103,7 +103,11 @@ fn struct_val() -> Value {
     m.insert("b".to_string(), v_string(""));
     Value::Struct(StructValue {
         anon_struct: AnonStructValue { members: m },
-        ty: struct_ty("S", anon_struct(&[("a", u32()), ("b", string(None))]), 3),
+        ty: as_struct_ty(&struct_ty(
+            "S",
+            anon_struct(&[("a", u32()), ("b", string(None))]),
+            3,
+        )),
     })
 }
 
@@ -572,7 +576,7 @@ fn value_convert_named_identity() {
     with_test_ctx(|| {
         // Same enum definition id -> identity conversion succeeds.
         let e = enumeration("E", fpp_ast::IntegerKind::I32, 510);
-        let ec = Value::EnumConstant(EnumConstantValue::new("X".to_string(), 1, e.clone()));
+        let ec = Value::EnumConstant(EnumConstantValue::new("X".to_string(), 1, as_enum_ty(&e)));
         assert!(ec.convert(&e).is_some());
     });
 }
