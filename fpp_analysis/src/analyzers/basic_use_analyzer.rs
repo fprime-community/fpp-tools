@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Deref};
 
 /// An extension of the standard [Visitor] trait that allows analyzing uses of symbols
-/// [BasicUseAnalyzer] or [UseAnalyzer] should be used in your pass for this to work properly
+/// [BasicUseAnalyzer] or [super::UseAnalyzer] should be used in your pass for this to work properly
 pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
     /// A use of a component definition
     fn component_use(

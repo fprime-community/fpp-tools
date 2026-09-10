@@ -2,7 +2,7 @@ use crate::semantics::Symbol;
 use rustc_hash::FxHashMap as HashMap;
 
 /// The set of F Prime framework definitions discovered during analysis.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FrameworkDefinitions {
     /// Map from qualified constant name to its symbol.
     pub constant_map: HashMap<String, Symbol>,

@@ -1,0 +1,32 @@
+# Built with maturin: a compiled PyO3 extension imported as the top-level
+# `fpp` module, which binds the Rust FPP compiler in-process. abi3-py310
+# yields one wheel per platform for CPython >= 3.10. The generated type stub
+# (`python/fpp/__init__.pyi`) and `py.typed` marker ship alongside.
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "fprime-fpp-python"
+description = "Native FPP bindings — a navigable Python object model over the Rust FPP compiler"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Andrei Tumbar", email = "andrei.tumbar@jpl.nasa.gov" }]
+keywords = ["fprime", "fpp", "nasa", "flight", "software"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Compilers",
+    "License :: OSI Approved :: Apache Software License",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/fprime-community/fpp-tools"
+Repository = "https://github.com/fprime-community/fpp-tools"
+
+[tool.maturin]
+manifest-path = "Cargo.toml"
+module-name = "fpp"
+bindings = "pyo3"

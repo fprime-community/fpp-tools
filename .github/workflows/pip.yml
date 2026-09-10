@@ -1,12 +1,13 @@
 name: Pip Packages
 
-# Builds pip wheels + sdists for the FPP Rust executables:
-#   - fprime-fpp-lsp     (from fpp_lsp_server)
-#   - fprime-fpp-format  (from fpp_format)
+# Builds pip wheels + sdists for the FPP Rust distributions:
+#   - fprime-fpp-lsp     (from fpp_lsp_server)  — executable
+#   - fprime-fpp-format  (from fpp_format)      — executable
+#   - fprime-fpp-python  (from fpp_python)      — abi3 PyO3 extension (import `fpp`)
 #
 # On push/PR/dispatch this only *builds* the distributions and uploads them as
-# artifacts. When a GitHub release is published it additionally publishes both
-# packages: a normal release goes to PyPI, a GitHub "pre-release" goes to
+# artifacts. When a GitHub release is published it additionally publishes every
+# package: a normal release goes to PyPI, a GitHub "pre-release" goes to
 # TestPyPI. The published version comes from the release tag.
 
 on:
@@ -34,6 +35,8 @@ jobs:
             dir: fpp_lsp_server
           - name: fprime-fpp-format
             dir: fpp_format
+          - name: fprime-fpp-python
+            dir: fpp_python
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,6 +85,8 @@ jobs:
             dir: fpp_lsp_server
           - name: fprime-fpp-format
             dir: fpp_format
+          - name: fprime-fpp-python
+            dir: fpp_python
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -132,6 +137,7 @@ jobs:
         package:
           - name: fprime-fpp-lsp
           - name: fprime-fpp-format
+          - name: fprime-fpp-python
     steps:
       - name: Download distributions
         uses: actions/download-artifact@v4

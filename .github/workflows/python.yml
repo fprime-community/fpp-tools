@@ -1,0 +1,112 @@
+name: Python bindings
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: python-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  pytest:
+    name: "Pytest (Python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # Builds the abi3 extension (via the maturin backend) and installs it.
+      - name: Build + install the wheel
+        run: |
+          python -m pip install --upgrade pip
+          pip install ./fpp_python
+
+      # Fixtures are referenced by CWD-relative paths, so run from the crate dir.
+      - name: Run tests
+        working-directory: fpp_python
+        run: |
+          pip install pytest
+          pytest tests/ -v
+
+  codegen:
+    name: "Codegen drift"
+    runs-on: ubuntu-latest
+    # Regenerates the checked-in declarations to validate they are up to date
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve the pinned nightly
+        id: nightly
+        run: echo "toolchain=$(tr -d '[:space:]' < fpp_python_bindgen/nightly-toolchain)" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned nightly Rust (for bindgen rustdoc)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.nightly.outputs.toolchain }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Regenerate declarations
+        run: make -C fpp_python bindgen
+
+      - name: Regenerate type stub
+        run: make -C fpp_python stubs
+
+      - name: Check for drift
+        run: |
+          if ! git diff --exit-code -- fpp_python/src/ast/defs.rs fpp_python/src/sem/defs.rs fpp_python/fpp.pyi; then
+            echo "::error::checked-in declaration/stub is stale; run \`make -C fpp_python codegen\` and commit the result."
+            exit 1
+          fi
+
+      # Prove the regenerated code still compiles as the import-only extension.
+      - name: Build native extension
+        run: make -C fpp_python ext
+
+  mypy:
+    name: "Mypy"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build + install the wheel + mypy
+        run: |
+          python -m pip install --upgrade pip mypy
+          pip install ./fpp_python
+
+      - name: Run mypy
+        run: mypy fpp_python/tests/typing_check.py

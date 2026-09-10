@@ -1,6 +1,8 @@
 use fpp_core::{Node, Span, Spanned};
 use std::sync::Arc;
 
+use crate::Analysis;
+
 /// The interface for an FPP symbol
 pub trait SymbolInterface: Clone {
     /// Gets the AST node ID of the symbol
@@ -49,6 +51,21 @@ pub enum Symbol {
 }
 
 impl Symbol {
+    /// The unqualified (leaf) name of this symbol.
+    pub fn unqualified_name(&self) -> &str {
+        &self.name().data
+    }
+
+    /// The fully-qualified name of this symbol.
+    pub fn qualified_name(&self, a: &Analysis) -> String {
+        a.get_qualified_name(self)
+    }
+
+    /// The parent (enclosing) symbol, if any.
+    pub fn parent<'a>(&self, a: &'a Analysis) -> Option<&'a Symbol> {
+        a.parent_symbol_map.get(self)
+    }
+
     /// Whether the definition named by this symbol is a dictionary definition.
     pub fn is_dictionary_def(&self) -> bool {
         match self {

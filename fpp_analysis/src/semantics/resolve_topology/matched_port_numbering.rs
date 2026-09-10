@@ -20,9 +20,6 @@ type InstanceConnectionMap = HashMap<ComponentInstance, Connection>;
 type PortConnectionMap = HashMap<i128, Connection>;
 
 // State for matched port numbering
-//
-// The topology `t` is threaded separately as a `&mut` reference rather than
-// being carried in the state, since Rust cannot copy it cheaply.
 struct State {
     // The port instance for port 1
     pi1: PortInstance,

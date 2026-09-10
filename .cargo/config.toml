@@ -1,0 +1,12 @@
+# PyO3 `extension-module` builds (the `fpp_python` cdylib) do not link libpython:
+# the Python symbols are resolved by the host interpreter at import time. For
+# local `cargo build` / `cargo check` / `cargo clippy` on macOS we must tell the
+# linker to allow those undefined symbols (`-undefined dynamic_lookup`). maturin
+# injects the equivalent flags automatically when building wheels, so this only
+# affects local cargo use; it is a no-op for the normal binaries (they have no
+# undefined symbols). CI runs on Linux, where the cdylib links without this.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]

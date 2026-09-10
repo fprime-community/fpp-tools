@@ -1,0 +1,39 @@
+# The declaration generator for `fpp_python`: emits both checked-in declaration
+# files (`fpp_python/src/ast/defs.rs`, `fpp_python/src/sem/defs.rs`) from the
+# in-workspace compiler crates.
+#
+# Deliberately NOT a target inside `fpp_python`. A bin is an implicit consumer of
+# its own package's lib, so living there made the generator unbuildable exactly
+# when it was needed most: delete an `fpp_analysis` method and the committed
+# `sem/defs.rs` stops compiling, which blocked the build of the tool whose job is
+# to regenerate it. Nothing here touches the generated crate — `fpp_ast` is read
+# as source text with `syn` and `fpp_analysis` through rustdoc JSON — so there is
+# no reason for the dependency to exist.
+#
+# Not published: it only supports the wheel.
+[package]
+name = "fpp_python_bindgen"
+description = "Declaration generator for the fpp_python PyO3 bindings"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "bindgen"
+path = "src/main.rs"
+doc = false
+
+[dependencies]
+# Reflection inputs only: `fpp_ast` source parsing (syn) and the nightly rustdoc
+# JSON of `fpp_analysis` (rustdoc-json to produce it, rustdoc-types to model it).
+# `rustdoc-types` is pinned exactly — `main.rs` asserts the JSON `format_version`
+# matches, so a mismatched bump fails loudly rather than mis-parsing. Its partner
+# pin is the toolchain that emits that JSON (`nightly-toolchain`, whose nightly
+# emits format_version 57); bump the two together or the assert trips.
+syn = { version = "2", features = ["full", "extra-traits", "visit"] }
+serde_json = "1"
+rustdoc-types = "=0.57.0"
+rustdoc-json = "0.9"

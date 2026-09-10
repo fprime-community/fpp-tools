@@ -1,0 +1,21 @@
+# Attribute + function-like proc macros that remove the boilerplate from the
+# hand-written PyO3 wrappers in `fpp_python`. See the crate docs for the four
+# macros (`semantic_wrapper`, `symbol_entity`, `semantic_subclasses`,
+# `fpp_ast_bindings`). Not published to crates.io — it only supports the wheel.
+[package]
+name = "fpp_python_macros"
+description = "Proc macros backing the fpp_python PyO3 bindings"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"

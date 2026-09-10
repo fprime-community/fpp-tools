@@ -14,21 +14,9 @@ members = [
     "fpp_util",
     "fpp_format",
     "fpp_diagram",
-]
-
-# Exclude fpp_macros from test suite
-default-members = [
-    "fpp",
-    "fpp_lsp_server",
-    "fpp_analysis",
-    "fpp_ast",
-    "fpp_core",
-    "fpp_errors",
-    "fpp_lexer",
-    "fpp_parser",
-    "fpp_lsp_parser",
-    "fpp_util",
-    "fpp_diagram",
+    "fpp_python",
+    "fpp_python_bindgen",
+    "fpp_python_macros",
 ]
 
 resolver = "2"

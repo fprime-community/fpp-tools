@@ -76,9 +76,7 @@ pub struct Analysis {
     /// `CheckDictionaryDefs`.
     pub dictionary_symbol_set: HashSet<Symbol>,
 
-    /// Map from an AST node id to the implied uses of FPP symbols at that node.
-    /// Populated by `ConstructImpliedUseMap` and consumed by the use-analysis
-    /// passes (`CheckUses`, `CheckUseDefCycles`).
+    /** Map from an AST node id to the implied uses of FPP symbols at that node. */
     pub implied_use_map: HashMap<fpp_core::Node, ImpliedUseSet>,
 
     /// The shared "unknown" type standing in for a type use that failed to

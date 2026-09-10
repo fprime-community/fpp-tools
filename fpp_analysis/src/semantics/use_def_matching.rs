@@ -3,7 +3,7 @@ use crate::semantics::{QualifiedName, Symbol, SymbolInterface};
 use fpp_core::Spanned;
 
 /// A matching between a use and its definition
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UseDefMatching {
     /// The node Identifier corresponding to the use
     pub node: fpp_core::Node,

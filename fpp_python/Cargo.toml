@@ -1,0 +1,53 @@
+# Native PyO3 bindings to the FPP compiler, packaged as the
+# `fprime-fpp-python` wheel — `import fpp`
+[package]
+name = "fpp_python"
+description = "Native Python bindings to the FPP compiler (PyO3)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+# Imported from Python as the top-level `fpp` module.
+name = "fpp"
+crate-type = ["cdylib", "rlib"]
+test = false
+doctest = false
+
+[[bin]]
+name = "stub_gen"
+required-features = ["stubgen"]
+doc = false
+
+[features]
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
+stubgen = []
+
+[dependencies]
+# abi3-py310: a single wheel per platform covers CPython >= 3.10. 0.29 supports
+# CPython up to 3.15.
+pyo3 = { version = "0.29", features = ["abi3-py310", "multiple-pymethods"] }
+pyo3-stub-gen = { version = "0.23", default-features = false, features = [
+    "infer_signature",
+] }
+
+# Attribute macros that remove wrapper boilerplate (in-workspace proc-macro crate).
+fpp_python_macros = { path = "../fpp_python_macros", version = "=0.0.0" }
+
+# FPP compiler crates (in-workspace path deps).
+fpp_core = { path = "../fpp_core", version = "=0.0.0" }
+fpp_ast = { path = "../fpp_ast", version = "=0.0.0" }
+fpp_analysis = { path = "../fpp_analysis", version = "=0.0.0" }
+fpp_parser = { path = "../fpp_parser", version = "=0.0.0" }
+fpp_fs = { path = "../fpp_fs", version = "=0.0.0" }
+
+rustc-hash = "2"
+
+# The declaration generator that emits `src/ast/defs.rs` + `src/sem/defs.rs` is
+# NOT a target here — it lives in the standalone `fpp_python_bindgen` crate, so a
+# stale declaration cannot block the build of the tool that regenerates it. See
+# that crate's manifest.
