@@ -53,10 +53,9 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
 
         a.type_map.insert(
             node.node_id,
-            Arc::new(Type::AbsType(AbsType {
-                node: node.clone(),
-                default_value: None,
-            })),
+            Arc::new(Type::AbsType(Arc::new(AbsType {
+                node: a.interned_def(node),
+            }))),
         );
         ControlFlow::Continue(())
     }
@@ -77,7 +76,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a.type_map.insert(
             node.node_id,
             Arc::new(Type::AliasType(AliasType {
-                node: node.clone(),
+                node: a.interned_def(node),
                 alias_type,
             })),
         );
@@ -99,15 +98,15 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
 
         a.type_map.insert(
             node.node_id,
-            Arc::new(Type::Array(ArrayType {
-                node: node.clone(),
+            Arc::new(Type::Array(Arc::new(ArrayType {
+                node: a.interned_def(node),
                 anon_array: AnonArrayType {
                     size: None,
                     elt_type,
                 },
                 default: None,
                 format: None,
-            })),
+            }))),
         );
 
         ControlFlow::Continue(())
@@ -147,11 +146,11 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
             }
         };
 
-        let ty = Arc::new(Type::Enum(EnumType {
-            node: node.clone(),
+        let ty = Arc::new(Type::Enum(Arc::new(EnumType {
+            node: a.interned_def(node),
             rep_type,
             default: None,
-        }));
+        })));
 
         a.type_map.insert(node.node_id, ty.clone());
 
@@ -199,13 +198,13 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
 
         a.type_map.insert(
             node.node_id,
-            Arc::new(Type::Struct(StructType {
-                node: node.clone(),
+            Arc::new(Type::Struct(Arc::new(StructType {
+                node: a.interned_def(node),
                 anon_struct: anon_ty,
                 default: None,
                 sizes: Default::default(),
                 formats: Default::default(),
-            })),
+            }))),
         );
 
         ControlFlow::Continue(())
@@ -240,7 +239,10 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
                 a.type_map.insert(node.node_id, ty);
                 return ControlFlow::Continue(());
             }
-            TypeNameKind::String(_) => Type::String(None),
+            TypeNameKind::String(_) => {
+                self.super_visit(a, Node::TypeName(node))?;
+                Type::String(None)
+            }
         };
 
         a.type_map.insert(node.node_id, Arc::new(ty));

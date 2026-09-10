@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/arith_overflow_mul.fpp:3:24
+  |
+3 | constant mulOverflow = max * 2
+  |                        ^^^^^^^ arithmetic result is too large to represent
+

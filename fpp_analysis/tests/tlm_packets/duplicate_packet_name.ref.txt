@@ -1,15 +1,14 @@
- --> [ local path prefix ]/tlm_packets/duplicate_packet_name.fpp:3:12
-  |
-3 |   instance c1
-  |            ^^ cannot find component instance or topology `c1` in scope
-
- --> [ local path prefix ]/tlm_packets/duplicate_packet_name.fpp:8:7
-  |
-8 |       c1.T
-  |       ^^ cannot find component instance or topology `c1` in scope
-
-  --> [ local path prefix ]/tlm_packets/duplicate_packet_name.fpp:12:7
+  --> [ local path prefix ]/tlm_packets/duplicate_packet_name.fpp:11:5
    |
-12 |       c1.T
-   |       ^^ cannot find component instance or topology `c1` in scope
+11 | /     packet P group 1 {
+12 | |       c1.T
+13 | |     }
+   | |_____^ duplicate packet name P
+   |
+  ::: [ local path prefix ]/tlm_packets/duplicate_packet_name.fpp:7:5
+   |
+ 7 | /     packet P group 0 {
+ 8 | |       c1.T
+ 9 | |     }
+   | |_____- previous occurrence is here
 

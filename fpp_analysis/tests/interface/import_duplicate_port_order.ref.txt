@@ -1,0 +1,20 @@
+  --> [ local path prefix ]/interface/import_duplicate_port_order.fpp:4:5
+   |
+ 4 |     output port q1: P
+   |     ^^^^^^^^^^^^^^^^^ duplicate port instance q1
+   |
+  ::: [ local path prefix ]/interface/import_duplicate_port_order.fpp:15:5
+   |
+15 |     import A
+   |     -------- port imported from here
+   |
+  ::: [ local path prefix ]/interface/import_duplicate_port_order.fpp:14:5
+   |
+14 |     output port q1: P
+   |     ----------------- previous instance is here
+   |
+  ::: [ local path prefix ]/interface/import_duplicate_port_order.fpp:15:5
+   |
+15 |     import A
+   |     -------- failed to import interface here
+

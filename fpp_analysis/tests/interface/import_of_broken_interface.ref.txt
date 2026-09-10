@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/interface/import_of_broken_interface.fpp:5:5
+  |
+5 |     output port p: P
+  |     ^^^^^^^^^^^^^^^^ duplicate port instance p
+  |
+ ::: [ local path prefix ]/interface/import_of_broken_interface.fpp:4:5
+  |
+4 |     output port p: P
+  |     ---------------- previous instance is here
+

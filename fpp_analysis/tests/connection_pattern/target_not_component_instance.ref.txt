@@ -1,0 +1,14 @@
+  --> [ local path prefix ]/connection_pattern/target_not_component_instance.fpp:25:5
+   |
+25 |       Inner
+   |       ^^^^^ invalid use of symbol Inner: not a component instance symbol
+   |
+  ::: [ local path prefix ]/connection_pattern/target_not_component_instance.fpp:11:1
+   |
+11 | / topology Inner {
+12 | |
+13 | |   instance c
+14 | |
+15 | | }
+   | |_- Inner defined here
+

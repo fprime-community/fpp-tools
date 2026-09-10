@@ -2,10 +2,10 @@ use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
 use crate::errors::SemanticError;
-use crate::semantics::{EnumConstantValue, Value};
+use crate::semantics::{EnumConstantValue, Type, Value};
 use fpp_ast::{DefEnum, Node, Visitor};
 use fpp_core::Spanned;
-use std::ops::ControlFlow;
+use std::ops::{ControlFlow, Deref};
 
 /// Evaluate implied enum constants
 pub struct EvalImpliedEnumConsts<'ast> {
@@ -35,9 +35,10 @@ impl<'ast> Visitor<'ast> for EvalImpliedEnumConsts<'ast> {
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        let enum_type = match a.type_map.get(&node.node_id) {
-            Some(ty) => ty.clone(),
-            None => return ControlFlow::Continue(()),
+        let Some(Type::Enum(enum_type)) =
+            a.type_map.get(&node.node_id).map(|ty| ty.deref().clone())
+        else {
+            return ControlFlow::Continue(());
         };
 
         #[allow(clippy::manual_try_fold)]

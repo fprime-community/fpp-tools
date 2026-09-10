@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/port_instance/output_queue_full.fpp:5:20
+  |
+5 |   output port p: P hook
+  |                    ^^^^ only async input may have queue full behavior
+

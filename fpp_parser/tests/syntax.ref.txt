@@ -197,7 +197,13 @@ TransUnit(
                                 },
                             ),
                             queue_full: Some(
-                                Assert,
+                                QueueFullSpecifier {
+                                    kind: Assert,
+                                    node_id: Span {
+                                        start: [ local path prefix ]/syntax.fpp:23:44,
+                                        end: [ local path prefix ]/syntax.fpp:23:50,
+                                    },
+                                },
                             ),
                             node_id: Span {
                                 start: [ local path prefix ]/syntax.fpp:23:5,
@@ -651,7 +657,13 @@ TransUnit(
                                 },
                             ),
                             queue_full: Some(
-                                Assert,
+                                QueueFullSpecifier {
+                                    kind: Assert,
+                                    node_id: Span {
+                                        start: [ local path prefix ]/syntax.fpp:53:61,
+                                        end: [ local path prefix ]/syntax.fpp:53:67,
+                                    },
+                                },
                             ),
                             node_id: Span {
                                 start: [ local path prefix ]/syntax.fpp:53:5,
@@ -780,7 +792,13 @@ TransUnit(
                                 },
                             ),
                             queue_full: Some(
-                                Assert,
+                                QueueFullSpecifier {
+                                    kind: Assert,
+                                    node_id: Span {
+                                        start: [ local path prefix ]/syntax.fpp:61:44,
+                                        end: [ local path prefix ]/syntax.fpp:61:50,
+                                    },
+                                },
                             ),
                             node_id: Span {
                                 start: [ local path prefix ]/syntax.fpp:61:5,
@@ -840,7 +858,13 @@ TransUnit(
                                 },
                             ),
                             queue_full: Some(
-                                Assert,
+                                QueueFullSpecifier {
+                                    kind: Assert,
+                                    node_id: Span {
+                                        start: [ local path prefix ]/syntax.fpp:69:55,
+                                        end: [ local path prefix ]/syntax.fpp:69:61,
+                                    },
+                                },
                             ),
                             node_id: Span {
                                 start: [ local path prefix ]/syntax.fpp:69:5,

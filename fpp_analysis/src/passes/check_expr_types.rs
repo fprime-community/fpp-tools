@@ -4,8 +4,8 @@ use crate::analyzers::basic_use_analyzer::UseAnalysisPass;
 use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::SemanticError;
 use crate::semantics::{
-    AnonArrayType, AnonStructType, ArrayType, QualifiedName, StructType, Symbol, SymbolInterface,
-    Type, TypeConversionResult,
+    AnonArrayType, AnonStructType, QualifiedName, Symbol, SymbolInterface, Type,
+    TypeConversionResult,
 };
 use fpp_ast::{
     DefAliasType, DefArray, DefConstant, DefEnum, DefEnumConstant, DefStruct, Expr, ExprKind,
@@ -212,7 +212,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                 let first_node = match array.first() {
                     None => {
                         SemanticError::EmptyArray { loc: node.span() }.emit();
-                        return ControlFlow::Continue(());
+                        return ControlFlow::Break(());
                     }
                     Some(first) => first,
                 };
@@ -259,7 +259,10 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                             })),
                         );
                     }
-                    Err(err) => err.emit(),
+                    Err(err) => {
+                        err.emit();
+                        return ControlFlow::Break(());
+                    }
                 }
             }
             ExprKind::ArraySubscript { e1, e2 } => {
@@ -270,17 +273,16 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                     Some(arr_ty) => Type::underlying_type(arr_ty),
                 };
 
-                let elt_ty = match arr_ty.deref() {
-                    Type::Array(ArrayType { anon_array, .. }) | Type::AnonArray(anon_array) => {
-                        anon_array.elt_type.clone()
-                    }
-                    ty => {
+                let elt_ty = match arr_ty.as_anon_array() {
+                    Some(anon_array) => anon_array.elt_type.clone(),
+                    None => {
+                        let ty = arr_ty.deref();
                         SemanticError::InvalidType {
                             loc: e1.span(),
                             msg: format!("{} is not an array type", ty),
                         }
                         .emit();
-                        return ControlFlow::Continue(());
+                        return ControlFlow::Break(());
                     }
                 };
 
@@ -311,7 +313,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                                     ),
                                 }
                                 .emit();
-                                return ControlFlow::Continue(());
+                                return ControlFlow::Break(());
                             }
                             Some(ty) => ty,
                         },
@@ -381,25 +383,28 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                     None => return ControlFlow::Continue(()),
                 };
 
-                match e_ty.deref() {
-                    Type::AnonStruct(anon_struct)
-                    | Type::Struct(StructType { anon_struct, .. }) => {
-                        match anon_struct.members.get(&id.data) {
-                            None => SemanticError::InvalidType {
+                match e_ty.as_anon_struct() {
+                    Some(anon_struct) => match anon_struct.members.get(&id.data) {
+                        None => {
+                            SemanticError::InvalidType {
                                 loc: id.span(),
                                 msg: format!("{} has no member `{}`", e_ty, id.data),
                             }
-                            .emit(),
-                            Some(member_ty) => {
-                                a.type_map.insert(node.node_id, member_ty.clone());
-                            }
+                            .emit();
+                            return ControlFlow::Break(());
                         }
+                        Some(member_ty) => {
+                            a.type_map.insert(node.node_id, member_ty.clone());
+                        }
+                    },
+                    None => {
+                        SemanticError::InvalidType {
+                            loc: e.span(),
+                            msg: format!("{} does not have members", e_ty),
+                        }
+                        .emit();
+                        return ControlFlow::Break(());
                     }
-                    ty => SemanticError::InvalidType {
-                        loc: e.span(),
-                        msg: format!("{} does not have members", ty),
-                    }
-                    .emit(),
                 }
             }
             ExprKind::Ident(_) => {} // already handled by constant_use
@@ -673,7 +678,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let symbol = match a.use_def_map.get(&node.node_id) {
-            None => return ControlFlow::Continue(()),
+            None => return ControlFlow::Break(()),
             Some(symbol) => symbol.clone(),
         };
 
@@ -695,7 +700,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
                     def_loc: symbol.name().span(),
                 }
                 .emit();
-                return ControlFlow::Continue(());
+                return ControlFlow::Break(());
             }
         }
 

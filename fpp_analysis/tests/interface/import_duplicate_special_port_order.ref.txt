@@ -1,0 +1,20 @@
+  --> [ local path prefix ]/interface/import_duplicate_special_port_order.fpp:7:5
+   |
+ 7 |     command recv port ar
+   |     ^^^^^^^^^^^^^^^^^^^^ duplicate port instance command recv
+   |
+  ::: [ local path prefix ]/interface/import_duplicate_special_port_order.fpp:14:5
+   |
+14 |     import A
+   |     -------- port imported from here
+   |
+  ::: [ local path prefix ]/interface/import_duplicate_special_port_order.fpp:12:5
+   |
+12 |     command recv port dr
+   |     -------------------- previous instance is here
+   |
+  ::: [ local path prefix ]/interface/import_duplicate_special_port_order.fpp:14:5
+   |
+14 |     import A
+   |     -------- failed to import interface here
+

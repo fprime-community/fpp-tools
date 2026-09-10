@@ -51,3 +51,52 @@ impl PortNumberingState {
         n
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::PortNumberingState;
+    use std::collections::BTreeSet;
+
+    fn state(used: &[i128]) -> PortNumberingState {
+        PortNumberingState::initial(used.iter().copied().collect::<BTreeSet<_>>())
+    }
+
+    #[test]
+    fn initial_picks_the_lowest_unused_number() {
+        assert_eq!(state(&[]).next_port_number, 0);
+        assert_eq!(state(&[1, 2]).next_port_number, 0);
+        assert_eq!(state(&[0, 1, 3]).next_port_number, 2);
+    }
+
+    #[test]
+    fn use_port_number_marks_the_number_and_advances_from_the_next_number() {
+        let s = state(&[0, 1, 3]).use_port_number(2);
+        assert_eq!(s.used_port_numbers, [0, 1, 2, 3].into_iter().collect());
+        assert_eq!(s.next_port_number, 4);
+
+        // The search for the next number restarts from the previous next number,
+        // not from the number just used, so a number above the gap leaves the
+        // next number where it was
+        let s = state(&[0, 1, 3]).use_port_number(100);
+        assert_eq!(s.used_port_numbers, [0, 1, 3, 100].into_iter().collect());
+        assert_eq!(s.next_port_number, 2);
+    }
+
+    #[test]
+    fn use_next_port_number_consumes_the_next_number() {
+        let s = state(&[0, 1, 3]).use_next_port_number();
+        assert_eq!(s.used_port_numbers, [0, 1, 2, 3].into_iter().collect());
+        assert_eq!(s.next_port_number, 4);
+
+        let s = state(&[]).use_next_port_number().use_next_port_number();
+        assert_eq!(s.used_port_numbers, [0, 1].into_iter().collect());
+        assert_eq!(s.next_port_number, 2);
+    }
+
+    #[test]
+    fn get_port_number_returns_the_consumed_number() {
+        let (s, n) = state(&[0, 1, 3]).get_port_number();
+        assert_eq!(n, 2);
+        assert_eq!(s.next_port_number, 4);
+    }
+}

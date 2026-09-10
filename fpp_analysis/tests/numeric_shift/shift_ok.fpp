@@ -13,3 +13,7 @@ enum L: U32 { X = 1 << 31 }
 
 constant SomeBytePatternOffset = 4
 constant SomeBytePatternMask = 0x7F << SomeBytePatternOffset
+enum G: U8 { P = 3 }
+enum H: U16 { Q = 2 }
+constant kindPreserved = G.P << H.Q
+constant kindDropped = G.P << 2

@@ -1,0 +1,25 @@
+  --> [ local path prefix ]/interface/failed_import_keeps_merged_ports.fpp:8:5
+   |
+ 8 |     output port x: P
+   |     ^^^^^^^^^^^^^^^^ duplicate port instance x
+   |
+  ::: [ local path prefix ]/interface/failed_import_keeps_merged_ports.fpp:13:5
+   |
+13 |     import B
+   |     -------- port imported from here
+   |
+  ::: [ local path prefix ]/interface/failed_import_keeps_merged_ports.fpp:4:5
+   |
+ 4 |     output port x: P
+   |     ---------------- previous instance is here
+   |
+  ::: [ local path prefix ]/interface/failed_import_keeps_merged_ports.fpp:12:5
+   |
+12 |     import A
+   |     -------- previous instance imported from here
+   |
+  ::: [ local path prefix ]/interface/failed_import_keeps_merged_ports.fpp:13:5
+   |
+13 |     import B
+   |     -------- failed to import interface here
+

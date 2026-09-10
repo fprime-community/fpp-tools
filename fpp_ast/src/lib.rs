@@ -236,11 +236,22 @@ pub struct DefArray {
 }
 
 /// Component kind
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ComponentKind {
     Active,
     Passive,
     Queued,
+}
+
+impl std::fmt::Display for ComponentKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ComponentKind::Active => "active",
+            ComponentKind::Passive => "passive",
+            ComponentKind::Queued => "queued",
+        };
+        f.write_str(s)
+    }
 }
 
 /// Component definition
@@ -377,7 +388,7 @@ pub struct SpecGeneralPortInstance {
     pub port: Option<QualIdent>,
     pub priority: Option<Expr>,
     #[visitable(ignore)]
-    pub queue_full: Option<QueueFull>,
+    pub queue_full: Option<QueueFullSpecifier>,
 }
 
 /// Special port instance
@@ -391,7 +402,7 @@ pub struct SpecSpecialPortInstance {
     pub name: Name,
     pub priority: Option<Expr>,
     #[visitable(ignore)]
-    pub queue_full: Option<QueueFull>,
+    pub queue_full: Option<QueueFullSpecifier>,
 }
 
 /// Port instance specifier

@@ -163,7 +163,7 @@ pub fn handle_diagram_elements(
     for topology in state.analysis.topology_map.values() {
         push_if_in_doc(
             DiagramKind::Topology,
-            topology.name.clone(),
+            topology.qualified_name.clone(),
             topology.symbol.name().data.clone(),
             topology.symbol.name().id(),
         );
@@ -174,7 +174,7 @@ pub fn handle_diagram_elements(
         for graph in &topology.raw_direct_graphs {
             push_if_in_doc(
                 DiagramKind::ConnectionGroup,
-                format!("{}.{}", topology.name, graph.name.data),
+                format!("{}.{}", topology.qualified_name, graph.name.data),
                 graph.name.data.clone(),
                 graph.name.id(),
             );

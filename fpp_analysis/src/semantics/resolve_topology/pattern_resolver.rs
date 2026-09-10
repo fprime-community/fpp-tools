@@ -9,25 +9,6 @@ use crate::semantics::{
 use fpp_ast::{ConnectionPatternKind, SpecialPortInstanceKind};
 use fpp_core::Span;
 
-/// The human-readable name of a special port kind.
-fn special_kind_str(kind: &SpecialPortInstanceKind) -> &'static str {
-    match kind {
-        SpecialPortInstanceKind::CommandRecv => "command recv",
-        SpecialPortInstanceKind::CommandReg => "command reg",
-        SpecialPortInstanceKind::CommandResp => "command resp",
-        SpecialPortInstanceKind::Event => "event",
-        SpecialPortInstanceKind::ParamGet => "param get",
-        SpecialPortInstanceKind::ParamSet => "param set",
-        SpecialPortInstanceKind::ProductGet => "product get",
-        SpecialPortInstanceKind::ProductRecv => "product recv",
-        SpecialPortInstanceKind::ProductRequest => "product request",
-        SpecialPortInstanceKind::ProductSend => "product send",
-        SpecialPortInstanceKind::Telemetry => "telemetry",
-        SpecialPortInstanceKind::TextEvent => "text event",
-        SpecialPortInstanceKind::TimeGet => "time get",
-    }
-}
-
 fn dir_str(d: Direction) -> &'static str {
     match d {
         Direction::Input => "input",
@@ -91,11 +72,14 @@ fn get_general_port(
 ) -> SemanticResult<PortInstanceIdentifier> {
     let (ci, loc) = ci_use;
     let Some(comp) = get_component(a, ci) else {
-        return missing_port(*loc, &format!("{} {}", kind, dir_str(direction)), &ci.name);
+        return missing_port(
+            *loc,
+            &format!("{} {}", kind, dir_str(direction)),
+            ci.get_unqualified_name(),
+        );
     };
     let ports: Vec<PortInstance> = comp
-        .port_interface
-        .port_map
+        .port_map()
         .values()
         .filter(|pi| a.is_general_port(pi, direction, port_type_name))
         .cloned()
@@ -104,7 +88,7 @@ fn get_general_port(
         ports,
         &format!("{} {}", kind, dir_str(direction)),
         *loc,
-        &ci.name,
+        ci.get_unqualified_name(),
     )?;
     Ok(PortInstanceIdentifier {
         interface_instance: InterfaceInstance::from_component_instance(ci.clone()),
@@ -119,15 +103,14 @@ fn get_special_port(
 ) -> SemanticResult<PortInstanceIdentifier> {
     let (ci, loc) = ci_use;
     let Some(comp) = get_component(a, ci) else {
-        return missing_port(*loc, special_kind_str(&kind), &ci.name);
+        return missing_port(*loc, &kind.to_string(), ci.get_unqualified_name());
     };
-    let key = format!("{:?}", kind);
-    match comp.port_interface.special_port_map.get(&key) {
+    match comp.special_port_map().get(&kind) {
         Some(pi) => Ok(PortInstanceIdentifier {
             interface_instance: InterfaceInstance::from_component_instance(ci.clone()),
-            port_instance: pi.clone(),
+            port_instance: PortInstance::Special(pi.clone()),
         }),
-        None => missing_port(*loc, special_kind_str(&kind), &ci.name),
+        None => missing_port(*loc, &kind.to_string(), ci.get_unqualified_name()),
     }
 }
 
@@ -139,7 +122,7 @@ fn resolve_targets<'a>(
     if pattern.targets.is_empty() {
         instances
             .iter()
-            .map(|ci| (ci.clone(), pattern.loc))
+            .map(|ci| (ci.clone(), pattern.get_loc()))
             .collect()
     } else {
         pattern.targets.clone()
@@ -152,7 +135,7 @@ pub fn resolve(
     pattern: &ConnectionPattern,
     instances: &[ComponentInstance],
 ) -> SemanticResult<Vec<(String, Connection)>> {
-    match pattern.kind {
+    match pattern.kind() {
         ConnectionPatternKind::Command => resolve_command(a, pattern, instances),
         ConnectionPatternKind::Event => resolve_from_special(
             a,
@@ -219,7 +202,7 @@ fn resolve_command(
     pattern: &ConnectionPattern,
     instances: &[ComponentInstance],
 ) -> SemanticResult<Vec<(String, Connection)>> {
-    let loc = pattern.loc;
+    let loc = pattern.get_loc();
     let cmd_reg_in = get_general_port(
         a,
         &pattern.source,
@@ -269,11 +252,11 @@ fn resolve_from_special(
     port_type_name: &str,
     graph_name: &str,
 ) -> SemanticResult<Vec<(String, Connection)>> {
-    let loc = pattern.loc;
+    let loc = pattern.get_loc();
     let source = get_general_port(
         a,
         &pattern.source,
-        special_kind_str(&kind),
+        &kind.to_string(),
         Direction::Input,
         port_type_name,
     )?;
@@ -301,7 +284,7 @@ fn resolve_health(
     pattern: &ConnectionPattern,
     instances: &[ComponentInstance],
 ) -> SemanticResult<Vec<(String, Connection)>> {
-    let loc = pattern.loc;
+    let loc = pattern.get_loc();
     let (source_in, source_out) = get_ping_ports(a, &pattern.source)?;
     for_targets(pattern, instances, |target| {
         let (target_in, target_out) = get_ping_ports(a, target)?;
@@ -329,7 +312,7 @@ fn resolve_param(
     pattern: &ConnectionPattern,
     instances: &[ComponentInstance],
 ) -> SemanticResult<Vec<(String, Connection)>> {
-    let loc = pattern.loc;
+    let loc = pattern.get_loc();
     let prm_get_in = get_general_port(
         a,
         &pattern.source,

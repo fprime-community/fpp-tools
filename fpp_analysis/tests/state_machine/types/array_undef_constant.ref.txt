@@ -3,8 +3,3 @@
 2 |   array A = [3] U32 default a
   |                             ^ cannot find constant `a` in scope
 
- --> [ local path prefix ]/state_machine/types/array_undef_constant.fpp:1:15
-  |
-1 | state machine SM {
-  |               ^^ state machine must have initial transition
-

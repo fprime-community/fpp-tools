@@ -1,20 +1,14 @@
- --> [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:3:12
-  |
-3 |   instance c1
-  |            ^^ cannot find component instance or topology `c1` in scope
-
- --> [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:4:12
-  |
-4 |   instance c2
-  |            ^^ cannot find component instance or topology `c2` in scope
-
- --> [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:9:7
-  |
-9 |       c1.T
-  |       ^^ cannot find component instance or topology `c1` in scope
-
-  --> [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:13:7
+  --> [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:12:5
    |
-13 |       c2.T
-   |       ^^ cannot find component instance or topology `c2` in scope
+12 | /     packet P2 id 0 group 1 {
+13 | |       c2.T
+14 | |     }
+   | |_____^ duplicate identifier value (0 dec, 0 hex)
+   |
+  ::: [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:8:5
+   |
+ 8 | /     packet P1 id 0 group 0 {
+ 9 | |       c1.T
+10 | |     }
+   | |_____- previous occurrence is here
 

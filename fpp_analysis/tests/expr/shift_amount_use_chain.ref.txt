@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/expr/shift_amount_use_chain.fpp:2:19
+  |
+2 | constant z = 1 << 300
+  |                   ^^^ invalid shift amount
+  |
+  = note: shift amount must be a non-negative value that must be in the range [0,255]
+

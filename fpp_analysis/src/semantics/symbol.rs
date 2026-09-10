@@ -1,5 +1,4 @@
-use crate::Analysis;
-use fpp_core::Node;
+use fpp_core::{Node, Span, Spanned};
 use std::sync::Arc;
 
 /// The interface for an FPP symbol
@@ -8,6 +7,10 @@ pub trait SymbolInterface: Clone {
     fn node(&self) -> Node;
     /// Gets the unqualified name of the symbol
     fn name(&self) -> &fpp_ast::Name;
+    /// Gets the location of the symbol
+    fn get_loc(&self) -> Span {
+        self.node().span()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

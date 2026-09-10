@@ -1,5 +1,5 @@
- --> [ local path prefix ]/command/sync_queue_full.fpp:3:3
+ --> [ local path prefix ]/command/sync_queue_full.fpp:3:18
   |
 3 |   sync command C drop
-  |   ^^^^^^^^^^^^^^^^^^^ only async input may have queue full behavior
+  |                  ^^^^ only async input may have queue full behavior
 

@@ -56,6 +56,11 @@ fn sync_input_queue_full() {
 }
 
 #[test]
+fn output_queue_full() {
+    run_test("port_instance/output_queue_full")
+}
+
+#[test]
 fn undef_command_reg() {
     run_test("port_instance/undef_command_reg")
 }

@@ -845,7 +845,7 @@ pub(crate) fn port_match_at_position<'a>(
     // because the request runs under `fpp_core::run_ref` (the compiler context
     // is set on this thread).
     let component = enclosing_component(state, &nodes)?;
-    let port_instance = component.port_interface.port_map.get(&name.data)?.clone();
+    let port_instance = component.port_map().get(&name.data)?.clone();
 
     // Look up the port name node among the resolved nodes for ranging.
     let name_node = nodes
@@ -1226,7 +1226,7 @@ fn completion_items_for_ports(
     let mut items: Vec<CompletionItem> = port_interface
         .port_map
         .values()
-        .filter(|pi| !general_only || matches!(pi, PortInstance::General { .. }))
+        .filter(|pi| !general_only || matches!(pi, PortInstance::General(_)))
         .filter(|pi| match direction_filter {
             Some(want) => pi.get_direction() == Some(want),
             None => true,

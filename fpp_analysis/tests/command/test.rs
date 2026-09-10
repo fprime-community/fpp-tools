@@ -51,6 +51,11 @@ fn sync_queue_full() {
 }
 
 #[test]
+fn guarded_queue_full() {
+    run_test("command/guarded_queue_full")
+}
+
+#[test]
 fn duplicate_opcode_explicit() {
     run_test("command/duplicate_opcode_explicit")
 }

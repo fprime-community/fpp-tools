@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/tlm_packets/negative_id.fpp:5:18
+  |
+5 |     packet P1 id -1 group 0 {
+  |                  ^^ value may not be negative
+  |
+  = note: expression evaluated to `-1`
+

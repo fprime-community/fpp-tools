@@ -39,3 +39,18 @@ fn shift_negative_amount_error() {
 fn shift_negative_rshift_error() {
     run_test("numeric_shift/shift_negative_rshift_error")
 }
+
+#[test]
+fn shift_wide_amount_positive_error() {
+    run_test("numeric_shift/shift_wide_amount_positive_error")
+}
+
+#[test]
+fn shift_wide_amount_negative_error() {
+    run_test("numeric_shift/shift_wide_amount_negative_error")
+}
+
+#[test]
+fn shift_overflow_error() {
+    run_test("numeric_shift/shift_overflow_error")
+}

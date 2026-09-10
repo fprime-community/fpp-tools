@@ -4,9 +4,10 @@ mod errors;
 use crate::passes::{
     BuildSpecLocMap, CheckComponentDefs, CheckComponentInstanceDefs, CheckDictionaryDefs,
     CheckExprTypes, CheckFrameworkConstantValues, CheckFrameworkDefs, CheckInterfaceDefs,
-    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs, CheckTopologyDefs,
-    CheckTopologyInstances, CheckTypeUses, CheckUseDefCycles, CheckUses, ConstructImpliedUseMap,
-    EnterSymbols, EvalConstantExprs, EvalImpliedEnumConsts, FinalizeTypeDefs,
+    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs, CheckTlmPacketSets,
+    CheckTopologyDefs, CheckTopologyInstances, CheckTypeUses, CheckUseDefCycles, CheckUses,
+    ConstructImpliedUseMap, EnterSymbols, EvalConstantExprs, EvalImpliedEnumConsts,
+    FinalizeTypeDefs,
 };
 pub use analysis::*;
 use fpp_ast::{MutVisitor, Visitor};
@@ -89,6 +90,9 @@ pub mod passes {
     mod check_topology_defs;
     pub use check_topology_defs::*;
 
+    mod check_tlm_packet_sets;
+    pub use check_tlm_packet_sets::*;
+
     pub(crate) mod check_spec_locs;
     pub use check_spec_locs::*;
 
@@ -133,7 +137,17 @@ pub mod semantics {
     mod system;
     pub use system::*;
 
-    pub(crate) mod resolve_topology;
+    mod tlm_channel_identifier;
+    pub use tlm_channel_identifier::*;
+
+    mod tlm_packet;
+    pub use tlm_packet::*;
+
+    pub mod tlm_packet_set;
+    pub use tlm_packet_set::*;
+
+    pub mod resolve_topology;
+    pub use resolve_topology::*;
 
     mod connection;
     pub use connection::*;
@@ -156,11 +170,18 @@ pub mod semantics {
     mod format;
     pub use format::*;
 
+    pub mod state_machine;
+    pub use state_machine::*;
+
+    pub mod spec_loc;
+    pub use spec_loc::*;
+
+    pub mod interned_def;
+    pub use interned_def::*;
+
     mod generic_name_symbol_map;
     mod generic_nested_scope;
     mod generic_scope;
-
-    pub mod state_machine;
 
     #[cfg(test)]
     mod format_spec;
@@ -212,6 +233,7 @@ pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> Contr
     BuildSpecLocMap.visit_trans_units(a, ast.iter().cloned())?;
     CheckSpecLocs.visit_trans_units(a, ast.iter().cloned())?;
     CheckDictionaryDefs.visit_trans_units(a, ast.iter().cloned())?;
+    CheckTlmPacketSets::check(a);
     CheckSystemDefs.visit_trans_units(a, ast.iter().cloned())?;
 
     ControlFlow::Continue(())

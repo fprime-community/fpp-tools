@@ -76,12 +76,16 @@ impl<'ast> Visitor<'ast> for CheckSystemDefs {
             return ControlFlow::Continue(());
         }
 
+        let topology = a
+            .topology_map
+            .get(&topology_symbol)
+            .cloned()
+            .expect("every topology is resolved by CheckTopologyDefs");
         a.system_map.insert(
-            symbol.clone(),
+            symbol,
             FppSystem {
-                symbol,
-                topology: topology_symbol,
-                loc: node.span(),
+                node: Arc::new(node.clone()),
+                topology,
             },
         );
         ControlFlow::Continue(())

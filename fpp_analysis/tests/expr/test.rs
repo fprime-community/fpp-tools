@@ -21,6 +21,46 @@ fn div_by_zero() {
 }
 
 #[test]
+fn div_by_near_zero_float() {
+    run_test("expr/div_by_near_zero_float")
+}
+
+#[test]
+fn add_ok() {
+    run_test("expr/add_ok")
+}
+
+#[test]
+fn arith_overflow_add() {
+    run_test("expr/arith_overflow_add")
+}
+
+#[test]
+fn arith_overflow_sub() {
+    run_test("expr/arith_overflow_sub")
+}
+
+#[test]
+fn arith_overflow_mul() {
+    run_test("expr/arith_overflow_mul")
+}
+
+#[test]
+fn arith_overflow_div() {
+    run_test("expr/arith_overflow_div")
+}
+
+#[test]
+fn arith_overflow_neg() {
+    run_test("expr/arith_overflow_neg")
+}
+
+#[test]
+fn arith_overflow_typed_context() {
+    run_test("expr/arith_overflow_typed_context")
+}
+
+#[test]
 fn array_error() {
     run_test("expr/array_error")
 }
@@ -66,6 +106,11 @@ fn sizeof_error() {
 }
 
 #[test]
+fn sizeof_too_large() {
+    run_test("expr/sizeof_too_large")
+}
+
+#[test]
 fn sizeof_types() {
     run_test("expr/sizeof_types")
 }
@@ -108,4 +153,44 @@ fn binop_numeric_error() {
 #[test]
 fn subscript_order_error() {
     run_test("expr/subscript_order_error")
+}
+
+#[test]
+fn string_size_sizeof_ok() {
+    run_test("expr/string_size_sizeof_ok")
+}
+
+#[test]
+fn string_size_sizeof_undefined() {
+    run_test("expr/string_size_sizeof_undefined")
+}
+
+#[test]
+fn subscript_index_too_large() {
+    run_test("expr/subscript_index_too_large")
+}
+
+#[test]
+fn div_by_zero_use_chain() {
+    run_test("expr/div_by_zero_use_chain")
+}
+
+#[test]
+fn shift_amount_use_chain() {
+    run_test("expr/shift_amount_use_chain")
+}
+
+#[test]
+fn subscript_use_chain() {
+    run_test("expr/subscript_use_chain")
+}
+
+#[test]
+fn binop_type_use_chain() {
+    run_test("expr/binop_type_use_chain")
+}
+
+#[test]
+fn arith_overflow_use_chain() {
+    run_test("expr/arith_overflow_use_chain")
 }

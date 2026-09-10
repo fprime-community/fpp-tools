@@ -1,7 +1,7 @@
   --> [ local path prefix ]/port_instance/duplicate_command_recv.fpp:10:3
    |
 10 |   command recv port p2
-   |   ^^^^^^^^^^^^^^^^^^^^ duplicate port instance CommandRecv
+   |   ^^^^^^^^^^^^^^^^^^^^ duplicate port instance command recv
    |
   ::: [ local path prefix ]/port_instance/duplicate_command_recv.fpp:9:3
    |

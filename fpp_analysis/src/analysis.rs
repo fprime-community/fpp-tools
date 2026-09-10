@@ -1,9 +1,9 @@
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
     FrameworkDefinitions, ImpliedUseSet, IntegerValue, Interface, NameGroup, NestedScope, Scope,
-    Symbol, SymbolInterface, Type, UseDefMatching, Value,
+    SpecLocEntry, Symbol, SymbolInterface, Type, UseDefMatching, Value,
 };
-use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull};
+use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier};
 use fpp_core::{SourceFile, Span, Spanned};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
@@ -62,6 +62,9 @@ pub struct Analysis {
     pub topology_map: HashMap<Symbol, crate::semantics::Topology>,
     /// The mapping from system symbols to their resolved systems.
     pub system_map: HashMap<Symbol, crate::semantics::FppSystem>,
+    /// The mapping from deployment topology symbols to their telemetry packet
+    /// sets, by packet set name.
+    pub tlm_packet_set_map: HashMap<Symbol, HashMap<String, crate::semantics::TlmPacketSet>>,
     /// The mapping from (location specifier kind, qualified name) to the
     /// location specifier that named it.
     pub location_specifier_map: HashMap<(fpp_ast::SpecLocKind, String), SpecLocEntry>,
@@ -81,19 +84,6 @@ pub struct Analysis {
     /// every type name an entry in `type_map`, letting later passes read a
     /// resolved type without handling the unresolved case.
     unknown_type: Option<Arc<Type>>,
-}
-
-/// A recorded location specifier, keyed in `location_specifier_map`.
-#[derive(Debug, Clone)]
-pub struct SpecLocEntry {
-    /// Span of the location specifier statement
-    pub spec_span: Span,
-    /// Span of the file string literal (error location + base for path resolution)
-    pub file_span: Span,
-    /// The specified (relative) path string
-    pub file_value: String,
-    /// Whether this is a dictionary specifier
-    pub is_dictionary_def: bool,
 }
 
 impl Default for Analysis {
@@ -133,6 +123,7 @@ impl Analysis {
             partial_topology_map: Default::default(),
             topology_map: Default::default(),
             system_map: Default::default(),
+            tlm_packet_set_map: Default::default(),
             location_specifier_map: Default::default(),
             scope_name_list: Vec::new(),
             state_machine_map: Default::default(),
@@ -156,18 +147,32 @@ impl Analysis {
             return ty.clone();
         }
         let node_id = fpp_core::Node::new(span);
-        let ty = Arc::new(Type::AbsType(crate::semantics::AbsType {
-            node: fpp_ast::DefAbsType {
+        let ty = Arc::new(Type::AbsType(Arc::new(crate::semantics::AbsType {
+            node: Arc::new(fpp_ast::DefAbsType {
                 node_id,
                 name: fpp_ast::Name {
                     node_id,
                     data: "<unknown>".to_string(),
                 },
-            },
-            default_value: None,
-        }));
+            }),
+        })));
         self.unknown_type = Some(ty.clone());
         ty
+    }
+
+    /// Gets the finalized type of a type-name use node.
+    ///
+    /// `FinalizeTypeDefs` rewrites the type recorded for a type DEFINITION
+    /// node; the type names that use it keep the type they were given by
+    /// `CheckTypeUses`, which may not be finalized yet (an array whose size is
+    /// not yet known, a struct with no default value). Resolve the use through
+    /// its definition node, so callers always see the finalized type.
+    pub fn get_finalized_type(&self, node: fpp_core::Node) -> Option<Arc<Type>> {
+        let ty = self.type_map.get(&node)?.clone();
+        match ty.def_node_id() {
+            Some(def_node) => Some(self.type_map.get(&def_node).cloned().unwrap_or(ty)),
+            None => Some(ty),
+        }
     }
 
     /// Get an integer value for an AST node from the value map, if present.
@@ -286,6 +291,12 @@ impl Analysis {
         opt.clone().unwrap_or(QueueFull::Assert)
     }
 
+    /// Get the queue full behavior named by an optional queue full specifier,
+    /// defaulting to `Assert`.
+    pub fn get_specified_queue_full(opt: &Option<QueueFullSpecifier>) -> QueueFull {
+        Self::get_queue_full(&opt.as_ref().map(|spec| spec.kind.clone()))
+    }
+
     /// Count the number of ref parameters in a formal parameter list.
     pub fn get_num_ref_params(params: &[FormalParam]) -> usize {
         params
@@ -347,8 +358,10 @@ impl Analysis {
         parts.join(".")
     }
 
-    pub fn get_symbol<N: fpp_ast::AstNode>(&self, node: &N) -> Symbol {
-        self.symbol_map.get(&node.id()).unwrap().clone()
+    /// The symbol that [`crate::passes::EnterSymbols`] entered for a definition
+    /// node.
+    pub fn get_symbol<N: fpp_ast::AstNode>(&self, node: &N) -> Option<Symbol> {
+        self.symbol_map.get(&node.id()).cloned()
     }
 
     /// Resolve a use (by node ID) to a topology symbol. Returns `Ok(None)` for
