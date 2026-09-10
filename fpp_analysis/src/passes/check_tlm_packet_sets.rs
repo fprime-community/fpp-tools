@@ -6,7 +6,6 @@ use rustc_hash::FxHashMap as HashMap;
 use std::sync::Arc;
 
 /// Construct and check the telemetry packet sets of every deployment topology.
-
 pub struct CheckTlmPacketSets;
 
 impl CheckTlmPacketSets {

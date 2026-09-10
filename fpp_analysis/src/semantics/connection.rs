@@ -35,7 +35,6 @@ pub struct TopologyInstance {
 }
 
 /// An FPP interface instance: a component instance or an imported topology.
-
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum InterfaceInstance {
