@@ -2,32 +2,35 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
-import enum
 import typing
 __all__ = [
+    "AbsType",
     "AbsTypeValue",
-    "Action",
+    "AliasType",
     "Analysis",
     "AnonArrayType",
     "AnonArrayValue",
     "AnonStructType",
     "AnonStructValue",
-    "Array",
     "ArrayType",
     "ArrayValue",
     "AstNode",
-    "Async",
-    "AsyncInput",
+    "AsyncInputGeneralKind",
+    "AsyncNonParamKind",
     "Binop",
+    "BooleanType",
+    "BooleanValue",
+    "ChoiceStateMachineTypedElement",
+    "ChoiceStateOrChoice",
+    "ChoiceTransitionGraphArc",
     "Command",
     "CommandBase",
-    "CommandParam",
     "Component",
+    "ComponentInterfaceInstance",
     "ComponentKind",
     "Connection",
     "ConnectionPattern",
     "ConnectionPatternKind",
-    "Constant",
     "Container",
     "DefAbsType",
     "DefAction",
@@ -43,17 +46,18 @@ __all__ = [
     "DefInterface",
     "DefModule",
     "DefPort",
+    "DefPortPortInstanceType",
     "DefSignal",
     "DefState",
     "DefStateMachine",
     "DefStruct",
     "DefSystem",
     "DefTopology",
+    "DefaultFormatReplacementKind",
     "Diagnostic",
     "Direction",
     "DoExpr",
     "Endpoint",
-    "EnumConstant",
     "EnumConstantValue",
     "EnumType",
     "Event",
@@ -73,81 +77,77 @@ __all__ = [
     "ExprSizeOf",
     "ExprStruct",
     "ExprUnop",
-    "External",
-    "Float",
+    "ExternalTransition",
     "FloatKind",
+    "FloatType",
     "FloatValue",
     "FormalParam",
     "FormalParamKind",
     "Format",
     "FormatPart",
     "FormatPartBase",
-    "FormatReplacementField",
+    "FormatReplacementFormatPart",
     "FormatReplacementKind",
     "FormatReplacementKindBase",
-    "FormatReplacementKindDefault",
-    "FormatReplacementKindInteger",
     "FppSystem",
     "FrameworkDefinitions",
     "GeneralKind",
     "GeneralKindBase",
     "GeneralPortInstance",
     "GeneralPortInstanceKind",
-    "Guard",
-    "Guarded",
-    "GuardedInput",
+    "GuardedInputGeneralKind",
+    "GuardedNonParamKind",
     "GuardedTransition",
     "Ident",
     "ImpliedUse",
     "ImpliedUseSet",
     "InitSpecifier",
-    "Initial",
-    "InitialTransition",
+    "InitialTransitionGraphArc",
+    "InitialTransitionStateMachineTypedElement",
     "InputPortKind",
     "IntegerFormatKind",
+    "IntegerFormatReplacementKind",
     "IntegerKind",
+    "IntegerType",
+    "IntegerValue",
     "Interface",
     "InterfaceInstance",
     "InterfaceInstanceBase",
-    "InterfaceInstanceComponent",
-    "Internal",
     "InternalPortInstance",
+    "InternalTransition",
     "Kind",
     "LitString",
-    "Literal",
+    "LiteralFormatPart",
     "Loc",
     "Model",
-    "Module",
     "NestedScope",
     "NodeVisitor",
-    "NonParam",
+    "NonParamCommand",
     "NonParamKind",
     "NonParamKindBase",
     "Opaque",
-    "Output",
+    "OutputGeneralKind",
     "Param",
+    "ParamCommand",
     "ParamKind",
-    "Port",
     "PortInstance",
     "PortInstanceBase",
     "PortInstanceIdentifier",
     "PortInstanceType",
     "PortInstanceTypeBase",
-    "PortInstanceTypeDefPort",
     "PortInterface",
     "PortMatching",
-    "PrimitiveInt",
+    "PrimitiveIntType",
     "PrimitiveIntegerValue",
     "Qualified",
     "QualifiedName",
     "QueueFull",
     "QueueFullSpecifier",
-    "Rational",
     "RationalFormatKind",
+    "RationalFormatReplacementKind",
     "Record",
     "Scope",
-    "Serial",
-    "Signal",
+    "SerialPortInstanceType",
     "Span",
     "SpecCommand",
     "SpecContainer",
@@ -178,26 +178,29 @@ __all__ = [
     "SpecTopPort",
     "SpecialPortInstance",
     "SpecialPortInstanceKind",
-    "StateEntry",
-    "StateExit",
+    "StateEntryStateMachineTypedElement",
+    "StateExitStateMachineTypedElement",
     "StateMachine",
     "StateMachineAnalysis",
     "StateMachineInstance",
     "StateMachineNestedScope",
     "StateMachineScope",
     "StateMachineSymbol",
+    "StateMachineSymbolAction",
     "StateMachineSymbolBase",
     "StateMachineSymbolChoice",
+    "StateMachineSymbolGuard",
+    "StateMachineSymbolSignal",
     "StateMachineSymbolState",
     "StateMachineTypedElement",
     "StateMachineTypedElementBase",
-    "StateMachineTypedElementChoice",
     "StateOrChoice",
     "StateOrChoiceBase",
-    "StateOrChoiceChoice",
-    "StateOrChoiceState",
-    "StateTransition",
-    "Struct",
+    "StateStateOrChoice",
+    "StateTransitionGraphArc",
+    "StateTransitionStateMachineTypedElement",
+    "StringType",
+    "StringValue",
     "StructExprMember",
     "StructType",
     "StructTypeMember",
@@ -205,17 +208,23 @@ __all__ = [
     "Symbol",
     "SymbolAbsType",
     "SymbolAliasType",
+    "SymbolArrayType",
     "SymbolBase",
     "SymbolComponent",
     "SymbolComponentInstance",
-    "SymbolEnum",
+    "SymbolConstant",
+    "SymbolEnumConstant",
+    "SymbolEnumType",
     "SymbolInterface",
+    "SymbolModule",
+    "SymbolPort",
     "SymbolStateMachine",
+    "SymbolStructType",
+    "SymbolSystem",
     "SymbolTopology",
-    "Sync",
-    "SyncInput",
+    "SyncInputGeneralKind",
+    "SyncNonParamKind",
     "SyntaxTree",
-    "System",
     "Throttle",
     "TimeInterval",
     "TlmChannel",
@@ -226,7 +235,7 @@ __all__ = [
     "TlmPacket",
     "TlmPacketSet",
     "Topology",
-    "TopologyInstance",
+    "TopologyInterfaceInstance",
     "TopologyPort",
     "TopologyPortInstance",
     "TransUnit",
@@ -236,61 +245,61 @@ __all__ = [
     "TransitionGraph",
     "TransitionGraphArc",
     "TransitionGraphArcBase",
-    "TransitionGraphArcChoice",
-    "TransitionGraphArcState",
     "TransitionGraphNode",
     "TransitionOrDoDo",
     "TransitionOrDoTransition",
     "Type",
-    "TypeAbsType",
-    "TypeAliasType",
     "TypeBase",
-    "TypeBoolean",
-    "TypeInteger",
     "TypeName",
     "TypeNameBool",
     "TypeNameFloating",
     "TypeNameInteger",
     "TypeNameQualIdent",
     "TypeNameString",
-    "TypeString",
     "Unop",
     "UseDefMatching",
     "Value",
     "ValueBase",
-    "ValueBoolean",
-    "ValueInteger",
-    "ValueString",
     "analyze",
     "parse",
 ]
 
-Command: typing.TypeAlias = NonParam | CommandParam
-FormatPart: typing.TypeAlias = Literal | FormatReplacementField
-FormatReplacementKind: typing.TypeAlias = FormatReplacementKindDefault | FormatReplacementKindInteger | Rational
-GeneralKind: typing.TypeAlias = AsyncInput | GuardedInput | Output | SyncInput
-InterfaceInstance: typing.TypeAlias = InterfaceInstanceComponent | TopologyInstance
-NonParamKind: typing.TypeAlias = Async | Guarded | Sync
+Command: typing.TypeAlias = NonParamCommand | ParamCommand
+FormatPart: typing.TypeAlias = LiteralFormatPart | FormatReplacementFormatPart
+FormatReplacementKind: typing.TypeAlias = DefaultFormatReplacementKind | IntegerFormatReplacementKind | RationalFormatReplacementKind
+GeneralKind: typing.TypeAlias = AsyncInputGeneralKind | GuardedInputGeneralKind | OutputGeneralKind | SyncInputGeneralKind
+InterfaceInstance: typing.TypeAlias = ComponentInterfaceInstance | TopologyInterfaceInstance
+NonParamKind: typing.TypeAlias = AsyncNonParamKind | GuardedNonParamKind | SyncNonParamKind
 PortInstance: typing.TypeAlias = GeneralPortInstance | SpecialPortInstance | InternalPortInstance | TopologyPortInstance
-PortInstanceType: typing.TypeAlias = PortInstanceTypeDefPort | Serial
-StateMachineSymbol: typing.TypeAlias = Action | Guard | StateMachineSymbolChoice | Signal | StateMachineSymbolState
-StateMachineTypedElement: typing.TypeAlias = StateEntry | StateExit | InitialTransition | StateTransition | StateMachineTypedElementChoice
-StateOrChoice: typing.TypeAlias = StateOrChoiceState | StateOrChoiceChoice
-Symbol: typing.TypeAlias = SymbolAbsType | SymbolAliasType | Array | SymbolComponent | SymbolComponentInstance | Constant | SymbolEnum | EnumConstant | SymbolInterface | Module | Port | SymbolStateMachine | Struct | System | SymbolTopology
-Transition: typing.TypeAlias = External | Internal
-TransitionGraphArc: typing.TypeAlias = Initial | TransitionGraphArcState | TransitionGraphArcChoice
-Type: typing.TypeAlias = PrimitiveInt | Float | TypeString | TypeBoolean | TypeInteger | TypeAbsType | TypeAliasType | ArrayType | AnonArrayType | EnumType | StructType | AnonStructType | TypeBase
-Value: typing.TypeAlias = PrimitiveIntegerValue | AbsTypeValue | ValueInteger | FloatValue | ValueBoolean | ValueString | EnumConstantValue | AnonArrayValue | ArrayValue | AnonStructValue | StructValue
+PortInstanceType: typing.TypeAlias = DefPortPortInstanceType | SerialPortInstanceType
+StateMachineSymbol: typing.TypeAlias = StateMachineSymbolAction | StateMachineSymbolGuard | StateMachineSymbolChoice | StateMachineSymbolSignal | StateMachineSymbolState
+StateMachineTypedElement: typing.TypeAlias = StateEntryStateMachineTypedElement | StateExitStateMachineTypedElement | InitialTransitionStateMachineTypedElement | StateTransitionStateMachineTypedElement | ChoiceStateMachineTypedElement
+StateOrChoice: typing.TypeAlias = StateStateOrChoice | ChoiceStateOrChoice
+Symbol: typing.TypeAlias = SymbolAbsType | SymbolAliasType | SymbolArrayType | SymbolComponent | SymbolComponentInstance | SymbolConstant | SymbolEnumType | SymbolEnumConstant | SymbolInterface | SymbolModule | SymbolPort | SymbolStateMachine | SymbolStructType | SymbolSystem | SymbolTopology
+Transition: typing.TypeAlias = ExternalTransition | InternalTransition
+TransitionGraphArc: typing.TypeAlias = InitialTransitionGraphArc | StateTransitionGraphArc | ChoiceTransitionGraphArc
+Type: typing.TypeAlias = PrimitiveIntType | FloatType | StringType | BooleanType | IntegerType | AbsType | AliasType | ArrayType | AnonArrayType | EnumType | StructType | AnonStructType | TypeBase
+Value: typing.TypeAlias = PrimitiveIntegerValue | AbsTypeValue | IntegerValue | FloatValue | BooleanValue | StringValue | EnumConstantValue | AnonArrayValue | ArrayValue | AnonStructValue | StructValue
+
+@typing.final
+class AbsType(TypeBase):
+    @property
+    def node(self) -> DefAbsType: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class AbsTypeValue(ValueBase):
     @property
-    def ty(self) -> TypeAbsType: ...
+    def ty(self) -> AbsType: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Action(StateMachineSymbolBase):
+class AliasType(TypeBase):
     @property
-    def definition(self) -> DefAction: ...
+    def node(self) -> DefAliasType: ...
+    @property
+    def alias_type(self) -> Type: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Analysis:
@@ -329,9 +338,9 @@ class Analysis:
     @property
     def component_map(self) -> builtins.dict[Symbol, Component]: ...
     @property
-    def component_instance(self) -> typing.Optional[InterfaceInstanceComponent]: ...
+    def component_instance(self) -> typing.Optional[ComponentInterfaceInstance]: ...
     @property
-    def component_instance_map(self) -> builtins.dict[Symbol, InterfaceInstanceComponent]: ...
+    def component_instance_map(self) -> builtins.dict[Symbol, ComponentInterfaceInstance]: ...
     @property
     def topology(self) -> typing.Optional[Topology]: ...
     @property
@@ -357,7 +366,7 @@ class Analysis:
     def get_array_size(self, node: AstNode, loc: Span) -> builtins.int: ...
     def get_array_size_opt(self, expr: typing.Optional[Expr]) -> builtins.int: ...
     def get_big_int_value_opt(self, expr: typing.Optional[Expr]) -> typing.Optional[builtins.int]: ...
-    def get_component_instance(self, id: AstNode) -> typing.Optional[InterfaceInstanceComponent]: ...
+    def get_component_instance(self, id: AstNode) -> typing.Optional[ComponentInterfaceInstance]: ...
     def get_finalized_type(self, node: AstNode) -> typing.Optional[Type]: ...
     def get_int_value(self, node: AstNode) -> typing.Optional[builtins.int]: ...
     def get_int_value_checked(self, node: AstNode, loc: Span) -> builtins.int: ...
@@ -377,6 +386,7 @@ class AnonArrayType(TypeBase):
     def size(self) -> typing.Optional[builtins.int]: ...
     @property
     def elt_type(self) -> Type: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class AnonArrayValue(ValueBase):
@@ -385,21 +395,19 @@ class AnonArrayValue(ValueBase):
     @property
     def scalar(self) -> typing.Optional[Value]: ...
     def get(self, index: builtins.int) -> typing.Optional[Value]: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class AnonStructType(TypeBase):
     @property
     def members(self) -> builtins.dict[builtins.str, Type]: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class AnonStructValue(ValueBase):
     @property
     def members(self) -> builtins.dict[builtins.str, Value]: ...
-
-@typing.final
-class Array(SymbolBase):
-    @property
-    def definition(self) -> DefArray: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class ArrayType(TypeBase):
@@ -411,6 +419,7 @@ class ArrayType(TypeBase):
     def default(self) -> typing.Optional[ArrayValue]: ...
     @property
     def format(self) -> typing.Optional[Format]: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class ArrayValue(ValueBase):
@@ -418,6 +427,7 @@ class ArrayValue(ValueBase):
     def anon_array(self) -> AnonArrayValue: ...
     @property
     def ty(self) -> ArrayType: ...
+    def __repr__(self) -> builtins.str: ...
 
 class AstNode:
     r"""
@@ -429,6 +439,18 @@ class AstNode:
     def node_id(self) -> builtins.int: ...
     @property
     def location(self) -> typing.Optional[Loc]: ...
+    @property
+    def in_source(self) -> builtins.bool:
+        r"""
+        Whether this node belongs to a unit the caller asked about, rather
+        than one passed to `analyze(imports=…)` to resolve references.
+        
+        Unit membership, not file membership: a member spliced in by
+        `include` is in-source if the unit that included it is, even though
+        its `location.uri` names a file that was never passed to `analyze`.
+        A node the state-enum transform spliced in likewise belongs to
+        whichever unit it was spliced into.
+        """
     @property
     def children(self) -> builtins.list[AstNode]:
         r"""
@@ -462,18 +484,52 @@ class AstNode:
         """
 
 @typing.final
-class Async(NonParamKindBase):
+class AsyncInputGeneralKind(GeneralKindBase):
     @property
     def priority(self) -> typing.Optional[builtins.int]: ...
     @property
     def queue_full(self) -> QueueFull: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class AsyncInput(GeneralKindBase):
+class AsyncNonParamKind(NonParamKindBase):
     @property
     def priority(self) -> typing.Optional[builtins.int]: ...
     @property
     def queue_full(self) -> QueueFull: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class BooleanType(TypeBase):
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class BooleanValue(ValueBase):
+    @property
+    def value(self) -> builtins.bool: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class ChoiceStateMachineTypedElement(StateMachineTypedElementBase):
+    @property
+    def definition(self) -> DefChoice: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class ChoiceStateOrChoice(StateOrChoiceBase):
+    @property
+    def value(self) -> StateMachineSymbol: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class ChoiceTransitionGraphArc(TransitionGraphArcBase):
+    @property
+    def start_choice(self) -> StateMachineSymbol: ...
+    @property
+    def a_node(self) -> TransitionExpr: ...
+    @property
+    def end_node(self) -> TransitionGraphNode: ...
+    def __repr__(self) -> builtins.str: ...
 
 class CommandBase:
     @property
@@ -481,13 +537,6 @@ class CommandBase:
     @property
     def is_async(self) -> builtins.bool: ...
     def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class CommandParam(CommandBase):
-    @property
-    def node(self) -> SpecParam: ...
-    @property
-    def kind(self) -> ParamKind: ...
 
 @typing.final
 class Component:
@@ -553,6 +602,39 @@ class Component:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
+class ComponentInterfaceInstance(InterfaceInstanceBase):
+    @property
+    def node(self) -> DefComponentInstance: ...
+    @property
+    def qualified_name(self) -> builtins.str: ...
+    @property
+    def component_symbol(self) -> Symbol: ...
+    @property
+    def base_id(self) -> builtins.int: ...
+    @property
+    def max_id(self) -> builtins.int: ...
+    @property
+    def file(self) -> typing.Optional[builtins.str]: ...
+    @property
+    def queue_size(self) -> typing.Optional[builtins.int]: ...
+    @property
+    def stack_size(self) -> typing.Optional[builtins.int]: ...
+    @property
+    def priority(self) -> typing.Optional[builtins.int]: ...
+    @property
+    def cpu(self) -> typing.Optional[builtins.int]: ...
+    @property
+    def init_specifier_map(self) -> builtins.dict[builtins.int, InitSpecifier]: ...
+    @property
+    def component(self) -> typing.Optional[Component]: ...
+    @property
+    def interface(self) -> typing.Optional[PortInterface]: ...
+    @property
+    def unqualified_name(self) -> builtins.str: ...
+    def add_init_specifier(self, spec: InitSpecifier) -> ComponentInterfaceInstance: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
 class Connection:
     @property
     def from_(self) -> Endpoint: ...
@@ -569,17 +651,12 @@ class ConnectionPattern:
     @property
     def node(self) -> SpecPatternConnectionGraph: ...
     @property
-    def source(self) -> tuple[InterfaceInstanceComponent, Span]: ...
+    def source(self) -> tuple[ComponentInterfaceInstance, Span]: ...
     @property
-    def targets(self) -> builtins.list[tuple[InterfaceInstanceComponent, Span]]: ...
+    def targets(self) -> builtins.list[tuple[ComponentInterfaceInstance, Span]]: ...
     @property
     def kind(self) -> ConnectionPatternKind: ...
     def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class Constant(SymbolBase):
-    @property
-    def definition(self) -> DefConstant: ...
 
 @typing.final
 class Container:
@@ -744,6 +821,12 @@ class DefPort(AstNode):
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
+class DefPortPortInstanceType(PortInstanceTypeBase):
+    @property
+    def value(self) -> Symbol: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
 class DefSignal(AstNode):
     @property
     def name(self) -> builtins.str: ...
@@ -800,6 +883,10 @@ class DefTopology(AstNode):
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
+class DefaultFormatReplacementKind(FormatReplacementKindBase):
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
 class Diagnostic:
     r"""
     A diagnostic surfaced to Python.
@@ -810,6 +897,14 @@ class Diagnostic:
     def message(self) -> builtins.str: ...
     @property
     def location(self) -> typing.Optional[Loc]: ...
+    @property
+    def display(self) -> builtins.str:
+        r"""
+        This diagnostic as a one-line compiler message:
+        `"path/to/file.fpp:12:5: error: cannot find type `Nope` in scope"`, or
+        `"error: <message>"` when there is no location.
+        """
+    def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -833,16 +928,12 @@ class Endpoint:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class EnumConstant(SymbolBase):
-    @property
-    def definition(self) -> DefEnumConstant: ...
-
-@typing.final
 class EnumConstantValue(ValueBase):
     @property
     def value(self) -> tuple[builtins.str, builtins.int]: ...
     @property
     def ty(self) -> EnumType: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class EnumType(TypeBase):
@@ -852,6 +943,7 @@ class EnumType(TypeBase):
     def rep_type(self) -> IntegerKind: ...
     @property
     def default(self) -> typing.Optional[EnumConstantValue]: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Event:
@@ -955,16 +1047,18 @@ class ExprUnop:
     def e(self) -> Expr: ...
 
 @typing.final
-class External(TransitionBase):
+class ExternalTransition(TransitionBase):
     @property
     def actions(self) -> builtins.list[StateMachineSymbol]: ...
     @property
     def target(self) -> StateOrChoice: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Float(TypeBase):
+class FloatType(TypeBase):
     @property
     def value(self) -> FloatKind: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class FloatValue(ValueBase):
@@ -972,6 +1066,7 @@ class FloatValue(ValueBase):
     def value(self) -> builtins.float: ...
     @property
     def kind(self) -> FloatKind: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class FormalParam(AstNode):
@@ -989,30 +1084,22 @@ class Format:
     def is_empty(self) -> builtins.bool: ...
     @property
     def len(self) -> builtins.int: ...
-    def get(self, n: builtins.int) -> typing.Optional[FormatReplacementField]: ...
+    def get(self, n: builtins.int) -> typing.Optional[FormatReplacementFormatPart]: ...
     def __repr__(self) -> builtins.str: ...
 
 class FormatPartBase:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class FormatReplacementField(FormatPartBase):
+class FormatReplacementFormatPart(FormatPartBase):
     @property
     def span(self) -> Span: ...
     @property
     def kind(self) -> FormatReplacementKind: ...
+    def __repr__(self) -> builtins.str: ...
 
 class FormatReplacementKindBase:
     def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class FormatReplacementKindDefault(FormatReplacementKindBase):
-    ...
-
-@typing.final
-class FormatReplacementKindInteger(FormatReplacementKindBase):
-    @property
-    def value(self) -> IntegerFormatKind: ...
 
 @typing.final
 class FppSystem:
@@ -1062,19 +1149,15 @@ class GeneralPortInstance(PortInstanceBase):
     @property
     def is_async_input(self) -> builtins.bool: ...
     def with_import_specifier(self, import_node: AstNode) -> GeneralPortInstance: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Guard(StateMachineSymbolBase):
-    @property
-    def definition(self) -> DefGuard: ...
+class GuardedInputGeneralKind(GeneralKindBase):
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Guarded(NonParamKindBase):
-    ...
-
-@typing.final
-class GuardedInput(GeneralKindBase):
-    ...
+class GuardedNonParamKind(NonParamKindBase):
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class GuardedTransition:
@@ -1117,18 +1200,36 @@ class InitSpecifier:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Initial(TransitionGraphArcBase):
+class InitialTransitionGraphArc(TransitionGraphArcBase):
     @property
     def start_state(self) -> StateMachineSymbol: ...
     @property
     def a_node(self) -> SpecInitialTransition: ...
     @property
     def end_node(self) -> TransitionGraphNode: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class InitialTransition(StateMachineTypedElementBase):
+class InitialTransitionStateMachineTypedElement(StateMachineTypedElementBase):
     @property
     def definition(self) -> SpecInitialTransition: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class IntegerFormatReplacementKind(FormatReplacementKindBase):
+    @property
+    def value(self) -> IntegerFormatKind: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class IntegerType(TypeBase):
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class IntegerValue(ValueBase):
+    @property
+    def value(self) -> builtins.int: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Interface:
@@ -1150,7 +1251,7 @@ class InterfaceInstanceBase:
     @property
     def as_topology(self) -> typing.Optional[Topology]: ...
     @property
-    def component_instance_opt(self) -> typing.Optional[InterfaceInstanceComponent]: ...
+    def component_instance_opt(self) -> typing.Optional[ComponentInterfaceInstance]: ...
     @property
     def interface(self) -> typing.Optional[PortInterface]: ...
     @property
@@ -1159,43 +1260,6 @@ class InterfaceInstanceBase:
     def unqualified_name(self) -> builtins.str: ...
     def get_port_instance(self, name: Ident) -> PortInstance: ...
     def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class InterfaceInstanceComponent(InterfaceInstanceBase):
-    @property
-    def node(self) -> DefComponentInstance: ...
-    @property
-    def qualified_name(self) -> builtins.str: ...
-    @property
-    def component_symbol(self) -> Symbol: ...
-    @property
-    def base_id(self) -> builtins.int: ...
-    @property
-    def max_id(self) -> builtins.int: ...
-    @property
-    def file(self) -> typing.Optional[builtins.str]: ...
-    @property
-    def queue_size(self) -> typing.Optional[builtins.int]: ...
-    @property
-    def stack_size(self) -> typing.Optional[builtins.int]: ...
-    @property
-    def priority(self) -> typing.Optional[builtins.int]: ...
-    @property
-    def cpu(self) -> typing.Optional[builtins.int]: ...
-    @property
-    def init_specifier_map(self) -> builtins.dict[builtins.int, InitSpecifier]: ...
-    @property
-    def component(self) -> typing.Optional[Component]: ...
-    @property
-    def interface(self) -> typing.Optional[PortInterface]: ...
-    @property
-    def unqualified_name(self) -> builtins.str: ...
-    def add_init_specifier(self, spec: InitSpecifier) -> InterfaceInstanceComponent: ...
-
-@typing.final
-class Internal(TransitionBase):
-    @property
-    def actions(self) -> builtins.list[StateMachineSymbol]: ...
 
 @typing.final
 class InternalPortInstance(PortInstanceBase):
@@ -1209,6 +1273,13 @@ class InternalPortInstance(PortInstanceBase):
     def node_id(self) -> builtins.int: ...
     @property
     def unqualified_name(self) -> builtins.str: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class InternalTransition(TransitionBase):
+    @property
+    def actions(self) -> builtins.list[StateMachineSymbol]: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class LitString(AstNode):
@@ -1217,14 +1288,15 @@ class LitString(AstNode):
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Literal(FormatPartBase):
+class LiteralFormatPart(FormatPartBase):
     @property
     def value(self) -> builtins.str: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Loc:
     r"""
-    A resolved source location (0-indexed line/column, matching `fpp_core`).
+    A resolved source location.
     """
     @property
     def uri(self) -> builtins.str: ...
@@ -1236,6 +1308,15 @@ class Loc:
     def end_line(self) -> builtins.int: ...
     @property
     def end_column(self) -> builtins.int: ...
+    @property
+    def display(self) -> builtins.str:
+        r"""
+        This location as a compiler displays it: `"path/to/file.fpp:12:5"`.
+        
+        The line and column are 1-indexed here, one more than the 0-indexed
+        `line`/`column` fields.
+        """
+    def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -1269,17 +1350,54 @@ class Model:
         `fpp_analysis::Analysis`. Navigate the model's semantics through its
         public maps (e.g. `model.analysis.component_map`) and methods (e.g.
         `model.analysis.get_qualified_name(sym)`).
+        
+        # Map iteration order
+        
+        Every `dict` the analysis hands back iterates in a defined order, so output
+        generated by walking one is stable without sorting:
+        
+        * keyed by an id, a name, or a kind (`command_map`, `event_map`,
+          `tlm_channel_map`, `param_map`, `container_map`, `record_map`, `port_map`,
+          `pattern_map`, …) → **key order**;
+        * keyed by anything that denotes an AST node — a node id, a symbol, a
+          state-machine typed element (`type_map`, `value_map`, `use_def_map`,
+          `component_map`, `topology_map`, `symbol_map`, `type_option_map`, …) →
+          **definition order**, i.e. the order the definitions appear in the source;
+        * keyed by a connection or a port-instance identifier (`Topology`'s
+          `instance_map`, `output_connection_map`, `input_connection_map`,
+          `from_port_number_map`, `to_port_number_map`) → **key order**, from the
+          ordered map the analysis already keeps them in.
+        
+        One exception: `TransitionGraph.arc_map`, whose key neither sorts nor carries
+        a node id, comes out in the underlying hash order — stable from run to run,
+        but neither key nor declaration order. Sort it yourself if you emit from it.
+        
+        One more caveat: a *semantic* map keyed by member name — chiefly
+        `AnonStructType.members` — is in name order, not declaration order, because
+        the analysis stores those members unordered and so has no declaration order
+        to give. Read `struct_type.node.members` for the declared order.
         """
-    def lookup(self, qualified_name: builtins.str) -> typing.Optional[Symbol]:
+    def lookup(self, qualified_name: builtins.str, *, kind: typing.Optional[type[Symbol]] = None) -> typing.Optional[Symbol]:
         r"""
         Look up a symbol by its fully-qualified (dotted) name.
+        
+        One name can denote more than one symbol: FPP keeps types and ports in
+        separate name groups, so `Fw.Time` in F Prime's own `Fw/Time/Time.fpp` is
+        both a `type Time` and a `port Time`. This returns the **first declared** of
+        them; pass `kind` to say which you want, or use `lookup_all` to see them
+        all.
+        
+        `kind` is a symbol class — `model.lookup("Fw.Time", kind=fpp.SymbolAbsType)`
+        — and matches subclasses, as `isinstance` does. `None` if nothing matches.
+        """
+    def lookup_all(self, qualified_name: builtins.str, *, kind: typing.Optional[type[Symbol]] = None) -> builtins.list[Symbol]:
+        r"""
+        Every symbol with this fully-qualified (dotted) name, in declaration order.
+        
+        Usually one; two when a name is declared in two name groups (see `lookup`).
+        Empty if nothing matches.
         """
     def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class Module(SymbolBase):
-    @property
-    def definition(self) -> DefModule: ...
 
 @typing.final
 class NestedScope:
@@ -1295,6 +1413,8 @@ class NodeVisitor:
     pre-order, in source order.
     
     ```python
+    import fpp
+    
     class Components(fpp.NodeVisitor):
         def __init__(self):
             self.names = []
@@ -1303,15 +1423,23 @@ class NodeVisitor:
             self.names.append(node.name)
             super().visit_DefComponent(node)   # keep descending
     
+    model = fpp.analyze(source="module M { passive component C {} }")
     v = Components()
-    for root in model.ast():
-        v.visit(root)
+    v.visit(model)                             # the whole model in one call
+    assert v.names == ["C"]
     ```
     
+    * `visit` takes an `AstNode`, a `TransUnit`, a `Model` or a `SyntaxTree`.
+      Handing it the model walks every unit; handing it a unit walks that unit's
+      members; handing it a node walks that subtree. So the explicit form of the
+      call above is `for unit in model.ast: for member in unit.members:
+      v.visit(member)`.
     * Recursion is **deep by default**. Call `super().visit_<TypeName>(node)` to
       descend from an override; omit it to prune that subtree.
     * Override `generic_visit` to hook *every* node — trace it, or return without
-      calling `super().generic_visit(node)` to make the whole pass shallow.
+      calling `super().generic_visit(node)` to make the whole pass shallow. It
+      takes AST nodes only; the three containers have their own
+      `visit_Model`/`visit_SyntaxTree`/`visit_TransUnit`, each overridable.
     * A node type with no `visit_<TypeName>` override falls through to
       `generic_visit`.
     * To stop early, raise an exception — return values are not inspected.
@@ -1383,12 +1511,14 @@ class NodeVisitor:
         Accepts (and ignores) any arguments, so a subclass is free to define its
         own `__init__` signature without forwarding to `super().__init__()`.
         """
-    def visit(self, node: AstNode) -> typing.Any:
+    def visit(self, node: AstNode | TransUnit | Model | SyntaxTree) -> typing.Any:
         r"""
         Visit `node` by dispatching to this visitor's `visit_<type(node).__name__>`
         method, falling back to `generic_visit` when there is none.
         
-        Returns whatever the dispatched method returned.
+        `node` may be an `AstNode`, a `TransUnit`, a `Model` or a `SyntaxTree` — so
+        `visit(model)` walks the whole model. Returns whatever the dispatched method
+        returned.
         """
     def generic_visit(self, node: AstNode) -> typing.Any:
         r"""
@@ -1399,14 +1529,33 @@ class NodeVisitor:
         `fpp_ast::Visitor::super_visit`. Children are the AST nodes reached
         through `node`'s fields (see `AstNode.children`); values returned by the
         children are discarded.
+        
+        A `Model`/`SyntaxTree`/`TransUnit` does not come through here: a container
+        is not a node, and its `visit_<TypeName>` iterates its own elements.
+        """
+    def visit_Model(self, model: Model) -> typing.Any:
+        r"""
+        Visit every translation unit of `model` (its `ast`).
+        
+        The whole-model entry point: `visitor.visit(model)` lands here. Call
+        `super().visit_Model(model)` from an override to keep descending.
+        """
+    def visit_SyntaxTree(self, tree: SyntaxTree) -> typing.Any:
+        r"""
+        Visit every translation unit of `tree` (its `units`).
+        """
+    def visit_TransUnit(self, unit: TransUnit) -> typing.Any:
+        r"""
+        Visit every top-level member of `unit` (its `members`).
         """
 
 @typing.final
-class NonParam(CommandBase):
+class NonParamCommand(CommandBase):
     @property
     def node(self) -> SpecCommand: ...
     @property
     def kind(self) -> NonParamKind: ...
+    def __repr__(self) -> builtins.str: ...
 
 class NonParamKindBase:
     def __repr__(self) -> builtins.str: ...
@@ -1418,8 +1567,8 @@ class Opaque(AstNode):
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Output(GeneralKindBase):
-    ...
+class OutputGeneralKind(GeneralKindBase):
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Param:
@@ -1440,9 +1589,12 @@ class Param:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Port(SymbolBase):
+class ParamCommand(CommandBase):
     @property
-    def definition(self) -> DefPort: ...
+    def node(self) -> SpecParam: ...
+    @property
+    def kind(self) -> ParamKind: ...
+    def __repr__(self) -> builtins.str: ...
 
 class PortInstanceBase:
     @property
@@ -1467,6 +1619,7 @@ class PortInstanceBase:
     def signature_eq(self, other: PortInstance) -> builtins.bool: ...
     def with_import_specifier(self, import_node: AstNode) -> PortInstance: ...
     def __repr__(self) -> builtins.str: ...
+    def __str__(self) -> builtins.str: ...
 
 @typing.final
 class PortInstanceIdentifier:
@@ -1486,11 +1639,6 @@ class PortInstanceTypeBase:
     @property
     def port_returns_value(self) -> typing.Optional[Span]: ...
     def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class PortInstanceTypeDefPort(PortInstanceTypeBase):
-    @property
-    def value(self) -> Symbol: ...
 
 @typing.final
 class PortInterface:
@@ -1516,11 +1664,13 @@ class PortMatching:
     def instance2(self) -> GeneralPortInstance: ...
     def matches(self, pi: PortInstance) -> builtins.bool: ...
     def __repr__(self) -> builtins.str: ...
+    def __str__(self) -> builtins.str: ...
 
 @typing.final
-class PrimitiveInt(TypeBase):
+class PrimitiveIntType(TypeBase):
     @property
     def value(self) -> IntegerKind: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class PrimitiveIntegerValue(ValueBase):
@@ -1528,6 +1678,7 @@ class PrimitiveIntegerValue(ValueBase):
     def value(self) -> builtins.int: ...
     @property
     def kind(self) -> IntegerKind: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Qualified(AstNode):
@@ -1542,6 +1693,7 @@ class QualifiedName:
     @property
     def to_ident_list(self) -> builtins.list[builtins.str]: ...
     def __repr__(self) -> builtins.str: ...
+    def __str__(self) -> builtins.str: ...
 
 @typing.final
 class QueueFullSpecifier(AstNode):
@@ -1550,11 +1702,12 @@ class QueueFullSpecifier(AstNode):
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Rational(FormatReplacementKindBase):
+class RationalFormatReplacementKind(FormatReplacementKindBase):
     @property
     def precision(self) -> typing.Optional[builtins.int]: ...
     @property
     def kind(self) -> RationalFormatKind: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Record:
@@ -1573,13 +1726,8 @@ class Scope:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Serial(PortInstanceTypeBase):
-    ...
-
-@typing.final
-class Signal(StateMachineSymbolBase):
-    @property
-    def definition(self) -> DefSignal: ...
+class SerialPortInstanceType(PortInstanceTypeBase):
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Span:
@@ -1597,6 +1745,12 @@ class Span:
     def uri(self) -> builtins.str:
         r"""
         The source file URI/path.
+        """
+    @property
+    def display(self) -> builtins.str:
+        r"""
+        This span's start as a compiler displays it: `"path/to/file.fpp:12:5"`
+        (1-indexed, unlike the 0-indexed `line`/`column` getters below).
         """
     @property
     def line(self) -> builtins.int:
@@ -1925,16 +2079,19 @@ class SpecialPortInstance(PortInstanceBase):
     @property
     def is_async_input(self) -> builtins.bool: ...
     def with_import_specifier(self, import_node: AstNode) -> SpecialPortInstance: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class StateEntry(StateMachineTypedElementBase):
+class StateEntryStateMachineTypedElement(StateMachineTypedElementBase):
     @property
     def definition(self) -> SpecStateEntry: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class StateExit(StateMachineTypedElementBase):
+class StateExitStateMachineTypedElement(StateMachineTypedElementBase):
     @property
     def definition(self) -> SpecStateExit: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class StateMachine:
@@ -2033,6 +2190,12 @@ class StateMachineNestedScope:
 class StateMachineScope:
     def __repr__(self) -> builtins.str: ...
 
+@typing.final
+class StateMachineSymbolAction(StateMachineSymbolBase):
+    @property
+    def definition(self) -> DefAction: ...
+    def __repr__(self) -> builtins.str: ...
+
 class StateMachineSymbolBase:
     @property
     def loc(self) -> typing.Optional[Loc]:
@@ -2042,18 +2205,32 @@ class StateMachineSymbolBase:
     @property
     def unqualified_name(self) -> builtins.str: ...
     @property
-    def node(self) -> builtins.int: ...
+    def node_id(self) -> builtins.int: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class StateMachineSymbolChoice(StateMachineSymbolBase):
     @property
     def definition(self) -> DefChoice: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class StateMachineSymbolGuard(StateMachineSymbolBase):
+    @property
+    def definition(self) -> DefGuard: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class StateMachineSymbolSignal(StateMachineSymbolBase):
+    @property
+    def definition(self) -> DefSignal: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class StateMachineSymbolState(StateMachineSymbolBase):
     @property
     def definition(self) -> DefState: ...
+    def __repr__(self) -> builtins.str: ...
 
 class StateMachineTypedElementBase:
     @property
@@ -2061,11 +2238,6 @@ class StateMachineTypedElementBase:
     @property
     def show_kind(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class StateMachineTypedElementChoice(StateMachineTypedElementBase):
-    @property
-    def definition(self) -> DefChoice: ...
 
 class StateOrChoiceBase:
     @property
@@ -2075,24 +2247,38 @@ class StateOrChoiceBase:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class StateOrChoiceChoice(StateOrChoiceBase):
+class StateStateOrChoice(StateOrChoiceBase):
     @property
     def value(self) -> StateMachineSymbol: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class StateOrChoiceState(StateOrChoiceBase):
+class StateTransitionGraphArc(TransitionGraphArcBase):
     @property
-    def value(self) -> StateMachineSymbol: ...
+    def start_state(self) -> StateMachineSymbol: ...
+    @property
+    def a_node(self) -> SpecStateTransition: ...
+    @property
+    def end_node(self) -> TransitionGraphNode: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class StateTransition(StateMachineTypedElementBase):
+class StateTransitionStateMachineTypedElement(StateMachineTypedElementBase):
     @property
     def definition(self) -> SpecStateTransition: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Struct(SymbolBase):
+class StringType(TypeBase):
     @property
-    def definition(self) -> DefStruct: ...
+    def value(self) -> typing.Optional[builtins.int]: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class StringValue(ValueBase):
+    @property
+    def value(self) -> builtins.str: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class StructExprMember(AstNode):
@@ -2114,6 +2300,7 @@ class StructType(TypeBase):
     def sizes(self) -> builtins.dict[builtins.str, builtins.int]: ...
     @property
     def formats(self) -> builtins.dict[builtins.str, Format]: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class StructTypeMember(AstNode):
@@ -2133,22 +2320,31 @@ class StructValue(ValueBase):
     def anon_struct(self) -> AnonStructValue: ...
     @property
     def ty(self) -> StructType: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class SymbolAbsType(SymbolBase):
     @property
     def definition(self) -> DefAbsType: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class SymbolAliasType(SymbolBase):
     @property
     def definition(self) -> DefAliasType: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolArrayType(SymbolBase):
+    @property
+    def definition(self) -> DefArray: ...
+    def __repr__(self) -> builtins.str: ...
 
 class SymbolBase:
     @property
     def is_dictionary_def(self) -> builtins.bool: ...
     @property
-    def node(self) -> builtins.int: ...
+    def node_id(self) -> builtins.int: ...
     @property
     def parent(self) -> typing.Optional[Symbol]: ...
     @property
@@ -2163,39 +2359,81 @@ class SymbolBase:
 class SymbolComponent(SymbolBase):
     @property
     def definition(self) -> DefComponent: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class SymbolComponentInstance(SymbolBase):
     @property
     def definition(self) -> DefComponentInstance: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class SymbolEnum(SymbolBase):
+class SymbolConstant(SymbolBase):
+    @property
+    def definition(self) -> DefConstant: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolEnumConstant(SymbolBase):
+    @property
+    def definition(self) -> DefEnumConstant: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolEnumType(SymbolBase):
     @property
     def definition(self) -> DefEnum: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class SymbolInterface(SymbolBase):
     @property
     def definition(self) -> DefInterface: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolModule(SymbolBase):
+    @property
+    def definition(self) -> DefModule: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolPort(SymbolBase):
+    @property
+    def definition(self) -> DefPort: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class SymbolStateMachine(SymbolBase):
     @property
     def definition(self) -> DefStateMachine: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolStructType(SymbolBase):
+    @property
+    def definition(self) -> DefStruct: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolSystem(SymbolBase):
+    @property
+    def definition(self) -> DefSystem: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class SymbolTopology(SymbolBase):
     @property
     def definition(self) -> DefTopology: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class Sync(NonParamKindBase):
-    ...
+class SyncInputGeneralKind(GeneralKindBase):
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class SyncInput(GeneralKindBase):
-    ...
+class SyncNonParamKind(NonParamKindBase):
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class SyntaxTree:
@@ -2222,11 +2460,6 @@ class SyntaxTree:
     def error_count(self) -> builtins.int: ...
     def __len__(self) -> builtins.int: ...
     def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class System(SymbolBase):
-    @property
-    def definition(self) -> DefSystem: ...
 
 @typing.final
 class Throttle:
@@ -2353,9 +2586,11 @@ class Topology:
     @property
     def unconnected_port_set(self) -> builtins.list[PortInstanceIdentifier]: ...
     @property
-    def component_instance_map(self) -> builtins.dict[InterfaceInstanceComponent, Span]: ...
+    def component_instance_map(self) -> builtins.dict[ComponentInterfaceInstance, Span]: ...
     @property
     def name(self) -> builtins.str: ...
+    @property
+    def node(self) -> DefTopology: ...
     @property
     def unqualified_name(self) -> builtins.str: ...
     def connection_exists_between(self, from_: PortInstanceIdentifier, to: PortInstanceIdentifier) -> builtins.bool: ...
@@ -2371,11 +2606,12 @@ class Topology:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class TopologyInstance(InterfaceInstanceBase):
+class TopologyInterfaceInstance(InterfaceInstanceBase):
     @property
     def symbol(self) -> Symbol: ...
     @property
     def qualified_name(self) -> builtins.str: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class TopologyPort:
@@ -2397,6 +2633,7 @@ class TopologyPortInstance(PortInstanceBase):
     def node_id(self) -> builtins.int: ...
     @property
     def unqualified_name(self) -> builtins.str: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class TransUnit:
@@ -2418,6 +2655,14 @@ class TransUnit:
     def members(self) -> builtins.list[AstNode]:
         r"""
         This unit's top-level member nodes, in source order.
+        """
+    @property
+    def is_source(self) -> builtins.bool:
+        r"""
+        Whether this is a unit the caller asked about, rather than one passed to
+        `analyze(imports=…)` only to resolve references.
+        
+        Always `True` for a unit from `parse`, which has no imports.
         """
     def __len__(self) -> builtins.int: ...
     def __repr__(self) -> builtins.str: ...
@@ -2464,24 +2709,6 @@ class TransitionGraphArcBase:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class TransitionGraphArcChoice(TransitionGraphArcBase):
-    @property
-    def start_choice(self) -> StateMachineSymbol: ...
-    @property
-    def a_node(self) -> TransitionExpr: ...
-    @property
-    def end_node(self) -> TransitionGraphNode: ...
-
-@typing.final
-class TransitionGraphArcState(TransitionGraphArcBase):
-    @property
-    def start_state(self) -> StateMachineSymbol: ...
-    @property
-    def a_node(self) -> SpecStateTransition: ...
-    @property
-    def end_node(self) -> TransitionGraphNode: ...
-
-@typing.final
 class TransitionGraphNode:
     @property
     def soc(self) -> StateOrChoice: ...
@@ -2496,18 +2723,6 @@ class TransitionOrDoDo:
 class TransitionOrDoTransition:
     @property
     def value(self) -> TransitionExpr: ...
-
-@typing.final
-class TypeAbsType(TypeBase):
-    @property
-    def node(self) -> DefAbsType: ...
-
-@typing.final
-class TypeAliasType(TypeBase):
-    @property
-    def node(self) -> DefAliasType: ...
-    @property
-    def alias_type(self) -> Type: ...
 
 class TypeBase:
     @property
@@ -2554,14 +2769,7 @@ class TypeBase:
     def __eq__(self, other: typing.Any) -> builtins.bool: ...
     def __hash__(self) -> builtins.int: ...
     def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class TypeBoolean(TypeBase):
-    ...
-
-@typing.final
-class TypeInteger(TypeBase):
-    ...
+    def __str__(self) -> builtins.str: ...
 
 @typing.final
 class TypeName(AstNode):
@@ -2594,14 +2802,9 @@ class TypeNameString:
     def value(self) -> typing.Optional[Expr]: ...
 
 @typing.final
-class TypeString(TypeBase):
-    @property
-    def value(self) -> typing.Optional[builtins.int]: ...
-
-@typing.final
 class UseDefMatching:
     @property
-    def node(self) -> builtins.int: ...
+    def node_id(self) -> builtins.int: ...
     @property
     def qualified_name(self) -> QualifiedName: ...
     @property
@@ -2627,178 +2830,468 @@ class ValueBase:
     def shr(self, other: Value) -> Value: ...
     def sub(self, other: Value) -> Value: ...
     def __repr__(self) -> builtins.str: ...
+    def __str__(self) -> builtins.str: ...
 
 @typing.final
-class ValueBoolean(ValueBase):
+class Binop:
+    r"""
+    A closed set of `Binop` kinds.
+    """
+    Add: typing.ClassVar[Binop]
+    Div: typing.ClassVar[Binop]
+    Mul: typing.ClassVar[Binop]
+    Sub: typing.ClassVar[Binop]
+    LShift: typing.ClassVar[Binop]
+    RShift: typing.ClassVar[Binop]
+
     @property
-    def value(self) -> builtins.bool: ...
-
-@typing.final
-class ValueInteger(ValueBase):
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
     @property
-    def value(self) -> builtins.int: ...
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class ValueString(ValueBase):
+class ComponentKind:
+    r"""
+    A closed set of `ComponentKind` kinds.
+    """
+    Active: typing.ClassVar[ComponentKind]
+    Passive: typing.ClassVar[ComponentKind]
+    Queued: typing.ClassVar[ComponentKind]
+
     @property
-    def value(self) -> builtins.str: ...
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class Binop(enum.Enum):
-    Add = ...
-    Div = ...
-    Mul = ...
-    Sub = ...
-    LShift = ...
-    RShift = ...
+class ConnectionPatternKind:
+    r"""
+    A closed set of `ConnectionPatternKind` kinds.
+    """
+    Command: typing.ClassVar[ConnectionPatternKind]
+    Event: typing.ClassVar[ConnectionPatternKind]
+    Health: typing.ClassVar[ConnectionPatternKind]
+    Param: typing.ClassVar[ConnectionPatternKind]
+    Telemetry: typing.ClassVar[ConnectionPatternKind]
+    TextEvent: typing.ClassVar[ConnectionPatternKind]
+    Time: typing.ClassVar[ConnectionPatternKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class ComponentKind(enum.Enum):
-    Active = ...
-    Passive = ...
-    Queued = ...
+class Direction:
+    r"""
+    A closed set of `Direction` kinds.
+    """
+    Input: typing.ClassVar[Direction]
+    Output: typing.ClassVar[Direction]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class ConnectionPatternKind(enum.Enum):
-    Command = ...
-    Event = ...
-    Health = ...
-    Param = ...
-    Telemetry = ...
-    TextEvent = ...
-    Time = ...
+class EventSeverity:
+    r"""
+    A closed set of `EventSeverity` kinds.
+    """
+    ActivityHigh: typing.ClassVar[EventSeverity]
+    ActivityLow: typing.ClassVar[EventSeverity]
+    Command: typing.ClassVar[EventSeverity]
+    Diagnostic: typing.ClassVar[EventSeverity]
+    Fatal: typing.ClassVar[EventSeverity]
+    WarningHigh: typing.ClassVar[EventSeverity]
+    WarningLow: typing.ClassVar[EventSeverity]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class Direction(enum.Enum):
-    Input = ...
-    Output = ...
+class FloatKind:
+    r"""
+    A closed set of `FloatKind` kinds.
+    """
+    F32: typing.ClassVar[FloatKind]
+    F64: typing.ClassVar[FloatKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class EventSeverity(enum.Enum):
-    ActivityHigh = ...
-    ActivityLow = ...
-    Command = ...
-    Diagnostic = ...
-    Fatal = ...
-    WarningHigh = ...
-    WarningLow = ...
+class FormalParamKind:
+    r"""
+    A closed set of `FormalParamKind` kinds.
+    """
+    Ref: typing.ClassVar[FormalParamKind]
+    Value: typing.ClassVar[FormalParamKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class FloatKind(enum.Enum):
-    F32 = ...
-    F64 = ...
+class GeneralPortInstanceKind:
+    r"""
+    A closed set of `GeneralPortInstanceKind` kinds.
+    """
+    Input: typing.ClassVar[GeneralPortInstanceKind]
+    Output: typing.ClassVar[GeneralPortInstanceKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class FormalParamKind(enum.Enum):
-    Ref = ...
-    Value = ...
+class InputPortKind:
+    r"""
+    A closed set of `InputPortKind` kinds.
+    """
+    Async: typing.ClassVar[InputPortKind]
+    Guarded: typing.ClassVar[InputPortKind]
+    Sync: typing.ClassVar[InputPortKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class GeneralPortInstanceKind(enum.Enum):
-    Input = ...
-    Output = ...
+class IntegerFormatKind:
+    r"""
+    A closed set of `IntegerFormatKind` kinds.
+    """
+    Character: typing.ClassVar[IntegerFormatKind]
+    Decimal: typing.ClassVar[IntegerFormatKind]
+    Hexadecimal: typing.ClassVar[IntegerFormatKind]
+    Octal: typing.ClassVar[IntegerFormatKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class InputPortKind(enum.Enum):
-    Async = ...
-    Guarded = ...
-    Sync = ...
+class IntegerKind:
+    r"""
+    A closed set of `IntegerKind` kinds.
+    """
+    U8: typing.ClassVar[IntegerKind]
+    I8: typing.ClassVar[IntegerKind]
+    U16: typing.ClassVar[IntegerKind]
+    I16: typing.ClassVar[IntegerKind]
+    U32: typing.ClassVar[IntegerKind]
+    I32: typing.ClassVar[IntegerKind]
+    U64: typing.ClassVar[IntegerKind]
+    I64: typing.ClassVar[IntegerKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class IntegerFormatKind(enum.Enum):
-    Character = ...
-    Decimal = ...
-    Hexadecimal = ...
-    Octal = ...
+class Kind:
+    r"""
+    A closed set of `Kind` kinds.
+    """
+    External: typing.ClassVar[Kind]
+    Internal: typing.ClassVar[Kind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class IntegerKind(enum.Enum):
-    U8 = ...
-    I8 = ...
-    U16 = ...
-    I16 = ...
-    U32 = ...
-    I32 = ...
-    U64 = ...
-    I64 = ...
+class ParamKind:
+    r"""
+    A closed set of `ParamKind` kinds.
+    """
+    Save: typing.ClassVar[ParamKind]
+    Set: typing.ClassVar[ParamKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class Kind(enum.Enum):
-    External = ...
-    Internal = ...
+class QueueFull:
+    r"""
+    A closed set of `QueueFull` kinds.
+    """
+    Assert: typing.ClassVar[QueueFull]
+    Block: typing.ClassVar[QueueFull]
+    Drop: typing.ClassVar[QueueFull]
+    Hook: typing.ClassVar[QueueFull]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class ParamKind(enum.Enum):
-    Save = ...
-    Set = ...
+class RationalFormatKind:
+    r"""
+    A closed set of `RationalFormatKind` kinds.
+    """
+    Exponent: typing.ClassVar[RationalFormatKind]
+    Fixed: typing.ClassVar[RationalFormatKind]
+    General: typing.ClassVar[RationalFormatKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class QueueFull(enum.Enum):
-    Assert = ...
-    Block = ...
-    Drop = ...
-    Hook = ...
+class SpecLocKind:
+    r"""
+    A closed set of `SpecLocKind` kinds.
+    """
+    Component: typing.ClassVar[SpecLocKind]
+    Instance: typing.ClassVar[SpecLocKind]
+    Constant: typing.ClassVar[SpecLocKind]
+    Port: typing.ClassVar[SpecLocKind]
+    StateMachine: typing.ClassVar[SpecLocKind]
+    System: typing.ClassVar[SpecLocKind]
+    Type: typing.ClassVar[SpecLocKind]
+    Interface: typing.ClassVar[SpecLocKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class RationalFormatKind(enum.Enum):
-    Exponent = ...
-    Fixed = ...
-    General = ...
+class SpecialPortInstanceKind:
+    r"""
+    A closed set of `SpecialPortInstanceKind` kinds.
+    """
+    CommandRecv: typing.ClassVar[SpecialPortInstanceKind]
+    CommandReg: typing.ClassVar[SpecialPortInstanceKind]
+    CommandResp: typing.ClassVar[SpecialPortInstanceKind]
+    Event: typing.ClassVar[SpecialPortInstanceKind]
+    ParamGet: typing.ClassVar[SpecialPortInstanceKind]
+    ParamSet: typing.ClassVar[SpecialPortInstanceKind]
+    ProductGet: typing.ClassVar[SpecialPortInstanceKind]
+    ProductRecv: typing.ClassVar[SpecialPortInstanceKind]
+    ProductRequest: typing.ClassVar[SpecialPortInstanceKind]
+    ProductSend: typing.ClassVar[SpecialPortInstanceKind]
+    Telemetry: typing.ClassVar[SpecialPortInstanceKind]
+    TextEvent: typing.ClassVar[SpecialPortInstanceKind]
+    TimeGet: typing.ClassVar[SpecialPortInstanceKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class SpecLocKind(enum.Enum):
-    Component = ...
-    Instance = ...
-    Constant = ...
-    Port = ...
-    StateMachine = ...
-    System = ...
-    Type = ...
-    Interface = ...
+class TlmChannelLimitKind:
+    r"""
+    A closed set of `TlmChannelLimitKind` kinds.
+    """
+    Red: typing.ClassVar[TlmChannelLimitKind]
+    Orange: typing.ClassVar[TlmChannelLimitKind]
+    Yellow: typing.ClassVar[TlmChannelLimitKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class SpecialPortInstanceKind(enum.Enum):
-    CommandRecv = ...
-    CommandReg = ...
-    CommandResp = ...
-    Event = ...
-    ParamGet = ...
-    ParamSet = ...
-    ProductGet = ...
-    ProductRecv = ...
-    ProductRequest = ...
-    ProductSend = ...
-    Telemetry = ...
-    TextEvent = ...
-    TimeGet = ...
+class TlmChannelUpdate:
+    r"""
+    A closed set of `TlmChannelUpdate` kinds.
+    """
+    Always: typing.ClassVar[TlmChannelUpdate]
+    OnChange: typing.ClassVar[TlmChannelUpdate]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
 @typing.final
-class TlmChannelLimitKind(enum.Enum):
-    Red = ...
-    Orange = ...
-    Yellow = ...
+class Unop:
+    r"""
+    A closed set of `Unop` kinds.
+    """
+    Minus: typing.ClassVar[Unop]
 
-@typing.final
-class TlmChannelUpdate(enum.Enum):
-    Always = ...
-    OnChange = ...
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name`: a kind mirror carries no payload, so
+        its name is its value (as for `enum.StrEnum`).
+        """
 
-@typing.final
-class Unop(enum.Enum):
-    Minus = ...
-
-def analyze(paths: typing.Optional[builtins.str | builtins.list[builtins.str]] = None, *, source: typing.Optional[builtins.str] = None, uri: builtins.str = '<string>') -> Model:
+def analyze(paths: typing.Optional[builtins.str | builtins.list[builtins.str]] = None, *, source: typing.Optional[builtins.str] = None, uri: builtins.str = '<string>', imports: typing.Optional[builtins.str | builtins.list[builtins.str]] = None) -> Model:
     r"""
     Parse and semantically analyze FPP sources, returning a `Model`.
     
     Takes the same inputs as `parse`, one translation unit per input, but analyzes
     all units **together**, so a definition in one resolves uses in another.
     
-    `model.ast` is the *transformed* AST — the parsed units after include
-    resolution and the state-enum transform — and `model.analysis` is the analysis
-    computed from it.
+    `imports` names units that are present only to resolve references — the
+    counterpart of `fpp-to-cpp -i`. Their units answer `is_source == False`, as does
+    `AstNode.in_source` for the nodes inside them. So the units a caller asked
+    about are `[u for u in model.ast if u.is_source]`.
+    `imports` alone is not enough to compile: it raises `ValueError`.
     
-    Raises `OSError` if a path cannot be read, `ValueError` if no input is given.
+    `model.ast` is the *transformed* AST after running analysis transformations
+    
+    Raises `OSError` if a path cannot be read, `ValueError` if no source is given.
     """
 
 def parse(paths: typing.Optional[builtins.str | builtins.list[builtins.str]] = None, *, source: typing.Optional[builtins.str] = None, uri: builtins.str = '<string>') -> SyntaxTree:
@@ -2813,6 +3306,9 @@ def parse(paths: typing.Optional[builtins.str | builtins.list[builtins.str]] = N
     This is the fast front end: the nodes it yields carry locations, annotations,
     and children, but no resolved symbols, types, or values. Use `analyze` for
     those.
+    
+    There is no `imports=` here, unlike `analyze`: nothing at this depth reads
+    another translation unit, so every unit `parse` returns is a source.
     
     Raises `OSError` if a path cannot be read, `ValueError` if no input is given.
     """

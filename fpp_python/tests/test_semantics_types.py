@@ -13,19 +13,19 @@ import pytest
 
 import fpp as f
 from fpp import (
+    AliasType,
     AnonArrayType,
     AnonStructType,
-    Array,
     ArrayType,
     EnumType,
-    Float,
+    FloatType,
     IntegerKind,
-    PrimitiveInt,
+    PrimitiveIntType,
     StructType,
-    SymbolEnum,
     Symbol,
+    SymbolArrayType,
+    SymbolEnumType,
     Type,
-    TypeAliasType,
 )
 
 SRC = """
@@ -58,10 +58,11 @@ def test_array_type(m):
     aa = t.anon_array
     assert isinstance(aa, AnonArrayType)
     assert aa.size == 4
-    assert isinstance(aa.elt_type, PrimitiveInt)
+    assert isinstance(aa.elt_type, PrimitiveIntType)
     assert aa.elt_type.value == IntegerKind.U32
-    # The `node` field bridges to the defining AST wrapper.
-    assert t.node.node_id == m.lookup("M.Arr").node
+    # The `node` field bridges to the defining AST wrapper; a symbol's `node_id`
+    # is that node's id.
+    assert t.node.node_id == m.lookup("M.Arr").node_id
 
 
 def test_enum_type(m):
@@ -76,18 +77,18 @@ def test_struct_type(m: f.Model):
     assert isinstance(t, StructType)
     members = t.anon_struct.members
     assert set(members) == {"x", "y"}
-    assert isinstance(members["x"], PrimitiveInt)
-    assert isinstance(members["y"], Float)
+    assert isinstance(members["x"], PrimitiveIntType)
+    assert isinstance(members["y"], FloatType)
 
 
 def test_alias_type(m):
     t = rtype(m, "M.Alias")
-    assert isinstance(t, TypeAliasType)
+    assert isinstance(t, AliasType)
     # `alias_type` is the immediate aliased type; `underlying_type` (a base method
     # getter) follows the alias chain. Both resolve to U16 here.
-    assert isinstance(t.alias_type, PrimitiveInt)
+    assert isinstance(t.alias_type, PrimitiveIntType)
     assert t.alias_type.value == IntegerKind.U16
-    assert isinstance(t.underlying_type, PrimitiveInt)
+    assert isinstance(t.underlying_type, PrimitiveIntType)
     assert t.underlying_type.value == IntegerKind.U16
 
 
@@ -99,9 +100,9 @@ def test_type_predicates(m):
 
 def test_symbols_are_union_subclasses(m):
     arr = m.lookup("M.Arr")
-    assert isinstance(arr, Array)
+    assert isinstance(arr, SymbolArrayType)
     assert isinstance(arr, Symbol)
-    assert isinstance(m.lookup("M.E"), SymbolEnum)
+    assert isinstance(m.lookup("M.E"), SymbolEnumType)
 
 
 def test_type_map_is_populated(m):
@@ -110,7 +111,7 @@ def test_type_map_is_populated(m):
     assert all(isinstance(k, int) for k in tm)
     assert all(isinstance(v, Type) for v in tm.values())
     # The array's resolved type is registered under its def node id.
-    arr_node = m.lookup("M.Arr").node
+    arr_node = m.lookup("M.Arr").node_id
     assert isinstance(tm[arr_node], ArrayType)
 
 

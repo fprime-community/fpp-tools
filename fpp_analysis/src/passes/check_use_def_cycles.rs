@@ -29,12 +29,12 @@ impl<'ast> CheckUseDefCycles<'ast> {
     fn visit_def_pre(&self, a: &mut Analysis, symbol: Symbol) -> ControlFlow<()> {
         match symbol {
             Symbol::AliasType(node) => node.visit(a, self),
-            Symbol::Array(node) => node.visit(a, self),
+            Symbol::ArrayType(node) => node.visit(a, self),
             Symbol::Constant(node) => node.visit(a, self),
-            Symbol::Enum(node) => node.visit(a, self),
+            Symbol::EnumType(node) => node.visit(a, self),
             Symbol::EnumConstant(node) => node.visit(a, self),
             Symbol::Interface(node) => node.visit(a, self),
-            Symbol::Struct(node) => node.visit(a, self),
+            Symbol::StructType(node) => node.visit(a, self),
             Symbol::Topology(node) => node.visit(a, self),
             _ => ControlFlow::Continue(()),
         }

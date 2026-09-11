@@ -1,15 +1,9 @@
 # fprime-fpp-python
 
 Native Python bindings to the [FPP](https://nasa.github.io/fpp/) compiler.
-Installed as `fprime-fpp-python`, imported as `fpp`. The
-`fpp` extension binds **directly** to the Rust FPP compiler in-process via
-PyO3: parsing and semantic analysis run in-process, and the AST and analysis are
-exposed as a live, navigable Python object graph.
+Installed as `fprime-fpp-python`, imported as `fpp`.
 
-Because the binding holds the compiler's real in-memory model, cross-references
-are exposed as **actual Python object references** (e.g. `use.definition`,
-`instance.component`, `node.resolved_type`) rather than being flattened through
-integer AST ids.
+The extension binds directly to the Rust FPP compiler via PyO3.
 
 ## Installation
 
@@ -17,9 +11,8 @@ integer AST ids.
 pip install fprime-fpp-python
 ```
 
-Building from source requires a Rust toolchain (edition 2024, i.e. Rust ≥ 1.85);
-the wheel is built with [maturin](https://www.maturin.rs/) and ships an `abi3`
-extension usable on CPython ≥ 3.10.
+An `abi3` wheel, usable on CPython ≥ 3.10. Building from source needs Rust ≥ 1.85
+and [maturin](https://www.maturin.rs/).
 
 ## Usage
 
@@ -33,199 +26,89 @@ module M {
 }
 """)
 
-if model.has_errors:
-    for d in model.diagnostics:
-        print(d.level, d.location, d.message)
+model.has_errors                             # False
+for d in model.diagnostics:
+    print(d.display)                         # 'path:line:col: error: message'
 
-# Navigate the AST: one TransUnit per input
-(unit,) = model.ast
+(unit,) = model.ast                          # one translation unit per input
 (module,) = unit.members
-for member in module.members:
-    print(type(member).__name__, getattr(member, "name", None))
+[type(m).__name__ for m in module.members]   # ['DefArray', 'DefConstant']
 
-# Resolve semantics by navigation (no AST ids)
-arr = model.lookup("M.Arr")                 # -> Symbol (here an ArraySymbol)
-t = arr.definition.resolved_type            # -> Type (here an ArrayType); t.array_size == 4
-answer = model.lookup("M.answer").definition.value.resolved_value  # -> Value (an IntegerValue); .value == 42
+arr = model.lookup("M.Arr")                                     # SymbolArrayType
+arr.definition.resolved_type.array_size                         # 4
+model.lookup("M.answer").definition.value.resolved_value.value  # 42
 ```
 
-### Entry points
-
-Both entry points take the same inputs — a `.fpp` path, a list of paths, and/or
-in-memory `source=` text — and produce one **translation unit** per input:
+All inputs to one call are analyzed together. A bare string is a path, `source=`
+is text, and `imports=` — the counterpart of `fpp-to-cpp -i` — is analyzed the
+same way but is not part of what you asked about:
 
 ```python
-fpp.analyze("Top.fpp")                     # one file
-fpp.analyze(["A.fpp", "B.fpp"])            # analyzed together
-fpp.analyze(source="constant a = 1")       # in-memory, uri="<string>"
-fpp.analyze(["A.fpp"], source=src, uri="patch.fpp")   # both
+model = fpp.analyze(["MyComponent.fpp"], imports=["Fw/Fw.fpp"])
+[u.uri for u in model.ast if u.is_source]    # ['MyComponent.fpp']
 ```
 
-A bare string is always a **path**, never source; pass `source=` for text. All
-units given to one `analyze` call are analyzed together, so a definition in one
-resolves uses in another. An unreadable path raises `OSError`.
-
-`parse(...)` is the fast front end: it parses and resolves `include`s, then stops.
-It returns a `SyntaxTree` — the units and the syntax diagnostics, and nothing
-semantic. Use it when you only need syntax:
+`parse` is the fast front end: it stops after `include` resolution, so you get
+syntax and nothing resolved.
 
 ```python
 tree = fpp.parse(["A.fpp", "B.fpp"])
-for unit in tree.units:
-    print(unit.uri, [type(m).__name__ for m in unit.members])
+[u.uri for u in tree.units]                  # ['A.fpp', 'B.fpp']
 ```
 
-`analyze(...)` runs the whole pipeline and returns a `Model` carrying the
-**transformed** AST — the parsed units after include resolution and the state-enum
-transform — alongside the analysis computed from it. Nodes reached from a
-`SyntaxTree` have locations, annotations, and children, but their `definition`,
-`resolved_type`, and `resolved_value` are all `None`; only `analyze` fills those
-in.
-
-### Typed unions and enums
-
-The "closed union" semantic types — `Symbol`, `Type`, `Value`, `PortInstance`,
-`StateMachineElement` — are each a union of concrete subclasses over a base
-class. A getter typed as `Type` returns one of `ArrayType | EnumType | …`;
-discriminate with `isinstance` / `match` (each subclass exposes only its own
-fields) rather than a string tag:
+Subclass `NodeVisitor` and override `visit_<type(node).__name__>`. Traversal is
+deep by default: `super()` descends, omitting it prunes.
 
 ```python
-from fpp import ArrayType, PrimitiveInt, IntegerKind
-
-match arr.definition.resolved_type:
-    case ArrayType() as a:
-        elt = a.anon_array.elt_type     # -> Type union
-        if isinstance(elt, PrimitiveInt) and elt.value == IntegerKind.U32:
-            ...
-```
-
-Enum-valued fields are real Python enums (`IntegerKind`, `ComponentKind`,
-`EventSeverity`, `QueueFull`, `Direction`, `CommandKind`, …), compared by member
-(e.g. `component.kind == ComponentKind.Passive`).
-
-A `Model` exposes:
-
-- `model.ast` — the transformed AST: one `TransUnit` per input, in the order
-  given. A unit has `.uri` and `.members` (its top-level definitions, in source
-  order).
-- `model.analysis` — the `Analysis` root, the 1:1 mirror of the compiler's
-  semantic model; navigate it through its typed maps (`component_map`,
-  `state_machine_map`, …) and methods (`get_qualified_name(sym)`).
-- `model.diagnostics` / `model.has_errors` / `model.error_count` — structured
-  diagnostics.
-- `model.lookup(qualified_name)` — a `Symbol` by dotted name.
-
-A `SyntaxTree` exposes `tree.units` plus the same `diagnostics` / `has_errors` /
-`error_count`.
-
-Every AST node exposes `.node_id`, `.location`, `.pre_annotation` /
-`.post_annotation`, `.children`, and — where applicable — `.definition` (the
-resolved symbol), `.resolved_type`, and `.resolved_value`. Node identity is
-stable: navigating to the same node twice returns the same Python object.
-
-### Walking the AST
-
-`NodeVisitor` is the traversal counterpart of the compiler's `fpp_ast::Visitor`.
-Subclass it and override `visit_<TypeName>` for the node types you care about,
-where `<TypeName>` is the node's class name — the same string as
-`type(node).__name__`. Each override receives its concrete node class, so the
-fields you reach are fully typed.
-
-```python
-from fpp import NodeVisitor
-
-class Constants(NodeVisitor):
+class Constants(fpp.NodeVisitor):
     def __init__(self):
         self.values = {}
 
     def visit_DefConstant(self, node):
-        # `node` is a DefConstant, so `.name` and `.value` are typed; the
-        # folded value comes from the analysis.
-        self.values[node.name] = node.value.resolved_value
-        super().visit_DefConstant(node)      # keep descending
+        self.values[node.name] = node.value.resolved_value.value
+        super().visit_DefConstant(node)
 
 consts = Constants()
-for unit in model.ast:
-    for root in unit.members:
-        consts.visit(root)
-
-# module M { constant width = 8; constant total = width * 4 }
-# -> {"width": 8, "total": 32}
-print({name: v.value for name, v in consts.values.items()})
+consts.visit(model)                          # or a SyntaxTree, TransUnit, or node
+consts.values                                # {'answer': 42}
 ```
 
-Traversal is depth-first, pre-order, in source order, and **deep by default** —
-the inverse of the Rust trait, where recursion is opt-in via an explicit
-`node.walk(..)`. Here the base `visit_<TypeName>` walks the children for you, so:
-
-- Call `super().visit_<TypeName>(node)` to descend from an override; **omit it to
-  prune** that subtree.
-- Override `generic_visit(node)` to hook *every* node — it is the single funnel
-  each base `visit_<TypeName>` delegates to, and the analogue of the Rust trait's
-  `super_visit`. Returning from it without calling
-  `super().generic_visit(node)` makes the whole pass shallow.
-- Raise an exception to stop early; return values are not inspected.
-
-`node.children` is the same traversal as a plain `list[AstNode]`, for one-off
-queries that do not warrant a visitor class:
+Semantic types are closed unions, so narrow them with `isinstance` or `match`
+rather than a string tag.
 
 ```python
-kinds = [type(c).__name__ for c in component.children]
+match arr.definition.resolved_type:
+    case fpp.ArrayType() as a:
+        elt = a.anon_array.elt_type
+        isinstance(elt, fpp.PrimitiveIntType) and elt.value == fpp.IntegerKind.U32
 ```
 
-Children are the AST *nodes* reached through a node's fields: `kind` enums and
-member unions are transparent (an `Expr`'s children are the sub-expressions
-inside its `kind`), and fields the binding collapses to a plain value — such as a
-definition's `name` — are not children. Traversal is read-only; the parsed AST is
-immutable, so there is no counterpart to `fpp_ast::MutVisitor`.
+`fpp.pyi` is the reference for the rest — every class, getter and return type —
+and the docstrings carry the contracts: `help(fpp.analyze)`, `help(fpp.Model)`,
+`help(fpp.NodeVisitor)`.
 
 ## Development
 
-The extension is a Cargo workspace member of
-[fpp-tools](https://github.com/fprime-community/fpp-tools). The AST node wrappers
-and the recording walk are expanded at compile time by the
-`fpp_python_macros::fpp_ast_bindings!` proc macro from a checked-in declaration
-(`src/ast/defs.rs`, a ~1:1 mirror of the `fpp_ast` grammar), as are the semantic
-wrappers from `src/sem/defs.rs`; the small core (`pipeline`, `ir_core`,
-`lower_core`, `noderef`, `model`, `visitor`, `diagnostics`) is hand-written.
+A Cargo workspace member of
+[fpp-tools](https://github.com/fprime-community/fpp-tools). The node wrappers and
+the recording walk are expanded by `fpp_python_macros` from checked-in
+declarations (`src/ast/defs.rs`, `src/sem/defs.rs`); the core (`pipeline`,
+`ir_core`, `lower_core`, `noderef`, `model`, `visitor`, `diagnostics`) is
+hand-written.
+
+Those declarations and `fpp.pyi` are generated and checked in — change the
+generator or the macro, never the file, and re-run `make`. CI fails on drift.
 
 ```sh
-maturin develop            # build + install the extension into the active venv
-pytest tests/              # run the test suite
+maturin develop            # build + install into the active venv
+pytest tests/              # run the tests
 
-make nightly               # one-time: install the nightly the bindgen needs
-make                       # regenerate declarations, then the type stub
-make help                  # list the individual codegen targets
+make nightly               # one-time: the nightly the bindgen's rustdoc needs
+make                       # regenerate the declarations, then the stub
+make help                  # the individual codegen targets
 ```
 
-`make` wraps the two generators (see the `Makefile` for the individual targets);
-the underlying commands are:
-
-```sh
-# Regenerate the checked-in declarations after an `fpp_ast`/`fpp_analysis` change.
-# A standalone crate, so a declaration left stale by an upstream change cannot
-# block the build of the generator that fixes it:
-cargo run -p fpp_python_bindgen
-
-# Regenerate the type stub after changing the exposed API. Built WITHOUT
-# `extension-module`, so it links libpython for real — on a distro without
-# `python3-dev` this needs `RUSTFLAGS="-L $(python3 -c 'import sysconfig;
-# print(sysconfig.get_config_var("LIBPL"))')"`, which `make stubs` adds for you:
-cargo run -p fpp_python --no-default-features --features stubgen --bin stub_gen
-```
-
-Run the declaration generator before the stub dump — the stub is derived from the
-pyclasses the declarations expand into. `make` and CI both enforce that order.
-
-The declaration generator reflects `fpp_analysis` from rustdoc JSON, so it shells
-out to a nightly `rustdoc` — an **exact** nightly, recorded in
-`fpp_python_bindgen/nightly-toolchain` and installed by `make nightly`. rustdoc's
-JSON schema is unstable and bumps its `format_version` on its own cadence, so a
-floating `nightly` would break the generator the next time upstream moved (and
-could reshape `sem/defs.rs` enough to trip the drift check even when it parsed).
-The generator asserts the emitted `format_version` against its `rustdoc-types`
-pin and names both pins if they disagree; to move to a newer nightly, bump that
-file and the `rustdoc-types` pin in `fpp_python_bindgen/Cargo.toml` together, then
-regenerate and commit. `FPP_BINDGEN_TOOLCHAIN` overrides the toolchain for a
-one-off run.
+The bindgen reflects `fpp_analysis` from rustdoc JSON, whose schema is unstable,
+so the nightly is pinned exactly — in `fpp_python_bindgen/nightly-toolchain`
+alongside the `rustdoc-types` pin in its `Cargo.toml`. Bump the two together.
+`FPP_BINDGEN_TOOLCHAIN` overrides the toolchain for a one-off run.

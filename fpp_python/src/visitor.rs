@@ -25,7 +25,11 @@
 //! `fpp_python_macros::fpp_ast_bindings!` into a second `#[pymethods]` block (the
 //! `multiple-pymethods` feature), one per node in the DSL, each typed with its
 //! concrete wrapper so the stub reads
-//! `def visit_DefComponent(self, node: DefComponent) -> Any`.
+//! `def visit_DefComponent(self, node: DefComponent) -> Any`. The three
+//! *container* peers — `visit_Model`, `visit_SyntaxTree`, `visit_TransUnit` — are
+//! hand-written here, because a container is not an AST node and so is absent
+//! from the DSL; they exist so that `visit` accepts a whole model and walking one
+//! is a single call.
 //!
 //! Every hop goes back through Python attribute lookup — `visit` dispatches with
 //! `getattr`, the generated `visit_*` bodies call `self.generic_visit(..)`, and
@@ -34,12 +38,36 @@
 //! override used as the global `super_visit`-style hook.
 
 use crate::ast::AstNode;
-use crate::model::Model;
+use crate::model::{Model, SyntaxTree, TransUnit};
 use fpp_core::Node;
-use pyo3::exceptions::PyAttributeError;
+use pyo3::exceptions::{PyAttributeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
+
+/// What [`NodeVisitor::visit`] accepts: a single AST node, one translation unit,
+/// or a whole parsed model.
+pub struct Visitable(Py<PyAny>);
+
+impl<'py> FromPyObject<'_, 'py> for Visitable {
+    type Error = PyErr;
+
+    fn extract(obj: Borrowed<'_, 'py, PyAny>) -> PyResult<Self> {
+        if obj.is_instance_of::<AstNode>()
+            || obj.is_instance_of::<TransUnit>()
+            || obj.is_instance_of::<Model>()
+            || obj.is_instance_of::<SyntaxTree>()
+        {
+            return Ok(Visitable(obj.to_owned().unbind()));
+        }
+        Err(PyTypeError::new_err(format!(
+            "expected an AstNode, TransUnit, Model or SyntaxTree, not {}",
+            obj.get_type().name()?
+        )))
+    }
+}
+
+pyo3_stub_gen::impl_stub_type!(Visitable = AstNode | TransUnit | Model | SyntaxTree);
 
 /// Base class for read-only AST traversals.
 ///
@@ -49,6 +77,8 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 /// pre-order, in source order.
 ///
 /// ```python
+/// import fpp
+///
 /// class Components(fpp.NodeVisitor):
 ///     def __init__(self):
 ///         self.names = []
@@ -57,15 +87,23 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 ///         self.names.append(node.name)
 ///         super().visit_DefComponent(node)   # keep descending
 ///
+/// model = fpp.analyze(source="module M { passive component C {} }")
 /// v = Components()
-/// for root in model.ast():
-///     v.visit(root)
+/// v.visit(model)                             # the whole model in one call
+/// assert v.names == ["C"]
 /// ```
 ///
+/// * `visit` takes an `AstNode`, a `TransUnit`, a `Model` or a `SyntaxTree`.
+///   Handing it the model walks every unit; handing it a unit walks that unit's
+///   members; handing it a node walks that subtree. So the explicit form of the
+///   call above is `for unit in model.ast: for member in unit.members:
+///   v.visit(member)`.
 /// * Recursion is **deep by default**. Call `super().visit_<TypeName>(node)` to
 ///   descend from an override; omit it to prune that subtree.
 /// * Override `generic_visit` to hook *every* node — trace it, or return without
-///   calling `super().generic_visit(node)` to make the whole pass shallow.
+///   calling `super().generic_visit(node)` to make the whole pass shallow. It
+///   takes AST nodes only; the three containers have their own
+///   `visit_Model`/`visit_SyntaxTree`/`visit_TransUnit`, each overridable.
 /// * A node type with no `visit_<TypeName>` override falls through to
 ///   `generic_visit`.
 /// * To stop early, raise an exception — return values are not inspected.
@@ -104,6 +142,21 @@ impl NodeVisitor {
     ) -> PyResult<Py<PyAny>> {
         Self::call_generic_visit(&Self::into_bound(slf), node)
     }
+
+    /// The body of the three *container* `visit_*` methods: visit each element of
+    /// `container.<attr>`, through Python so an override applies.
+    fn visit_children_of(
+        slf: PyRef<'_, Self>,
+        container: &Bound<'_, PyAny>,
+        attr: &str,
+    ) -> PyResult<Py<PyAny>> {
+        let py = slf.py();
+        let this = Self::into_bound(slf);
+        for child in container.getattr(attr)?.try_iter()? {
+            this.call_method1("visit", (child?,))?;
+        }
+        Ok(py.None())
+    }
 }
 
 #[gen_stub_pymethods]
@@ -121,14 +174,18 @@ impl NodeVisitor {
     /// Visit `node` by dispatching to this visitor's `visit_<type(node).__name__>`
     /// method, falling back to `generic_visit` when there is none.
     ///
-    /// Returns whatever the dispatched method returned.
-    fn visit(slf: PyRef<'_, Self>, node: &Bound<'_, AstNode>) -> PyResult<Py<PyAny>> {
-        let method = format!("visit_{}", node.get_type().name()?);
+    /// `node` may be an `AstNode`, a `TransUnit`, a `Model` or a `SyntaxTree` — so
+    /// `visit(model)` walks the whole model. Returns whatever the dispatched method
+    /// returned.
+    fn visit(slf: PyRef<'_, Self>, node: Visitable) -> PyResult<Py<PyAny>> {
+        let py = slf.py();
+        let target = node.0.into_bound(py);
+        let method = format!("visit_{}", target.get_type().name()?);
         let this = Self::into_bound(slf);
         match this.getattr(method.as_str()) {
-            Ok(f) => Ok(f.call1((node,))?.unbind()),
+            Ok(f) => Ok(f.call1((&target,))?.unbind()),
             Err(e) if e.is_instance_of::<PyAttributeError>(this.py()) => {
-                Self::call_generic_visit(&this, node.as_any())
+                Self::call_generic_visit(&this, &target)
             }
             Err(e) => Err(e),
         }
@@ -141,6 +198,9 @@ impl NodeVisitor {
     /// `fpp_ast::Visitor::super_visit`. Children are the AST nodes reached
     /// through `node`'s fields (see `AstNode.children`); values returned by the
     /// children are discarded.
+    ///
+    /// A `Model`/`SyntaxTree`/`TransUnit` does not come through here: a container
+    /// is not a node, and its `visit_<TypeName>` iterates its own elements.
     fn generic_visit(slf: PyRef<'_, Self>, node: &Bound<'_, AstNode>) -> PyResult<Py<PyAny>> {
         let py = slf.py();
         // `AstNode` is `frozen`, so reading its fields needs no borrow guard —
@@ -154,5 +214,29 @@ impl NodeVisitor {
             this.call_method1("visit", (wrapper,))?;
         }
         Ok(py.None())
+    }
+
+    /// Visit every translation unit of `model` (its `ast`).
+    ///
+    /// The whole-model entry point: `visitor.visit(model)` lands here. Call
+    /// `super().visit_Model(model)` from an override to keep descending.
+    #[pyo3(name = "visit_Model")]
+    fn visit_model(slf: PyRef<'_, Self>, model: &Bound<'_, Model>) -> PyResult<Py<PyAny>> {
+        Self::visit_children_of(slf, model.as_any(), "ast")
+    }
+
+    /// Visit every translation unit of `tree` (its `units`).
+    #[pyo3(name = "visit_SyntaxTree")]
+    fn visit_syntax_tree(
+        slf: PyRef<'_, Self>,
+        tree: &Bound<'_, SyntaxTree>,
+    ) -> PyResult<Py<PyAny>> {
+        Self::visit_children_of(slf, tree.as_any(), "units")
+    }
+
+    /// Visit every top-level member of `unit` (its `members`).
+    #[pyo3(name = "visit_TransUnit")]
+    fn visit_trans_unit(slf: PyRef<'_, Self>, unit: &Bound<'_, TransUnit>) -> PyResult<Py<PyAny>> {
+        Self::visit_children_of(slf, unit.as_any(), "members")
     }
 }

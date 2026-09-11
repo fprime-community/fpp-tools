@@ -21,8 +21,7 @@
 //! traits { <path>, … }                     // traits supplying reflected methods
 //! union <PyName> native <path> handle <arc_type|value|symbol|clone> alias "<Alias>"
 //!       accessor <ident> [include_base] [custom_build] [loc_from_node]
-//!       [identity <node | identical[(<eq_fn>, <node_id_method>)]>]
-//!       [repr <variant | variant_qualified[(<method>)] | variant_unqualified[(<method>)]>] {
+//!       [identity <node | identical[(<eq_fn>, <node_id_method>)]>] [repr <reprmode>] {
 //!     variants { <NativeVariant> => <Subclass> : <payloadkind>, … }
 //!     methods  { [assoc] <name> [(<params>)] [throws] -> <shape>, … }
 //! }
@@ -30,7 +29,8 @@
 //!     fields  { <name>: <shape>, … }
 //!     methods { … }
 //! }
-//! entity <PyName> native <path> [ field <ident> ] {
+//! entity <PyName> native <path> [ field <ident> ]
+//!        [identity <node | qualified_name[(<method>)] | raw_handle>] [repr <reprmode>] {
 //!     extras  { <name>: <shape>, … }   // clone-handle only: build-time scalars
 //!     fields  { <name>: <shape>, … }
 //!     methods { … }
@@ -43,10 +43,17 @@
 //! `loc_from_node` emits a base `loc` getter resolving the location from the
 //! native's node id. `identity` emits `__eq__`/`__hash__` (`node`: native `==` +
 //! hash by node id; `identical`: value equality + node-id hash via the carried
-//! `(eq_fn, node_id_method)` idents). `repr` emits `__repr__`
-//! (`<Alias Variant [ 'qualified'|'unqualified' name ]>`), resolving the name via
-//! the carried method ident. A `leaf_enum` emits a `#[pyclass(eq, eq_int)]` mirror
-//! + `From<&native>`.
+//! `(eq_fn, node_id_method)` idents). A `leaf_enum` emits a
+//! `#[pyclass(eq, eq_int)]` mirror (not an `enum.Enum` subclass) with
+//! `.name`/`.value` getters, + `From<&native>`.
+//!
+//! `reprmode` is how a class renders itself — `plain` (the default),
+//! `display`, `name(<method>)`, `analysis_name(<method>)` or
+//! `symbol_name(<field>, <method>)`; see [`Repr`]. Every class gets a
+//! `__repr__` of `<PythonClassName …>`, a union emitting one per subclass so the
+//! CONCRETE class is named; `display` additionally emits `__str__` as the native
+//! `Display`, which is the only rendering the wrappers ever surface (a derived
+//! `Debug` prints the whole owned subtree, which `repr` cannot afford).
 //!
 //! An `entity` is a standalone `#[pyclass(frozen)]` (not a union subclass). It
 //! stores a native `Clone` (the default field `native`, or `field <ident>`); its
@@ -107,11 +114,23 @@
 //! describes `T`, but the conversion receives the returned reference itself rather
 //! than a reference to it.
 //!
-//! An `entity` may carry an optional
-//! `identity <node | qualified_name[(<method>)] | raw_handle>` directive (peer of
-//! the handle/field directives), emitting `__eq__`/`__hash__` in the clone-entity
-//! `#[pymethods]` block. Every clone-entity also gets a default `__repr__`
-//! (`<PyName>`).
+//! # Python names
+//!
+//! CLASS names arrive pre-resolved in the declaration (`Variant => PyName : …`);
+//! the macro never invents one. They are the bindgen's `qualify`: `<Variant><Union>`
+//! for a union subclass, `<Union><Variant>` for the two symbol unions.
+//!
+//! A member's Python name is its native name verbatim, with three exceptions: a
+//! native named after a Python keyword gains a trailing `_` ([`py_getter_ident`]);
+//! PyO3 itself strips a `get_` prefix from a `#[getter]`, so the native
+//! `get_node_id` surfaces as `.node_id`; and a member named `node` of shape `node`
+//! is exposed as `node_id` ([`renames_to_node_id`]) — it is an id, and every other
+//! `.node` in the API is an object.
+//!
+//! An `entity`'s `identity` directive (peer of the handle/field directives) emits
+//! `__eq__`/`__hash__` in the clone-entity `#[pymethods]` block; its `repr`
+//! directive is the same one a union takes, and every clone-entity gets a
+//! `__repr__` whether or not it declares one.
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -139,6 +158,15 @@ struct UnionInfo {
     /// bare payload struct of exactly this variant — refine to the concrete
     /// `Py<Subclass>` instead of the broad union alias.
     subclasses: std::collections::BTreeMap<String, Ident>,
+    /// The native's zero-argument accessor yielding the `fpp_core::Node` of the AST
+    /// node it denotes, if it has one — `node()` on `Symbol` and
+    /// `StateMachineSymbol`, `get_node_id()` on `StateMachineTypedElement`.
+    ///
+    /// Derived from the union's declared methods rather than from a directive, so a
+    /// union that gains such an accessor upstream is picked up by a regen. This is
+    /// what lets a map keyed by one iterate in definition order — see
+    /// [`Shape::key_order`].
+    node_accessor: Option<Ident>,
 }
 
 /// Per-entity metadata a parameter argkind needs: the pyclass field storing the
@@ -235,11 +263,13 @@ enum Shape {
     List(Box<Shape>),
     /// A `String`-keyed map → a Python `dict[str, V]`.
     Dict(Box<Shape>),
-    /// An arbitrary native map → a real Python `dict[K, V]`, built by iterating
-    /// the native map and inserting each converted key→value. Unlike [`Shape::Dict`]
-    /// (string-keyed only, returning a `BTreeMap<String, V>`), both key and value
-    /// are arbitrary shapes and the result is a `Py<PyDict>` wrapped in a
-    /// [`crate::ir_core::DictStub`] so the stub renders `dict[Kstub, Vstub]`.
+    /// An arbitrary native map → a real Python `dict[K, V]`, built by inserting each
+    /// converted key→value in the order [`KeyOrder`] defines (integer/string/leaf
+    /// keys by key; node and symbol keys by definition order; anything else in
+    /// native order). Unlike [`Shape::Dict`] (string-keyed only, returning a
+    /// `BTreeMap<String, V>`), both key and value are arbitrary shapes and the
+    /// result is a `Py<PyDict>` wrapped in a [`crate::ir_core::DictStub`] so the
+    /// stub renders `dict[Kstub, Vstub]`.
     Map(Box<Shape>, Box<Shape>),
     /// A Rust tuple → a Python `tuple`, e.g. `(String, i128)`.
     Tuple(Vec<Shape>),
@@ -249,7 +279,96 @@ enum Shape {
     Skip,
 }
 
+/// How a [`Shape::Map`]'s keys can be put in a defined order.
+///
+/// Almost every native map behind a `map(K, V)` is a `HashMap` (`FxHashMap`), whose
+/// iteration order is neither declaration nor key order. It is seed-free, so the
+/// order is stable across processes — not a determinism bug, but every consumer that
+/// emits ordered output has to sort, and one that forgets gets scrambled output that
+/// looks fine. Since a Python `dict` iterates in insertion order, inserting in a
+/// defined order is enough to fix it for everyone.
+///
+/// The DSL collapses `HashMap`/`BTreeMap`/`IndexMap` into one `map(K, V)` token, so
+/// the macro cannot tell an unordered native from an ordered one. It does not need
+/// to: sorting an already-`BTreeMap`-ordered map by the same key is a no-op, and the
+/// key shape is enough to decide *whether* an order is computable at all.
+enum KeyOrder {
+    /// The native key is directly `Ord` (an integer, a string, a leaf-enum mirror,
+    /// or a tuple of those) — sort by it.
+    Key,
+    /// The key denotes an AST node — sort by that node's dense walk id, which is
+    /// assigned in pre-order, so the result is declaration order.
+    NodeId,
+    /// No order the macro can compute: an entity key, or a union key that denotes no
+    /// AST node. Left in native order.
+    ///
+    /// For all but one of these that is already a defined order, because the native
+    /// is a `BTreeMap` — every `Topology` map keyed by a `Connection` or a
+    /// `PortInstanceIdentifier`. The exception is `TransitionGraph::arc_map`, an
+    /// `FxHashMap` whose `transition_graph::Node` key is not `Ord` and exposes no
+    /// node id, so it has neither a key order to fall back on nor one to compute.
+    /// `Model.analysis`'s docstring names it for callers.
+    Unordered,
+}
+
 impl Shape {
+    /// How a map with `self` as its key shape can be ordered.
+    fn key_order(&self, reg: &Registry) -> KeyOrder {
+        match self {
+            Shape::I128 | Shape::Usize | Shape::Str | Shape::Leaf(_) => KeyOrder::Key,
+            Shape::Node => KeyOrder::NodeId,
+            // A union key that denotes an AST node orders by that node.
+            Shape::UnionRef(name) if reg.union(name).node_accessor.is_some() => KeyOrder::NodeId,
+            Shape::Tuple(parts) => {
+                // A tuple is `Ord` only if every element is; mixing in a `NodeId`
+                // element would need a composite key, which no map wants today.
+                if parts
+                    .iter()
+                    .all(|p| matches!(p.key_order(reg), KeyOrder::Key))
+                {
+                    KeyOrder::Key
+                } else {
+                    KeyOrder::Unordered
+                }
+            }
+            _ => KeyOrder::Unordered,
+        }
+    }
+
+    /// An expression over `kref` (a `&Native` key) yielding a value to sort by.
+    ///
+    /// Borrowed, never cloned: the comparator runs over a `Vec` of native
+    /// references, so ordering a map costs no allocation beyond that `Vec`.
+    fn sort_key(&self, kref: &TokenStream, data: &TokenStream, reg: &Registry) -> TokenStream {
+        match self {
+            Shape::I128 => quote!(*#kref),
+            Shape::Usize => quote!((*#kref as i128)),
+            Shape::Str => quote!((#kref).as_str()),
+            Shape::Leaf(p) => quote!(#p::from(#kref)),
+            Shape::Node => quote!(#data.ids.get(#kref).copied().unwrap_or(0)),
+            // `key_order` only says `NodeId` when the accessor exists. A plain method
+            // call, because `loc_from_node` already relies on the same accessor being
+            // callable that way (`SymbolInterface` is in scope at the expansion site).
+            Shape::UnionRef(name) => {
+                let m = reg
+                    .union(name)
+                    .node_accessor
+                    .as_ref()
+                    .expect("a union key ordered by node id has a node accessor");
+                quote!(#data.ids.get(&#kref.#m()).copied().unwrap_or(0))
+            }
+            Shape::Tuple(parts) => {
+                let elems = parts.iter().enumerate().map(|(i, p)| {
+                    let idx = syn::Index::from(i);
+                    p.sort_key(&quote!((&(#kref).#idx)), data, reg)
+                });
+                quote!((#(#elems),*))
+            }
+            // `key_order` never returns an orderable verdict for anything else.
+            _ => quote!(()),
+        }
+    }
+
     /// Whether emission touches the union builders (needs `py` + the model).
     fn needs_py(&self) -> bool {
         match self {
@@ -410,13 +529,48 @@ impl Shape {
                 let vt = v.ty(reg);
                 let kexpr = k.expr(&quote!((__k)), model, data, reg);
                 let vexpr = v.expr(&quote!((__e)), model, data, reg);
-                quote!({
-                    let __d = ::pyo3::types::PyDict::new(py);
-                    for (__k, __e) in #vref.iter() {
-                        __d.set_item(#kexpr, #vexpr)?;
+                // A Python `dict` iterates in insertion order, so inserting in a
+                // defined order is what makes the map's iteration order defined —
+                // see `KeyOrder`. `sort_by` (stable) over borrowed native pairs;
+                // the conversions then run in that order, unchanged.
+                //
+                // `__row` is bound before the push so a nested `map` in the VALUE
+                // expression cannot shadow `__rows`/`__k`/`__e` out from under this
+                // loop (`tlm_packet_set_map` and `flattened_state_transition_map`
+                // are both maps of maps).
+                let ordered = match k.key_order(reg) {
+                    KeyOrder::Unordered => None,
+                    _ => {
+                        let sk = k.sort_key(&quote!(__ka), data, reg);
+                        Some(quote! {
+                            __rows.sort_by(|&(__ka, _), &(__kb, _)| {
+                                let __a = #sk;
+                                let __b = { let __ka = __kb; #sk };
+                                ::std::cmp::Ord::cmp(&__a, &__b)
+                            });
+                        })
                     }
-                    crate::ir_core::DictStub::<#kt, #vt>::new(__d.unbind())
-                })
+                };
+                match ordered {
+                    Some(sort) => quote!({
+                        let mut __rows: ::std::vec::Vec<_> = #vref.iter().collect();
+                        #sort
+                        let __d = ::pyo3::types::PyDict::new(py);
+                        for __row in __rows {
+                            let (__k, __e) = __row;
+                            __d.set_item(#kexpr, #vexpr)?;
+                        }
+                        crate::ir_core::DictStub::<#kt, #vt>::new(__d.unbind())
+                    }),
+                    None => quote!({
+                        let __d = ::pyo3::types::PyDict::new(py);
+                        for __row in #vref.iter() {
+                            let (__k, __e) = __row;
+                            __d.set_item(#kexpr, #vexpr)?;
+                        }
+                        crate::ir_core::DictStub::<#kt, #vt>::new(__d.unbind())
+                    }),
+                }
             }
             Shape::Tuple(v) => {
                 let elems = v.iter().enumerate().map(|(i, s)| {
@@ -756,20 +910,42 @@ enum Identity {
     Identical(Ident, Ident),
 }
 
-/// A union's `__repr__` directive. All forms render `<Alias …>`; the `…` is the
-/// native variant discriminant name, optionally followed by a quoted qualified /
-/// unqualified name resolved via the carried method identifier.
+/// How a class renders itself: `__repr__` is always `<PythonClassName …>`, and this
+/// directive says what the `…` is. The class name is the CONCRETE one (a union
+/// emits a `__repr__` per subclass), so with subclasses named for their union
+/// ([`crate::sem_bindings`]'s class-name note) the repr already carries the variant
+/// — `<SymbolPort 'Fw.Time'>`, not `<Symbol Port 'Fw.Time'>`.
+///
+/// The method identifiers are carried as DSL payloads (not hardcoded here) so a
+/// rename in `fpp_analysis` regenerates a still-correct call site. Which form a
+/// class gets is the bindgen's decision, never the macro's.
 enum Repr {
-    /// No generated repr — hand-written elsewhere.
-    None,
-    /// `<Alias Variant>`.
-    Variant,
-    /// `<Alias Variant 'qualified'>` — the `Ident` names the `Analysis` method
-    /// called as `self.data.analysis.<method>(&accessor)`.
-    VariantQualified(Ident),
-    /// `<Alias Variant 'unqualified'>` — the `Ident` names the accessor method
-    /// called as `accessor.<method>()`.
-    VariantUnqualified(Ident),
+    /// `<Class>` — the native offers nothing that identifies the value.
+    Plain,
+    /// `<Class {native}>` — the native impls `Display`. Also the ONLY thing that
+    /// emits `__str__`, which is that same rendering: a native `Display` is the
+    /// compiler's own spelling of the value, so it is both the string form and the
+    /// most useful thing a repr can carry.
+    Display,
+    /// `<Class 'name'>` — the `Ident` names a no-argument native method, called as
+    /// `accessor.<method>()`.
+    Name(Ident),
+    /// `<Class 'name'>` — the `Ident` names an `Analysis` method taking the native,
+    /// called as `self.data.analysis.<method>(&accessor)`. What `Symbol` uses: its
+    /// qualified name is a property of the scope tree, not of the definition.
+    AnalysisName(Ident),
+    /// `<Class 'name'>` — the pair names a native FIELD holding a symbol and the
+    /// `Analysis` method to resolve it, called as
+    /// `self.data.analysis.<method>(&accessor.<field>)`. What the definition-backed
+    /// entities (`Component`, `Topology`, `StateMachine`, …) use.
+    SymbolName(Ident, Ident),
+}
+
+impl Repr {
+    /// Whether this directive also emits `__str__` (only [`Repr::Display`] does).
+    fn has_str(&self) -> bool {
+        matches!(self, Repr::Display)
+    }
 }
 
 struct UnionDecl {
@@ -830,6 +1006,8 @@ struct EntityDecl {
     handle: EntityHandle,
     /// `__eq__`/`__hash__` directive (clone-handle entities only).
     identity: EntityIdentity,
+    /// `__repr__`/`__str__` directive — the same vocabulary the unions use.
+    repr: Repr,
     extras: Vec<FieldDecl>,
     fields: Vec<FieldDecl>,
     methods: Vec<MethodDecl>,
@@ -847,7 +1025,8 @@ enum LeafPattern {
     Struct,
 }
 
-/// A leaf-enum mirror: a fieldless `#[pyclass(eq, eq_int)]` Python enum plus a
+/// A leaf-enum mirror: a fieldless `#[pyclass(eq, eq_int)]` Python enum (not an
+/// `enum.Enum` subclass) plus a
 /// `From<&native>` mapping each native variant onto it (the discriminant only;
 /// any payload is exposed by dedicated getters elsewhere).
 struct LeafEnumDecl {
@@ -1252,35 +1431,7 @@ impl Parse for UnionDecl {
         } else {
             Identity::None
         };
-        let repr = if peek_kw(input, "repr") {
-            input.parse::<Ident>()?; // consume `repr`
-            let mode: Ident = input.parse()?;
-            match mode.to_string().as_str() {
-                "variant" => Repr::Variant,
-                // `variant_qualified(<method>)` / `variant_unqualified(<method>)` —
-                // payload optional, defaulting to the historical method names so an
-                // older (payload-free) `defs.rs` still parses.
-                "variant_qualified" => Repr::VariantQualified(parse_ident_payload(input, || {
-                    format_ident!("get_qualified_name")
-                })?),
-                "variant_unqualified" => {
-                    Repr::VariantUnqualified(parse_ident_payload(input, || {
-                        format_ident!("get_unqualified_name")
-                    })?)
-                }
-                other => {
-                    return Err(syn::Error::new(
-                        mode.span(),
-                        format!(
-                            "unknown repr mode `{other}` \
-                             (expected variant/variant_qualified/variant_unqualified)"
-                        ),
-                    ));
-                }
-            }
-        } else {
-            Repr::None
-        };
+        let repr = parse_repr(input)?;
         let body;
         braced!(body in input);
         let variants = parse_section::<VariantDecl>(&body, "variants")?;
@@ -1376,6 +1527,7 @@ impl Parse for EntityDecl {
         } else {
             EntityIdentity::None
         };
+        let repr = parse_repr(input)?;
         let body;
         braced!(body in input);
         let extras = if peek_section(&body, "extras") {
@@ -1398,6 +1550,7 @@ impl Parse for EntityDecl {
             native,
             handle,
             identity,
+            repr,
             extras,
             fields,
             methods,
@@ -1517,6 +1670,52 @@ fn parse_ident_pair_payload(
     } else {
         Ok((default_a(), default_b()))
     }
+}
+
+/// Parse the optional `repr <mode>` directive shared by `union` and `entity`.
+/// Absent → [`Repr::Plain`], the `<Class>`-only rendering.
+fn parse_repr(input: ParseStream) -> syn::Result<Repr> {
+    if !peek_kw(input, "repr") {
+        return Ok(Repr::Plain);
+    }
+    input.parse::<Ident>()?; // consume `repr`
+    let mode: Ident = input.parse()?;
+    Ok(match mode.to_string().as_str() {
+        "plain" => Repr::Plain,
+        "display" => Repr::Display,
+        "name" => Repr::Name(input_ident_payload(input, "name")?),
+        "analysis_name" => Repr::AnalysisName(input_ident_payload(input, "analysis_name")?),
+        // `symbol_name(<field>, <method>)`: the field holding the symbol, then the
+        // `Analysis` method that names it.
+        "symbol_name" => {
+            let (field, method) = parse_ident_pair_payload(
+                input,
+                || format_ident!("symbol"),
+                || format_ident!("get_qualified_name"),
+            )?;
+            Repr::SymbolName(field, method)
+        }
+        other => {
+            return Err(syn::Error::new(
+                mode.span(),
+                format!(
+                    "unknown repr mode `{other}` (expected \
+                     plain/display/name/analysis_name/symbol_name)"
+                ),
+            ));
+        }
+    })
+}
+
+/// The `(<method>)` payload of a repr mode that requires one — unlike the
+/// back-compat directives, a name-bearing repr has no sensible default method.
+fn input_ident_payload(input: ParseStream, mode: &str) -> syn::Result<Ident> {
+    if !input.peek(syn::token::Paren) {
+        return Err(input.error(format!("repr {mode} requires a `(<method>)` payload")));
+    }
+    let content;
+    parenthesized!(content in input);
+    content.parse()
 }
 
 impl Parse for Dsl {
@@ -1697,6 +1896,28 @@ fn py_getter_ident(name: &Ident) -> Ident {
     } else {
         name.clone()
     }
+}
+
+/// Whether a zero-argument member named `node` of shape `node` is the one member
+/// this macro deliberately renames, to `node_id`.
+///
+/// `Shape::Node` yields the dense *id* of an AST node, not the node. Everywhere
+/// else in the API an id is spelled `node_id` — `AstNode.node_id`, and every
+/// `get_node_id` native, whose `get_` PyO3 strips — and every `.node` is an object
+/// (`Component.node`, `Event.node`). So a member literally named `node` that hands
+/// back an `int` reads as the one thing it is not, and the failure surfaces far from
+/// the read. The three members this catches (`Symbol.node`,
+/// `StateMachineSymbol.node`, `UseDefMatching.node`) each have the node object one
+/// hop away, as `definition` / `symbol.definition`.
+///
+/// The old name is *removed*, not aliased: an alias that returns an `int` under a
+/// name the rest of the API uses for an object would preserve exactly the confusion
+/// the rename exists to end.
+///
+/// The rename lives here rather than in the bindgen because the DSL carries native
+/// names only; the bindgen has no vocabulary for "expose this under another name".
+fn renames_to_node_id(name: &Ident, params_empty: bool, shape: &Shape) -> bool {
+    name == "node" && params_empty && matches!(shape, Shape::Node)
 }
 
 fn getter_tokens(g: &Getter) -> TokenStream {
@@ -1895,8 +2116,15 @@ fn emit_union_methods(u: &UnionDecl, reg: &Registry) -> Vec<TokenStream> {
                 Ok(#expr)
             })
         };
+        // `node() -> Node` on a symbol-like union yields an AST node *id*, so it is
+        // exposed as `node_id` (see `renames_to_node_id`).
+        let name = if renames_to_node_id(mname, m.params.is_empty(), &m.shape) {
+            format_ident!("node_id")
+        } else {
+            mname.clone()
+        };
         getter_tokens(&Getter {
-            name: mname.clone(),
+            name,
             shape_ty: ty,
             needs_py: m.shape.needs_py(),
             body,
@@ -2064,89 +2292,94 @@ fn emit_subclass_getters(
     }
 }
 
-/// The base scrutinee (`&Native`) matching the stored handle (for the `__repr__`
-/// kind-name match).
-fn union_base_scrut(u: &UnionDecl) -> TokenStream {
-    let accessor = &u.accessor;
-    if u.handle.is_arc() {
-        quote!(self.#accessor.as_ref())
+/// The `…` of a `<Class …>` repr: the format fragment plus the expression that
+/// fills it, over `this` (an expression of the struct holding `data` + the native
+/// handle) and `handle` (that struct's native field). `None` for the bare `<Class>`.
+///
+/// A name is quoted and a `Display` rendering is not: the quotes mark a name the
+/// model gave the thing, where a rendering is the value itself.
+fn repr_fill(
+    repr: &Repr,
+    this: &TokenStream,
+    handle: &Ident,
+) -> Option<(&'static str, TokenStream)> {
+    match repr {
+        Repr::Plain => None,
+        Repr::Display => Some((" {}", quote!(#this.#handle))),
+        Repr::Name(m) => Some((" '{}'", quote!(#this.#handle.#m()))),
+        Repr::AnalysisName(m) => Some((" '{}'", quote!(#this.data.analysis.#m(&#this.#handle)))),
+        Repr::SymbolName(field, m) => Some((
+            " '{}'",
+            quote!(#this.data.analysis.#m(&#this.#handle.#field)),
+        )),
+    }
+}
+
+/// Wrap a `String`-returning dunder body in the receiver `via_super` implies: a
+/// union SUBCLASS is a unit struct whose handle lives on the base, reached through
+/// `as_super()` exactly as its field getters do ([`getter_tokens`]); everything else
+/// (union base, entity) stores the handle itself.
+fn dunder(name: Ident, via_super: bool, body: TokenStream) -> TokenStream {
+    if via_super {
+        quote! {
+            fn #name(self_: ::pyo3::PyRef<'_, Self>) -> ::std::string::String {
+                let base = self_.as_super();
+                #body
+            }
+        }
     } else {
-        quote!(&self.#accessor)
+        quote! {
+            fn #name(&self) -> ::std::string::String { #body }
+        }
     }
 }
 
-/// The `<Native>::<Variant><pattern>` match pattern for a variant (payload
-/// discarded — only the discriminant is named).
-fn variant_match_pattern(native: &Path, v: &VariantDecl) -> TokenStream {
-    let variant = &v.native_variant;
-    match &v.payload {
-        PayloadKind::Unit => quote!(#native::#variant),
-        PayloadKind::StructVariant(_) => quote!(#native::#variant { .. }),
-        _ => quote!(#native::#variant(..)),
+/// The struct expression a repr body reads, matching [`dunder`]'s receiver.
+fn repr_this(via_super: bool) -> TokenStream {
+    if via_super {
+        quote!(base)
+    } else {
+        quote!(self)
     }
 }
 
-/// Emit the private `sem_repr_kind` helper (the native variant discriminant name),
-/// used only by a generated `__repr__`. Empty when no repr is generated.
-fn emit_union_kind_helper(u: &UnionDecl) -> TokenStream {
-    if matches!(u.repr, Repr::None) {
+/// Emit `__repr__` — `<Class …>`, with `…` per the [`Repr`] directive.
+///
+/// `class` is a LITERAL, so a union emits this once per subclass (each with its own
+/// name) rather than matching the native discriminant at runtime: the concrete
+/// Python class is what a reader wants named, and it is known statically at the one
+/// place each subclass is emitted.
+///
+/// The body runs inside `run_ref` — a native `Display` or name method may read the
+/// retained compiler context, exactly as every generated method call may.
+fn emit_repr(class: &str, repr: &Repr, via_super: bool, handle: &Ident) -> TokenStream {
+    let this = repr_this(via_super);
+    let (fmt, args) = match repr_fill(repr, &this, handle) {
+        Some((frag, expr)) => (format!("<{class}{frag}>"), quote!(, #expr)),
+        None => (format!("<{class}>"), quote!()),
+    };
+    dunder(
+        format_ident!("__repr__"),
+        via_super,
+        quote!(::fpp_core::run_ref(&#this.data.ctx, || format!(#fmt #args))),
+    )
+}
+
+/// Emit `__str__` — the native's `Display`, and nothing at all without one, since
+/// Python then falls back to `__repr__` on its own, which is the intended answer.
+///
+/// Emitted on a union BASE only: a subclass inherits it, and the base's native is
+/// the union, whose `Display` already dispatches on the variant.
+fn emit_str(repr: &Repr, via_super: bool, handle: &Ident) -> TokenStream {
+    if !repr.has_str() {
         return quote!();
     }
-    let base = &u.py;
-    let native = &u.native;
-    let scrut = union_base_scrut(u);
-    let arms = u.variants.iter().map(|v| {
-        let pat = variant_match_pattern(native, v);
-        let name = v.native_variant.to_string();
-        quote!(#pat => #name)
-    });
-    quote! {
-        impl #base {
-            /// The native variant discriminant name (for `__repr__`).
-            fn sem_repr_kind(&self) -> &'static str {
-                match #scrut {
-                    #(#arms),*
-                }
-            }
-        }
-    }
-}
-
-/// Emit the generated `__repr__` method (empty when hand-written).
-fn emit_union_repr(u: &UnionDecl) -> TokenStream {
-    let accessor = &u.accessor;
-    let alias = u.alias.value();
-    match &u.repr {
-        Repr::None => quote!(),
-        Repr::Variant => {
-            let fmt = format!("<{alias} {{}}>");
-            quote! {
-                fn __repr__(&self) -> ::std::string::String {
-                    format!(#fmt, self.sem_repr_kind())
-                }
-            }
-        }
-        Repr::VariantQualified(method) => {
-            let fmt = format!("<{alias} {{}} '{{}}'>");
-            quote! {
-                fn __repr__(&self) -> ::std::string::String {
-                    format!(
-                        #fmt,
-                        self.sem_repr_kind(),
-                        self.data.analysis.#method(&self.#accessor)
-                    )
-                }
-            }
-        }
-        Repr::VariantUnqualified(method) => {
-            let fmt = format!("<{alias} {{}} '{{}}'>");
-            quote! {
-                fn __repr__(&self) -> ::std::string::String {
-                    format!(#fmt, self.sem_repr_kind(), self.#accessor.#method())
-                }
-            }
-        }
-    }
+    let this = repr_this(via_super);
+    dunder(
+        format_ident!("__str__"),
+        via_super,
+        quote!(::fpp_core::run_ref(&#this.data.ctx, || format!("{}", #this.#handle))),
+    )
 }
 
 /// Emit the generated `__eq__`/`__hash__` methods (empty when default identity).
@@ -2235,6 +2468,10 @@ fn emit_union(
 
         let payload = payloads.iter().find(|p| p.name == v.subclass);
         let getters = emit_subclass_getters(u, v, payload, reg);
+        // Named for the concrete subclass, not the union: the class is what a
+        // reader `isinstance`s against, and under the bindgen's naming it already
+        // carries the variant (`<SymbolPort 'Fw.Time'>`, `<StructType S>`).
+        let repr = emit_repr(&sub.to_string(), &u.repr, true, handle_field);
         subclass_defs.push(quote! {
             #[::pyo3_stub_gen::derive::gen_stub_pyclass]
             #[::pyo3::pyclass(extends = #base, frozen)]
@@ -2243,6 +2480,7 @@ fn emit_union(
             #[::pyo3::pymethods]
             impl #sub {
                 #(#getters)*
+                #repr
             }
         });
     }
@@ -2252,8 +2490,10 @@ fn emit_union(
 
     let methods = emit_union_methods(u, reg);
     let identity_methods = emit_union_identity(u);
-    let repr_method = emit_union_repr(u);
-    let kind_helper = emit_union_kind_helper(u);
+    // The base's own repr names the BASE class: reachable only for an
+    // `include_base` union, whose base is a real instance (the unknown `Type`).
+    let base_repr = emit_repr(&base_name.value(), &u.repr, false, handle_field);
+    let str_method = emit_str(&u.repr, false, handle_field);
 
     // Dispatch + register (base + subclasses + the runtime union object).
     let native = &u.native;
@@ -2265,10 +2505,9 @@ fn emit_union(
         impl #base {
             #(#methods)*
             #identity_methods
-            #repr_method
+            #base_repr
+            #str_method
         }
-
-        #kind_helper
 
         impl #base {
             /// Box `base` as the concrete subclass matching `disc`'s variant.
@@ -2512,12 +2751,15 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStr
     let method_names = method_name_set(&e.methods);
     let push_field = |getters: &mut Vec<TokenStream>, f: &FieldDecl, access: TokenStream| {
         let expr = f.shape.expr(&access, &model, &data, reg);
-        let mut g = Getter::field(
-            f.name.clone(),
-            f.shape.ty(reg),
-            f.shape.needs_py(),
-            quote!(Ok(#expr)),
-        );
+        // A `node`-shaped FIELD named `node` is an AST node id just as the method of
+        // that name is, so it is renamed the same way (see `renames_to_node_id`) —
+        // otherwise the trap survives one class over, on `UseDefMatching`.
+        let name = if renames_to_node_id(&f.name, true, &f.shape) {
+            format_ident!("node_id")
+        } else {
+            f.name.clone()
+        };
+        let mut g = Getter::field(name, f.shape.ty(reg), f.shape.needs_py(), quote!(Ok(#expr)));
         avoid_getter_symbol_clash(&mut g, &method_names);
         getters.push(getter_tokens(&g));
     };
@@ -2580,14 +2822,11 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStr
     // `__eq__`/`__hash__` from the `identity` directive (clone-handle entities).
     getters.extend(emit_entity_identity(e, field));
 
-    // A default `__repr__` (`<PyName>`). Clone-handle entities never emit their
-    // own repr elsewhere, so this is always safe to add.
-    let repr_lit = format!("<{py}>");
-    getters.push(quote! {
-        fn __repr__(&self) -> ::std::string::String {
-            ::std::string::String::from(#repr_lit)
-        }
-    });
+    // `__repr__` (+ `__str__` where the native impls `Display`), from the same
+    // directive the unions use. Clone-handle entities never emit either elsewhere,
+    // so this is always safe to add.
+    getters.push(emit_repr(&py.to_string(), &e.repr, false, field));
+    getters.push(emit_str(&e.repr, false, field));
 
     let def = quote! {
         #[::pyo3_stub_gen::derive::gen_stub_pyclass]
@@ -2626,13 +2865,19 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStr
     (def, quote!(m.add_class::<#py>()?;))
 }
 
-/// Emit a leaf-enum mirror: the fieldless `#[pyclass(eq, eq_int)]` Python enum +
-/// a `From<&native>` mapping each native variant onto it. Returns
-/// `(definition, register_call)`.
+/// Emit a leaf-enum mirror: the fieldless `#[pyclass(eq, eq_int)]` Python enum, its
+/// `.name`/`.value` getters, and a `From<&native>` mapping each native variant onto
+/// it. Returns `(definition, register_call)`.
+///
+/// The getters are the same ones `crate::ast_bindings` puts on the `fpp_ast` kind
+/// mirrors, for the same reason: PyO3 gives a simple enum only `__repr__`/`__int__`/
+/// `__richcmp__`/`__hash__`, so the member spelling would otherwise be recoverable
+/// only by parsing `repr`.
 fn emit_leaf_enum(e: &LeafEnumDecl) -> (TokenStream, TokenStream) {
     let py = &e.py;
     let native = &e.native;
     let variant_idents: Vec<&Ident> = e.variants.iter().map(|(v, _)| v).collect();
+    let variant_names: Vec<String> = variant_idents.iter().map(|v| v.to_string()).collect();
     let from_arms = e.variants.iter().map(|(v, pat)| {
         let lhs = match pat {
             LeafPattern::Unit => quote!(#native::#v),
@@ -2641,12 +2886,37 @@ fn emit_leaf_enum(e: &LeafEnumDecl) -> (TokenStream, TokenStream) {
         };
         quote!(#lhs => #py::#v)
     });
+    let doc = crate::leaf_enum_doc(&py.to_string());
     let def = quote! {
+        #[doc = #doc]
         #[::pyo3_stub_gen::derive::gen_stub_pyclass_enum]
         #[::pyo3::pyclass(eq, eq_int, frozen, hash, skip_from_py_object)]
-        #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+        // `Ord` is Rust-only (`#[pyclass(ord)]` stays off, so nothing appears in the
+        // stub): it is what lets a map keyed by this mirror iterate in native
+        // declaration order — see [`KeyOrder`].
+        #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
         pub enum #py {
             #(#variant_idents),*
+        }
+
+        // A plain `impl`, not the `#[pymethods]` block below, so the getters
+        // delegate to it rather than to each other through PyO3's rewriting.
+        impl #py {
+            fn member_name(&self) -> &'static str {
+                match self { #(Self::#variant_idents => #variant_names,)* }
+            }
+        }
+
+        #[::pyo3_stub_gen::derive::gen_stub_pymethods]
+        #[::pyo3::pymethods]
+        impl #py {
+            /// Get enum variant name as a string
+            #[getter]
+            fn name(&self) -> &'static str { self.member_name() }
+            /// The same string as `name`: a kind mirror carries no payload, so
+            /// its name is its value (as for `enum.StrEnum`).
+            #[getter]
+            fn value(&self) -> &'static str { self.member_name() }
         }
 
         impl ::std::convert::From<&#native> for #py {
@@ -2787,6 +3057,15 @@ pub fn expand(input: TokenStream) -> TokenStream {
                         handle: u.handle,
                         accessor: u.accessor.clone(),
                         subclasses,
+                        // The first zero-argument method returning a `node`: the
+                        // reflected name of whatever the native calls it.
+                        node_accessor: u
+                            .methods
+                            .iter()
+                            .find(|m| {
+                                m.params.is_empty() && !m.assoc && matches!(m.shape, Shape::Node)
+                            })
+                            .map(|m| m.name.clone()),
                     },
                 )
             })

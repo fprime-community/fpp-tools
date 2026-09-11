@@ -92,14 +92,27 @@ pub struct Diagnostic {
 #[gen_stub_pymethods]
 #[pymethods]
 impl Diagnostic {
+    /// This diagnostic as a one-line compiler message:
+    /// `"path/to/file.fpp:12:5: error: cannot find type `Nope` in scope"`, or
+    /// `"error: <message>"` when there is no location.
+    #[getter]
+    fn display(&self) -> String {
+        match &self.location {
+            Some(l) => format!("{}: {}: {}", l.display_string(), self.level, self.message),
+            None => format!("{}: {}", self.level, self.message),
+        }
+    }
+
+    fn __str__(&self) -> String {
+        self.display()
+    }
+
     fn __repr__(&self) -> String {
         match &self.location {
             Some(l) => format!(
-                "<Diagnostic {} {}:{}:{}: {}>",
+                "<Diagnostic {} {}: {}>",
                 self.level,
-                l.uri,
-                l.line + 1,
-                l.column + 1,
+                l.display_string(),
                 self.message
             ),
             None => format!("<Diagnostic {}: {}>", self.level, self.message),

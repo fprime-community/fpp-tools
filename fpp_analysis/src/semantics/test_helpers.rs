@@ -127,7 +127,7 @@ pub fn abs_type(name: &str, id: u64) -> Arc<Type> {
         name: name_with_id(name, id),
         node_id: node_for(id),
     });
-    Arc::new(Type::AbsType(Arc::new(crate::semantics::AbsType { node })))
+    Arc::new(Type::Abs(Arc::new(crate::semantics::AbsType { node })))
 }
 
 /// A dummy `TypeName` (`Integer(U32)`) used as a placeholder.
@@ -145,7 +145,7 @@ pub fn alias_type(name: &str, ty: Arc<Type>, id: u64) -> Arc<Type> {
         is_dictionary_def: false,
         node_id: node_for(id),
     });
-    Arc::new(Type::AliasType(crate::semantics::AliasType {
+    Arc::new(Type::Alias(crate::semantics::AliasType {
         node,
         alias_type: ty,
     }))
@@ -427,7 +427,7 @@ pub fn sizeof_test_analysis() -> crate::Analysis {
     let store_id = 900_001;
     let store_ty = alias_type("FwSizeStoreType", u16(), store_id);
     let store_def = match store_ty.deref() {
-        Type::AliasType(al) => al.node.clone(),
+        Type::Alias(al) => al.node.clone(),
         _ => unreachable!(),
     };
     a.framework_definitions

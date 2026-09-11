@@ -62,9 +62,9 @@ impl<'ast> FinalizeTypeDefs<'ast> {
                     match &symbol {
                         Symbol::AbsType(ty) => self.visit_def_abs_type(a, ty.deref()),
                         Symbol::AliasType(ty) => self.visit_def_alias_type(a, ty.deref()),
-                        Symbol::Array(ty) => self.visit_def_array(a, ty.deref()),
-                        Symbol::Enum(ty) => self.visit_def_enum(a, ty.deref()),
-                        Symbol::Struct(ty) => self.visit_def_struct(a, ty.deref()),
+                        Symbol::ArrayType(ty) => self.visit_def_array(a, ty.deref()),
+                        Symbol::EnumType(ty) => self.visit_def_enum(a, ty.deref()),
+                        Symbol::StructType(ty) => self.visit_def_struct(a, ty.deref()),
                         _ => ControlFlow::Continue(()),
                     }?;
 
@@ -133,6 +133,13 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         ControlFlow::Continue(())
     }
 
+    fn visit_type_name(&self, a: &mut Self::State, node: &'ast TypeName) -> ControlFlow<()> {
+        if matches!(node.kind, TypeNameKind::String(_)) {
+            self.ty(a, node)?;
+        }
+        ControlFlow::Continue(())
+    }
+
     fn visit_trans_unit(
         &self,
         a: &mut Self::State,
@@ -161,7 +168,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         // Update the alias type in the type map
         a.type_map.insert(
             node.node_id,
-            Arc::new(Type::AliasType(AliasType {
+            Arc::new(Type::Alias(AliasType {
                 node: def,
                 alias_type: ty,
             })),

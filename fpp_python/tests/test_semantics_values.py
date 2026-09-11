@@ -2,9 +2,10 @@
 `fpp_analysis::semantics::Value`.
 
 Constants are located by qualified name; their folded value is read through
-`def_constant.value.resolved_value`. Native tuple-struct variants render as
-`Value*` subclasses (`Integer` -> `ValueInteger`, etc.) to stay clear of the
-`enum.Enum`-style names.
+`def_constant.value.resolved_value`. Every subclass is named `<Variant>Value`,
+which for the variants carrying a native payload struct is that struct's own name
+(`Value::Float(FloatValue)` -> `FloatValue`) and for the bare tuple variants is
+the name it would have had (`Value::Integer(IntegerValue)` -> `IntegerValue`).
 """
 
 import pytest
@@ -13,13 +14,13 @@ import fpp as f
 from fpp import (
     AnonArrayValue,
     AnonStructValue,
+    BooleanValue,
     EnumConstantValue,
     EnumType,
     FloatValue,
+    IntegerValue,
+    StringValue,
     Value,
-    ValueBoolean,
-    ValueInteger,
-    ValueString,
 )
 
 SRC = """
@@ -49,7 +50,7 @@ def rval(m, qn):
 
 def test_integer_constant_folding(m):
     v = rval(m, "M.c")
-    assert isinstance(v, ValueInteger) and isinstance(v, Value)
+    assert isinstance(v, IntegerValue) and isinstance(v, Value)
     assert v.value == 7  # 1 + 2*3
     # `get_type` is mirrored as the `.type` getter (PyO3 strips the `get_` prefix).
     assert v.type.is_int
@@ -57,12 +58,12 @@ def test_integer_constant_folding(m):
 
 def test_string(m):
     v = rval(m, "M.s")
-    assert isinstance(v, ValueString) and v.value == "hello"
+    assert isinstance(v, StringValue) and v.value == "hello"
 
 
 def test_bool(m):
     v = rval(m, "M.b")
-    assert isinstance(v, ValueBoolean) and v.value is True
+    assert isinstance(v, BooleanValue) and v.value is True
 
 
 def test_float(m):

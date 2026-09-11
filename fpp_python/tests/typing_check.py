@@ -8,7 +8,11 @@ and `analyze` (a `Model`) — and the semantic surface: the `Analysis` root, its
 `NonParamKind` union base+subclass hierarchies (narrowed with `isinstance`), the
 resolved `Loc` and lazy `Span` location types, the state-machine model, and the AST
 traversal surface (`AstNode.children` plus a `NodeVisitor` subclass overriding typed
-`visit_*` methods).
+`visit_*` methods). It also covers the contracts the stub is easiest to get wrong
+about: a leaf enum's `str`-typed `.name`/`.value`, `str()` of a union base,
+`lookup(kind=…)` / `lookup_all`, a symbol's `int` `node_id` beside its node
+`definition`, `Topology.node`, `Diagnostic.display`, and the `is_source` /
+`in_source` flags.
 """
 
 from __future__ import annotations
@@ -20,25 +24,28 @@ from fpp import (
     analyze,
     parse,
     Analysis,
-    Async,
     AstNode,
+    AsyncNonParamKind,
     Command,
     Component,
     DefComponent,
     DefConstant,
+    DefPort,
+    DefTopology,
     Endpoint,
     IntegerKind,
     Loc,
     Model,
     NodeVisitor,
-    NonParam,
+    NonParamCommand,
     NonParamKind,
-    PrimitiveInt,
+    PrimitiveIntType,
     Span,
     SpecCommand,
     StateMachine,
     StateMachineSymbol,
     Symbol,
+    SymbolPort,
     SyntaxTree,
     TransUnit,
     Type,
@@ -79,25 +86,63 @@ module M {
 
 
 def command_priority(cmd: Command) -> Optional[int]:
-    """`Command` is itself a union (`NonParam | CommandParam`); narrowing to
-    `NonParam` gives a `.kind` of the `NonParamKind` union (`Async | Guarded |
-    Sync`), narrowed again to the `Async` subclass, which alone exposes
-    `.priority`."""
-    if not isinstance(cmd, NonParam):
+    """`Command` is itself a union (`NonParamCommand | ParamCommand`); narrowing
+    to `NonParamCommand` gives a `.kind` of the `NonParamKind` union
+    (`AsyncNonParamKind | GuardedNonParamKind | SyncNonParamKind`), narrowed again
+    to the async subclass, which alone exposes `.priority`."""
+    if not isinstance(cmd, NonParamCommand):
         return None
     kind: NonParamKind = cmd.kind
-    if isinstance(kind, Async):
-        return kind.priority  # Optional[int], only on the Async subclass
+    if isinstance(kind, AsyncNonParamKind):
+        return kind.priority  # Optional[int], only on the async subclass
     return None
 
 
 def constant_type_kind(node: DefConstant) -> Optional[IntegerKind]:
     """`.resolved_type` is the `Type` union (`Optional`); `isinstance` narrows it
-    to `PrimitiveInt`, whose `.value` is the mirrored `IntegerKind` payload."""
+    to `PrimitiveIntType`, whose `.value` is the mirrored `IntegerKind` payload."""
     resolved: Optional[Type] = node.resolved_type
-    if isinstance(resolved, PrimitiveInt):
+    if isinstance(resolved, PrimitiveIntType):
         return resolved.value
     return None
+
+
+def kind_spelling(kind: IntegerKind) -> str:
+    """A leaf-enum mirror's `.name`/`.value` are both `str` — the member spelling.
+    They are declared on a plain class, not on `enum.Enum`, so the class surface a
+    real enum would offer (iteration, `IntegerKind("U32")`) is correctly absent."""
+    name: str = kind.name
+    value: str = kind.value
+    return name + value
+
+
+def type_spelling(node: AstNode) -> str:
+    """`__str__` is declared on the union base (it is the native `Display`), so a
+    type renders without narrowing to a subclass first."""
+    resolved: Optional[Type] = node.resolved_type
+    return str(resolved) if resolved is not None else ""
+
+
+def first_port_symbol(model: Model) -> Optional[SymbolPort]:
+    """`lookup`'s `kind=` takes a symbol class and narrows nothing by itself, so
+    the caller still asserts what it asked for; `lookup_all` returns a list."""
+    every: list[Symbol] = model.lookup_all("M.P")
+    found: Optional[Symbol] = model.lookup("M.P", kind=SymbolPort)
+    if isinstance(found, SymbolPort) and every:
+        node_id: int = found.node_id
+        definition: DefPort = found.definition
+        assert node_id == definition.node_id
+        return found
+    return None
+
+
+def source_units(model: Model) -> int:
+    """`is_source`/`in_source` are plain bools on the unit and the node."""
+    total = 0
+    for unit in model.ast:
+        if unit.is_source:
+            total += sum(1 for n in unit.members if n.in_source)
+    return total
 
 
 def analysis_detail(a: Analysis) -> int:
@@ -132,6 +177,8 @@ def connection_spans(a: Analysis) -> int:
     `resolve()` yields the concrete `Loc`."""
     total = 0
     for topology in a.topology_map.values():
+        definition: DefTopology = topology.node
+        total += len(definition.name)
         for connections in topology.connection_map.values():
             for conn in connections:
                 source: Endpoint = conn.from_
@@ -209,6 +256,11 @@ def main() -> int:
     sym: Optional[Symbol] = model.lookup("M.c")
     name = analysis.get_qualified_name(sym) if sym is not None else "<none>"
     total = node_id_sum + analysis_detail(analysis) + connection_spans(analysis)
+    total += source_units(model) + len(kind_spelling(IntegerKind.U32))
+    total += len(type_spelling(units[0].members[0]))
+    total += 1 if first_port_symbol(model) is not None else 0
+    for diag in model.diagnostics:
+        total += len(diag.display)
     print(name, total)
     return 0
 

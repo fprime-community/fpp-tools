@@ -408,7 +408,7 @@ struct S { x: T }
             .symbol_map
             .values()
             .find_map(|s| match s {
-                Symbol::Array(def) => a.type_map.get(&def.node_id),
+                Symbol::ArrayType(def) => a.type_map.get(&def.node_id),
                 _ => None,
             })
             .expect("the array type");
@@ -450,7 +450,7 @@ fn nested_array_default_shares_its_repeated_element() {
             .symbol_map
             .values()
             .find_map(|s| match s {
-                Symbol::Array(def) if def.name.data == "Outer" => a.type_map.get(&def.node_id),
+                Symbol::ArrayType(def) if def.name.data == "Outer" => a.type_map.get(&def.node_id),
                 _ => None,
             })
             .expect("the Outer array type");
@@ -506,7 +506,7 @@ array Big = [1] I64 default [1.0e18]
                 .symbol_map
                 .values()
                 .find_map(|s| match s {
-                    Symbol::Array(def) if def.name.data == name => a.type_map.get(&def.node_id),
+                    Symbol::ArrayType(def) if def.name.data == name => a.type_map.get(&def.node_id),
                     _ => None,
                 })
                 .unwrap_or_else(|| panic!("the {name} array type"));
@@ -549,7 +549,9 @@ enum F { A = 1, B = 4, C = 5 } default B
             .symbol_map
             .values()
             .filter_map(|s| match s {
-                Symbol::Enum(def) => Some((def.name.data.clone(), a.type_map.get(&def.node_id)?)),
+                Symbol::EnumType(def) => {
+                    Some((def.name.data.clone(), a.type_map.get(&def.node_id)?))
+                }
                 _ => None,
             })
             .collect();
@@ -602,7 +604,7 @@ passive component C {{
             .symbol_map
             .values()
             .find_map(|s| match s {
-                Symbol::Struct(def) => a.type_map.get(&def.node_id),
+                Symbol::StructType(def) => a.type_map.get(&def.node_id),
                 _ => None,
             })
             .expect("the struct type");
