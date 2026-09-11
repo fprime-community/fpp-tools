@@ -39,7 +39,7 @@ impl Direction {
 /// A port instance type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PortInstanceType {
-    DefPort(Symbol),
+    DefPort(Arc<fpp_ast::DefPort>),
     Serial,
 }
 
@@ -47,7 +47,7 @@ impl PortInstanceType {
     /// Show a type option.
     pub fn show(ty: &Option<PortInstanceType>) -> String {
         match ty {
-            Some(PortInstanceType::DefPort(symbol)) => symbol.name().data.clone(),
+            Some(PortInstanceType::DefPort(port)) => port.name.data.clone(),
             Some(PortInstanceType::Serial) => "serial".to_string(),
             None => "none".to_string(),
         }
@@ -66,9 +66,7 @@ impl PortInstanceType {
     /// If this is a defined port with a return type, get the port def symbol.
     pub fn port_returns_value(&self) -> Option<Span> {
         match self {
-            PortInstanceType::DefPort(Symbol::Port(def)) => {
-                def.return_type.as_ref().map(|_| def.span())
-            }
+            PortInstanceType::DefPort(def) => def.return_type.as_ref().map(|_| def.span()),
             _ => None,
         }
     }
@@ -107,7 +105,7 @@ pub struct SpecialPortInstance {
     /// The specifier defining the port instance.
     pub node: Arc<SpecSpecialPortInstance>,
     /// The port definition symbol backing the special port.
-    pub symbol: Symbol,
+    pub def: Arc<fpp_ast::DefPort>,
     /// The queue priority, for an async special port.
     pub priority: Option<i128>,
     /// The queue-full behavior, for a product receive port.
@@ -259,7 +257,7 @@ impl GeneralPortInstance {
         // Get the type
         let ty = match &specifier.port {
             Some(qid) => match a.use_def_map.get(&qid.id()) {
-                Some(symbol @ Symbol::Port(_)) => PortInstanceType::DefPort(symbol.clone()),
+                Some(Symbol::Port(d)) => PortInstanceType::DefPort(d.clone()),
                 Some(symbol) => {
                     return Err(SemanticError::InvalidSymbol {
                         symbol_name: symbol.name().data.clone(),
@@ -298,7 +296,7 @@ impl GeneralPortInstance {
     /// Checks general async input port specifiers.
     fn check_async_input(&self) -> SemanticResult {
         if let GeneralKind::AsyncInput { .. } = self.kind
-            && let PortInstanceType::DefPort(Symbol::Port(def)) = &self.ty
+            && let PortInstanceType::DefPort(def) = &self.ty
             && def.return_type.is_some()
         {
             return Err(SemanticError::InvalidPortInstance {
@@ -339,7 +337,7 @@ impl SpecialPortInstance {
 
     /// Gets the type of the port instance. A special port always has one.
     pub fn get_type(&self) -> PortInstanceType {
-        PortInstanceType::DefPort(self.symbol.clone())
+        PortInstanceType::DefPort(self.def.clone())
     }
 
     /// Gets the special kind of the port instance.
@@ -384,8 +382,8 @@ impl SpecialPortInstance {
         specifier: &SpecSpecialPortInstance,
     ) -> SemanticResult<SpecialPortInstance> {
         let loc = specifier.span();
-        let symbol = match a.use_def_map.get(&specifier.node_id) {
-            Some(symbol @ Symbol::Port(_)) => symbol.clone(),
+        let def = match a.use_def_map.get(&specifier.node_id) {
+            Some(Symbol::Port(def)) => def.clone(),
             _ => {
                 return Err(SemanticError::InvalidSpecialPort {
                     loc,
@@ -439,7 +437,7 @@ impl SpecialPortInstance {
 
         Ok(SpecialPortInstance {
             node: Arc::new(specifier.clone()),
-            symbol,
+            def,
             priority,
             queue_full,
             import_node_ids: vec![],

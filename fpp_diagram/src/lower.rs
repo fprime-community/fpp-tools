@@ -10,7 +10,7 @@ use crate::ir::{self, Diagram, DiagramKind, Edge, Node, Port};
 use fpp_analysis::Analysis;
 use fpp_analysis::semantics::{
     Component, ComponentInstance, Connection, Direction as SemDirection, GeneralKind,
-    InterfaceInstance, PortInstance, PortInstanceType, SymbolInterface, Topology,
+    InterfaceInstance, PortInstance, PortInstanceType, Symbol, SymbolInterface, Topology,
 };
 
 /// Errors that can occur while lowering an element to a diagram.
@@ -190,7 +190,9 @@ fn expand_port(a: &Analysis, node_id: &str, pi: &PortInstance) -> Vec<Port> {
     };
     let kind = port_kind(pi);
     let type_name = match pi.get_type() {
-        Some(PortInstanceType::DefPort(symbol)) => Some(a.get_qualified_name(&symbol)),
+        Some(PortInstanceType::DefPort(def)) => {
+            Some(a.get_qualified_name(&Symbol::Port(def.clone())))
+        }
         Some(PortInstanceType::Serial) | None => None,
     };
     let array_size = pi.get_array_size().max(1);

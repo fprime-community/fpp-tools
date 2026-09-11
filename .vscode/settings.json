@@ -15,5 +15,13 @@
         "fpp_python"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "rust-analyzer.check.extraArgs": [
+        "--exclude",
+        "fpp_python",
+        "--exclude",
+        "fpp_python_bindgen",
+        "--exclude",
+        "fpp_python_macros"
+    ]
 }
