@@ -66,9 +66,7 @@ impl PortInstanceType {
     /// If this is a defined port with a return type, get the port def symbol.
     pub fn port_returns_value(&self) -> Option<Span> {
         match self {
-            PortInstanceType::DefPort(def) => {
-                def.return_type.as_ref().map(|_| def.span())
-            }
+            PortInstanceType::DefPort(def) => def.return_type.as_ref().map(|_| def.span()),
             _ => None,
         }
     }

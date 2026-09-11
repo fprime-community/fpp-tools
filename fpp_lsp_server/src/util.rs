@@ -685,13 +685,9 @@ fn port_interface_for_instance_symbol<'a>(
 /// Returns `None` for serial ports and instances with no underlying port
 /// definition (e.g. internal ports), which have no parameter signature.
 fn port_signature(state: &GlobalState, pi: &PortInstance) -> Option<String> {
-    let symbol = match pi.get_type()? {
+    let def = match pi.get_type()? {
         PortInstanceType::DefPort(symbol) => symbol,
         PortInstanceType::Serial => return None,
-    };
-    let def = match &symbol {
-        Symbol::Port(def) => def,
-        _ => return None,
     };
 
     let args: Vec<String> = def
