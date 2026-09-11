@@ -151,7 +151,7 @@ fpp_python_macros::fpp_sem_bindings! {
 
     union PortInstanceType native fpp_analysis::semantics::PortInstanceType handle clone alias "PortInstanceType" accessor native {
         variants {
-            DefPort => DefPortPortInstanceType : union(Symbol),
+            DefPort => DefPortPortInstanceType : astdef(DefPort),
             Serial => SerialPortInstanceType : unit,
         }
         methods {
@@ -481,7 +481,7 @@ fpp_python_macros::fpp_sem_bindings! {
     payload SpecialPortInstance native fpp_analysis::semantics::SpecialPortInstance {
         fields {
             node: astdef(SpecSpecialPortInstance),
-            symbol: union(Symbol),
+            def: astdef(DefPort),
             priority: opt(i128),
             queue_full: opt(leaf(crate::ast::QueueFull)),
             import_node_ids: list(node),

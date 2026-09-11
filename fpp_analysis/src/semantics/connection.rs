@@ -587,8 +587,8 @@ impl Analysis {
         port_type_name: &str,
     ) -> bool {
         match (pi.get_type(), pi.get_direction()) {
-            (Some(PortInstanceType::DefPort(symbol)), Some(d)) => {
-                self.get_qualified_name(&symbol) == port_type_name && d == direction
+            (Some(PortInstanceType::DefPort(def)), Some(d)) => {
+                self.get_qualified_name(&Symbol::Port(def)) == port_type_name && d == direction
             }
             _ => false,
         }

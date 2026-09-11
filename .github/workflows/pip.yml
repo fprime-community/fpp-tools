@@ -4,13 +4,6 @@ name: Pip Packages
 #   - fprime-fpp-lsp     (from fpp_lsp_server)  — executable
 #   - fprime-fpp-format  (from fpp_format)      — executable
 #   - fprime-fpp-python  (from fpp_python)      — abi3 PyO3 extension (import `fpp`)
-#
-# On push/PR/dispatch this only *builds* the distributions and uploads them as
-# artifacts. When a GitHub release is published it additionally publishes every
-# package: TestPyPI first as a staging upload, then PyPI unless the release is
-# marked a GitHub "pre-release". The published version comes from the release
-# tag. The two-stage publish is modeled on nasa/fprime-tools'
-# .github/workflows/publish.yml.
 
 on:
   push:
@@ -168,12 +161,10 @@ jobs:
         run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber
 
       - name: Publish distributions to TestPyPI
-        continue-on-error: true
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist
-          skip-existing: true
 
       - name: Clean up attestations
         run: rm -f dist/*.attestation
