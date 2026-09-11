@@ -10,11 +10,15 @@
 //! entity (including opaque handles), the payload structs, and the leaf-enum
 //! mirrors — plus `defs::register` and `defs::union_aliases`.
 //!
-//! [`hand`] holds the single irreducible escape hatch the macro cannot produce
-//! mechanically: `build_type` (the `Type` union is `custom_build` because an
-//! "unknown" type whose def node is absent from the walk must render as the bare
-//! base) and `Type`'s `__repr__`. It re-exports through `crate::sem::*` so callers
-//! reference stable paths.
+//! [`hand`] holds the one thing the macro cannot produce mechanically:
+//! `build_type` (the `Type` union is `custom_build` because an "unknown" type whose
+//! def node is absent from the walk must render as the bare base). It re-exports
+//! through `crate::sem::*` so callers reference stable paths.
+//!
+//! `__repr__` and `__str__` are NOT hand-written: every class gets
+//! `<PythonClassName …>` from its `repr` directive, and `__str__` wherever the
+//! native impls `Display` — see [`crate::sem::defs`]'s macro and the bindgen's
+//! `repr_directive`.
 
 mod defs;
 mod hand;

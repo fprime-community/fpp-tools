@@ -505,23 +505,20 @@ const DEF_MODULE_STUB: &str = "DefModuleStub";
 /// The `fpp_ast` node [`DEF_MODULE_STUB`] resolves to.
 const DEF_MODULE_AST: &str = "DefModule";
 
-/// Bare type names that always get their CamelCased last-module-segment prefix
-/// (even when unique among emitted classes), because the bare form shadows or
-/// confuses a type already living in the generated module (e.g.
-/// `transition_graph::Node` → `TransitionGraphNode`, `transition_graph::Arc` →
-/// `TransitionGraphArc`, and `FormatReplacementKind::Default` → a subclass
-/// `FormatReplacementKindDefault` so it does not shadow `std::default::Default`).
-///
-/// `Enum` and `DefPort` are semantic-layer names that collide with *other things
-/// in the same emitted Python module*, invisible to the emitted-class uniqueness
-/// pass: `Enum` (the `Symbol::Enum` variant) shadows the `enum.Enum` the stub
-/// imports as the base of every leaf-enum mirror, and `DefPort` (the
-/// `PortInstanceType::DefPort` variant) shadows the `fpp_ast` `DefPort` node
-/// wrapper registered by the sibling AST bindings. Prefixing yields `SymbolEnum`
-/// / `PortInstanceTypeDefPort`.
+/// Bare PRIMARY names (union / entity / leaf_enum) that always get their
+/// CamelCased last-module-segment prefix, even when unique among emitted classes,
+/// because the bare form shadows or confuses a type already living in the
+/// generated module: `transition_graph::Node` → `TransitionGraphNode`,
+/// `transition_graph::Arc` → `TransitionGraphArc`.
 const RESERVED_TYPE_NAMES: &[&str] = &[
-    "Arc", "Box", "Rc", "Node", "Cell", "RefCell", "Ref", "Cow", "Weak", "Default", "Enum",
-    "DefPort",
+    "Arc", "Box", "Rc", "Node", "Cell", "RefCell", "Ref", "Cow", "Weak",
+];
+
+/// Unions whose subclasses read `<Union><Variant>` instead of the default
+/// `<Variant><Union>`.
+const PREFIXED_UNION_NATIVES: &[&str] = &[
+    "fpp_analysis::semantics::Symbol",
+    "fpp_analysis::semantics::state_machine::StateMachineSymbol",
 ];
 
 /// Peel `Box`/`Arc`/`Rc` (transparent) → the innermost referenced type.
@@ -1006,11 +1003,12 @@ fn classify_method(
         ));
         return None;
     }
+
+    let ret_ref = matches!(out, Type::BorrowedRef { .. });
+
     // Rule R2: an `fpp_ast` node returned BY VALUE from an analysis method is
     // synthesized fresh (its `node_id` is never recorded in the walk), so an
-    // `astdef` getter over it would raise at runtime. Only fields / variant
-    // payloads carry recorded walk nodes; drop the method (logged).
-    if shape_contains_astdef(&ret) {
+    if !ret_ref && shape_contains_astdef(&ret) {
         let owner_name = ctx.last_segment(owner);
         ctx.skips.push(format!(
             "  skip {owner_name}.{name}(): fpp_ast node returned by value from an analysis \
@@ -1023,12 +1021,7 @@ fn classify_method(
         assoc,
         params,
         ret,
-        // Only the OUTERMOST reference is recorded: a nested one
-        // (`Option<&Leaf>`) reaches the shape through the container's own
-        // conversion, which cannot be told to expect one fewer `&`. No such
-        // signature is reflected today, and one would fail to compile rather than
-        // marshal wrongly.
-        ret_ref: matches!(out, Type::BorrowedRef { .. }),
+        ret_ref,
         throws,
         trait_path: None,
     })
@@ -1699,42 +1692,83 @@ pub fn resolve_names(ctx: &Ctx, r: &Reflected) -> Names {
         primary.insert(id.0, name);
     }
 
-    // 2) Subclass names, unique against primaries + each other.
-    let mut used: BTreeMap<String, usize> = BTreeMap::new();
-    for n in primary.values() {
-        *used.entry(n.clone()).or_default() += 1;
-    }
-    // Tentative subclass names.
-    let mut tentatives: Vec<(u32, String, String)> = Vec::new(); // (union_id, variant, tentative)
+    // 2) Subclass names: every one carries its union's name ([`qualify`]), so a
+    //    variant can neither collide with a sibling nor claim a bare name that
+    //    something else in the module wants. There is no census and no
+    //    collision-driven fallback: the name a variant gets is a pure function of
+    //    (union python name, variant name), which is what makes it predictable from
+    //    the `fpp_analysis` spelling alone rather than only from the stub.
+    let mut subclass: BTreeMap<(u32, String), String> = BTreeMap::new();
     for u in &r.unions {
+        let union_py = primary.get(&u.id.0).cloned().unwrap_or_default();
+        let prefixed = PREFIXED_UNION_NATIVES.contains(&ctx.native_path(u.id).as_str());
         for v in &u.variants {
-            let tentative = match &v.payload {
-                VariantPayload::Struct(sid) => ctx.last_segment(*sid),
-                _ => v.native.clone(),
-            };
-            *used.entry(tentative.clone()).or_default() += 1;
-            tentatives.push((u.id.0, v.native.clone(), tentative));
+            subclass.insert(
+                (u.id.0, v.native.clone()),
+                qualify(&union_py, &v.native, prefixed),
+            );
         }
     }
-    let mut subclass: BTreeMap<(u32, String), String> = BTreeMap::new();
-    for (uid, variant, tentative) in tentatives {
-        // Prefix when the tentative name collides among emitted classes *or* is a
-        // reserved name that shadows/confuses a std/crate type.
-        let name = if used.get(&tentative).copied().unwrap_or(0) > 1
-            || RESERVED_TYPE_NAMES.contains(&tentative.as_str())
-        {
-            format!(
-                "{}{}",
-                primary.get(&uid).cloned().unwrap_or_default(),
-                variant
-            )
-        } else {
-            tentative
-        };
-        subclass.insert((uid, variant), name);
-    }
 
+    assert_names_unique(&primary, &subclass);
     Names { primary, subclass }
+}
+
+/// The Python name of one union subclass: `<Variant><Union>`, or `<Union><Variant>`
+/// for a union in [`PREFIXED_UNION_NATIVES`].
+///
+/// The suffix form is not a disambiguation of last resort — it IS the name. It
+/// falls out of the convention `fpp_analysis` gives the payload structs
+/// themselves, so for every variant that has a named payload the two agree
+/// exactly: `Type::Array(Arc<ArrayType>)` → `ArrayType`, `Type::Abs(Arc<AbsType>)`
+/// → `AbsType`, `Value::Float(FloatValue)` → `FloatValue`. The variants with no
+/// payload struct to borrow a name from (`Type::Boolean`, `Value::Integer`, every
+/// `astdef` symbol variant) then get the name that struct WOULD have had —
+/// `BooleanType`, `IntegerValue` — rather than a bare `Boolean`/`Integer` that says
+/// nothing about which of the three unions it belongs to.
+///
+/// The stutter guard matters in both directions, and each case is one upstream
+/// rename away: a `Type::AbsType` variant (what it was called before the
+/// `fpp_analysis` rename to `Type::Abs`) would otherwise come out `AbsTypeType`,
+/// and a prefixed `Symbol::SymbolFoo` would come out `SymbolSymbolFoo`.
+fn qualify(union_py: &str, variant: &str, prefixed: bool) -> String {
+    if prefixed {
+        if variant.starts_with(union_py) {
+            variant.to_string()
+        } else {
+            format!("{union_py}{variant}")
+        }
+    } else if variant.ends_with(union_py) {
+        variant.to_string()
+    } else {
+        format!("{variant}{union_py}")
+    }
+}
+
+/// Fail the generator when two emitted classes would share a Python name.
+fn assert_names_unique(
+    primary: &BTreeMap<u32, String>,
+    subclass: &BTreeMap<(u32, String), String>,
+) {
+    let mut seen: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+    for (id, name) in primary {
+        seen.entry(name).or_default().push(format!("primary #{id}"));
+    }
+    for ((uid, variant), name) in subclass {
+        seen.entry(name)
+            .or_default()
+            .push(format!("union #{uid}::{variant}"));
+    }
+    let dups: Vec<String> = seen
+        .iter()
+        .filter(|(_, owners)| owners.len() > 1)
+        .map(|(name, owners)| format!("{name} ← {}", owners.join(", ")))
+        .collect();
+    assert!(
+        dups.is_empty(),
+        "bindgen: Python name claimed by more than one emitted class:\n  {}",
+        dups.join("\n  ")
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1952,17 +1986,15 @@ fn union_directives(ctx: &Ctx, u: &UnionDef) -> (String, String, String, String,
         "symbol" => " identity node".to_string(),
         _ => String::new(),
     };
+    // `Symbol` is the one union whose repr is not derivable: it has no `Display`
+    // and no no-argument name method, because a symbol's qualified name is a
+    // property of the scope tree rather than of the definition it points at — so it
+    // takes the `Analysis` method that walks that tree. Every other union
+    // (`Type`/`Value` `Display`, the port/state-machine unions' name methods) falls
+    // out of [`repr_directive`].
     let repr = match handle {
-        "arc_type" => String::new(),
-        "value" => " repr variant".to_string(),
-        "symbol" => " repr variant_qualified(get_qualified_name)".to_string(),
-        _ => {
-            if has_unqualified_name(ctx, u.id) {
-                " repr variant_unqualified(get_unqualified_name)".to_string()
-            } else {
-                " repr variant".to_string()
-            }
-        }
+        "symbol" => " repr analysis_name(get_qualified_name)".to_string(),
+        _ => repr_directive(ctx, u.id),
     };
     (
         handle.to_string(),
@@ -2363,23 +2395,120 @@ pub fn warn_identityless_map_keys(
 fn has_no_arg_node(ctx: &Ctx, id: Id) -> bool {
     has_no_arg_method_returning_node(ctx, id, "node")
 }
-fn has_unqualified_name(ctx: &Ctx, id: Id) -> bool {
-    method_names(ctx, id).contains(&"get_unqualified_name".to_string())
+/// Whether the native impls `core::fmt::Display`.
+///
+/// This is the one trait the wrappers surface directly: it is the compiler's own
+/// spelling of a value (`U32`, `string size 40`, `Ref.inst.Chan`, `match a with b`),
+/// so it becomes `__str__` and the identifying part of `__repr__`. `Debug` is
+/// deliberately NOT used: it is derived, so it prints the whole owned subtree — a
+/// `Component` is ~35 KB and a component `Symbol` ~6 KB, which `repr` cannot afford
+/// (it is what a failing assert, a REPL echo, and `print(a_dict)` all call).
+fn has_display(ctx: &Ctx, id: Id) -> bool {
+    impls_on(ctx, id).iter().any(|imp| {
+        imp.trait_.as_ref().is_some_and(|t| {
+            t.path == "Display" || t.path.ends_with("::Display") || t.path == "std::fmt::Display"
+        })
+    })
 }
 
-fn method_names(ctx: &Ctx, id: Id) -> Vec<String> {
-    let mut out = Vec::new();
+/// The no-argument, string-returning native method that names a value, in preference
+/// order — the qualified spelling first, since it is the one that identifies the
+/// thing across the whole model, then the unqualified, then the bare member name a
+/// component sub-element carries (`Event`, `TlmChannel`, `Param`, `Container`,
+/// `Record`, `TlmPacket`).
+///
+/// The string-return check is not paranoia: `StateMachineSymbol::name()` returns an
+/// `fpp_ast::Name`, which would compile into a `format!` of a non-`Display` type.
+const NAME_METHODS: &[&str] = &[
+    "qualified_name",
+    "get_qualified_name",
+    "unqualified_name",
+    "get_unqualified_name",
+    "get_name",
+    "name",
+];
+
+/// The `repr <mode>` directive for one native: what `__repr__` puts after the class
+/// name (and, for `display`, what `__str__` renders).
+///
+/// Derived, in this order:
+/// 1. a native `Display` ([`has_display`]) — the compiler's own rendering;
+/// 2. a no-argument [`NAME_METHODS`] method — the value's own name;
+/// 3. a `symbol` field — the name the analysis gives that symbol, which is how every
+///    definition-backed entity (`Component`, `Topology`, `StateMachine`, …) is
+///    identified, none of them carrying a name of its own;
+/// 4. nothing — a bare `<Class>`.
+///
+/// Returns the directive text, leading space included, for splicing into a `union` /
+/// `entity` header.
+fn repr_directive(ctx: &Ctx, id: Id) -> String {
+    if has_display(ctx, id) {
+        return " repr display".to_string();
+    }
+    if let Some(m) = NAME_METHODS
+        .iter()
+        .find(|m| no_arg_string_method(ctx, id, m))
+    {
+        return format!(" repr name({m})");
+    }
+    if has_symbol_field(ctx, id) {
+        return " repr symbol_name(symbol, get_qualified_name)".to_string();
+    }
+    String::new()
+}
+
+/// Whether `name` is a method on `id` taking only `&self` and returning a string
+/// (`String`, `&String` or `&str`).
+fn no_arg_string_method(ctx: &Ctx, id: Id, name: &str) -> bool {
     for imp in impls_on(ctx, id) {
         for mid in &imp.items {
-            if let Some(mi) = ctx.item(*mid)
-                && matches!(mi.inner, ItemEnum::Function(_))
-                && let Some(n) = &mi.name
+            let Some(mi) = ctx.item(*mid) else { continue };
+            if mi.name.as_deref() != Some(name) {
+                continue;
+            }
+            if let ItemEnum::Function(f) = &mi.inner
+                && f.sig.inputs.len() == 1
+                && f.sig.inputs[0].0 == "self"
+                && f.sig.output.as_ref().is_some_and(is_string_ty)
             {
-                out.push(n.clone());
+                return true;
             }
         }
     }
-    out
+    false
+}
+
+/// `String` / `&String` / `&str`.
+fn is_string_ty(t: &Type) -> bool {
+    match t {
+        Type::BorrowedRef { type_, .. } => is_string_ty(type_),
+        Type::Primitive(p) => p == "str",
+        Type::ResolvedPath(p) => p.path.rsplit("::").next().unwrap_or(&p.path) == "String",
+        _ => false,
+    }
+}
+
+/// Whether the native has a public `symbol` field of the `Symbol` union type.
+fn has_symbol_field(ctx: &Ctx, id: Id) -> bool {
+    let Some(s) = ctx.item(id).and_then(as_struct) else {
+        return false;
+    };
+    let StructKind::Plain { fields, .. } = &s.kind else {
+        return false;
+    };
+    fields.iter().any(|fid| {
+        let Some(fi) = ctx.item(*fid) else {
+            return false;
+        };
+        if fi.name.as_deref() != Some("symbol") || !is_public(fi) {
+            return false;
+        }
+        matches!(
+            struct_field_ty(fi).map(peel_wrappers),
+            Some(Type::ResolvedPath(p))
+                if p.path.rsplit("::").next().unwrap_or(&p.path) == "Symbol"
+        )
+    })
 }
 
 fn has_no_arg_method_returning_node(ctx: &Ctx, id: Id, name: &str) -> bool {
@@ -2486,8 +2615,9 @@ fn emit_entity(ctx: &Ctx, names: &Names, e: &EntityDef, out: &mut String, skips:
     } else {
         ""
     };
+    let repr = repr_directive(ctx, e.impl_id);
     out.push_str(&format!(
-        "    entity {name} native {}{identity} {{\n",
+        "    entity {name} native {}{identity}{repr} {{\n",
         ctx.native_path(e.id)
     ));
     // Opaque = empty entity (no fields / methods).
@@ -2586,18 +2716,18 @@ pub fn prepare<'a>(krate: &'a Crate, ast: AstClass) -> Ctx<'a> {
 
 /// Phase E: rewrite `astdef(x)` → `skip` for every shadowed AST node `x` — its
 /// Python name is owned by a semantic class, so the node has no stub and is
-/// opaque as a child. Walks the reflected fields + variant payloads; method
-/// returns carrying an `astdef` were already dropped by Rule R2, so none survive
-/// there. Method *parameters* are also walked: an `astnode(x)` param would name the
-/// unstubbed wrapper class in the `.pyi`, so such a method is dropped whole (a
-/// parameter, unlike a field, cannot degrade to `skip`). Returns one log line per
-/// rewrite.
+/// opaque as a child. Walks the reflected fields + variant payloads. A method is
+/// dropped whole (rather than degraded to `skip`, which only a field can be) when
+/// a shadowed node appears in either of its two remaining positions: an
+/// `astnode(x)` *parameter*, or — since Rule R2 now admits a *borrowed* `astdef`
+/// return — an `astdef(x)` *return*. Either would name the unstubbed wrapper class
+/// in the `.pyi`. Returns one log line per rewrite.
 pub fn apply_shadow(r: &mut Reflected, names: &Names, shadowed: &BTreeSet<String>) -> Vec<String> {
     let mut log = Vec::new();
     for (fname, sh) in &mut r.analysis_fields {
         shadow_shape(sh, shadowed, &format!("Analysis.{fname}"), &mut log);
     }
-    drop_shadowed_param_methods(&mut r.analysis_methods, "Analysis", shadowed, &mut log);
+    drop_shadowed_methods(&mut r.analysis_methods, "Analysis", shadowed, &mut log);
     for u in &mut r.unions {
         for v in &mut u.variants {
             let label = v.native.clone();
@@ -2614,50 +2744,54 @@ pub fn apply_shadow(r: &mut Reflected, names: &Names, shadowed: &BTreeSet<String
             }
         }
         let owner = names.union(u.id).to_string();
-        drop_shadowed_param_methods(&mut u.methods, &owner, shadowed, &mut log);
+        drop_shadowed_methods(&mut u.methods, &owner, shadowed, &mut log);
     }
     for p in &mut r.payloads {
         for (fname, sh) in &mut p.fields {
             shadow_shape(sh, shadowed, fname, &mut log);
         }
-        drop_shadowed_param_methods(&mut p.methods, "payload", shadowed, &mut log);
+        drop_shadowed_methods(&mut p.methods, "payload", shadowed, &mut log);
     }
     for e in &mut r.entities {
         for (fname, sh) in &mut e.fields {
             shadow_shape(sh, shadowed, fname, &mut log);
         }
         let owner = names.entity(e.id).to_string();
-        drop_shadowed_param_methods(&mut e.methods, &owner, shadowed, &mut log);
+        drop_shadowed_methods(&mut e.methods, &owner, shadowed, &mut log);
     }
     log
 }
 
-/// Drop every method taking an `astnode(x)` parameter for a shadowed AST node `x`.
-/// The wrapper class exists at runtime but carries no stub, so naming it in a
-/// parameter position would emit a `.pyi` referencing an undeclared class.
-fn drop_shadowed_param_methods(
+/// Drop every method naming a shadowed AST node `x` in a parameter (`astnode(x)`)
+/// or in its return (`astdef(x)`). The wrapper class exists at runtime but carries
+/// no stub, so naming it in either position would emit a `.pyi` referencing an
+/// undeclared class. Neither position can degrade to `skip` the way a field does,
+/// so the whole method goes.
+fn drop_shadowed_methods(
     methods: &mut Vec<MethodDef>,
     owner: &str,
     shadowed: &BTreeSet<String>,
     log: &mut Vec<String>,
 ) {
-    let mut dropped: Vec<(String, String)> = Vec::new();
+    let mut dropped: Vec<(String, String, &'static str)> = Vec::new();
     methods.retain(|m| {
-        match m
+        let hit = m
             .params
             .iter()
             .find_map(|(_, spec)| shadowed_astnode(&spec.arg, shadowed))
-        {
-            Some(name) => {
-                dropped.push((m.name.clone(), name));
+            .map(|name| (name, "astnode param"))
+            .or_else(|| shadowed_astdef(&m.ret, shadowed).map(|name| (name, "astdef return")));
+        match hit {
+            Some((name, position)) => {
+                dropped.push((m.name.clone(), name, position));
                 false
             }
             None => true,
         }
     });
-    for (m, name) in dropped {
+    for (m, name, position) in dropped {
         log.push(format!(
-            "  shadow {owner}.{m}(): astnode({name}) param -> method dropped (name owned by a \
+            "  shadow {owner}.{m}(): {position} ({name}) -> method dropped (name owned by a \
              sem class, so the node wrapper has no stub)"
         ));
     }
@@ -2668,6 +2802,17 @@ fn shadowed_astnode(a: &Arg, shadowed: &BTreeSet<String>) -> Option<String> {
     match a {
         Arg::AstNode(name) if shadowed.contains(name) => Some(name.clone()),
         Arg::Arc(i) | Arg::Opt(i) | Arg::List(i) => shadowed_astnode(i, shadowed),
+        _ => None,
+    }
+}
+
+/// The first shadowed AST-node name referenced anywhere inside a return shape.
+fn shadowed_astdef(s: &Shape, shadowed: &BTreeSet<String>) -> Option<String> {
+    match s {
+        Shape::AstDef(name) if shadowed.contains(name) => Some(name.clone()),
+        Shape::Opt(i) | Shape::List(i) => shadowed_astdef(i, shadowed),
+        Shape::Map(k, v) => shadowed_astdef(k, shadowed).or_else(|| shadowed_astdef(v, shadowed)),
+        Shape::Tuple(v) => v.iter().find_map(|e| shadowed_astdef(e, shadowed)),
         _ => None,
     }
 }

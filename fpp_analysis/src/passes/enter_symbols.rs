@@ -69,7 +69,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
     }
 
     fn visit_def_array(&self, a: &mut Analysis, def: &'ast DefArray) -> ControlFlow<Self::Break> {
-        let symbol = Symbol::Array(Arc::new(def.clone()));
+        let symbol = Symbol::ArrayType(Arc::new(def.clone()));
         a.symbol_map.insert(def.node_id, symbol.clone());
         self.enter_symbol(a, symbol, NameGroup::Type)
             .unwrap_or_else(|err| err.emit());
@@ -131,7 +131,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
     }
 
     fn visit_def_enum(&self, a: &mut Analysis, def: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        let symbol = Symbol::Enum(Arc::new(def.clone()));
+        let symbol = Symbol::EnumType(Arc::new(def.clone()));
         a.symbol_map.insert(def.node_id, symbol.clone());
 
         (|| -> SemanticResult {
@@ -268,7 +268,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
     }
 
     fn visit_def_struct(&self, a: &mut Analysis, def: &'ast DefStruct) -> ControlFlow<Self::Break> {
-        let symbol = Symbol::Struct(Arc::new(def.clone()));
+        let symbol = Symbol::StructType(Arc::new(def.clone()));
         a.symbol_map.insert(def.node_id, symbol.clone());
         self.enter_symbol(a, symbol, NameGroup::Type)
             .unwrap_or_else(|err| err.emit());

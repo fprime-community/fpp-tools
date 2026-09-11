@@ -15,6 +15,10 @@ use proc_macro::TokenStream;
 mod ast_bindings;
 mod sem_bindings;
 
+pub(crate) fn leaf_enum_doc(name: &str) -> String {
+    format!("A closed set of `{name}` kinds.\n")
+}
+
 /// Expand a declarative mirror of the `fpp_ast` grammar (emitted by the
 /// `bindgen` binary into `fpp_python/src/ast/defs.rs`) into the PyO3 AST-node
 /// wrappers + the recording walk. The DSL has `leaves {…}`, `shadowed {…}`,

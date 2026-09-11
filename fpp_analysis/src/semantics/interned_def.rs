@@ -24,9 +24,9 @@ macro_rules! impl_interned_def {
 impl_interned_def! {
     DefAbsType => AbsType,
     DefAliasType => AliasType,
-    DefArray => Array,
-    DefEnum => Enum,
-    DefStruct => Struct,
+    DefArray => ArrayType,
+    DefEnum => EnumType,
+    DefStruct => StructType,
 }
 
 impl Analysis {

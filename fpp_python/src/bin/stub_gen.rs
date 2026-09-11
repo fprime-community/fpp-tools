@@ -1,4 +1,4 @@
-//! Dumps `python/fpp/__init__.pyi` from the pyclasses annotated with
+//! Dumps `fpp.pyi` from the pyclasses annotated with
 //! `#[gen_stub_pyclass]` / `#[gen_stub_pymethods]`, via pyo3-stub-gen's inventory.
 //!
 //! Build/run WITHOUT the `extension-module` feature (a standalone executable
@@ -16,10 +16,12 @@
 //! `TypeAlias`es — the union return sites render as the alias name via a custom
 //! `PyStubType`, and these lines define it (see `fpp::union_aliases`).
 //!
-//! Two fixups follow, both because the aliases are injected *after* generation
-//! and so are invisible to the generator: their names are added to the emitted
-//! `__all__`, and the doubled spacing pyo3-stub-gen leaves around union `|` is
-//! collapsed.
+//! Three fixups follow. Two are consequences of injecting the aliases *after*
+//! generation, where they are invisible to the generator: their names are added to
+//! the emitted `__all__`, and the doubled spacing pyo3-stub-gen leaves around a
+//! union `|` is collapsed. The third corrects a claim pyo3-stub-gen hardcodes — it
+//! renders every `#[pyclass]` enum as `class X(enum.Enum)`, which the leaf-enum
+//! mirrors are not; see [`unenum_leaf_mirrors`].
 
 use std::fs;
 use std::path::Path;
@@ -72,7 +74,63 @@ fn inject_union_aliases(path: &Path) -> std::io::Result<()> {
     out.push_str(&text[insert_at..]);
 
     let out = add_to_dunder_all(&out, &alias_names);
-    fs::write(path, normalize_union_spacing(&out))
+    let out = normalize_union_spacing(&out);
+    fs::write(path, unenum_leaf_mirrors(&out))
+}
+
+/// Rewrite `class X(enum.Enum):` to a plain `class X:` whose members are declared
+/// `typing.ClassVar[X]`.
+fn unenum_leaf_mirrors(text: &str) -> String {
+    const HEADER_SUFFIX: &str = "(enum.Enum):";
+    let mut out = String::with_capacity(text.len());
+    let mut class_name: Option<String> = None;
+    for line in text.lines() {
+        // A line at column 0 ends the previous class body; only an `enum.Enum`
+        // header opens one.
+        if !line.is_empty() && !line.starts_with(char::is_whitespace) {
+            class_name = line
+                .strip_prefix("class ")
+                .and_then(|rest| rest.strip_suffix(HEADER_SUFFIX))
+                .map(str::to_string);
+            match &class_name {
+                Some(name) => out.push_str(&format!("class {name}:\n")),
+                None => {
+                    out.push_str(line);
+                    out.push('\n');
+                }
+            }
+            continue;
+        }
+        let member = class_name.as_deref().and_then(|name| {
+            let member = line.strip_prefix("    ")?.strip_suffix(" = ...")?;
+            let is_ident = !member.is_empty()
+                && member.chars().all(|c| c.is_alphanumeric() || c == '_')
+                && !member.starts_with(|c: char| c.is_numeric());
+            is_ident.then(|| format!("    {member}: typing.ClassVar[{name}]\n"))
+        });
+        match member {
+            Some(rewritten) => out.push_str(&rewritten),
+            None => {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+    }
+    drop_dead_enum_import(&out)
+}
+
+/// Drop `import enum` once nothing in the stub uses the module.
+fn drop_dead_enum_import(text: &str) -> String {
+    let used = text
+        .lines()
+        .any(|l| l.contains("(enum.") || l.contains(": enum.") || l.contains("-> enum."));
+    if used {
+        return text.to_string();
+    }
+    text.lines()
+        .filter(|l| *l != "import enum")
+        .map(|l| format!("{l}\n"))
+        .collect()
 }
 
 /// Merge `names` into the generated `__all__` list, keeping it sorted (as

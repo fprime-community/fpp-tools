@@ -1,7 +1,8 @@
 # Built with maturin: a compiled PyO3 extension imported as the top-level
 # `fpp` module, which binds the Rust FPP compiler in-process. abi3-py310
 # yields one wheel per platform for CPython >= 3.10. The generated type stub
-# (`python/fpp/__init__.pyi`) and `py.typed` marker ship alongside.
+# (`fpp.pyi`, shipped in the wheel as `fpp/__init__.pyi`) and `py.typed` marker
+# ship alongside.
 [build-system]
 requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"

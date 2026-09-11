@@ -177,17 +177,17 @@ fn symbol_kind_name(symbol: &Symbol) -> &'static str {
     match symbol {
         Symbol::AbsType(_) => "Abstract Type",
         Symbol::AliasType(_) => "Type Alias",
-        Symbol::Array(_) => "Array",
+        Symbol::ArrayType(_) => "Array",
         Symbol::Component(_) => "Component",
         Symbol::ComponentInstance(_) => "Component Instance",
         Symbol::Constant(_) => "Constant",
-        Symbol::Enum(_) => "Enum",
+        Symbol::EnumType(_) => "Enum",
         Symbol::EnumConstant(_) => "Enum Constant",
         Symbol::Interface(_) => "Interface",
         Symbol::Module(_) => "Module",
         Symbol::Port(_) => "Port",
         Symbol::StateMachine(_) => "State Machine",
-        Symbol::Struct(_) => "Struct",
+        Symbol::StructType(_) => "Struct",
         Symbol::System(_) => "System",
         Symbol::Topology(_) => "Topology",
     }
@@ -359,27 +359,27 @@ pub fn symbol_to_completion_item(state: &GlobalState, symbol: &Symbol) -> Comple
     let kind = match symbol {
         Symbol::AbsType(_) => CompletionItemKind::CLASS,
         Symbol::AliasType(_) => CompletionItemKind::CLASS,
-        Symbol::Array(_) => CompletionItemKind::CLASS,
+        Symbol::ArrayType(_) => CompletionItemKind::CLASS,
         Symbol::Component(_) => CompletionItemKind::CLASS,
         Symbol::ComponentInstance(_) => CompletionItemKind::VARIABLE,
         Symbol::Constant(_) => CompletionItemKind::CONSTANT,
-        Symbol::Enum(_) => CompletionItemKind::ENUM,
+        Symbol::EnumType(_) => CompletionItemKind::ENUM,
         Symbol::EnumConstant(_) => CompletionItemKind::ENUM_MEMBER,
         Symbol::Interface(_) => CompletionItemKind::INTERFACE,
         Symbol::Module(_) => CompletionItemKind::MODULE,
         Symbol::Port(_) => CompletionItemKind::CLASS,
         Symbol::StateMachine(_) => CompletionItemKind::CLASS,
-        Symbol::Struct(_) => CompletionItemKind::STRUCT,
+        Symbol::StructType(_) => CompletionItemKind::STRUCT,
         Symbol::System(_) => CompletionItemKind::CLASS,
         Symbol::Topology(_) => CompletionItemKind::CLASS,
     };
 
     let detail = match symbol {
-        Symbol::Struct(_)
+        Symbol::StructType(_)
         | Symbol::AbsType(_)
         | Symbol::AliasType(_)
-        | Symbol::Array(_)
-        | Symbol::Enum(_) => state
+        | Symbol::ArrayType(_)
+        | Symbol::EnumType(_) => state
             .analysis
             .type_map
             .get(&symbol.node())

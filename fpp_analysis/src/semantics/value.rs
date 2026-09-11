@@ -408,7 +408,7 @@ impl Value {
             Value::Boolean(_) => Arc::new(Type::Boolean),
             Value::String(_) => Arc::new(Type::String(None)),
             Value::EnumConstant(v) => Arc::new(Type::Enum(v.ty.clone())),
-            Value::AbsType(AbsTypeValue { ty }) => Arc::new(Type::AbsType(ty.clone())),
+            Value::AbsType(AbsTypeValue { ty }) => Arc::new(Type::Abs(ty.clone())),
             Value::Array(ArrayValue { ty, .. }) => Arc::new(Type::Array(ty.clone())),
             Value::Struct(StructValue { ty, .. }) => Arc::new(Type::Struct(ty.clone())),
             Value::AnonArray(AnonArrayValue { elements, scalar }) => {

@@ -23,11 +23,8 @@ pub enum Type {
     Boolean,
     /// The type of arbitrary-width integers
     Integer,
-    /// A named type definition is held behind an `Arc`, so cloning a [`Type`]
-    /// (which every value that has a type definition does) is a reference-count
-    /// bump and never copies a definition node, a default value, or a member map
-    AbsType(Arc<AbsType>),
-    AliasType(AliasType),
+    Abs(Arc<AbsType>),
+    Alias(AliasType),
     Array(Arc<ArrayType>),
     AnonArray(AnonArrayType),
     Enum(Arc<EnumType>),
@@ -51,7 +48,7 @@ impl Type {
     /// Get the underlying type
     pub fn underlying_type(ty: &Arc<Type>) -> Arc<Type> {
         match ty.deref() {
-            Type::AliasType(alias) => Type::underlying_type(&alias.alias_type),
+            Type::Alias(alias) => Type::underlying_type(&alias.alias_type),
             _ => ty.clone(),
         }
     }
@@ -70,10 +67,10 @@ impl Type {
             Type::String(_) => Some(Value::String(StringValue("".to_string()))),
             Type::Boolean => Some(Value::Boolean(BooleanValue(false))),
             Type::Integer => Some(Value::Integer(IntegerValue(0))),
-            Type::AliasType(ty) => ty.alias_type.default_value(),
+            Type::Alias(ty) => ty.alias_type.default_value(),
             // An abstract type always has a default value: the opaque value of
             // the type itself.
-            Type::AbsType(ty) => Some(Value::AbsType(AbsTypeValue { ty: ty.clone() })),
+            Type::Abs(ty) => Some(Value::AbsType(AbsTypeValue { ty: ty.clone() })),
             Type::Array(array) => array.default.clone().map(Value::Array),
             // `size` copies of the element default, sharing one element: the
             // element default is built once and the array holds `size`
@@ -128,7 +125,7 @@ impl Type {
     /// Get the array size
     pub fn array_size(&self) -> Option<usize> {
         match self {
-            Type::AliasType(ty) => ty.alias_type.array_size(),
+            Type::Alias(ty) => ty.alias_type.array_size(),
             Type::AnonArray(arr) => arr.size,
             Type::Array(arr) => arr.anon_array.size,
             _ => None,
@@ -141,11 +138,11 @@ impl Type {
     /// and no AST is copied; callers may use the result as a map key in a loop.
     pub fn def_symbol(&self) -> Option<Symbol> {
         match self {
-            Type::AbsType(ty) => Some(Symbol::AbsType(ty.node.clone())),
-            Type::AliasType(ty) => Some(Symbol::AliasType(ty.node.clone())),
-            Type::Array(ty) => Some(Symbol::Array(ty.node.clone())),
-            Type::Enum(ty) => Some(Symbol::Enum(ty.node.clone())),
-            Type::Struct(ty) => Some(Symbol::Struct(ty.node.clone())),
+            Type::Abs(ty) => Some(Symbol::AbsType(ty.node.clone())),
+            Type::Alias(ty) => Some(Symbol::AliasType(ty.node.clone())),
+            Type::Array(ty) => Some(Symbol::ArrayType(ty.node.clone())),
+            Type::Enum(ty) => Some(Symbol::EnumType(ty.node.clone())),
+            Type::Struct(ty) => Some(Symbol::StructType(ty.node.clone())),
             _ => None,
         }
     }
@@ -153,8 +150,8 @@ impl Type {
     /// Get the definition node identifier, if any
     pub fn def_node_id(&self) -> Option<fpp_core::Node> {
         match self {
-            Type::AbsType(ty) => Some(ty.node.node_id),
-            Type::AliasType(ty) => Some(ty.node.node_id),
+            Type::Abs(ty) => Some(ty.node.node_id),
+            Type::Alias(ty) => Some(ty.node.node_id),
             Type::Array(ty) => Some(ty.node.node_id),
             Type::Enum(ty) => Some(ty.node.node_id),
             Type::Struct(ty) => Some(ty.node.node_id),
@@ -165,7 +162,7 @@ impl Type {
     /// Does this type have numeric members?
     pub fn has_numeric_members(&self) -> bool {
         match self {
-            Type::AliasType(ty) => ty.alias_type.has_numeric_members(),
+            Type::Alias(ty) => ty.alias_type.has_numeric_members(),
             Type::Array(ty) => ty.anon_array.elt_type.has_numeric_members(),
             Type::AnonArray(ty) => ty.elt_type.has_numeric_members(),
             Type::Struct(ty) => ty
@@ -184,7 +181,7 @@ impl Type {
     /// Is this type convertible to a numeric type?
     pub fn is_convertible_to_numeric(&self) -> bool {
         match self {
-            Type::AliasType(ty) => ty.alias_type.is_convertible_to_numeric(),
+            Type::Alias(ty) => ty.alias_type.is_convertible_to_numeric(),
             Type::Enum(_) => true,
             _ => self.is_numeric(),
         }
@@ -193,7 +190,7 @@ impl Type {
     /// Is this type promotable to an array type?
     pub fn is_promotable_to_array(&self) -> bool {
         match self {
-            Type::AliasType(ty) => ty.alias_type.is_promotable_to_array(),
+            Type::Alias(ty) => ty.alias_type.is_promotable_to_array(),
             Type::String(_) => true,
             Type::Boolean => true,
             Type::Enum(_) => true,
@@ -209,8 +206,8 @@ impl Type {
             Type::String(_) => true,
             Type::Boolean => true,
             Type::Integer => false,
-            Type::AbsType(_) => false,
-            Type::AliasType(alias) => alias.alias_type.is_displayable(),
+            Type::Abs(_) => false,
+            Type::Alias(alias) => alias.alias_type.is_displayable(),
             // A named array is displayable iff its element type is; anonymous
             // aggregates (AnonArray/AnonStruct) inherit the base `false`.
             Type::Array(arr) => arr.anon_array.elt_type.is_displayable(),
@@ -228,7 +225,7 @@ impl Type {
     /// Is this type a float type?
     pub fn is_float(&self) -> bool {
         match self {
-            Type::AliasType(ty) => ty.alias_type.is_float(),
+            Type::Alias(ty) => ty.alias_type.is_float(),
             Type::Float(_) => true,
             _ => false,
         }
@@ -242,7 +239,7 @@ impl Type {
     /// (arrays/structs) that is not available within the current pass set.
     pub fn primitive_serialized_size(&self) -> Option<i128> {
         match self {
-            Type::AliasType(alias) => alias.alias_type.primitive_serialized_size(),
+            Type::Alias(alias) => alias.alias_type.primitive_serialized_size(),
             Type::Boolean => Some(1),
             Type::Float(FloatKind::F32) => Some(4),
             Type::Float(FloatKind::F64) => Some(8),
@@ -280,7 +277,7 @@ impl Type {
         }
 
         match self {
-            Type::AliasType(alias) => alias.alias_type.serialized_size(a),
+            Type::Alias(alias) => alias.alias_type.serialized_size(a),
             Type::Boolean => Ok(1),
             Type::Float(FloatKind::F32) => Ok(4),
             Type::Float(FloatKind::F64) => Ok(8),
@@ -340,14 +337,14 @@ impl Type {
                 }
                 Ok(total)
             }
-            Type::Integer | Type::AbsType(_) => Err(Unavailable),
+            Type::Integer | Type::Abs(_) => Err(Unavailable),
         }
     }
 
     /// Is this type an int type?
     pub fn is_int(&self) -> bool {
         match self {
-            Type::AliasType(ty) => ty.alias_type.is_int(),
+            Type::Alias(ty) => ty.alias_type.is_int(),
             Type::PrimitiveInt(_) => true,
             Type::Integer => true,
             _ => false,
@@ -357,7 +354,7 @@ impl Type {
     /// Is this type a primitive type?
     pub fn is_primitive(&self) -> bool {
         match self {
-            Type::AliasType(ty) => ty.alias_type.is_primitive(),
+            Type::Alias(ty) => ty.alias_type.is_primitive(),
             Type::PrimitiveInt(_) => true,
             Type::Float(_) => true,
             Type::Boolean => true,
@@ -367,7 +364,7 @@ impl Type {
 
     /// Is this type a canonical (non-aliased) type?
     pub fn is_canonical(&self) -> bool {
-        !matches!(self, Type::AliasType(_))
+        !matches!(self, Type::Alias(_))
     }
 
     /// Is this type promotable to a struct type?
@@ -378,7 +375,7 @@ impl Type {
     /// Is this type numeric?
     pub fn is_numeric(&self) -> bool {
         match self {
-            Type::AliasType(ty) => ty.alias_type.is_numeric(),
+            Type::Alias(ty) => ty.alias_type.is_numeric(),
             _ => self.is_int() || self.is_float(),
         }
     }
@@ -521,7 +518,7 @@ impl Type {
             fn lca(a: &Arc<Type>, b: &Arc<Type>) -> Option<Arc<Type>> {
                 fn get_ancestors(t: &Arc<Type>, out: &mut Vec<Arc<Type>>) {
                     out.push(t.clone());
-                    if let Type::AliasType(AliasType { alias_type, .. }) = t.deref() {
+                    if let Type::Alias(AliasType { alias_type, .. }) = t.deref() {
                         get_ancestors(alias_type, out)
                     }
                 }
@@ -676,6 +673,16 @@ impl Type {
     }
 }
 
+/// A type rendered by its [`Display`] inside a `Debug` builder, which is what
+/// [`Formatter::debug_struct`]'s `field` takes.
+struct Displayed<'a>(&'a Type);
+
+impl Debug for Displayed<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self.0, f)
+    }
+}
+
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -684,8 +691,8 @@ impl Display for Type {
             Type::String(_) => f.write_str("string"),
             Type::Boolean => f.write_str("boolean"),
             Type::Integer => f.write_str("Integer"),
-            Type::AbsType(ty) => f.write_str(&ty.node.name.data),
-            Type::AliasType(ty) => f.write_str(&ty.node.name.data),
+            Type::Abs(ty) => f.write_str(&ty.node.name.data),
+            Type::Alias(ty) => f.write_str(&ty.node.name.data),
             Type::Array(arr) => f.write_str(&arr.node.name.data),
             Type::AnonArray(anon_arr) => {
                 match anon_arr.size {
@@ -703,7 +710,7 @@ impl Display for Type {
                     anon_struct.members.clone().into_iter().collect();
                 members.sort_by(|a, b| a.0.cmp(&b.0));
                 for (name, member_ty) in &members {
-                    s.field(name, member_ty.deref());
+                    s.field(name, &Displayed(member_ty.deref()));
                 }
 
                 s.finish()

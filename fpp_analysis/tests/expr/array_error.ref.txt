@@ -1,5 +1,5 @@
  --> [ local path prefix ]/expr/array_error.fpp:3:19
   |
 3 | constant c = [ a, b ]
-  |                   ^ cannot find common type between [2] F64 and anonymous struct { x: Integer, y: Float(F64) }
+  |                   ^ cannot find common type between [2] F64 and anonymous struct { x: Integer, y: F64 }
 

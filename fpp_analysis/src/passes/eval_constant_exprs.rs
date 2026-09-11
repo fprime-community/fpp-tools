@@ -82,7 +82,7 @@ impl<'ast> EvalConstantExprs<'ast> {
     fn finalize_type(&self, a: &mut Analysis, ty: &Arc<Type>) -> ControlFlow<()> {
         let finalize_defs = FinalizeTypeDefs::new();
         match ty.deref() {
-            Type::AliasType(alias) => {
+            Type::Alias(alias) => {
                 let def = alias.node.clone();
                 self.visit_def_alias_type(a, &def)?;
                 finalize_defs.visit_def_alias_type(a, &def)?;

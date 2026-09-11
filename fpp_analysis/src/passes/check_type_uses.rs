@@ -53,7 +53,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
 
         a.type_map.insert(
             node.node_id,
-            Arc::new(Type::AbsType(Arc::new(AbsType {
+            Arc::new(Type::Abs(Arc::new(AbsType {
                 node: a.interned_def(node),
             }))),
         );
@@ -75,7 +75,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         let alias_type = a.type_map.get(&node.type_name.node_id).unwrap().clone();
         a.type_map.insert(
             node.node_id,
-            Arc::new(Type::AliasType(AliasType {
+            Arc::new(Type::Alias(AliasType {
                 node: a.interned_def(node),
                 alias_type,
             })),
@@ -266,9 +266,9 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckTypeUses<'ast> {
         match &symbol {
             Symbol::AbsType(def) => def.visit(a, self)?,
             Symbol::AliasType(def) => def.visit(a, self)?,
-            Symbol::Array(def) => def.visit(a, self)?,
-            Symbol::Enum(def) => def.visit(a, self)?,
-            Symbol::Struct(def) => def.visit(a, self)?,
+            Symbol::ArrayType(def) => def.visit(a, self)?,
+            Symbol::EnumType(def) => def.visit(a, self)?,
+            Symbol::StructType(def) => def.visit(a, self)?,
             _ => {
                 SemanticError::InvalidSymbol {
                     symbol_name: symbol.name().data.clone(),

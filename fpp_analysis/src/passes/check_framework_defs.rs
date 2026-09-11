@@ -231,12 +231,12 @@ impl<'ast> Visitor<'ast> for CheckFrameworkDefs {
         a: &mut Self::State,
         node: &'ast DefArray,
     ) -> ControlFlow<Self::Break> {
-        self.analyze_type(a, Symbol::Array(Arc::new(node.clone())), node.span());
+        self.analyze_type(a, Symbol::ArrayType(Arc::new(node.clone())), node.span());
         ControlFlow::Continue(())
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        self.analyze_type(a, Symbol::Enum(Arc::new(node.clone())), node.span());
+        self.analyze_type(a, Symbol::EnumType(Arc::new(node.clone())), node.span());
         ControlFlow::Continue(())
     }
 
@@ -245,7 +245,7 @@ impl<'ast> Visitor<'ast> for CheckFrameworkDefs {
         a: &mut Self::State,
         node: &'ast DefStruct,
     ) -> ControlFlow<Self::Break> {
-        self.analyze_type(a, Symbol::Struct(Arc::new(node.clone())), node.span());
+        self.analyze_type(a, Symbol::StructType(Arc::new(node.clone())), node.span());
         ControlFlow::Continue(())
     }
 

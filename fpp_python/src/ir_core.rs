@@ -20,7 +20,7 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
-/// A resolved source location (0-indexed line/column, matching `fpp_core`).
+/// A resolved source location.
 #[gen_stub_pyclass]
 #[pyclass(frozen, get_all, skip_from_py_object)]
 #[derive(Clone, Debug)]
@@ -32,11 +32,31 @@ pub struct Loc {
     pub end_column: u32,
 }
 
+impl Loc {
+    /// `uri:line:column` with the 1-indexed line/column a compiler displays.
+    pub(crate) fn display_string(&self) -> String {
+        format!("{}:{}:{}", self.uri, self.line + 1, self.column + 1)
+    }
+}
+
 #[gen_stub_pymethods]
 #[pymethods]
 impl Loc {
+    /// This location as a compiler displays it: `"path/to/file.fpp:12:5"`.
+    ///
+    /// The line and column are 1-indexed here, one more than the 0-indexed
+    /// `line`/`column` fields.
+    #[getter]
+    fn display(&self) -> String {
+        self.display_string()
+    }
+
+    fn __str__(&self) -> String {
+        self.display_string()
+    }
+
     fn __repr__(&self) -> String {
-        format!("Loc({}:{}:{})", self.uri, self.line + 1, self.column + 1)
+        format!("Loc({})", self.display_string())
     }
 }
 
@@ -111,6 +131,13 @@ impl Span {
         self.resolve().uri
     }
 
+    /// This span's start as a compiler displays it: `"path/to/file.fpp:12:5"`
+    /// (1-indexed, unlike the 0-indexed `line`/`column` getters below).
+    #[getter]
+    fn display(&self) -> String {
+        self.resolve().display_string()
+    }
+
     /// The 0-indexed start line.
     #[getter]
     fn line(&self) -> u32 {
@@ -150,8 +177,7 @@ impl Span {
     }
 
     fn __repr__(&self) -> String {
-        let l = self.resolve();
-        format!("<Span {}:{}:{}>", l.uri, l.line + 1, l.column + 1)
+        format!("<Span {}>", self.resolve().display_string())
     }
 }
 
@@ -209,6 +235,9 @@ pub struct UnitData {
     pub tu: fpp_ast::TransUnit,
     /// Top-level member nodes, in source order.
     pub roots: Vec<Node>,
+    pub is_source: bool,
+    /// The dense ids the walk assigned to this unit's nodes.
+    pub id_range: std::ops::Range<u32>,
 }
 
 /// A parsed (and optionally analyzed) set of translation units: the live ASTs and
@@ -240,14 +269,38 @@ pub struct ModelData {
     /// fields: `kind` enums and union wrappers are transparent, so a node's
     /// children are the nodes inside them, not the enum/union itself.
     pub children: FxHashMap<Node, Vec<Node>>,
-    /// Fully-qualified name -> symbol, for `Model.lookup`.
-    pub by_qualified_name: FxHashMap<String, Symbol>,
+    /// Fully-qualified name -> the symbols declaring it, in source order, for
+    /// `Model.lookup`/`lookup_all`. Several, because types and ports live in
+    /// separate name groups — see [`crate::lower_core::build_indexes`].
+    pub by_qualified_name: FxHashMap<String, Vec<Symbol>>,
 }
 
 impl ModelData {
     /// The dense id assigned to `node` during the walk.
     pub fn id(&self, node: Node) -> u32 {
         self.ids[&node]
+    }
+
+    /// Which translation unit `node` belongs to, or `None` for an unrecorded node.
+    ///
+    /// A binary search over the units' `id_range`s, which the walk leaves ascending
+    /// and disjoint (see [`UnitData::id_range`]).
+    pub fn unit_index(&self, node: Node) -> Option<usize> {
+        let id = *self.ids.get(&node)?;
+        let after = self.units.partition_point(|u| u.id_range.start <= id);
+        let index = after.checked_sub(1)?;
+        self.units[index].id_range.contains(&id).then_some(index)
+    }
+
+    /// Whether `node` belongs to a unit the caller asked about, rather than one
+    /// supplied only to resolve references.
+    ///
+    /// Unit membership, not file membership: a member spliced in by `include` from
+    /// a file that was never passed to `analyze` is in-source, because the unit
+    /// that included it is.
+    pub fn in_source(&self, node: Node) -> bool {
+        self.unit_index(node)
+            .is_some_and(|index| self.units[index].is_source)
     }
 
     /// The direct child nodes of `node`, in walk (source) order.

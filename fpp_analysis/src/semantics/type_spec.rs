@@ -843,9 +843,9 @@ struct S { x: U32, y: F64 }
                     s,
                     Symbol::AbsType(_)
                         | Symbol::AliasType(_)
-                        | Symbol::Array(_)
-                        | Symbol::Enum(_)
-                        | Symbol::Struct(_)
+                        | Symbol::ArrayType(_)
+                        | Symbol::EnumType(_)
+                        | Symbol::StructType(_)
                 )
             })
             .cloned()
@@ -905,9 +905,9 @@ fn symbols_share_def(a: &crate::semantics::Symbol, b: &crate::semantics::Symbol)
     match (a, b) {
         (AbsType(x), AbsType(y)) => Arc::ptr_eq(x, y),
         (AliasType(x), AliasType(y)) => Arc::ptr_eq(x, y),
-        (Array(x), Array(y)) => Arc::ptr_eq(x, y),
-        (Enum(x), Enum(y)) => Arc::ptr_eq(x, y),
-        (Struct(x), Struct(y)) => Arc::ptr_eq(x, y),
+        (ArrayType(x), ArrayType(y)) => Arc::ptr_eq(x, y),
+        (EnumType(x), EnumType(y)) => Arc::ptr_eq(x, y),
+        (StructType(x), StructType(y)) => Arc::ptr_eq(x, y),
         _ => false,
     }
 }

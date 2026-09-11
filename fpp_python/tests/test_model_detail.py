@@ -5,19 +5,19 @@ component sub-element maps (commands / events / params / telemetry), the
 
 import fpp as f
 from fpp import (
-    Async,
+    AsyncNonParamKind,
     Command,
-    Guarded,
+    GuardedNonParamKind,
     Kind,
     Loc,
-    NonParam,
+    NonParamCommand,
     NonParamKind,
     QueueFull,
-    Sync,
-    Action,
-    Signal,
     StateMachineSymbol,
+    StateMachineSymbolAction,
+    StateMachineSymbolSignal,
     SymbolStateMachine,
+    SyncNonParamKind,
 )
 
 
@@ -44,9 +44,9 @@ def test_commands_from_fixture():
     # Every command in this fixture is a non-param async command with a priority.
     for cmd in cmds.values():
         assert cmd.is_async
-        assert isinstance(cmd, NonParam)
+        assert isinstance(cmd, NonParamCommand)
         assert isinstance(cmd, Command)
-        assert isinstance(cmd.kind, Async)
+        assert isinstance(cmd.kind, AsyncNonParamKind)
         assert isinstance(cmd.kind, NonParamKind)
         assert isinstance(cmd.node.location, Loc)
     # Only COMMAND_3 declares its opcode; 0 and 1 are auto-assigned.
@@ -80,9 +80,9 @@ def test_non_param_kinds_are_union_subclasses():
     assert not m.has_errors, [d.message for d in m.diagnostics]
     comp = _only_component(m)
     by_name = {c.name: c.kind for c in comp.command_map.values()}
-    assert isinstance(by_name["S_CMD"], Sync)
-    assert isinstance(by_name["G_CMD"], Guarded)
-    assert isinstance(by_name["A_CMD"], Async)
+    assert isinstance(by_name["S_CMD"], SyncNonParamKind)
+    assert isinstance(by_name["G_CMD"], GuardedNonParamKind)
+    assert isinstance(by_name["A_CMD"], AsyncNonParamKind)
     assert all(isinstance(k, NonParamKind) for k in by_name.values())
 
 
@@ -187,11 +187,11 @@ def test_state_machine_model():
     assert sm.has_actions and sm.has_guards and sm.has_signals
 
     (action,) = sm.actions
-    assert isinstance(action, Action)
+    assert isinstance(action, StateMachineSymbolAction)
     assert isinstance(action, StateMachineSymbol)
     assert action.unqualified_name == "a"
     assert action.definition.name == "a"
 
     (signal,) = sm.signals
-    assert isinstance(signal, Signal)
+    assert isinstance(signal, StateMachineSymbolSignal)
     assert signal.unqualified_name == "s"

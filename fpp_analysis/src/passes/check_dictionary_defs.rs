@@ -91,7 +91,7 @@ impl<'ast> Visitor<'ast> for CheckDictionaryDefs {
     fn visit_def_array(&self, a: &mut Analysis, node: &'ast DefArray) -> ControlFlow<Self::Break> {
         Self::check_type_def(
             a,
-            Symbol::Array(Arc::new(node.clone())),
+            Symbol::ArrayType(Arc::new(node.clone())),
             node.node_id,
             node.span(),
         );
@@ -101,7 +101,7 @@ impl<'ast> Visitor<'ast> for CheckDictionaryDefs {
     fn visit_def_enum(&self, a: &mut Analysis, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
         Self::check_type_def(
             a,
-            Symbol::Enum(Arc::new(node.clone())),
+            Symbol::EnumType(Arc::new(node.clone())),
             node.node_id,
             node.span(),
         );
@@ -115,7 +115,7 @@ impl<'ast> Visitor<'ast> for CheckDictionaryDefs {
     ) -> ControlFlow<Self::Break> {
         Self::check_type_def(
             a,
-            Symbol::Struct(Arc::new(node.clone())),
+            Symbol::StructType(Arc::new(node.clone())),
             node.node_id,
             node.span(),
         );

@@ -95,8 +95,9 @@ struct LeafVariant {
     payload: Payload,
 }
 
-/// A leaf enum (e.g. `IntegerKind`) rendered as a fieldless Python `enum.Enum`
-/// via a `#[pyclass(eq, eq_int)]` mirror + a `From<&fpp_ast::X>` conversion.
+/// A leaf enum (e.g. `IntegerKind`) rendered as a fieldless `#[pyclass(eq, eq_int)]`
+/// mirror — NOT an `enum.Enum` subclass — plus `.name`/`.value` getters and a
+/// `From<&fpp_ast::X>` conversion.
 struct LeafEnumDef {
     #[allow(dead_code)]
     name: String,
@@ -1053,9 +1054,15 @@ fn emit_py(reg: &Registry) -> TokenStream {
         });
     }
 
-    // Leaf enums: a fieldless `#[pyclass(eq, eq_int)]` Python-enum mirror per leaf
-    // + a `From<&fpp_ast::X>` that maps each native variant onto it (payload, if
-    // any, is dropped — the Python mirror only carries the discriminant).
+    // Leaf enums: a fieldless `#[pyclass(eq, eq_int)]` mirror per leaf + `.name`/
+    // `.value` getters + a `From<&fpp_ast::X>` that maps each native variant onto it
+    // (payload, if any, is dropped — the Python mirror only carries the
+    // discriminant). PyO3 gives a simple enum only `__repr__`/`__int__`/
+    // `__richcmp__`/`__hash__`, so without the getters the member spelling would be
+    // recoverable only by parsing `repr`. For `IntegerKind`/`FloatKind` that spelling
+    // is the FPP (and F Prime C++) type name a generator needs directly; for the
+    // keyword kinds it is the model's own name, and FPP's surface syntax differs
+    // (`passive`, `activity high`) — which is what `leaf_enum_doc` tells callers.
     let mut leaf_defs = Vec::new();
     for (name, def) in &reg.leaf_enums {
         let ety = format_ident!("{}", name);
@@ -1065,6 +1072,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
             .iter()
             .map(|v| format_ident!("{}", v.name))
             .collect();
+        let variant_names: Vec<&str> = def.variants.iter().map(|v| v.name.as_str()).collect();
         let from_arms: Vec<_> = def
             .variants
             .iter()
@@ -1079,11 +1087,37 @@ fn emit_py(reg: &Registry) -> TokenStream {
             })
             .collect();
         register_calls.push(quote!(m.add_class::<#ety>()?;));
+        let doc = crate::leaf_enum_doc(name);
         leaf_defs.push(quote! {
+            #[doc = #doc]
             #[gen_stub_pyclass_enum]
             #[pyclass(eq, eq_int, frozen, hash, skip_from_py_object)]
-            #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+            // `Ord` is Rust-only (`#[pyclass(ord)]` stays off, so nothing appears in
+            // the stub): it is what lets a map keyed by this mirror iterate in
+            // native declaration order — see `sem_bindings::KeyOrder`.
+            #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
             pub enum #ety { #(#variant_ids,)* }
+
+            // A plain `impl`, not the `#[pymethods]` block below, so the getters
+            // delegate to it rather than to each other through PyO3's rewriting.
+            impl #ety {
+                fn member_name(&self) -> &'static str {
+                    match self { #(Self::#variant_ids => #variant_names,)* }
+                }
+            }
+
+            #[gen_stub_pymethods]
+            #[pymethods]
+            impl #ety {
+                /// Get enum variant name as a string
+                #[getter]
+                fn name(&self) -> &'static str { self.member_name() }
+                /// The same string as `name`: a kind mirror carries no payload, so
+                /// its name is its value (as for `enum.StrEnum`).
+                #[getter]
+                fn value(&self) -> &'static str { self.member_name() }
+            }
+
             impl ::std::convert::From<&fpp_ast::#nat> for #ety {
                 fn from(x: &fpp_ast::#nat) -> Self {
                     match x { #(#from_arms,)* }
@@ -1115,6 +1149,15 @@ fn emit_py(reg: &Registry) -> TokenStream {
         impl AstNode {
             #[getter] fn node_id(&self) -> u32 { self.data.id(self.node) }
             #[getter] fn location(&self) -> Option<Loc> { self.data.loc(self.node) }
+            /// Whether this node belongs to a unit the caller asked about, rather
+            /// than one passed to `analyze(imports=…)` to resolve references.
+            ///
+            /// Unit membership, not file membership: a member spliced in by
+            /// `include` is in-source if the unit that included it is, even though
+            /// its `location.uri` names a file that was never passed to `analyze`.
+            /// A node the state-enum transform spliced in likewise belongs to
+            /// whichever unit it was spliced into.
+            #[getter] fn in_source(&self) -> bool { self.data.in_source(self.node) }
             /// This node's direct child nodes, in source order.
             ///
             /// `kind` enums and union wrappers are transparent: the children are

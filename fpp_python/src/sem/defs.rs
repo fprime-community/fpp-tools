@@ -68,10 +68,10 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union Command native fpp_analysis::semantics::Command handle clone alias "Command" accessor native repr variant {
+    union Command native fpp_analysis::semantics::Command handle clone alias "Command" accessor native repr name(get_name) {
         variants {
-            NonParam => NonParam : struct { node: astdef(SpecCommand), kind: union(NonParamKind) },
-            Param => CommandParam : struct { node: astdef(SpecParam), kind: leaf(crate::sem::ParamKind) },
+            NonParam => NonParamCommand : struct { node: astdef(SpecCommand), kind: union(NonParamKind) },
+            Param => ParamCommand : struct { node: astdef(SpecParam), kind: leaf(crate::sem::ParamKind) },
         }
         methods {
             get_name -> str,
@@ -79,34 +79,34 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union FormatPart native fpp_analysis::semantics::FormatPart handle clone alias "FormatPart" accessor native repr variant {
+    union FormatPart native fpp_analysis::semantics::FormatPart handle clone alias "FormatPart" accessor native {
         variants {
-            Literal => Literal : str,
-            FormatReplacement => FormatReplacementField : payload,
+            Literal => LiteralFormatPart : str,
+            FormatReplacement => FormatReplacementFormatPart : payload,
         }
     }
 
-    union FormatReplacementKind native fpp_analysis::semantics::FormatReplacementKind handle clone alias "FormatReplacementKind" accessor native repr variant {
+    union FormatReplacementKind native fpp_analysis::semantics::FormatReplacementKind handle clone alias "FormatReplacementKind" accessor native {
         variants {
-            Default => FormatReplacementKindDefault : unit,
-            Integer => FormatReplacementKindInteger : leaf(crate::sem::IntegerFormatKind),
-            Rational => Rational : struct { precision: opt(usize), kind: leaf(crate::sem::RationalFormatKind) },
+            Default => DefaultFormatReplacementKind : unit,
+            Integer => IntegerFormatReplacementKind : leaf(crate::sem::IntegerFormatKind),
+            Rational => RationalFormatReplacementKind : struct { precision: opt(usize), kind: leaf(crate::sem::RationalFormatKind) },
         }
     }
 
-    union GeneralKind native fpp_analysis::semantics::GeneralKind handle clone alias "GeneralKind" accessor native repr variant {
+    union GeneralKind native fpp_analysis::semantics::GeneralKind handle clone alias "GeneralKind" accessor native {
         variants {
-            AsyncInput => AsyncInput : struct { priority: opt(i128), queue_full: leaf(crate::ast::QueueFull) },
-            GuardedInput => GuardedInput : unit,
-            Output => Output : unit,
-            SyncInput => SyncInput : unit,
+            AsyncInput => AsyncInputGeneralKind : struct { priority: opt(i128), queue_full: leaf(crate::ast::QueueFull) },
+            GuardedInput => GuardedInputGeneralKind : unit,
+            Output => OutputGeneralKind : unit,
+            SyncInput => SyncInputGeneralKind : unit,
         }
     }
 
-    union InterfaceInstance native fpp_analysis::semantics::InterfaceInstance handle clone alias "InterfaceInstance" accessor native repr variant {
+    union InterfaceInstance native fpp_analysis::semantics::InterfaceInstance handle clone alias "InterfaceInstance" accessor native repr name(qualified_name) {
         variants {
-            Component => InterfaceInstanceComponent : payload,
-            Topology => TopologyInstance : payload,
+            Component => ComponentInterfaceInstance : payload,
+            Topology => TopologyInterfaceInstance : payload,
         }
         methods {
             as_topology(a: analysis) -> opt(entity(Topology)),
@@ -118,15 +118,15 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union NonParamKind native fpp_analysis::semantics::NonParamKind handle clone alias "NonParamKind" accessor native repr variant {
+    union NonParamKind native fpp_analysis::semantics::NonParamKind handle clone alias "NonParamKind" accessor native {
         variants {
-            Async => Async : struct { priority: opt(i128), queue_full: leaf(crate::ast::QueueFull) },
-            Guarded => Guarded : unit,
-            Sync => Sync : unit,
+            Async => AsyncNonParamKind : struct { priority: opt(i128), queue_full: leaf(crate::ast::QueueFull) },
+            Guarded => GuardedNonParamKind : unit,
+            Sync => SyncNonParamKind : unit,
         }
     }
 
-    union PortInstance native fpp_analysis::semantics::PortInstance handle clone alias "PortInstance" accessor native repr variant_unqualified(get_unqualified_name) {
+    union PortInstance native fpp_analysis::semantics::PortInstance handle clone alias "PortInstance" accessor native repr display {
         variants {
             General => GeneralPortInstance : payload,
             Special => SpecialPortInstance : payload,
@@ -149,22 +149,22 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union PortInstanceType native fpp_analysis::semantics::PortInstanceType handle clone alias "PortInstanceType" accessor native repr variant {
+    union PortInstanceType native fpp_analysis::semantics::PortInstanceType handle clone alias "PortInstanceType" accessor native {
         variants {
-            DefPort => PortInstanceTypeDefPort : union(Symbol),
-            Serial => Serial : unit,
+            DefPort => DefPortPortInstanceType : union(Symbol),
+            Serial => SerialPortInstanceType : unit,
         }
         methods {
             port_returns_value -> opt(span),
         }
     }
 
-    union StateMachineSymbol native fpp_analysis::semantics::state_machine::StateMachineSymbol handle clone alias "StateMachineSymbol" accessor native loc_from_node repr variant_unqualified(get_unqualified_name) {
+    union StateMachineSymbol native fpp_analysis::semantics::state_machine::StateMachineSymbol handle clone alias "StateMachineSymbol" accessor native loc_from_node repr name(get_unqualified_name) {
         variants {
-            Action => Action : astdef(DefAction),
-            Guard => Guard : astdef(DefGuard),
+            Action => StateMachineSymbolAction : astdef(DefAction),
+            Guard => StateMachineSymbolGuard : astdef(DefGuard),
             Choice => StateMachineSymbolChoice : astdef(DefChoice),
-            Signal => Signal : astdef(DefSignal),
+            Signal => StateMachineSymbolSignal : astdef(DefSignal),
             State => StateMachineSymbolState : astdef(DefState),
         }
         methods {
@@ -173,13 +173,13 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union StateMachineTypedElement native fpp_analysis::semantics::state_machine::StateMachineTypedElement handle clone alias "StateMachineTypedElement" accessor native repr variant {
+    union StateMachineTypedElement native fpp_analysis::semantics::state_machine::StateMachineTypedElement handle clone alias "StateMachineTypedElement" accessor native {
         variants {
-            StateEntry => StateEntry : astdef(SpecStateEntry),
-            StateExit => StateExit : astdef(SpecStateExit),
-            InitialTransition => InitialTransition : astdef(SpecInitialTransition),
-            StateTransition => StateTransition : astdef(SpecStateTransition),
-            Choice => StateMachineTypedElementChoice : astdef(DefChoice),
+            StateEntry => StateEntryStateMachineTypedElement : astdef(SpecStateEntry),
+            StateExit => StateExitStateMachineTypedElement : astdef(SpecStateExit),
+            InitialTransition => InitialTransitionStateMachineTypedElement : astdef(SpecInitialTransition),
+            StateTransition => StateTransitionStateMachineTypedElement : astdef(SpecStateTransition),
+            Choice => ChoiceStateMachineTypedElement : astdef(DefChoice),
         }
         methods {
             get_node_id -> node,
@@ -187,10 +187,10 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union StateOrChoice native fpp_analysis::semantics::state_machine::StateOrChoice handle clone alias "StateOrChoice" accessor native repr variant {
+    union StateOrChoice native fpp_analysis::semantics::state_machine::StateOrChoice handle clone alias "StateOrChoice" accessor native repr name(get_name) {
         variants {
-            State => StateOrChoiceState : union(StateMachineSymbol),
-            Choice => StateOrChoiceChoice : union(StateMachineSymbol),
+            State => StateStateOrChoice : union(StateMachineSymbol),
+            Choice => ChoiceStateOrChoice : union(StateMachineSymbol),
         }
         methods {
             get_name -> str,
@@ -198,22 +198,22 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union Symbol native fpp_analysis::semantics::Symbol handle symbol alias "Symbol" accessor sym identity node repr variant_qualified(get_qualified_name) {
+    union Symbol native fpp_analysis::semantics::Symbol handle symbol alias "Symbol" accessor sym identity node repr analysis_name(get_qualified_name) {
         variants {
             AbsType => SymbolAbsType : astdef(DefAbsType),
             AliasType => SymbolAliasType : astdef(DefAliasType),
-            Array => Array : astdef(DefArray),
+            ArrayType => SymbolArrayType : astdef(DefArray),
             Component => SymbolComponent : astdef(DefComponent),
             ComponentInstance => SymbolComponentInstance : astdef(DefComponentInstance),
-            Constant => Constant : astdef(DefConstant),
-            Enum => SymbolEnum : astdef(DefEnum),
-            EnumConstant => EnumConstant : astdef(DefEnumConstant),
+            Constant => SymbolConstant : astdef(DefConstant),
+            EnumType => SymbolEnumType : astdef(DefEnum),
+            EnumConstant => SymbolEnumConstant : astdef(DefEnumConstant),
             Interface => SymbolInterface : astdef(DefInterface),
-            Module => Module : astdef(DefModule),
-            Port => Port : astdef(DefPort),
+            Module => SymbolModule : astdef(DefModule),
+            Port => SymbolPort : astdef(DefPort),
             StateMachine => SymbolStateMachine : astdef(DefStateMachine),
-            Struct => Struct : astdef(DefStruct),
-            System => System : astdef(DefSystem),
+            StructType => SymbolStructType : astdef(DefStruct),
+            System => SymbolSystem : astdef(DefSystem),
             Topology => SymbolTopology : astdef(DefTopology),
         }
         methods {
@@ -225,10 +225,10 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union Transition native fpp_analysis::semantics::state_machine::Transition handle clone alias "Transition" accessor native repr variant {
+    union Transition native fpp_analysis::semantics::state_machine::Transition handle clone alias "Transition" accessor native {
         variants {
-            External => External : struct { actions: list(union(StateMachineSymbol)), target: union(StateOrChoice) },
-            Internal => Internal : struct { actions: list(union(StateMachineSymbol)) },
+            External => ExternalTransition : struct { actions: list(union(StateMachineSymbol)), target: union(StateOrChoice) },
+            Internal => InternalTransition : struct { actions: list(union(StateMachineSymbol)) },
         }
         methods {
             get_actions -> ref list(union(StateMachineSymbol)),
@@ -236,11 +236,11 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union TransitionGraphArc native fpp_analysis::semantics::transition_graph::Arc handle clone alias "TransitionGraphArc" accessor native repr variant {
+    union TransitionGraphArc native fpp_analysis::semantics::transition_graph::Arc handle clone alias "TransitionGraphArc" accessor native {
         variants {
-            Initial => Initial : struct { start_state: union(StateMachineSymbol), a_node: astdef(SpecInitialTransition), end_node: entity(TransitionGraphNode) },
-            State => TransitionGraphArcState : struct { start_state: union(StateMachineSymbol), a_node: astdef(SpecStateTransition), end_node: entity(TransitionGraphNode) },
-            Choice => TransitionGraphArcChoice : struct { start_choice: union(StateMachineSymbol), a_node: astdef(TransitionExpr), end_node: entity(TransitionGraphNode) },
+            Initial => InitialTransitionGraphArc : struct { start_state: union(StateMachineSymbol), a_node: astdef(SpecInitialTransition), end_node: entity(TransitionGraphNode) },
+            State => StateTransitionGraphArc : struct { start_state: union(StateMachineSymbol), a_node: astdef(SpecStateTransition), end_node: entity(TransitionGraphNode) },
+            Choice => ChoiceTransitionGraphArc : struct { start_choice: union(StateMachineSymbol), a_node: astdef(TransitionExpr), end_node: entity(TransitionGraphNode) },
         }
         methods {
             get_end_node -> ref entity(TransitionGraphNode),
@@ -251,15 +251,15 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union Type native fpp_analysis::semantics::Type handle arc_type alias "Type" accessor ty include_base custom_build identity identical(identical, def_node_id) {
+    union Type native fpp_analysis::semantics::Type handle arc_type alias "Type" accessor ty include_base custom_build identity identical(identical, def_node_id) repr display {
         variants {
-            PrimitiveInt => PrimitiveInt : leaf(crate::ast::IntegerKind),
-            Float => Float : leaf(crate::ast::FloatKind),
-            String => TypeString : opt(i128),
-            Boolean => TypeBoolean : unit,
-            Integer => TypeInteger : unit,
-            AbsType => TypeAbsType : payload,
-            AliasType => TypeAliasType : payload,
+            PrimitiveInt => PrimitiveIntType : leaf(crate::ast::IntegerKind),
+            Float => FloatType : leaf(crate::ast::FloatKind),
+            String => StringType : opt(i128),
+            Boolean => BooleanType : unit,
+            Integer => IntegerType : unit,
+            Abs => AbsType : payload,
+            Alias => AliasType : payload,
             Array => ArrayType : payload,
             AnonArray => AnonArrayType : payload,
             Enum => EnumType : payload,
@@ -292,14 +292,14 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union Value native fpp_analysis::semantics::Value handle value alias "Value" accessor val repr variant {
+    union Value native fpp_analysis::semantics::Value handle value alias "Value" accessor val repr display {
         variants {
             PrimitiveInteger => PrimitiveIntegerValue : payload,
             AbsType => AbsTypeValue : payload,
-            Integer => ValueInteger : newtype(i128),
+            Integer => IntegerValue : newtype(i128),
             Float => FloatValue : payload,
-            Boolean => ValueBoolean : newtype(bool),
-            String => ValueString : newtype(str),
+            Boolean => BooleanValue : newtype(bool),
+            String => StringValue : newtype(str),
             EnumConstant => EnumConstantValue : payload,
             AnonArray => AnonArrayValue : payload,
             Array => ArrayValue : payload,
@@ -322,9 +322,22 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
+    payload AbsType native fpp_analysis::semantics::AbsType {
+        fields {
+            node: astdef(DefAbsType),
+        }
+    }
+
     payload AbsTypeValue native fpp_analysis::semantics::AbsTypeValue {
         fields {
-            ty: rewrap(Type::AbsType),
+            ty: rewrap(Type::Abs),
+        }
+    }
+
+    payload AliasType native fpp_analysis::semantics::AliasType {
+        fields {
+            node: astdef(DefAliasType),
+            alias_type: union(Type),
         }
     }
 
@@ -373,6 +386,29 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
+    payload ComponentInterfaceInstance native fpp_analysis::semantics::ComponentInstance {
+        fields {
+            node: astdef(DefComponentInstance),
+            qualified_name: str,
+            component_symbol: union(Symbol),
+            base_id: i128,
+            max_id: i128,
+            file: opt(str),
+            queue_size: opt(i128),
+            stack_size: opt(i128),
+            priority: opt(i128),
+            cpu: opt(i128),
+            init_specifier_map: map(i128, entity(InitSpecifier)),
+        }
+        methods {
+            add_init_specifier(spec: entity(InitSpecifier)) throws -> rewrap(InterfaceInstance::Component),
+            get_component(a: analysis) -> opt(entity(Component)),
+            get_interface(a: analysis) -> opt(entity(PortInterface)),
+            get_qualified_name -> ref str,
+            get_unqualified_name -> ref str,
+        }
+    }
+
     payload EnumConstantValue native fpp_analysis::semantics::EnumConstantValue {
         fields {
             value: tuple(str, i128),
@@ -395,7 +431,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    payload FormatReplacementField native fpp_analysis::semantics::FormatReplacementField {
+    payload FormatReplacementFormatPart native fpp_analysis::semantics::FormatReplacementField {
         fields {
             span: span,
             kind: union(FormatReplacementKind),
@@ -420,29 +456,6 @@ fpp_python_macros::fpp_sem_bindings! {
             get_unqualified_name -> ref str,
             is_async_input -> bool,
             with_import_specifier(import_node: node) -> rewrap(PortInstance::General),
-        }
-    }
-
-    payload InterfaceInstanceComponent native fpp_analysis::semantics::ComponentInstance {
-        fields {
-            node: astdef(DefComponentInstance),
-            qualified_name: str,
-            component_symbol: union(Symbol),
-            base_id: i128,
-            max_id: i128,
-            file: opt(str),
-            queue_size: opt(i128),
-            stack_size: opt(i128),
-            priority: opt(i128),
-            cpu: opt(i128),
-            init_specifier_map: map(i128, entity(InitSpecifier)),
-        }
-        methods {
-            add_init_specifier(spec: entity(InitSpecifier)) throws -> rewrap(InterfaceInstance::Component),
-            get_component(a: analysis) -> opt(entity(Component)),
-            get_interface(a: analysis) -> opt(entity(PortInterface)),
-            get_qualified_name -> ref str,
-            get_unqualified_name -> ref str,
         }
     }
 
@@ -503,7 +516,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    payload TopologyInstance native fpp_analysis::semantics::TopologyInstance {
+    payload TopologyInterfaceInstance native fpp_analysis::semantics::TopologyInstance {
         fields {
             symbol: union(Symbol),
             qualified_name: str,
@@ -521,20 +534,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    payload TypeAbsType native fpp_analysis::semantics::AbsType {
-        fields {
-            node: astdef(DefAbsType),
-        }
-    }
-
-    payload TypeAliasType native fpp_analysis::semantics::AliasType {
-        fields {
-            node: astdef(DefAliasType),
-            alias_type: union(Type),
-        }
-    }
-
-    entity Component native fpp_analysis::semantics::Component {
+    entity Component native fpp_analysis::semantics::Component repr symbol_name(symbol, get_qualified_name) {
         fields {
             symbol: union(Symbol),
             node: astdef(DefComponent),
@@ -594,7 +594,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Container native fpp_analysis::semantics::Container {
+    entity Container native fpp_analysis::semantics::Container repr name(get_name) {
         fields {
             node: astdef(SpecContainer),
             default_priority: opt(i128),
@@ -616,7 +616,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Event native fpp_analysis::semantics::Event {
+    entity Event native fpp_analysis::semantics::Event repr name(get_name) {
         fields {
             node: astdef(SpecEvent),
             format: entity(Format),
@@ -635,7 +635,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity FppSystem native fpp_analysis::semantics::FppSystem {
+    entity FppSystem native fpp_analysis::semantics::FppSystem repr name(get_name) {
         fields {
             node: astdef(DefSystem),
             topology: entity(Topology),
@@ -681,7 +681,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Interface native fpp_analysis::semantics::Interface {
+    entity Interface native fpp_analysis::semantics::Interface repr name(get_unqualified_name) {
         fields {
             node: astdef(DefInterface),
             import_map: map(union(Symbol), tuple(node, span)),
@@ -698,7 +698,7 @@ fpp_python_macros::fpp_sem_bindings! {
     entity NestedScope native fpp_analysis::semantics::NestedScope {
     }
 
-    entity Param native fpp_analysis::semantics::Param {
+    entity Param native fpp_analysis::semantics::Param repr name(get_name) {
         fields {
             node: astdef(SpecParam),
             param_type: union(Type),
@@ -712,7 +712,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity PortInstanceIdentifier native fpp_analysis::semantics::PortInstanceIdentifier identity qualified_name(qualified_name) {
+    entity PortInstanceIdentifier native fpp_analysis::semantics::PortInstanceIdentifier identity qualified_name(qualified_name) repr name(qualified_name) {
         fields {
             interface_instance: union(InterfaceInstance),
             port_instance: union(PortInstance),
@@ -737,7 +737,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity PortMatching native fpp_analysis::semantics::PortMatching {
+    entity PortMatching native fpp_analysis::semantics::PortMatching repr display {
         fields {
             node: astdef(SpecPortMatching),
             instance1: rewrap(PortInstance::General),
@@ -748,13 +748,13 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity QualifiedName native fpp_analysis::semantics::QualifiedName {
+    entity QualifiedName native fpp_analysis::semantics::QualifiedName repr display {
         methods {
             to_ident_list -> list(str),
         }
     }
 
-    entity Record native fpp_analysis::semantics::Record {
+    entity Record native fpp_analysis::semantics::Record repr name(get_name) {
         fields {
             node: astdef(SpecRecord),
             record_type: union(Type),
@@ -796,7 +796,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity StateMachineAnalysis native fpp_analysis::semantics::state_machine::StateMachineAnalysis {
+    entity StateMachineAnalysis native fpp_analysis::semantics::state_machine::StateMachineAnalysis repr symbol_name(symbol, get_qualified_name) {
         fields {
             symbol: union(Symbol),
             scope_name_list: list(str),
@@ -824,7 +824,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity StateMachineInstance native fpp_analysis::semantics::StateMachineInstance {
+    entity StateMachineInstance native fpp_analysis::semantics::StateMachineInstance repr name(get_name) {
         fields {
             node: astdef(SpecStateMachineInstance),
             state_machine: astdef(DefStateMachine),
@@ -862,7 +862,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity TlmChannel native fpp_analysis::semantics::TlmChannel {
+    entity TlmChannel native fpp_analysis::semantics::TlmChannel repr name(get_name) {
         fields {
             node: astdef(SpecTlmChannel),
             channel_type: union(Type),
@@ -876,7 +876,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity TlmPacket native fpp_analysis::semantics::TlmPacket {
+    entity TlmPacket native fpp_analysis::semantics::TlmPacket repr name(get_name) {
         fields {
             node: astdef(SpecTlmPacket),
             group: usize,
@@ -888,7 +888,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity TlmPacketSet native fpp_analysis::semantics::TlmPacketSet {
+    entity TlmPacketSet native fpp_analysis::semantics::TlmPacketSet repr name(get_name) {
         fields {
             node: astdef(SpecTlmPacketSet),
             packet_map: map(i128, entity(TlmPacket)),
@@ -903,7 +903,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Topology native fpp_analysis::semantics::Topology {
+    entity Topology native fpp_analysis::semantics::Topology repr name(unqualified_name) {
         fields {
             symbol: union(Symbol),
             qualified_name: str,
@@ -936,13 +936,14 @@ fpp_python_macros::fpp_sem_bindings! {
             get_port_number(pi: ref union(PortInstance), c: ref entity(Connection)) -> opt(i128),
             get_used_port_numbers(pi: ref union(PortInstance), cs: ref list(entity(Connection))) -> list(i128),
             look_up_instance_at(instance: ref union(InterfaceInstance), loc: span) throws -> unit,
+            node -> ref astdef(DefTopology),
             resolve_numbers(c: ref entity(Connection)) -> entity(Connection),
             sort_connections(connections: ref list(entity(Connection))) -> list(entity(Connection)),
             unqualified_name -> str,
         }
     }
 
-    entity TopologyPort native fpp_analysis::semantics::TopologyPort {
+    entity TopologyPort native fpp_analysis::semantics::TopologyPort repr name(get_name) {
         fields {
             node: astdef(SpecTopPort),
             pii: entity(PortInstanceIdentifier),
@@ -971,7 +972,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity UseDefMatching native fpp_analysis::semantics::UseDefMatching {
+    entity UseDefMatching native fpp_analysis::semantics::UseDefMatching repr symbol_name(symbol, get_qualified_name) {
         fields {
             node: node,
             qualified_name: entity(QualifiedName),

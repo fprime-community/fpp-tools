@@ -147,7 +147,7 @@ impl Analysis {
             return ty.clone();
         }
         let node_id = fpp_core::Node::new(span);
-        let ty = Arc::new(Type::AbsType(Arc::new(crate::semantics::AbsType {
+        let ty = Arc::new(Type::Abs(Arc::new(crate::semantics::AbsType {
             node: Arc::new(fpp_ast::DefAbsType {
                 node_id,
                 name: fpp_ast::Name {

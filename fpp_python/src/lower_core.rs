@@ -13,7 +13,7 @@ use crate::ast::NodeKind;
 use crate::ir_core::Loc;
 use crate::noderef::NodeRef;
 use fpp_analysis::Analysis;
-use fpp_analysis::semantics::Symbol;
+use fpp_analysis::semantics::{Symbol, SymbolInterface};
 use fpp_core::Node;
 use rustc_hash::FxHashMap;
 
@@ -77,6 +77,14 @@ impl Walker {
         }
     }
 
+    /// The id the next newly-seen node will get.
+    ///
+    /// Read either side of one unit's walk, this brackets the ids that walk assigned
+    /// — see [`crate::ir_core::UnitData::id_range`].
+    pub fn next_id(&self) -> u32 {
+        self.next
+    }
+
     /// Consume the walker, yielding the recorded side-tables.
     pub fn finish(self) -> WalkTables {
         WalkTables {
@@ -87,16 +95,23 @@ impl Walker {
     }
 }
 
-/// Build the fully-qualified-name -> [`Symbol`] index for `Model.lookup`, inside
+/// Build the fully-qualified-name -> [`Symbol`]s index for `Model.lookup`, inside
 /// the `run` scope. Only symbols whose def node was recorded during the walk are
 /// included (synthetic/unwalked nodes are skipped). `get_qualified_name` is
 /// context-free, but building the index once here keeps lookups O(1).
-pub fn build_indexes(a: &Analysis, ids: &FxHashMap<Node, u32>) -> FxHashMap<String, Symbol> {
-    let mut by_qualified_name: FxHashMap<String, Symbol> = FxHashMap::default();
+pub fn build_indexes(a: &Analysis, ids: &FxHashMap<Node, u32>) -> FxHashMap<String, Vec<Symbol>> {
+    let mut by_qualified_name: FxHashMap<String, Vec<Symbol>> = FxHashMap::default();
     for (def_node, sym) in &a.symbol_map {
         if ids.contains_key(def_node) {
-            by_qualified_name.insert(a.get_qualified_name(sym), sym.clone());
+            by_qualified_name
+                .entry(a.get_qualified_name(sym))
+                .or_default()
+                .push(sym.clone());
         }
+    }
+    for syms in by_qualified_name.values_mut() {
+        syms.sort_by_key(|s| ids[&s.node()]);
+        syms.dedup_by_key(|s| ids[&s.node()]);
     }
     by_qualified_name
 }
