@@ -3,6 +3,7 @@
 
 import builtins
 import typing
+import typing_extensions
 __all__ = [
     "AbsType",
     "AbsTypeValue",
@@ -1506,11 +1507,7 @@ class NodeVisitor:
     def visit_TransitionExpr(self, node: TransitionExpr) -> typing.Any: ...
     def visit_TypeName(self, node: TypeName) -> typing.Any: ...
     def visit_Opaque(self, node: Opaque) -> typing.Any: ...
-    def __new__(cls, *args: typing.Any, **kwargs: typing.Any) -> NodeVisitor:
-        r"""
-        Accepts (and ignores) any arguments, so a subclass is free to define its
-        own `__init__` signature without forwarding to `super().__init__()`.
-        """
+    def __new__(cls, *args: typing.Any, **kwargs: typing.Any) -> typing_extensions.Self: ...
     def visit(self, node: AstNode | TransUnit | Model | SyntaxTree) -> typing.Any:
         r"""
         Visit `node` by dispatching to this visitor's `visit_<type(node).__name__>`

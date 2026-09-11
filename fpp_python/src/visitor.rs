@@ -162,8 +162,10 @@ impl NodeVisitor {
 #[gen_stub_pymethods]
 #[pymethods]
 impl NodeVisitor {
-    /// Accepts (and ignores) any arguments, so a subclass is free to define its
-    /// own `__init__` signature without forwarding to `super().__init__()`.
+    #[gen_stub(override_return_type(
+        type_repr = "typing_extensions.Self",
+        imports = ("typing_extensions")
+    ))]
     #[new]
     #[pyo3(signature = (*args, **kwargs))]
     fn new(args: &Bound<'_, PyTuple>, kwargs: Option<&Bound<'_, PyDict>>) -> Self {
