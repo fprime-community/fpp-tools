@@ -72,7 +72,7 @@ impl fpp_core::DiagnosticEmitter for SharedEmitter {
             .map(|c| {
                 (
                     c.message.clone(),
-                    c.span.as_ref().and_then(|s| Some(loc_of(s))),
+                    c.span.as_ref().map(|s| loc_of(s)),
                 )
             })
             .collect();
