@@ -1148,7 +1148,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
         #[pymethods]
         impl AstNode {
             #[getter] fn node_id(&self) -> u32 { self.data.id(self.node) }
-            #[getter] fn location(&self) -> Option<Loc> { self.data.loc(self.node) }
+            #[getter] fn location(&self) -> Loc { self.data.loc(self.node) }
             /// Whether this node belongs to a unit the caller asked about, rather
             /// than one passed to `analyze(imports=…)` to resolve references.
             ///

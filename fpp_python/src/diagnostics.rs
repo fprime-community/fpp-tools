@@ -51,17 +51,17 @@ fn level_str(level: fpp_core::Level) -> &'static str {
     }
 }
 
-fn loc_of(span: &fpp_core::SpanData) -> Option<Loc> {
-    let file = span.file.upgrade()?;
+fn loc_of(span: &fpp_core::SpanData) -> Loc {
+    let file = span.file.upgrade().unwrap();
     let start = file.position(span.start);
     let end = file.position(span.start + span.length);
-    Some(Loc {
+    Loc {
         uri: file.uri.clone(),
         line: start.line(),
         column: start.column(),
         end_line: end.line(),
         end_column: end.column(),
-    })
+    }
 }
 
 impl fpp_core::DiagnosticEmitter for SharedEmitter {
@@ -69,12 +69,12 @@ impl fpp_core::DiagnosticEmitter for SharedEmitter {
         let children = diagnostic
             .children
             .iter()
-            .map(|c| (c.message.clone(), c.span.as_ref().and_then(loc_of)))
+            .map(|c| (c.message.clone(), c.span.as_ref().map(loc_of)))
             .collect();
         self.diags.lock().unwrap().push(OwnedDiagnostic {
             level: level_str(diagnostic.level),
             message: diagnostic.message,
-            location: loc_of(&diagnostic.span),
+            location: Some(loc_of(&diagnostic.span)),
             children,
         });
     }

@@ -441,7 +441,7 @@ class AstNode:
     @property
     def node_id(self) -> builtins.int: ...
     @property
-    def location(self) -> typing.Optional[Loc]: ...
+    def location(self) -> Loc: ...
     @property
     def in_source(self) -> builtins.bool:
         r"""
@@ -2197,7 +2197,7 @@ class StateMachineSymbolAction(StateMachineSymbolBase):
 
 class StateMachineSymbolBase:
     @property
-    def loc(self) -> typing.Optional[Loc]:
+    def loc(self) -> Loc:
         r"""
         The source location of this element's definition.
         """
