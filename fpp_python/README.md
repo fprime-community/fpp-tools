@@ -91,7 +91,7 @@ any node's `span`, add child annotations and notes, and `print` it.
 ```python
 node = model.lookup("M.answer").definition
 print(fpp.Diagnostic(
-    fpp.DiagnosticLevel.Warning, "answer is unused",
+    "answer is unused", level=fpp.DiagnosticLevel.Warning,
     span=node.span,
     children=[fpp.DiagnosticMessage("delete it")],
 ))
@@ -101,6 +101,18 @@ print(fpp.Diagnostic(
 #   |   ^^^^^^^^^^^^^^^^^^^^^^^ answer is unused
 #   |
 #   = note: delete it
+```
+
+A check can raise its finding instead of returning it: `fpp.DiagnosticError`
+carries a `Diagnostic`, and everything on that diagnostic stays writable, so each
+handler on the way out can add the context it knows.
+
+```python
+try:
+    check_component(instance.component)
+except fpp.DiagnosticError as error:
+    error.diagnostic.add_note("in this instance", span=instance.node.span)
+    raise
 ```
 
 `fpp.pyi` is the reference for the rest — every class, getter and return type —

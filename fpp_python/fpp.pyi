@@ -58,6 +58,7 @@ __all__ = [
     "DefTopology",
     "DefaultFormatReplacementKind",
     "Diagnostic",
+    "DiagnosticError",
     "DiagnosticLevel",
     "DiagnosticMessage",
     "DiagnosticMessageKind",
@@ -902,11 +903,15 @@ class Diagnostic:
     
     ```python
     fpp.Diagnostic(
-        fpp.DiagnosticLevel.Error, "component is missing a command port",
+        "component is missing a command port",
         span=component.node.span,
         children=[fpp.DiagnosticMessage("declared here", span=other.node.span)],
     )
     ```
+    
+    Raise one with `DiagnosticError`, which carries it. Every part of a
+    `Diagnostic` is writable, so a check can raise one and each caller that
+    catches it can add the context it knows before re-raising.
     
     `str()` renders it the way the `fpp` compiler renders a diagnostic on the
     console — source excerpt, carets, and all — while
@@ -917,8 +922,12 @@ class Diagnostic:
         r"""
         This diagnostic's severity.
         """
+    @level.setter
+    def level(self, value: DiagnosticLevel) -> None: ...
     @property
     def message(self) -> builtins.str: ...
+    @message.setter
+    def message(self, value: builtins.str) -> None: ...
     @property
     def location(self) -> typing.Optional[Loc]:
         r"""
@@ -939,7 +948,12 @@ class Diagnostic:
     def children(self) -> builtins.list[DiagnosticMessage]:
         r"""
         The child messages, in the order they were added.
+        
+        A fresh list each read, so `diagnostic.children.append(...)` appends to a
+        copy and changes nothing — use `add_child` (or assign to `children`).
         """
+    @children.setter
+    def children(self, value: typing.Sequence[DiagnosticMessage]) -> None: ...
     @property
     def display(self) -> builtins.str:
         r"""
@@ -949,7 +963,30 @@ class Diagnostic:
         
         The children are not part of it — see `render` for the full rendering.
         """
-    def __new__(cls, level: DiagnosticLevel, message: builtins.str, *, span: typing.Optional[Span] = None, children: typing.Sequence[DiagnosticMessage] = []) -> Diagnostic: ...
+    def __new__(cls, message: builtins.str, *, level: DiagnosticLevel = DiagnosticLevel.Error, span: typing.Optional[Span] = None, children: typing.Sequence[DiagnosticMessage] = []) -> Diagnostic: ...
+    def add_child(self, child: DiagnosticMessage) -> None:
+        r"""
+        Append `child` to `children`.
+        """
+    def add_note(self, message: builtins.str, *, span: typing.Optional[Span] = None) -> None:
+        r"""
+        Append a child note: a remark under this diagnostic, pointing at `span`
+        if it is given.
+        """
+    def add_annotation(self, message: builtins.str, *, span: typing.Optional[Span] = None) -> None:
+        r"""
+        Append a child annotation: a further message at this diagnostic's own
+        level, pointing at `span` if it is given.
+        """
+    def set_span(self, span: typing.Optional[Span]) -> None:
+        r"""
+        Point this diagnostic at `span`'s source instead of wherever it pointed
+        before, or at nothing for `span=None`.
+        
+        A method rather than a `span` property: a diagnostic keeps only the
+        resolved source excerpt (see `location`/`source`), not the `Span` it came
+        from, so there is nothing for a getter to return.
+        """
     def render(self, *, color: builtins.bool = False) -> builtins.str:
         r"""
         This diagnostic as the compiler renders it on the console: the message,
@@ -959,6 +996,39 @@ class Diagnostic:
         """
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
+
+class DiagnosticError(builtins.Exception):
+    r"""
+    A raised `Diagnostic`, in the `diagnostic` attribute.
+    
+    A `Diagnostic` cannot be an exception itself: the extension is built against
+    Python's stable ABI (one wheel for CPython >= 3.10), which does not let a
+    native class inherit from `Exception` before 3.12. So a check raises this:
+    
+    ```python
+    raise fpp.DiagnosticError(
+        fpp.Diagnostic("component is missing a command port", span=component.node.span)
+    )
+    ```
+    
+    The diagnostic stays writable while the exception propagates, so a caller can
+    add the context it knows and re-raise:
+    
+    ```python
+    try:
+        check_component(instance.component)
+    except fpp.DiagnosticError as error:
+        error.diagnostic.add_note("in this instance", span=instance.node.span)
+        raise
+    ```
+    
+    `str()` of the error is the diagnostic's console rendering.
+    """
+    @property
+    def diagnostic(self) -> Diagnostic:
+        r"""
+        The diagnostic this error was raised with.
+        """
 
 @typing.final
 class DiagnosticMessage:
@@ -1463,6 +1533,9 @@ class Model:
     def diagnostics(self) -> builtins.list[Diagnostic]:
         r"""
         The diagnostics (errors, warnings, notes) emitted during analysis.
+        
+        Freshly built on each read, so writing to one of them (a `Diagnostic` is
+        mutable) changes nothing in the model.
         """
     @property
     def analysis(self) -> Analysis:
@@ -3047,6 +3120,7 @@ class DiagnosticLevel:
         The compiler's spelling of this level: `"error"`, `"warning"`, `"note"`
         or `"help"`.
         """
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class DiagnosticMessageKind:
@@ -3068,6 +3142,7 @@ class DiagnosticMessageKind:
         r"""
         The same string as `name` (`enum.StrEnum`).
         """
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Direction:

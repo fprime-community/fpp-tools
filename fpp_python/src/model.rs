@@ -197,6 +197,9 @@ impl Model {
     }
 
     /// The diagnostics (errors, warnings, notes) emitted during analysis.
+    ///
+    /// Freshly built on each read, so writing to one of them (a `Diagnostic` is
+    /// mutable) changes nothing in the model.
     #[getter]
     fn diagnostics(&self) -> Vec<Diagnostic> {
         self.diagnostics

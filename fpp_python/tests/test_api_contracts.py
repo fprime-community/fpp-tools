@@ -633,8 +633,8 @@ def test_a_diagnostic_can_be_built_from_python_against_a_model_span():
     m = f.analyze(source="module M {\n  constant a = 1\n}\n")
     node = m.lookup("M.a").definition
     built = f.Diagnostic(
-        f.DiagnosticLevel.Warning,
         "a is unused",
+        level=f.DiagnosticLevel.Warning,
         span=node.span,
         children=[
             f.DiagnosticMessage(
@@ -660,22 +660,99 @@ def test_a_diagnostic_can_be_built_from_python_against_a_model_span():
     assert "\x1b[" in built.render(color=True)
 
 
-def test_a_diagnostic_needs_no_span():
-    bare = f.Diagnostic(f.DiagnosticLevel.Error, "nothing to point at")
+def test_a_diagnostic_needs_no_span_and_is_an_error_by_default():
+    bare = f.Diagnostic("nothing to point at")
     assert bare.location is None and bare.source is None
+    assert bare.level is f.DiagnosticLevel.Error
     assert str(bare) == "error: nothing to point at"
     assert bare.display == "error: nothing to point at"
+
+
+def test_every_part_of_a_diagnostic_is_writable():
+    m = f.analyze(source="module M {\n  constant a = 1\n}\n")
+    node = m.lookup("M.a").definition
+    d = f.Diagnostic("a is unsued")
+
+    d.message = "a is unused"
+    d.level = f.DiagnosticLevel.Warning
+    d.set_span(node.span)
+    assert d.display == "<string>:2:3: warning: a is unused"
+
+    d.add_note("delete it")
+    d.add_annotation("declared here", span=node.span)
+    d.add_child(f.DiagnosticMessage("prebuilt", span=node.span))
+    assert [c.kind for c in d.children] == [
+        f.DiagnosticMessageKind.Note,
+        f.DiagnosticMessageKind.Annotation,
+        f.DiagnosticMessageKind.Note,
+    ]
+    assert d.children[1].location.line == node.location.line
+
+    # `children` hands back a fresh list, so it takes an assignment to drop one.
+    d.children.append(f.DiagnosticMessage("appended to a copy"))
+    assert len(d.children) == 3
+    d.children = d.children[:1]
+    assert [c.message for c in d.children] == ["delete it"]
+
+    # Back to pointing at nothing.
+    d.set_span(None)
+    assert d.location is None and d.source is None
+    assert d.display == "warning: a is unused"
+
+
+def test_a_diagnostic_is_raised_by_a_diagnostic_error_and_survives_the_handlers():
+    m = f.analyze(source="module M {\n  constant a = 1\n}\n")
+    node = m.lookup("M.a").definition
+    d = f.Diagnostic("a is unused", level=f.DiagnosticLevel.Warning, span=node.span)
+
+    def inner():
+        raise f.DiagnosticError(d)
+
+    # Each handler adds the context it knows to the one diagnostic, and re-raises.
+    with pytest.raises(f.DiagnosticError) as outer:
+        try:
+            inner()
+        except f.DiagnosticError as error:
+            assert error.diagnostic is d
+            error.diagnostic.add_note("while checking M", span=node.span)
+            raise
+
+    assert outer.value.diagnostic is d
+    outer.value.diagnostic.add_note("and while checking the topology")
+    assert [c.message for c in d.children] == [
+        "while checking M",
+        "and while checking the topology",
+    ]
+    # The error renders as the diagnostic it carries.
+    assert str(outer.value) == str(d)
+    assert issubclass(f.DiagnosticError, Exception)
+
+
+def test_a_diagnostic_error_carries_a_diagnostic_or_nothing_at_all():
+    with pytest.raises(TypeError):
+        f.DiagnosticError("a string is not a diagnostic").diagnostic
+    with pytest.raises(TypeError):
+        f.DiagnosticError().diagnostic
+
+
+def test_model_diagnostics_are_freshly_built_on_each_read():
+    bad = f.analyze(source="module Bad { struct S { x: Nope } }")
+    bad.diagnostics[0].message = "rewritten"
+    assert bad.diagnostics[0].message == "cannot find type `Nope` in scope"
 
 
 def test_a_diagnostics_level_and_kind_are_enums_not_strings():
     # The level is the `DiagnosticLevel` mirror, so a string is not a level.
     with pytest.raises(TypeError):
-        f.Diagnostic("error", "a string is not a level")
+        f.Diagnostic("a string is not a level", level="error")
     with pytest.raises(TypeError):
         f.DiagnosticMessage("a string is not a kind", kind="note")
     bad = f.analyze(source="module Bad { struct S { x: Nope } }")
     assert bad.diagnostics[0].level is f.DiagnosticLevel.Error
     assert f.DiagnosticLevel.Error != f.DiagnosticLevel.Warning
+    # Each mirror reprs as the way you spell it.
+    assert repr(f.DiagnosticLevel.Error) == "DiagnosticLevel.Error"
+    assert repr(f.DiagnosticMessageKind.Note) == "DiagnosticMessageKind.Note"
 
 
 def test_loc_and_span_render_the_same_position_as_a_diagnostic():

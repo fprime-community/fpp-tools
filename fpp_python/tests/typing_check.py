@@ -11,8 +11,8 @@ traversal surface (`AstNode.children` plus a `NodeVisitor` subclass overriding t
 `visit_*` methods). It also covers the contracts the stub is easiest to get wrong
 about: a leaf enum's `str`-typed `.name`/`.value`, `str()` of a union base,
 `lookup(kind=…)` / `lookup_all`, a symbol's `int` `node_id` beside its node
-`definition`, `Topology.node`, `Diagnostic.display`, and the `is_source` /
-`in_source` flags.
+`definition`, `Topology.node`, `Diagnostic.display`, the writable `Diagnostic` raised as a
+`DiagnosticError`, and the `is_source` / `in_source` flags.
 """
 
 from __future__ import annotations
@@ -36,6 +36,7 @@ from fpp import (
     DiagnosticMessageKind,
     DiagnosticLevel,
     DiagnosticMessage,
+    DiagnosticError,
     Endpoint,
     IntegerKind,
     Loc,
@@ -243,8 +244,8 @@ def built_diagnostic(node: AstNode) -> str:
     """A diagnostic built in Python renders like one the compiler emitted."""
     span: Span = node.span
     diagnostic: Diagnostic = Diagnostic(
-        DiagnosticLevel.Warning,
         "built from Python",
+        level=DiagnosticLevel.Warning,
         span=span,
         children=[
             DiagnosticMessage(
@@ -274,6 +275,24 @@ def built_diagnostic(node: AstNode) -> str:
     )
 
 
+def raised_diagnostic(node: AstNode) -> str:
+    """A diagnostic raised as a `DiagnosticError`, extended by its handler."""
+    diagnostic: Diagnostic = Diagnostic("raised from Python")
+    diagnostic.level = DiagnosticLevel.Warning
+    diagnostic.message = "raised from Python, and rewritten"
+    diagnostic.set_span(node.span)
+    diagnostic.add_note("a note", span=node.span)
+    diagnostic.add_annotation("an annotation")
+    diagnostic.add_child(DiagnosticMessage("a prebuilt child"))
+    diagnostic.children = diagnostic.children[:2]
+    try:
+        raise DiagnosticError(diagnostic)
+    except DiagnosticError as error:
+        carried: Diagnostic = error.diagnostic
+        carried.add_note("caught here")
+        return carried.display
+
+
 def main() -> int:
     model: Model = analyze(source=SRC, uri="mem.fpp")
     if model.has_errors:
@@ -301,6 +320,7 @@ def main() -> int:
     for diag in model.diagnostics:
         total += len(diag.display) + len(str(diag)) + len(diag.children)
     total += len(built_diagnostic(units[0].members[0]))
+    total += len(raised_diagnostic(units[0].members[0]))
     print(name, total)
     return 0
 
