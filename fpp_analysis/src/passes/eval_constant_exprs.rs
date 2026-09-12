@@ -101,7 +101,7 @@ impl<'ast> EvalConstantExprs<'ast> {
             Type::Struct(struct_ty) => {
                 let def = struct_ty.node.clone();
                 self.visit_def_struct(a, &def)?;
-                for member_type in struct_ty.anon_struct.members.values() {
+                for (_, member_type) in &struct_ty.anon_struct.members {
                     self.finalize_if_needed(a, member_type)?;
                 }
                 finalize_defs.visit_def_struct(a, &def)?;

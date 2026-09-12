@@ -255,9 +255,9 @@ pub fn anon_array(size: Option<usize>, elt_type: Arc<Type>) -> Arc<Type> {
 }
 
 pub fn anon_struct(members: &[(&str, Arc<Type>)]) -> Arc<Type> {
-    let mut m = HashMap::default();
+    let mut m = Vec::default();
     for (name, ty) in members {
-        m.insert((*name).to_string(), ty.clone());
+        m.push(((*name).to_string(), ty.clone()));
     }
     Arc::new(Type::AnonStruct(AnonStructType { members: m }))
 }
@@ -302,8 +302,7 @@ pub fn types_structurally_eq(a: &Type, b: &Type) -> bool {
         (Type::AnonStruct(s1), Type::AnonStruct(s2)) => {
             s1.members.len() == s2.members.len()
                 && s1.members.iter().all(|(name, ty1)| {
-                    s2.members
-                        .get(name)
+                    s2.get_member(name)
                         .is_some_and(|ty2| types_structurally_eq(ty1, ty2))
                 })
         }

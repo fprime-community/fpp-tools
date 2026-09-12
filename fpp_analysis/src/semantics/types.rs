@@ -168,12 +168,12 @@ impl Type {
             Type::Struct(ty) => ty
                 .anon_struct
                 .members
-                .values()
-                .all(|member| member.has_numeric_members()),
+                .iter()
+                .all(|(_, member)| member.has_numeric_members()),
             Type::AnonStruct(ty) => ty
                 .members
-                .values()
-                .all(|member| member.has_numeric_members()),
+                .iter()
+                .all(|(_, member)| member.has_numeric_members()),
             _ => self.is_numeric(),
         }
     }
@@ -216,8 +216,8 @@ impl Type {
             Type::Struct(ty) => ty
                 .anon_struct
                 .members
-                .values()
-                .all(|member| member.is_displayable()),
+                .iter()
+                .all(|(_, member)| member.is_displayable()),
             Type::AnonStruct(_) => false,
         }
     }
@@ -330,7 +330,7 @@ impl Type {
             }
             Type::AnonStruct(ty) => {
                 let mut total = 0i128;
-                for member_ty in ty.members.values() {
+                for (_, member_ty) in &ty.members {
                     total = total
                         .checked_add(member_ty.serialized_size(a)?)
                         .ok_or(SerializedSizeError::TooLarge)?;
@@ -444,7 +444,7 @@ impl Type {
         if let (Some(from_struct), Some(to_struct)) = (from.as_anon_struct(), to.as_anon_struct()) {
             // May sure all the members in 'from' can fit into 'to'
             for (name, from_member_ty) in &from_struct.members {
-                match to_struct.members.get(name) {
+                match to_struct.get_member(name) {
                     None => return Err(TypeConversionError::MissingStructMember(name.clone())),
                     Some(to_member_ty) => match Type::convert(from_member_ty, to_member_ty) {
                         Ok(_) => {}
@@ -618,24 +618,24 @@ impl Type {
             // - If the member only exists in t2, bring it in unchanged
             // - If the member exists in _both_, find the common type of the member on both
             //    - If there is no common type, return None
-            let mut out_members = HashMap::default();
+            let mut out_members = Vec::default();
 
             for (name, t1_ty) in &t1_struct.members {
-                match t2_struct.members.get(name) {
+                match t2_struct.get_member(name) {
                     None => {
-                        out_members.insert(name.clone(), t1_ty.clone());
+                        out_members.push((name.clone(), t1_ty.clone()));
                     }
                     Some(t2_ty) => {
                         let member_common = Type::common_type(t1_ty, t2_ty)?;
-                        out_members.insert(name.clone(), member_common);
+                        out_members.push((name.clone(), member_common));
                     }
                 }
             }
 
             // Add the remaining members left over in t2
             for (name, t2_ty) in &t2_struct.members {
-                if !t1_struct.members.contains_key(name) {
-                    out_members.insert(name.clone(), t2_ty.clone());
+                if !t1_struct.has_member(name) {
+                    out_members.push((name.clone(), t2_ty.clone()));
                 }
             }
 
@@ -655,12 +655,12 @@ impl Type {
             }
             // Build a new struct with the same members as the old one while trying
             // to find the common type between the single element and all the members
-            let mut out_members = HashMap::default();
+            let mut out_members = Vec::default();
             let other_rc = Arc::new(other.clone());
 
             for (name, in_member_ty) in &str.members {
                 let out_member_ty = Type::common_type(&other_rc, in_member_ty)?;
-                out_members.insert(name.clone(), out_member_ty);
+                out_members.push((name.clone(), out_member_ty));
             }
 
             // Create a new struct with similar shape of the old struct
@@ -887,7 +887,19 @@ pub struct StructType {
 #[derive(Debug, Clone)]
 pub struct AnonStructType {
     /// The members
-    pub members: HashMap<String, Arc<Type>>,
+    pub members: Vec<(String, Arc<Type>)>,
+}
+
+impl AnonStructType {
+    pub fn get_member(&self, name: &str) -> Option<&Arc<Type>> {
+        self.members
+            .iter()
+            .find_map(|(k, v)| if k == name { Some(v) } else { None })
+    }
+
+    pub fn has_member(&self, name: &str) -> bool {
+        self.get_member(name).is_some()
+    }
 }
 
 #[cfg(test)]
@@ -1081,8 +1093,8 @@ mod tests {
             !anon_array(Arc::new(Type::Boolean), Some(3)).is_displayable(),
             "anonymous array must not be displayable"
         );
-        let mut members = HashMap::default();
-        members.insert("x".to_string(), Arc::new(Type::Boolean));
+        let mut members = Vec::default();
+        members.push(("x".to_string(), Arc::new(Type::Boolean)));
         assert!(
             !Type::AnonStruct(AnonStructType { members }).is_displayable(),
             "anonymous struct must not be displayable"

@@ -350,7 +350,7 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             let member_ty = self.ty(a, &member.type_name)?;
             ty.anon_struct
                 .members
-                .insert(member.name.data.clone(), member_ty.clone());
+                .push((member.name.data.clone(), member_ty.clone()));
 
             // Compute the size
             let size = self.expr_as_integer_opt(a, &member.size);
