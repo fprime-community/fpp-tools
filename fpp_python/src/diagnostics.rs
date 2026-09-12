@@ -69,12 +69,7 @@ impl fpp_core::DiagnosticEmitter for SharedEmitter {
         let children = diagnostic
             .children
             .iter()
-            .map(|c| {
-                (
-                    c.message.clone(),
-                    c.span.as_ref().map(|s| loc_of(s)),
-                )
-            })
+            .map(|c| (c.message.clone(), c.span.as_ref().map(|s| loc_of(s))))
             .collect();
         self.diags.lock().unwrap().push(OwnedDiagnostic {
             level: level_str(diagnostic.level),
