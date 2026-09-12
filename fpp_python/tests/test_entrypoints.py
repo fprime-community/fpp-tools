@@ -134,7 +134,7 @@ def test_parse_resolves_includes():
 def test_parse_reports_syntax_errors():
     st = f.parse(source="module M { constant = }")
     assert st.has_errors and st.error_count >= 1
-    assert st.diagnostics[0].level == "error"
+    assert st.diagnostics[0].level is f.DiagnosticLevel.Error
 
 
 def test_only_analyze_applies_the_state_enum_transform():

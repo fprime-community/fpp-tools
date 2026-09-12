@@ -1,6 +1,5 @@
-use crate::snippet::diagnostic_to_snippet_group;
+use crate::owned::{OwnedDiagnostic, renderer};
 use annotate_snippets::Renderer;
-use annotate_snippets::renderer::DecorStyle;
 use fpp_core::{DiagnosticData, DiagnosticEmitter};
 use std::io::Write;
 
@@ -12,7 +11,7 @@ pub struct WriteEmitter<W: Write> {
 impl<W: Write> WriteEmitter<W> {
     pub fn new(w: W) -> WriteEmitter<W> {
         WriteEmitter {
-            renderer: Renderer::plain().decor_style(DecorStyle::Ascii),
+            renderer: renderer(false),
             write: w,
         }
     }
@@ -20,8 +19,7 @@ impl<W: Write> WriteEmitter<W> {
 
 impl<W: Write> DiagnosticEmitter for WriteEmitter<W> {
     fn emit(&mut self, diagnostic: DiagnosticData) {
-        let group = diagnostic_to_snippet_group(&diagnostic);
-        let mut out = self.renderer.render(&[group]);
+        let mut out = OwnedDiagnostic::from(&diagnostic).render(&self.renderer);
         out.push('\n');
         out.push('\n');
         self.write

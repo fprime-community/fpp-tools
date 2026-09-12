@@ -28,7 +28,9 @@ module M {
 
 model.has_errors                             # False
 for d in model.diagnostics:
+    d.level                                  # fpp.DiagnosticLevel.Error
     print(d.display)                         # 'path:line:col: error: message'
+    print(d)                                 # the compiler's console rendering
 
 (unit,) = model.ast                          # one translation unit per input
 (module,) = unit.members
@@ -81,6 +83,24 @@ match arr.definition.resolved_type:
     case fpp.ArrayType() as a:
         elt = a.anon_array.elt_type
         isinstance(elt, fpp.PrimitiveIntType) and elt.value == fpp.IntegerKind.U32
+```
+
+Findings of your own report like compiler errors: build a `Diagnostic` against
+any node's `span`, add child annotations and notes, and `print` it.
+
+```python
+node = model.lookup("M.answer").definition
+print(fpp.Diagnostic(
+    fpp.DiagnosticLevel.Warning, "answer is unused",
+    span=node.span,
+    children=[fpp.DiagnosticMessage("delete it")],
+))
+#  --> mem.fpp:4:3
+#   |
+# 4 |   constant answer = 6 * 7
+#   |   ^^^^^^^^^^^^^^^^^^^^^^^ answer is unused
+#   |
+#   = note: delete it
 ```
 
 `fpp.pyi` is the reference for the rest — every class, getter and return type —

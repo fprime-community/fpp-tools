@@ -513,6 +513,7 @@ dependencies = [
  "fpp_analysis",
  "fpp_ast",
  "fpp_core",
+ "fpp_errors",
  "fpp_fs",
  "fpp_parser",
  "fpp_python_macros",

@@ -15,7 +15,7 @@ pub enum Level {
     Help,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum DiagnosticMessageKind {
     Primary,
     Note,

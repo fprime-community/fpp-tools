@@ -1,6 +1,5 @@
-use crate::snippet::diagnostic_to_snippet_group;
+use crate::owned::{OwnedDiagnostic, renderer};
 use annotate_snippets::Renderer;
-use annotate_snippets::renderer::DecorStyle;
 use fpp_core::{DiagnosticData, Level};
 
 pub struct ConsoleEmitter {
@@ -11,14 +10,14 @@ pub struct ConsoleEmitter {
 impl ConsoleEmitter {
     pub fn color() -> ConsoleEmitter {
         ConsoleEmitter {
-            renderer: Renderer::styled().decor_style(DecorStyle::Ascii),
+            renderer: renderer(true),
             seen_errors: false,
         }
     }
 
     pub fn plain() -> ConsoleEmitter {
         ConsoleEmitter {
-            renderer: Renderer::plain().decor_style(DecorStyle::Ascii),
+            renderer: renderer(false),
             seen_errors: false,
         }
     }
@@ -34,7 +33,9 @@ impl fpp_core::DiagnosticEmitter for &mut ConsoleEmitter {
             self.seen_errors = true;
         }
 
-        let group = diagnostic_to_snippet_group(&diagnostic);
-        anstream::println!("{}\n", self.renderer.render(&[group]));
+        anstream::println!(
+            "{}\n",
+            OwnedDiagnostic::from(&diagnostic).render(&self.renderer)
+        );
     }
 }

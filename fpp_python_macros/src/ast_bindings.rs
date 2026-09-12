@@ -1112,8 +1112,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
                 /// Get enum variant name as a string
                 #[getter]
                 fn name(&self) -> &'static str { self.member_name() }
-                /// The same string as `name`: a kind mirror carries no payload, so
-                /// its name is its value (as for `enum.StrEnum`).
+                /// The same string as `name` (`enum.StrEnum`).
                 #[getter]
                 fn value(&self) -> &'static str { self.member_name() }
             }
@@ -1149,23 +1148,13 @@ fn emit_py(reg: &Registry) -> TokenStream {
         impl AstNode {
             #[getter] fn node_id(&self) -> u32 { self.data.id(self.node) }
             #[getter] fn location(&self) -> Loc { self.data.loc(self.node) }
+            #[getter] fn span(&self) -> crate::ir_core::Span {
+                crate::ir_core::Span::new(self.data.clone(), self.data.span_of(self.node))
+            }
             /// Whether this node belongs to a unit the caller asked about, rather
-            /// than one passed to `analyze(imports=…)` to resolve references.
-            ///
-            /// Unit membership, not file membership: a member spliced in by
-            /// `include` is in-source if the unit that included it is, even though
-            /// its `location.uri` names a file that was never passed to `analyze`.
-            /// A node the state-enum transform spliced in likewise belongs to
-            /// whichever unit it was spliced into.
+            /// than one passed to `analyze(imports=...)` to resolve references.
             #[getter] fn in_source(&self) -> bool { self.data.in_source(self.node) }
             /// This node's direct child nodes, in source order.
-            ///
-            /// `kind` enums and union wrappers are transparent: the children are
-            /// the AST *nodes* reached through this node's fields (so an `Expr`'s
-            /// children are the sub-expressions inside its `kind`). The typed
-            /// field getters are the precise way to reach a specific child; this
-            /// is the type-agnostic one, and is what `NodeVisitor.generic_visit`
-            /// traverses.
             #[getter] fn children(&self, py: Python<'_>) -> PyResult<Vec<Py<AstNode>>> {
                 let kids: Vec<Node> = self.data.children(self.node).to_vec();
                 kids.into_iter().map(|c| Model::build(&self.model, py, c)).collect()

@@ -32,6 +32,10 @@ from fpp import (
     DefConstant,
     DefPort,
     DefTopology,
+    Diagnostic,
+    DiagnosticMessageKind,
+    DiagnosticLevel,
+    DiagnosticMessage,
     Endpoint,
     IntegerKind,
     Loc,
@@ -224,7 +228,7 @@ def syntax_only(paths: list[str]) -> int:
     tree: SyntaxTree = parse(paths)
     if tree.has_errors:
         for diag in tree.diagnostics:
-            print(diag.level, diag.message)
+            print(diag.level.value, diag.message)
         return tree.error_count
 
     total = 0
@@ -235,11 +239,46 @@ def syntax_only(paths: list[str]) -> int:
     return total
 
 
+def built_diagnostic(node: AstNode) -> str:
+    """A diagnostic built in Python renders like one the compiler emitted."""
+    span: Span = node.span
+    diagnostic: Diagnostic = Diagnostic(
+        DiagnosticLevel.Warning,
+        "built from Python",
+        span=span,
+        children=[
+            DiagnosticMessage(
+                "declared here", span=span, kind=DiagnosticMessageKind.Annotation
+            ),
+            DiagnosticMessage("a standalone note"),
+        ],
+    )
+    level: DiagnosticLevel = diagnostic.level
+    location: Optional[Loc] = diagnostic.location
+    includes: list[Loc] = diagnostic.includes
+    source: Optional[str] = diagnostic.source
+    children: list[DiagnosticMessage] = diagnostic.children
+    kinds: list[DiagnosticMessageKind] = [child.kind for child in children]
+    return "".join(
+        [
+            level.value,
+            diagnostic.message,
+            diagnostic.display,
+            diagnostic.render(color=False),
+            str(diagnostic),
+            "" if location is None else location.display,
+            "".join(loc.display for loc in includes),
+            source or "",
+            "".join(kind.name for kind in kinds),
+        ]
+    )
+
+
 def main() -> int:
     model: Model = analyze(source=SRC, uri="mem.fpp")
     if model.has_errors:
         for diag in model.diagnostics:
-            print(diag.level, diag.message)
+            print(diag.level.value, diag.message)
         return model.error_count
 
     node_id_sum = syntax_only([str(Path(__file__).parent / "commands" / "commands.fpp")])
@@ -260,7 +299,8 @@ def main() -> int:
     total += len(type_spelling(units[0].members[0]))
     total += 1 if first_port_symbol(model) is not None else 0
     for diag in model.diagnostics:
-        total += len(diag.display)
+        total += len(diag.display) + len(str(diag)) + len(diag.children)
+    total += len(built_diagnostic(units[0].members[0]))
     print(name, total)
     return 0
 

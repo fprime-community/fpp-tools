@@ -599,7 +599,84 @@ def test_diagnostic_display_is_one_indexed_and_location_is_zero_indexed():
     assert diagnostic.display == (
         "<string>:1:28: error: cannot find type `Nope` in scope"
     )
-    assert str(diagnostic) == diagnostic.display
+    assert repr(diagnostic) == f"<Diagnostic {diagnostic.display}>"
+
+
+def test_diagnostic_str_is_the_console_rendering():
+    # `str` is what the `fpp` binary prints: the annotated source excerpt, not
+    # the one-line `display`.
+    bad = f.analyze(source="module Bad { struct S { x: Nope } }")
+    assert str(bad.diagnostics[0]) == (
+        " --> <string>:1:28\n"
+        "  |\n"
+        "1 | module Bad { struct S { x: Nope } }\n"
+        "  |                            ^^^^ cannot find type `Nope` in scope"
+    )
+
+
+def test_diagnostic_exposes_its_source_excerpt_and_children():
+    bad = f.analyze(
+        source="module Bad {\n  constant a = 1\n  constant a = 2\n}\n"
+    )
+    (redefinition, *_) = [d for d in bad.diagnostics if d.children]
+    assert redefinition.source == "  constant a = 2\n"
+    assert redefinition.includes == []
+    (child, *_) = redefinition.children
+    # A child points at the first definition, with its own excerpt, and renders
+    # under the primary annotation.
+    assert child.kind in (f.DiagnosticMessageKind.Annotation, f.DiagnosticMessageKind.Note)
+    assert child.location.line == 1
+    assert child.source == "  constant a = 1\n"
+    assert child.message in str(redefinition)
+
+
+def test_a_diagnostic_can_be_built_from_python_against_a_model_span():
+    m = f.analyze(source="module M {\n  constant a = 1\n}\n")
+    node = m.lookup("M.a").definition
+    built = f.Diagnostic(
+        f.DiagnosticLevel.Warning,
+        "a is unused",
+        span=node.span,
+        children=[
+            f.DiagnosticMessage(
+                "declared here", span=node.span, kind=f.DiagnosticMessageKind.Annotation
+            ),
+            f.DiagnosticMessage("delete it"),
+        ],
+    )
+    assert built.level is f.DiagnosticLevel.Warning
+    assert built.level.value == "warning" and built.level.name == "Warning"
+    assert built.location.line == node.location.line
+    assert built.display == "<string>:2:3: warning: a is unused"
+    assert [c.kind for c in built.children] == [
+        f.DiagnosticMessageKind.Annotation,
+        f.DiagnosticMessageKind.Note,
+    ]
+    assert built.children[1].location is None
+    rendered = str(built)
+    assert "a is unused" in rendered
+    assert "declared here" in rendered
+    assert "= note: delete it" in rendered
+    # Same text with ANSI escapes when asked for color.
+    assert "\x1b[" in built.render(color=True)
+
+
+def test_a_diagnostic_needs_no_span():
+    bare = f.Diagnostic(f.DiagnosticLevel.Error, "nothing to point at")
+    assert bare.location is None and bare.source is None
+    assert str(bare) == "error: nothing to point at"
+    assert bare.display == "error: nothing to point at"
+
+
+def test_a_diagnostics_level_and_kind_are_enums_not_strings():
+    # The level is the `DiagnosticLevel` mirror, so a string is not a level.
+    with pytest.raises(TypeError):
+        f.Diagnostic("error", "a string is not a level")
+    with pytest.raises(TypeError):
+        f.DiagnosticMessage("a string is not a kind", kind="note")
+    bad = f.analyze(source="module Bad { struct S { x: Nope } }")
+    assert bad.diagnostics[0].level is f.DiagnosticLevel.Error
+    assert f.DiagnosticLevel.Error != f.DiagnosticLevel.Warning
 
 
 def test_loc_and_span_render_the_same_position_as_a_diagnostic():

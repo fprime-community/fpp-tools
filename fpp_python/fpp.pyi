@@ -56,6 +56,9 @@ __all__ = [
     "DefTopology",
     "DefaultFormatReplacementKind",
     "Diagnostic",
+    "DiagnosticLevel",
+    "DiagnosticMessage",
+    "DiagnosticMessageKind",
     "Direction",
     "DoExpr",
     "Endpoint",
@@ -443,28 +446,17 @@ class AstNode:
     @property
     def location(self) -> Loc: ...
     @property
+    def span(self) -> Span: ...
+    @property
     def in_source(self) -> builtins.bool:
         r"""
         Whether this node belongs to a unit the caller asked about, rather
-        than one passed to `analyze(imports=…)` to resolve references.
-        
-        Unit membership, not file membership: a member spliced in by
-        `include` is in-source if the unit that included it is, even though
-        its `location.uri` names a file that was never passed to `analyze`.
-        A node the state-enum transform spliced in likewise belongs to
-        whichever unit it was spliced into.
+        than one passed to `analyze(imports=...)` to resolve references.
         """
     @property
     def children(self) -> builtins.list[AstNode]:
         r"""
         This node's direct child nodes, in source order.
-        
-        `kind` enums and union wrappers are transparent: the children are
-        the AST *nodes* reached through this node's fields (so an `Expr`'s
-        children are the sub-expressions inside its `kind`). The typed
-        field getters are the precise way to reach a specific child; this
-        is the type-agnostic one, and is what `NodeVisitor.generic_visit`
-        traverses.
         """
     @property
     def pre_annotation(self) -> builtins.list[builtins.str]: ...
@@ -892,21 +884,101 @@ class DefaultFormatReplacementKind(FormatReplacementKindBase):
 @typing.final
 class Diagnostic:
     r"""
-    A diagnostic surfaced to Python.
+    A diagnostic: a level, a message, the source it points at, and any child
+    messages.
+    
+    Construct one to report a finding of your own against a model:
+    
+    ```python
+    fpp.Diagnostic(
+        fpp.DiagnosticLevel.Error, "component is missing a command port",
+        span=component.node.span,
+        children=[fpp.DiagnosticMessage("declared here", span=other.node.span)],
+    )
+    ```
+    
+    `str()` renders it the way the `fpp` compiler renders a diagnostic on the
+    console — source excerpt, carets, and all — while
+    `display` is the one-line form.
     """
     @property
-    def level(self) -> builtins.str: ...
+    def level(self) -> DiagnosticLevel:
+        r"""
+        This diagnostic's severity.
+        """
     @property
     def message(self) -> builtins.str: ...
     @property
-    def location(self) -> typing.Optional[Loc]: ...
+    def location(self) -> typing.Optional[Loc]:
+        r"""
+        Where this diagnostic points, or `None` if it has no location.
+        """
+    @property
+    def includes(self) -> builtins.list[Loc]:
+        r"""
+        The `include` chain that spliced `location`'s file in, nearest first;
+        empty when the file was compiled directly.
+        """
+    @property
+    def source(self) -> typing.Optional[builtins.str]:
+        r"""
+        The source line(s) this diagnostic points at, as they appear in the file.
+        """
+    @property
+    def children(self) -> builtins.list[DiagnosticMessage]:
+        r"""
+        The child messages, in the order they were added.
+        """
     @property
     def display(self) -> builtins.str:
         r"""
         This diagnostic as a one-line compiler message:
         `"path/to/file.fpp:12:5: error: cannot find type `Nope` in scope"`, or
         `"error: <message>"` when there is no location.
+        
+        The children are not part of it — see `render` for the full rendering.
         """
+    def __new__(cls, level: DiagnosticLevel, message: builtins.str, *, span: typing.Optional[Span] = None, children: typing.Sequence[DiagnosticMessage] = []) -> Diagnostic: ...
+    def render(self, *, color: builtins.bool = False) -> builtins.str:
+        r"""
+        This diagnostic as the compiler renders it on the console: the message,
+        the annotated source excerpt, and every child message.
+        
+        With `color`, the result carries ANSI escapes
+        """
+    def __str__(self) -> builtins.str: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class DiagnosticMessage:
+    r"""
+    One child message of a `Diagnostic`: a second span worth pointing at, or a
+    standalone remark under the primary one.
+    """
+    @property
+    def kind(self) -> DiagnosticMessageKind:
+        r"""
+        Whether this is an annotation or a note.
+        """
+    @property
+    def message(self) -> builtins.str: ...
+    @property
+    def location(self) -> typing.Optional[Loc]:
+        r"""
+        Where this message points, or `None` if it has no location.
+        """
+    @property
+    def includes(self) -> builtins.list[Loc]:
+        r"""
+        The `include` chain that spliced `location`'s file in, nearest first;
+        empty when the file was compiled directly.
+        """
+    @property
+    def source(self) -> typing.Optional[builtins.str]:
+        r"""
+        The source line(s) this message points at, as they appear in the file.
+        """
+    def __new__(cls, message: builtins.str, *, span: typing.Optional[Span] = None, kind: typing.Optional[DiagnosticMessageKind] = None) -> DiagnosticMessage: ...
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -2851,8 +2923,7 @@ class Binop:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -2872,8 +2943,7 @@ class ComponentKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -2897,8 +2967,50 @@ class ConnectionPatternKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
+        """
+
+@typing.final
+class DiagnosticLevel:
+    r"""
+    A diagnostic's severity
+    """
+    Error: typing.ClassVar[DiagnosticLevel]
+    Warning: typing.ClassVar[DiagnosticLevel]
+    Note: typing.ClassVar[DiagnosticLevel]
+    Help: typing.ClassVar[DiagnosticLevel]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The compiler's spelling of this level: `"error"`, `"warning"`, `"note"`
+        or `"help"`.
+        """
+
+@typing.final
+class DiagnosticMessageKind:
+    r"""
+    What a `DiagnosticMessageKind` is: a further annotation at its diagnostic's own
+    level (the compiler's `span_annotation`/`annotation`), or a note
+    (`span_note`/`note`).
+    """
+    Annotation: typing.ClassVar[DiagnosticMessageKind]
+    Note: typing.ClassVar[DiagnosticMessageKind]
+
+    @property
+    def name(self) -> builtins.str:
+        r"""
+        Get enum variant name as a string
+        """
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -2917,8 +3029,7 @@ class Direction:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -2942,8 +3053,7 @@ class EventSeverity:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -2962,8 +3072,7 @@ class FloatKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -2982,8 +3091,7 @@ class FormalParamKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3002,8 +3110,7 @@ class GeneralPortInstanceKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3023,8 +3130,7 @@ class InputPortKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3045,8 +3151,7 @@ class IntegerFormatKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3071,8 +3176,7 @@ class IntegerKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3091,8 +3195,7 @@ class Kind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3111,8 +3214,7 @@ class ParamKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3133,8 +3235,7 @@ class QueueFull:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3154,8 +3255,7 @@ class RationalFormatKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3180,8 +3280,7 @@ class SpecLocKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3211,8 +3310,7 @@ class SpecialPortInstanceKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3232,8 +3330,7 @@ class TlmChannelLimitKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3252,8 +3349,7 @@ class TlmChannelUpdate:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3271,8 +3367,7 @@ class Unop:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 def analyze(paths: typing.Optional[builtins.str | builtins.list[builtins.str]] = None, *, source: typing.Optional[builtins.str] = None, uri: builtins.str = '<string>', imports: typing.Optional[builtins.str | builtins.list[builtins.str]] = None) -> Model:
