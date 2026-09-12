@@ -35,7 +35,7 @@ mod pipeline;
 mod sem;
 mod visitor;
 
-use diagnostics::{Diagnostic, DiagnosticMessageKind, DiagnosticLevel, DiagnosticMessage};
+use diagnostics::{Diagnostic, DiagnosticLevel, DiagnosticMessage, DiagnosticMessageKind};
 use model::{Model, SyntaxTree, TransUnit};
 
 #[pymodule]

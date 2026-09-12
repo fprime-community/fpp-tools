@@ -45,7 +45,7 @@ impl From<&DiagnosticData> for OwnedDiagnostic {
                 .children
                 .iter()
                 .map(|child| OwnedDiagnosticMessage {
-                    kind: child.kind.clone(),
+                    kind: child.kind,
                     message: child.message.clone(),
                     snippet: child.span.as_ref().map(|span| span.snippet()),
                 })
