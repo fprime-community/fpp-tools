@@ -120,9 +120,7 @@ pub(crate) fn same_model(recv: &Arc<ModelData>, arg: &Arc<ModelData>) -> PyResul
 impl Span {
     /// Resolve this span to a concrete source [`Loc`] (enters the compiler context).
     fn resolve(&self) -> Loc {
-        self.data
-            .loc_of_span(self.span)
-            .expect("a recorded span resolves to a location")
+        self.data.loc_of_span(self.span)
     }
 
     /// The source file URI/path.
@@ -309,17 +307,13 @@ impl ModelData {
     }
 
     /// The resolved location of `node` (resolved lazily against the live ctx).
-    pub fn loc(&self, node: Node) -> Option<Loc> {
-        Some(fpp_core::run_ref(&self.ctx, || {
-            crate::lower_core::loc_of_span(&node.span())
-        }))
+    pub fn loc(&self, node: Node) -> Loc {
+        fpp_core::run_ref(&self.ctx, || crate::lower_core::loc_of_span(&node.span()))
     }
 
     /// The resolved location of a `Span` (resolved lazily against the live ctx).
-    pub fn loc_of_span(&self, span: fpp_core::Span) -> Option<Loc> {
-        Some(fpp_core::run_ref(&self.ctx, || {
-            crate::lower_core::loc_of_span(&span)
-        }))
+    pub fn loc_of_span(&self, span: fpp_core::Span) -> Loc {
+        fpp_core::run_ref(&self.ctx, || crate::lower_core::loc_of_span(&span))
     }
 
     /// The definition symbol that use-site `node` resolves to, if the reference

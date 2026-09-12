@@ -2083,7 +2083,7 @@ fn emit_union_methods(u: &UnionDecl, reg: &Registry) -> Vec<TokenStream> {
         out.push(quote! {
             /// The source location of this element's definition.
             #[getter]
-            fn loc(&self) -> ::std::option::Option<crate::ir_core::Loc> {
+            fn loc(&self) -> crate::ir_core::Loc {
                 self.data.loc(self.#accessor.node())
             }
         });
