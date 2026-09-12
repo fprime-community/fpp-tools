@@ -88,6 +88,13 @@ impl Span {
         self.span
     }
 
+    /// The annotated source excerpt for this span, for a Python-built
+    /// [`Diagnostic`](crate::diagnostics::Diagnostic). Reads the retained context
+    /// directly rather than through `run_ref`, since it has it in hand.
+    pub(crate) fn snippet(&self) -> fpp_core::DiagnosticDataSnippet {
+        self.data.ctx.span_get(&self.span).snippet()
+    }
+
     /// The backing model, for the generated [`same_model`] argument guard. `Span`
     /// keeps `data` private (unlike the wrappers, which expose it `pub(crate)`), so
     /// the guard reaches it through here.
@@ -309,6 +316,11 @@ impl ModelData {
     /// The resolved location of `node` (resolved lazily against the live ctx).
     pub fn loc(&self, node: Node) -> Loc {
         fpp_core::run_ref(&self.ctx, || crate::lower_core::loc_of_span(&node.span()))
+    }
+
+    /// The span of `node` (a handle read out of the live ctx).
+    pub fn span_of(&self, node: Node) -> fpp_core::Span {
+        fpp_core::run_ref(&self.ctx, || node.span())
     }
 
     /// The resolved location of a `Span` (resolved lazily against the live ctx).

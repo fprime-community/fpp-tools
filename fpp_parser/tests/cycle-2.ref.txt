@@ -1,8 +1,10 @@
  --> [ local path prefix ]/cycle-1.fpp:1:1
   |
 1 | include "cycle-2.fpp"
-  | ^^^^^^^^^^^^^^^^^^^^^ included from [ local path prefix ]/cycle-2.fpp:1:1
+  | ^^^^^^^^^^^^^^^^^^^^^ include cycle detected
   |
+  = note: included from [ local path prefix ]/cycle-3.fpp:1:1
+  = note: included from [ local path prefix ]/cycle-2.fpp:1:1
   = note: included from [ local path prefix ]/cycle-1.fpp:1:1
   = note: included from [ local path prefix ]/cycle-3.fpp:1:1
   = note: included from [ local path prefix ]/cycle-2.fpp:1:1

@@ -20,7 +20,7 @@ def test_analyze_reports_errors():
     m = f.analyze(source="module M { constant x = nope }")
     assert m.has_errors and len(m.diagnostics) >= 1
     d = m.diagnostics[0]
-    assert d.level == "error" and d.location is not None
+    assert d.level is f.DiagnosticLevel.Error and d.location is not None
 
 
 def test_node_identity_is_memoized():

@@ -164,14 +164,14 @@ pub struct NodeData {
     pub post_annotation: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DiagnosticDataIncludeLocation {
     pub line: u32,
     pub column: u32,
     pub uri: String,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DiagnosticDataSnippet {
     pub start: BytePos,
     pub end: BytePos,

@@ -1,24 +1,27 @@
  --> [ local path prefix ]/parse-error.fpp:5:1
   |
 5 | + c
-  | ^ included from [ local path prefix ]/include-parse-error.fpp:1:1
+  | ^ syntax error: module member expected
   |
+  = note: included from [ local path prefix ]/include-parse-error.fpp:1:1
   = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate
   = note: got +
 
  --> [ local path prefix ]/parse-error.fpp:7:1
   |
 7 | + c
-  | ^ included from [ local path prefix ]/include-parse-error.fpp:1:1
+  | ^ syntax error: module member expected
   |
+  = note: included from [ local path prefix ]/include-parse-error.fpp:1:1
   = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate
   = note: got +
 
   --> [ local path prefix ]/parse-error.fpp:14:11
    |
 14 |     async input i: d -> d
-   |           ^^^^^ included from [ local path prefix ]/include-parse-error.fpp:1:1
+   |           ^^^^^ syntax error: unexpected token
    |
+   = note: included from [ local path prefix ]/include-parse-error.fpp:1:1
    = note: expected port
    = note: got identifier
 
@@ -27,8 +30,9 @@
 18 |       ) severity warning low format "hello" throttle 1
    |  _____________________________________________________^
 19 | |
-   | |_^ included from [ local path prefix ]/include-parse-error.fpp:1:1
+   | |_^ syntax error: unexpected token
    |
+   = note: included from [ local path prefix ]/include-parse-error.fpp:1:1
    = note: expected }
    = note: got eof
 

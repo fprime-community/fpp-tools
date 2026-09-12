@@ -44,6 +44,7 @@ fpp_ast = { path = "../fpp_ast", version = "=0.0.0" }
 fpp_analysis = { path = "../fpp_analysis", version = "=0.0.0" }
 fpp_parser = { path = "../fpp_parser", version = "=0.0.0" }
 fpp_fs = { path = "../fpp_fs", version = "=0.0.0" }
+fpp_errors = { path = "../fpp_errors", version = "=0.0.0" }
 
 rustc-hash = "2"
 

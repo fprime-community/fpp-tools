@@ -35,7 +35,7 @@ mod pipeline;
 mod sem;
 mod visitor;
 
-use diagnostics::Diagnostic;
+use diagnostics::{Diagnostic, DiagnosticMessageKind, DiagnosticLevel, DiagnosticMessage};
 use model::{Model, SyntaxTree, TransUnit};
 
 #[pymodule]
@@ -45,6 +45,9 @@ fn fpp(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SyntaxTree>()?;
     m.add_class::<TransUnit>()?;
     m.add_class::<Diagnostic>()?;
+    m.add_class::<DiagnosticMessage>()?;
+    m.add_class::<DiagnosticLevel>()?;
+    m.add_class::<DiagnosticMessageKind>()?;
     m.add_class::<ir_core::Loc>()?;
     m.add_class::<ir_core::Span>()?;
     m.add_class::<visitor::NodeVisitor>()?;

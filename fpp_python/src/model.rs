@@ -79,7 +79,10 @@ pub struct Model {
 
 impl Model {
     pub fn new(data: ModelData, diagnostics: Vec<OwnedDiagnostic>) -> Self {
-        let error_count = diagnostics.iter().filter(|d| d.is_error()).count();
+        let error_count = diagnostics
+            .iter()
+            .filter(|d| crate::diagnostics::is_error(d))
+            .count();
         Model {
             data: Arc::new(data),
             memo: Mutex::new(FxHashMap::default()),
