@@ -1093,10 +1093,11 @@ mod tests {
             !anon_array(Arc::new(Type::Boolean), Some(3)).is_displayable(),
             "anonymous array must not be displayable"
         );
-        let mut members = Vec::default();
-        members.push(("x".to_string(), Arc::new(Type::Boolean)));
         assert!(
-            !Type::AnonStruct(AnonStructType { members }).is_displayable(),
+            !Type::AnonStruct(AnonStructType {
+                members: vec![("x".to_string(), Arc::new(Type::Boolean))]
+            })
+            .is_displayable(),
             "anonymous struct must not be displayable"
         );
     }
