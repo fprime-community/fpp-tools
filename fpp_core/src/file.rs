@@ -4,6 +4,64 @@ use crate::interface::with;
 use crate::{Error, Span};
 use std::cell::Ref;
 use std::fmt::{Debug, Display, Formatter};
+use std::path::{Path, PathBuf};
+
+/// A file used in compilation
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum File {
+    /// A file path
+    Path(PathBuf),
+    /// Standard input
+    StdIn,
+}
+
+impl Display for File {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            File::Path(p) => f.write_str(&normalize(p).to_string_lossy()),
+            File::StdIn => f.write_str("stdin"),
+        }
+    }
+}
+
+impl File {
+    /// Get the absolute, normalized path associated with a string
+    pub fn get_path(s: &str) -> PathBuf {
+        let path = Path::new(s);
+        let absolute = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            match std::env::current_dir() {
+                Ok(cwd) => cwd.join(path),
+                Err(_) => path.to_path_buf(),
+            }
+        };
+        normalize(&absolute)
+    }
+
+    /// Construct a file from a string representing a file path
+    pub fn from_string(s: &str) -> File {
+        File::Path(File::get_path(s))
+    }
+}
+
+/// Collapse `.` and `..` components in a path, without touching the file system
+fn normalize(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !out.pop() {
+                    out.push(Component::ParentDir);
+                }
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
 
 pub trait FileReader {
     /// Resolve an include path relative to the parent source file

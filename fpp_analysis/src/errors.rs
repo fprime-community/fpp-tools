@@ -41,6 +41,8 @@ pub enum SemanticError {
     InvalidType {
         loc: Span,
         msg: String,
+        /// The chain of locations explaining why the type is invalid
+        notes: Vec<(Span, String)>,
     },
     /// Invalid qualifier
     InvalidQualifier {
@@ -546,7 +548,11 @@ impl From<SemanticError> for Diagnostic {
                         .span_note(suse.def_loc, "defined here"),
                 },
             ),
-            SemanticError::InvalidType { loc, msg } => Diagnostic::new(loc, Level::Error, msg),
+            SemanticError::InvalidType { loc, msg, notes } => notes
+                .into_iter()
+                .fold(Diagnostic::new(loc, Level::Error, msg), |diag, (loc, note)| {
+                    diag.span_note(loc, note)
+                }),
             SemanticError::InvalidQualifier {
                 loc,
                 msg,

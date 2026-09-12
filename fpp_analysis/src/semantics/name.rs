@@ -2,18 +2,47 @@ use std::collections::VecDeque;
 use std::fmt::{Debug, Display, Formatter, Write};
 
 /// A qualified or unqualified name
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct QualifiedName {
     qualifier: VecDeque<String>,
     base: String,
 }
 
 impl QualifiedName {
+    /// The qualifier of the name
+    pub fn qualifier(&self) -> &VecDeque<String> {
+        &self.qualifier
+    }
+
+    /// The base of the name
+    pub fn base(&self) -> &str {
+        &self.base
+    }
+
     /// Convert a qualified name to an identifier list
     pub fn to_ident_list(&self) -> VecDeque<String> {
         let mut out = self.qualifier.clone();
         out.push_back(self.base.clone());
         out
+    }
+
+    /// Computes a short qualified name. Deletes the longest prefix provided by
+    /// the enclosing scope.
+    pub fn short_name(&self, enclosing_names: &[String]) -> QualifiedName {
+        let ident_list = self.to_ident_list();
+        let mut skip = 0;
+        // Never delete the base of the name
+        while skip < enclosing_names.len()
+            && skip + 1 < ident_list.len()
+            && enclosing_names[skip] == ident_list[skip]
+        {
+            skip += 1;
+        }
+        ident_list
+            .into_iter()
+            .skip(skip)
+            .collect::<VecDeque<String>>()
+            .into()
     }
 }
 

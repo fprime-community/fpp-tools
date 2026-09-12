@@ -1,4 +1,4 @@
-use crate::semantics::Topology;
+use crate::semantics::{Dictionary, Topology};
 use fpp_ast::DefSystem;
 use fpp_core::{Span, Spanned};
 use std::sync::Arc;
@@ -12,6 +12,8 @@ pub struct FppSystem {
     pub node: Arc<DefSystem>,
     /// The deployment topology named by the system.
     pub topology: Topology,
+    /// The dictionary of the deployment topology.
+    pub dictionary: Dictionary,
 }
 
 impl FppSystem {

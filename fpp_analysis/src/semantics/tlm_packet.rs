@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::errors::SemanticResult;
-use crate::semantics::{Topology, tlm_packet_set};
+use crate::semantics::{Dictionary, TlmChannelIdentifier, Topology};
 use fpp_ast::{SpecTlmPacket, TlmPacketMember};
 use fpp_core::{Span, Spanned};
 use rustc_hash::FxHashMap as HashMap;
@@ -33,8 +33,9 @@ impl TlmPacket {
     }
 
     /// Creates a telemetry packet from a telemetry packet specifier
-    pub fn from_spec(
+    pub fn from_spec_tlm_packet(
         a: &Analysis,
+        d: &Dictionary,
         t: &Topology,
         node: &SpecTlmPacket,
     ) -> SemanticResult<TlmPacket> {
@@ -50,7 +51,7 @@ impl TlmPacket {
         let mut member_id_list = Vec::new();
         let mut member_location_map = HashMap::default();
         for member in members {
-            let Some(id) = tlm_packet_set::get_numeric_id_for_node(a, t, member)? else {
+            let Some(id) = TlmChannelIdentifier::get_numeric_id_for_node(a, d, t, member)? else {
                 continue;
             };
             member_id_list.push(id);

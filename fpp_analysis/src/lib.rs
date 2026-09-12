@@ -1,11 +1,13 @@
 mod analysis;
 mod errors;
+pub mod used_symbols;
+pub use used_symbols::UsedSymbols;
 
 use crate::passes::{
     BuildSpecLocMap, CheckComponentDefs, CheckComponentInstanceDefs, CheckDictionaryDefs,
     CheckExprTypes, CheckFrameworkConstantValues, CheckFrameworkDefs, CheckInterfaceDefs,
-    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs, CheckTlmPacketSets,
-    CheckTopologyDefs, CheckTopologyInstances, CheckTypeUses, CheckUseDefCycles, CheckUses,
+    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs, CheckTopologyDefs,
+    CheckTopologyInstances, CheckTypeUses, CheckUseDefCycles, CheckUses, ConstructDictionaryMap,
     ConstructImpliedUseMap, EnterSymbols, EvalConstantExprs, EvalImpliedEnumConsts,
     FinalizeTypeDefs,
 };
@@ -90,8 +92,8 @@ pub mod passes {
     mod check_topology_defs;
     pub use check_topology_defs::*;
 
-    mod check_tlm_packet_sets;
-    pub use check_tlm_packet_sets::*;
+    mod construct_dictionary_map;
+    pub use construct_dictionary_map::*;
 
     pub(crate) mod check_spec_locs;
     pub use check_spec_locs::*;
@@ -101,6 +103,9 @@ pub mod passes {
 
     mod check_system_defs;
     pub use check_system_defs::*;
+
+    pub mod compute_dependencies;
+    pub use compute_dependencies::*;
 }
 
 pub mod transform {
@@ -146,6 +151,12 @@ pub mod semantics {
     pub mod tlm_packet_set;
     pub use tlm_packet_set::*;
 
+    mod dictionary;
+    pub use dictionary::*;
+
+    pub mod construct_dictionary;
+    pub use construct_dictionary::*;
+
     pub mod resolve_topology;
     pub use resolve_topology::*;
 
@@ -173,9 +184,6 @@ pub mod semantics {
     pub mod state_machine;
     pub use state_machine::*;
 
-    pub mod spec_loc;
-    pub use spec_loc::*;
-
     pub mod interned_def;
     pub use interned_def::*;
 
@@ -198,18 +206,17 @@ pub fn resolve_includes<Reader: FileReader>(
     reader: Reader,
     ast: &mut fpp_ast::TransUnit,
 ) -> ControlFlow<()> {
-    fpp_parser::ResolveIncludes::new(reader).visit_trans_unit(&mut a.include_context_map, ast)
+    let result =
+        fpp_parser::ResolveIncludes::new(reader).visit_trans_unit(&mut a.include_context_map, ast);
+    a.included_file_set = a
+        .include_context_map
+        .keys()
+        .map(|f| fpp_core::File::from_string(&f.uri()))
+        .collect();
+    result
 }
 
 /// Check the semantics of a list of translation units.
-///
-/// The passes run in the order below. A few passes are intentionally absent
-/// (see docs/analysis-work-to-go.md):
-///   - template resolution and template interface-arg checking: not
-///     implemented.
-///   - constant-expr finalization: folded into `CheckExprTypes` /
-///     `EvalConstantExprs`.
-///   - dictionary-map construction: codegen-support only, deferred.
 pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> ControlFlow<()> {
     EnterSymbols.visit_trans_units(a, ast.iter().cloned())?;
     ConstructImpliedUseMap.visit_trans_units(a, ast.iter().cloned())?;
@@ -233,7 +240,7 @@ pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> Contr
     BuildSpecLocMap.visit_trans_units(a, ast.iter().cloned())?;
     CheckSpecLocs.visit_trans_units(a, ast.iter().cloned())?;
     CheckDictionaryDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckTlmPacketSets::check(a);
+    ConstructDictionaryMap::construct(a);
     CheckSystemDefs.visit_trans_units(a, ast.iter().cloned())?;
 
     ControlFlow::Continue(())

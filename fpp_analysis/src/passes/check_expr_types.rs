@@ -74,6 +74,7 @@ impl<'ast> CheckExprTypes<'ast> {
                 SemanticError::InvalidType {
                     loc: expr.span(),
                     msg: format!("{} is not an integer or enum type", ty),
+                    notes: vec![],
                 }
                 .emit();
             }
@@ -235,6 +236,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                                         next_type.as_ref(),
                                         common.as_ref()
                                     ),
+                                    notes: vec![],
                                 }),
                                 Some(new_ty) => Ok(new_ty),
                             }
@@ -280,6 +282,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                         SemanticError::InvalidType {
                             loc: e1.span(),
                             msg: format!("{} is not an array type", ty),
+                            notes: vec![],
                         }
                         .emit();
                         return ControlFlow::Break(());
@@ -311,6 +314,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                                         "invalid binary operation between {} and {}",
                                         lty, rty
                                     ),
+                                    notes: vec![],
                                 }
                                 .emit();
                                 return ControlFlow::Break(());
@@ -336,6 +340,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                                         "cannot convert {} to a numeric or string type",
                                         ty
                                     ),
+                                    notes: vec![],
                                 }
                                 .emit();
                             }
@@ -350,6 +355,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                                 SemanticError::InvalidType {
                                     loc: node.span(),
                                     msg: format!("cannot convert {} to a numeric type", ty),
+                                    notes: vec![],
                                 }
                                 .emit();
                             }
@@ -364,6 +370,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                     SemanticError::InvalidType {
                         loc: node.span(),
                         msg: format!("size of type {} is not known in the model", ty),
+                        notes: vec![],
                     }
                     .emit();
                 }
@@ -389,6 +396,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                             SemanticError::InvalidType {
                                 loc: id.span(),
                                 msg: format!("{} has no member `{}`", e_ty, id.data),
+                                notes: vec![],
                             }
                             .emit();
                             return ControlFlow::Break(());
@@ -401,6 +409,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                         SemanticError::InvalidType {
                             loc: e.span(),
                             msg: format!("{} does not have members", e_ty),
+                            notes: vec![],
                         }
                         .emit();
                         return ControlFlow::Break(());

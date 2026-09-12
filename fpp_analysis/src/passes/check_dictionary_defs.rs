@@ -37,6 +37,7 @@ impl CheckDictionaryDefs {
                 loc: node.span(),
                 msg: "dictionary constant must have a numeric, Boolean, string, or enum type"
                     .to_string(),
+                notes: vec![],
             }
             .emit();
         }

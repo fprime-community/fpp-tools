@@ -2,4 +2,9 @@
    |
 19 |   product record R: A id 0x100
    |                     ^ type of record is not displayable
+   |
+  ::: [ local path prefix ]/record/not_displayable.fpp:17:3
+   |
+17 |   type A
+   |   ------ type is defined here
 

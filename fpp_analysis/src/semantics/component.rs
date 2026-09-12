@@ -13,11 +13,6 @@ use fpp_core::{Node, Span, Spanned};
 use rustc_hash::FxHashMap as HashMap;
 use std::sync::Arc;
 
-/// Display an id value as `(<dec> dec, <HEX> hex)`.
-pub fn display_id_value(v: i128) -> String {
-    format!("({} dec, {:X} hex)", v, v)
-}
-
 /// An FPP command.
 #[derive(Debug, Clone)]
 pub enum Command {
@@ -743,7 +738,7 @@ impl Component {
         let opcode = opcode_opt.unwrap_or(self.default_opcode);
         if let Some(prev) = self.command_map.get(&opcode) {
             return Err(SemanticError::DuplicateOpcodeValue {
-                value: display_id_value(opcode),
+                value: Analysis::display_id_value(opcode),
                 loc: command.get_loc(),
                 prev_loc: prev.get_loc(),
             });
@@ -769,7 +764,7 @@ impl Component {
 
     /// Add a data product container
     pub fn add_container(&mut self, id_opt: Option<i128>, container: Container) -> SemanticResult {
-        let next = add_element_to_id_map(
+        let next = Analysis::add_element_to_id_map(
             &mut self.container_map,
             id_opt.unwrap_or(self.default_container_id),
             container,
@@ -781,7 +776,7 @@ impl Component {
 
     /// Add an event
     pub fn add_event(&mut self, id_opt: Option<i128>, event: Event) -> SemanticResult {
-        let next = add_element_to_id_map(
+        let next = Analysis::add_element_to_id_map(
             &mut self.event_map,
             id_opt.unwrap_or(self.default_event_id),
             event,
@@ -793,7 +788,7 @@ impl Component {
 
     /// Add a data product record
     pub fn add_record(&mut self, id_opt: Option<i128>, record: Record) -> SemanticResult {
-        let next = add_element_to_id_map(
+        let next = Analysis::add_element_to_id_map(
             &mut self.record_map,
             id_opt.unwrap_or(self.default_record_id),
             record,
@@ -806,7 +801,7 @@ impl Component {
     /// Add a telemetry channel
     pub fn add_tlm_channel(&mut self, id_opt: Option<i128>, channel: TlmChannel) -> SemanticResult {
         let name = channel.get_name().to_string();
-        let next = add_element_to_id_map(
+        let next = Analysis::add_element_to_id_map(
             &mut self.tlm_channel_map,
             id_opt.unwrap_or(self.default_tlm_channel_id),
             channel.clone(),
@@ -834,7 +829,7 @@ impl Component {
             kind: ParamKind::Save,
         };
         // Update the parameter map and the default parameter ID.
-        let next = add_element_to_id_map(
+        let next = Analysis::add_element_to_id_map(
             &mut self.param_map,
             id_opt.unwrap_or(self.default_param_id),
             param,
@@ -891,37 +886,37 @@ impl Component {
 
     /// Checks that there are no duplicate names in dictionaries
     fn check_no_duplicate_names(&self) -> SemanticResult {
-        check_dictionary_names(
+        Analysis::check_dictionary_names(
             &self.param_map,
             "parameter",
             |p| p.get_name().to_string(),
             Param::get_loc,
         )?;
-        check_dictionary_names(
+        Analysis::check_dictionary_names(
             &self.command_map,
             "command",
             Command::get_name,
             Command::get_loc,
         )?;
-        check_dictionary_names(
+        Analysis::check_dictionary_names(
             &self.event_map,
             "event",
             |e| e.get_name().to_string(),
             Event::get_loc,
         )?;
-        check_dictionary_names(
+        Analysis::check_dictionary_names(
             &self.tlm_channel_map,
             "telemetry channel",
             |t| t.get_name().to_string(),
             TlmChannel::get_loc,
         )?;
-        check_dictionary_names(
+        Analysis::check_dictionary_names(
             &self.container_map,
             "container",
             |c| c.get_name().to_string(),
             Container::get_loc,
         )?;
-        check_dictionary_names(
+        Analysis::check_dictionary_names(
             &self.record_map,
             "record",
             |r| r.get_name().to_string(),
@@ -1117,51 +1112,6 @@ impl Component {
             instance2,
         })
     }
-}
-
-/// Add an element to an id map, returning the updated map and the next default id
-pub(crate) fn add_element_to_id_map<T>(
-    map: &mut HashMap<i128, T>,
-    id: i128,
-    element: T,
-    get_loc: impl Fn(&T) -> Span,
-) -> SemanticResult<i128> {
-    if let Some(prev) = map.get(&id) {
-        return Err(SemanticError::DuplicateIdValue {
-            value: display_id_value(id),
-            loc: get_loc(&element),
-            prev_loc: get_loc(prev),
-        });
-    }
-    map.insert(id, element);
-    Ok(id + 1)
-}
-
-/// Checks for duplicate names in dictionary.
-pub(crate) fn check_dictionary_names<T>(
-    map: &HashMap<i128, T>,
-    kind: &str,
-    get_name: impl Fn(&T) -> String,
-    get_loc: impl Fn(&T) -> Span,
-) -> SemanticResult {
-    // Iterate in id order for deterministic diagnostics.
-    let mut ids: Vec<&i128> = map.keys().collect();
-    ids.sort();
-    let mut seen: HashMap<String, Span> = HashMap::default();
-    for id in ids {
-        let value = &map[id];
-        let name = get_name(value);
-        let loc = get_loc(value);
-        if let Some(prev_loc) = seen.insert(name.clone(), loc) {
-            return Err(SemanticError::DuplicateDictionaryName {
-                kind: kind.to_string(),
-                name,
-                loc,
-                prev_loc,
-            });
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

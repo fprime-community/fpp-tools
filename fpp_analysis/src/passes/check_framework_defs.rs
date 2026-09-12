@@ -84,6 +84,7 @@ impl CheckFrameworkDefs {
                             "the F Prime framework type {} must be an alias of an integer type",
                             name
                         ),
+                        notes: vec![],
                     }
                     .emit();
                 }
@@ -98,6 +99,7 @@ impl CheckFrameworkDefs {
                             "the F Prime framework type {} must be an alias of a signed integer type",
                             name
                         ),
+                        notes: vec![],
                     }
                     .emit();
                 }
@@ -112,6 +114,7 @@ impl CheckFrameworkDefs {
                             "the F Prime framework type {} must be an alias of an unsigned integer type",
                             name
                         ),
+                        notes: vec![],
                     }
                     .emit();
                 }
@@ -123,6 +126,7 @@ impl CheckFrameworkDefs {
                     SemanticError::InvalidType {
                         loc,
                         msg: format!("the F Prime framework type {} must be an enum", name),
+                        notes: vec![],
                     }
                     .emit();
                 }
@@ -267,6 +271,7 @@ impl<'ast> Visitor<'ast> for CheckFrameworkDefs {
                                 "the F Prime framework constant {} must have an integer type",
                                 name
                             ),
+                            notes: vec![],
                         }
                         .emit();
                     }

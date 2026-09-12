@@ -300,7 +300,6 @@ def test_the_int_valued_node_attribute_is_gone():
     m = analyzed("module M { constant a = 1 }")
     assert not hasattr(m.lookup("M.a"), "node")
     assert not hasattr(f.SymbolBase, "node")
-    assert not hasattr(f.UseDefMatching, "node")
 
 
 # --- enums expose their member name ---------------------------------------

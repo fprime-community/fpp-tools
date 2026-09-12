@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::errors::SemanticResult;
-use crate::semantics::{ComponentInstance, TlmChannel};
+use crate::semantics::{ComponentInstance, Dictionary, TlmChannel, Topology};
 use fpp_ast::{self as ast, AstNode};
 use fpp_core::{Span, Spanned};
 use std::sync::Arc;
@@ -44,6 +44,20 @@ impl TlmChannelIdentifier {
             self.component_instance.get_unqualified_name(),
             self.tlm_channel.get_name()
         )
+    }
+
+    /// Gets a numeric channel identifier from an AST node. Returns `None` if
+    /// the component instance is unresolved (already reported by CheckUses).
+    pub fn get_numeric_id_for_node(
+        a: &Analysis,
+        d: &Dictionary,
+        t: &Topology,
+        node: &ast::TlmChannelIdentifier,
+    ) -> SemanticResult<Option<i128>> {
+        let Some(channel_id) = TlmChannelIdentifier::from_node(a, node)? else {
+            return Ok(None);
+        };
+        d.find_numeric_id_for_channel(t, &channel_id).map(Some)
     }
 
     /// Creates a telemetry channel identifier from an AST node. Returns `None`

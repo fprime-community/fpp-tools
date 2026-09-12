@@ -1,10 +1,11 @@
 use crate::Analysis;
 use crate::errors::SemanticError;
 use crate::passes::check_spec_locs::resolve_spec_path;
-use crate::semantics::{QualifiedName, SpecLocEntry};
+use crate::semantics::QualifiedName;
 use fpp_ast::{DefModule, SpecLoc, Visitor, Walkable};
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
+use std::sync::Arc;
 
 /// Build the location specifier map, checking that duplicate specifiers for the
 /// same symbol name a consistent path.
@@ -19,43 +20,36 @@ impl<'ast> Visitor<'ast> for BuildSpecLocMap {
         a: &mut Self::State,
         node: &'ast DefModule,
     ) -> ControlFlow<Self::Break> {
-        a.scope_name_list.push(node.name.data.clone());
+        a.scope_name_list.insert(0, node.name.data.clone());
         let result = node.walk(a, self);
-        a.scope_name_list.pop();
+        a.scope_name_list.remove(0);
         result
     }
 
     fn visit_spec_loc(&self, a: &mut Self::State, node: &'ast SpecLoc) -> ControlFlow<Self::Break> {
-        let mut parts: Vec<String> = a.scope_name_list.clone();
+        let mut parts: Vec<String> = a.scope_name_list.iter().rev().cloned().collect();
         parts.extend(QualifiedName::from(&node.symbol).to_ident_list());
-        let key = (node.kind.clone(), parts.join("."));
-
-        let entry = SpecLocEntry {
-            spec_span: node.span(),
-            file_span: node.file.span(),
-            file_value: node.file.data.clone(),
-            is_dictionary_def: node.is_dictionary_def,
-        };
+        let key = (node.kind.clone(), QualifiedName::from(parts));
 
         match a.location_specifier_map.get(&key) {
             None => {
-                a.location_specifier_map.insert(key, entry);
+                a.location_specifier_map.insert(key, Arc::new(node.clone()));
             }
             Some(prev) => {
-                let path = resolve_spec_path(entry.file_span, &entry.file_value);
-                let prev_path = resolve_spec_path(prev.file_span, &prev.file_value);
+                let path = resolve_spec_path(node.file.span(), &node.file.data);
+                let prev_path = resolve_spec_path(prev.file.span(), &prev.file.data);
                 if path != prev_path {
                     SemanticError::InconsistentLocationPath {
-                        loc: entry.file_span,
+                        loc: node.file.span(),
                         path,
-                        prev_loc: prev.file_span,
+                        prev_loc: prev.file.span(),
                         prev_path,
                     }
                     .emit();
-                } else if entry.is_dictionary_def != prev.is_dictionary_def {
+                } else if node.is_dictionary_def != prev.is_dictionary_def {
                     SemanticError::InconsistentDictionarySpecifier {
-                        loc: entry.spec_span,
-                        prev_loc: prev.spec_span,
+                        loc: node.span(),
+                        prev_loc: prev.span(),
                     }
                     .emit();
                 }
