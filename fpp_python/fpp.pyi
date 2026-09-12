@@ -954,9 +954,6 @@ class DiagnosticMessage:
     r"""
     One child message of a `Diagnostic`: a second span worth pointing at, or a
     standalone remark under the primary one.
-    
-    `kind` says which — see `DiagnosticKind`; it defaults to a note. With no
-    `span`, the message renders as a line of its own beneath the source excerpt.
     """
     @property
     def kind(self) -> DiagnosticMessageKind:
@@ -2926,8 +2923,7 @@ class Binop:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -2947,8 +2943,7 @@ class ComponentKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -2972,17 +2967,13 @@ class ConnectionPatternKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
 class DiagnosticLevel:
     r"""
-    A diagnostic's severity, mirroring `fpp_core::Level`.
-    
-    `value` is the compiler's own spelling — what a rendered diagnostic is
-    prefixed with — and `name` is the member name.
+    A diagnostic's severity
     """
     Error: typing.ClassVar[DiagnosticLevel]
     Warning: typing.ClassVar[DiagnosticLevel]
@@ -3019,8 +3010,7 @@ class DiagnosticMessageKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so its name
-        is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3039,8 +3029,7 @@ class Direction:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3064,8 +3053,7 @@ class EventSeverity:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3084,8 +3072,7 @@ class FloatKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3104,8 +3091,7 @@ class FormalParamKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3124,8 +3110,7 @@ class GeneralPortInstanceKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3145,8 +3130,7 @@ class InputPortKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3167,8 +3151,7 @@ class IntegerFormatKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3193,8 +3176,7 @@ class IntegerKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3213,8 +3195,7 @@ class Kind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3233,8 +3214,7 @@ class ParamKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3255,8 +3235,7 @@ class QueueFull:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3276,8 +3255,7 @@ class RationalFormatKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3302,8 +3280,7 @@ class SpecLocKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3333,8 +3310,7 @@ class SpecialPortInstanceKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3354,8 +3330,7 @@ class TlmChannelLimitKind:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3374,8 +3349,7 @@ class TlmChannelUpdate:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 @typing.final
@@ -3393,8 +3367,7 @@ class Unop:
     @property
     def value(self) -> builtins.str:
         r"""
-        The same string as `name`: a kind mirror carries no payload, so
-        its name is its value (as for `enum.StrEnum`).
+        The same string as `name` (`enum.StrEnum`).
         """
 
 def analyze(paths: typing.Optional[builtins.str | builtins.list[builtins.str]] = None, *, source: typing.Optional[builtins.str] = None, uri: builtins.str = '<string>', imports: typing.Optional[builtins.str | builtins.list[builtins.str]] = None) -> Model:

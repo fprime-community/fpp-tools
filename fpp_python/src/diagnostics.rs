@@ -149,8 +149,7 @@ impl DiagnosticMessageKind {
         self.member_name()
     }
 
-    /// The same string as `name`: a kind mirror carries no payload, so its name
-    /// is its value (as for `enum.StrEnum`).
+    /// The same string as `name` (`enum.StrEnum`).
     #[getter]
     fn value(&self) -> &'static str {
         self.member_name()
