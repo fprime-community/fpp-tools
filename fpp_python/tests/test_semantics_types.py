@@ -75,10 +75,10 @@ def test_enum_type(m):
 def test_struct_type(m: f.Model):
     t = rtype(m, "M.S")
     assert isinstance(t, StructType)
-    members = t.anon_struct.members
-    assert set(members) == {"x", "y"}
-    assert isinstance(members["x"], PrimitiveIntType)
-    assert isinstance(members["y"], FloatType)
+    anon = t.anon_struct
+    assert [name for name, _ in anon.members] == ["x", "y"]
+    assert isinstance(anon.get_member("x"), PrimitiveIntType)
+    assert isinstance(anon.get_member("y"), FloatType)
 
 
 def test_alias_type(m):

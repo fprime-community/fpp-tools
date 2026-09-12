@@ -384,16 +384,20 @@ def test_a_union_keyed_map_orders_by_its_key_s_node():
     assert ids == sorted(ids)
 
 
-def test_anon_struct_members_are_name_ordered_and_the_node_is_declaration_ordered():
+def test_anon_struct_members_are_declaration_ordered():
     m = analyzed(ORDER_SRC)
     struct = m.analysis.type_map[m.lookup("M.Complex").node_id]
-    members = list(struct.anon_struct.members)
-    assert members == sorted(members)
-    # The analysis stores these unordered, so declaration order lives on the AST
-    # node — which is what the docs now point at.
-    declared = [member.name for member in struct.node.members]
-    assert declared != members
-    assert sorted(declared) == members
+    anon = struct.anon_struct
+    names = [name for name, _ in anon.members]
+    assert names == [member.name for member in struct.node.members]
+    assert names != sorted(names)
+    # Name lookup is a method, not indexing, since the members are a sequence.
+    for name, member_ty in anon.members:
+        assert anon.has_member(name)
+        assert anon.get_member(name) is not None
+        assert str(anon.get_member(name)) == str(member_ty)
+    assert anon.get_member("nope") is None
+    assert anon.has_member("nope") is False
 
 
 # --- a modeled string keeps its declared size everywhere ------------------
@@ -634,11 +638,11 @@ module Ref {
     assert spelled("Ref.Simple") == "Simple"
 
     simple = a.type_map[m.lookup("Ref.Simple").node_id]
-    members = simple.anon_struct.members
-    assert str(members["x"]) == "U32"
-    assert str(members["f"]) == "F32"
+    anon = simple.anon_struct
+    assert str(anon.get_member("x")) == "U32"
+    assert str(anon.get_member("f")) == "F32"
     # A declared size is not part of how the compiler renders a string type.
-    assert str(members["y"]) == "string"
+    assert str(anon.get_member("y")) == "string"
     # Every member renders by `Display` too, so an aggregate stays one line.
     assert (
         str(simple.anon_struct)

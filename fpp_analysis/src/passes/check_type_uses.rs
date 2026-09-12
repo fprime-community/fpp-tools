@@ -183,7 +183,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
             match member_locs.insert(member.name.data.clone(), member.span()) {
                 None => {
                     let member_ty = a.type_map.get(&member.type_name.node_id).unwrap().clone();
-                    anon_ty.members.insert(member.name.data.clone(), member_ty);
+                    anon_ty.members.push((member.name.data.clone(), member_ty));
                 }
                 Some(old) => {
                     SemanticError::DuplicateStructMember {

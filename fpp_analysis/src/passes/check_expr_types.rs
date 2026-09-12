@@ -384,7 +384,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                 };
 
                 match e_ty.as_anon_struct() {
-                    Some(anon_struct) => match anon_struct.members.get(&id.data) {
+                    Some(anon_struct) => match anon_struct.get_member(&id.data) {
                         None => {
                             SemanticError::InvalidType {
                                 loc: id.span(),
@@ -428,13 +428,13 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                 }
             }
             ExprKind::Struct(struct_expr) => {
-                let mut members_out = HashMap::default();
+                let mut members_out = Vec::default();
                 let mut member_locs = HashMap::default();
 
                 for member in struct_expr {
                     match a.type_map.get(&member.value.node_id) {
                         Some(member_ty) => {
-                            members_out.insert(member.name.data.clone(), member_ty.clone());
+                            members_out.push((member.name.data.clone(), member_ty.clone()));
                             if let Some(old_member) =
                                 member_locs.insert(member.name.data.clone(), member.value.span())
                             {
@@ -510,7 +510,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                         a,
                         every,
                         &Arc::new(Type::AnonStruct(AnonStructType {
-                            members: HashMap::from_iter([
+                            members: vec![
                                 (
                                     "seconds".to_string(),
                                     Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
@@ -519,7 +519,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                                     "useconds".to_string(),
                                     Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
                                 ),
-                            ]),
+                            ],
                         })),
                     )
                 {

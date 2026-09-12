@@ -360,7 +360,11 @@ fpp_python_macros::fpp_sem_bindings! {
 
     payload AnonStructType native fpp_analysis::semantics::AnonStructType {
         fields {
-            members: map(str, union(Type)),
+            members: list(tuple(str, union(Type))),
+        }
+        methods {
+            get_member(name: str) -> opt(union(Type)),
+            has_member(name: str) -> bool,
         }
     }
 

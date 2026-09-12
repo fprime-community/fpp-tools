@@ -3,7 +3,7 @@
 3 |   event E severity activity low format "" throttle 10 every false
   |                                                             ^^^^^ event throttle every must be convertable to a time interval
   |
-  = note: struct member `useconds` type cannot be converted
+  = note: struct member `seconds` type cannot be converted
   = note: boolean cannot be converted to U32
 
  --> [ local path prefix ]/event/bad_throttle_interval.fpp:1:1

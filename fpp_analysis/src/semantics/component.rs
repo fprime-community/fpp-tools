@@ -435,10 +435,12 @@ fn check_throttle_interval(
     let loc = every.span();
     use crate::semantics::{AnonStructType, StructValue};
     let u32_ty = Arc::new(Type::PrimitiveInt(fpp_ast::IntegerKind::U32));
-    let mut members = HashMap::default();
-    members.insert("seconds".to_string(), u32_ty.clone());
-    members.insert("useconds".to_string(), u32_ty.clone());
-    let interval_ty = Arc::new(Type::AnonStruct(AnonStructType { members }));
+    let interval_ty = Arc::new(Type::AnonStruct(AnonStructType {
+        members: vec![
+            ("seconds".to_string(), u32_ty.clone()),
+            ("useconds".to_string(), u32_ty.clone()),
+        ],
+    }));
 
     let Some(value) = a.value_map.get(&every.node_id) else {
         return Ok(None);
