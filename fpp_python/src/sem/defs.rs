@@ -15,54 +15,59 @@ fpp_python_macros::fpp_sem_bindings! {
 
     analysis native fpp_analysis::Analysis {
         fields {
-            parent_symbol_map: map(union(Symbol), union(Symbol)),
-            global_scope: entity(Scope),
-            symbol_scope_map: map(union(Symbol), entity(Scope)),
-            symbol_map: map(node, union(Symbol)),
-            use_def_map: map(node, union(Symbol)),
-            use_def_matching_list: list(entity(UseDefMatching)),
-            visited_symbol_set: list(union(Symbol)),
-            use_def_symbol_set: list(union(Symbol)),
-            parent_symbol: opt(union(Symbol)),
-            nested_scope: entity(NestedScope),
+            input_file_set: skip,
+            dependency_file_set: skip,
+            direct_dependency_file_set: skip,
+            missing_dependency_file_set: skip,
+            included_file_set: skip,
             include_context_map: skip,
+            location_specifier_map: map(tuple(leaf(crate::ast::SpecLocKind), entity(QualifiedName)), astdef(SpecLoc)),
+            dictionary_generation: bool,
+            global_scope: entity(Scope),
+            parent_symbol_map: map(union(Symbol), union(Symbol)),
+            symbol_scope_map: map(union(Symbol), entity(Scope)),
+            use_def_map: map(node, union(Symbol)),
+            symbol_map: map(node, union(Symbol)),
             type_map: map(node, union(Type)),
             value_map: map(node, union(Value)),
             framework_definitions: entity(FrameworkDefinitions),
-            interface: opt(entity(Interface)),
-            interface_map: map(union(Symbol), entity(Interface)),
-            component: opt(entity(Component)),
             component_map: map(union(Symbol), entity(Component)),
-            component_instance: opt(rewrap(InterfaceInstance::Component)),
             component_instance_map: map(union(Symbol), rewrap(InterfaceInstance::Component)),
-            topology: opt(entity(Topology)),
+            interface_map: map(union(Symbol), entity(Interface)),
             partial_topology_map: map(union(Symbol), entity(Topology)),
             topology_map: map(union(Symbol), entity(Topology)),
-            system_map: map(union(Symbol), entity(FppSystem)),
-            tlm_packet_set_map: map(union(Symbol), map(str, entity(TlmPacketSet))),
-            location_specifier_map: map(tuple(leaf(crate::ast::SpecLocKind), str), entity(SpecLocEntry)),
-            scope_name_list: list(str),
             state_machine_map: map(union(Symbol), entity(StateMachine)),
-            dictionary_symbol_set: list(union(Symbol)),
+            dictionary_map: map(union(Symbol), entity(Dictionary)),
             implied_use_map: map(node, entity(ImpliedUseSet)),
+            dictionary_symbol_set: list(union(Symbol)),
+            system_map: map(union(Symbol), entity(FppSystem)),
         }
         methods {
             check_displayable_params(params: ref list(astnode(FormalParam)), msg: str) throws -> unit,
             check_displayable_type(node: node, loc: span, msg: str) throws -> unit,
             get_array_size(node: node, loc: span) throws -> i128,
             get_array_size_opt(expr: ref opt(astnode(Expr))) throws -> i128,
+            get_big_int_value(node: node) -> opt(i128),
             get_big_int_value_opt(expr: ref opt(astnode(Expr))) -> opt(i128),
+            get_component(id: node) throws -> opt(entity(Component)),
             get_component_instance(id: node) throws -> opt(rewrap(InterfaceInstance::Component)),
+            get_component_instance_symbol(id: node) throws -> opt(union(Symbol)),
+            get_dictionary(id: node) throws -> opt(entity(Dictionary)),
+            get_enclosing_names(symbol: ref union(Symbol)) -> list(str),
             get_finalized_type(node: node) -> opt(union(Type)),
             get_int_value(node: node) -> opt(i128),
             get_int_value_checked(node: node, loc: span) throws -> i128,
             get_interface(id: node) -> opt(entity(Interface)),
             get_interface_instance(id: node) -> opt(union(InterfaceInstance)),
+            get_interface_instance_symbol(id: node) throws -> opt(union(Symbol)),
+            get_interface_symbol(id: node) throws -> opt(union(Symbol)),
             get_nonnegative_big_int_value(node: node, loc: span) throws -> i128,
             get_nonnegative_big_int_value_opt(expr: ref opt(astnode(Expr))) throws -> opt(i128),
             get_nonnegative_int_value(node: node, loc: span) throws -> i128,
             get_qualified_name(symbol: ref union(Symbol)) -> str,
+            get_reason_for_non_displayable_type_at(node: node) -> list(tuple(span, str)),
             get_scope(symbol: ref opt(union(Symbol))) -> ref entity(Scope),
+            get_topology(id: node) throws -> opt(entity(Topology)),
             get_topology_symbol(id: node) throws -> opt(union(Symbol)),
             implied_uses(node: node) -> opt(entity(ImpliedUseSet)),
         }
@@ -538,6 +543,13 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
+    entity CommandEntry native fpp_analysis::semantics::CommandEntry {
+        fields {
+            instance: rewrap(InterfaceInstance::Component),
+            command: union(Command),
+        }
+    }
+
     entity Component native fpp_analysis::semantics::Component repr symbol_name(symbol, get_qualified_name) {
         fields {
             symbol: union(Symbol),
@@ -608,6 +620,30 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
+    entity ContainerEntry native fpp_analysis::semantics::ContainerEntry {
+        fields {
+            instance: rewrap(InterfaceInstance::Component),
+            container: entity(Container),
+        }
+    }
+
+    entity Dictionary native fpp_analysis::semantics::Dictionary {
+        fields {
+            used_symbol_set: list(union(Symbol)),
+            command_entry_map: map(i128, entity(CommandEntry)),
+            tlm_channel_entry_map: map(i128, entity(TlmChannelEntry)),
+            reverse_tlm_channel_entry_map: map(entity(TlmChannelEntry), i128),
+            event_entry_map: map(i128, entity(EventEntry)),
+            param_entry_map: map(i128, entity(ParamEntry)),
+            record_entry_map: map(i128, entity(RecordEntry)),
+            container_entry_map: map(i128, entity(ContainerEntry)),
+            tlm_packet_set_map: map(str, entity(TlmPacketSet)),
+        }
+        methods {
+            find_numeric_id_for_channel(t: ref entity(Topology), channel_id: ref entity(TlmChannelIdentifier)) throws -> i128,
+        }
+    }
+
     entity Endpoint native fpp_analysis::semantics::Endpoint {
         fields {
             loc: span,
@@ -631,6 +667,13 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
+    entity EventEntry native fpp_analysis::semantics::EventEntry {
+        fields {
+            instance: rewrap(InterfaceInstance::Component),
+            event: entity(Event),
+        }
+    }
+
     entity Format native fpp_analysis::semantics::Format {
         methods {
             get(n: usize) -> opt(rewrap(FormatPart::FormatReplacement)),
@@ -643,6 +686,7 @@ fpp_python_macros::fpp_sem_bindings! {
         fields {
             node: astdef(DefSystem),
             topology: entity(Topology),
+            dictionary: entity(Dictionary),
         }
         methods {
             get_name -> ref str,
@@ -665,6 +709,7 @@ fpp_python_macros::fpp_sem_bindings! {
 
     entity ImpliedUse native fpp_analysis::semantics::ImpliedUse {
         methods {
+            annotations -> ref list(str),
             id -> node,
             name -> ref entity(QualifiedName),
         }
@@ -699,9 +744,6 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity NestedScope native fpp_analysis::semantics::NestedScope {
-    }
-
     entity Param native fpp_analysis::semantics::Param repr name(get_name) {
         fields {
             node: astdef(SpecParam),
@@ -713,6 +755,13 @@ fpp_python_macros::fpp_sem_bindings! {
         }
         methods {
             get_name -> ref str,
+        }
+    }
+
+    entity ParamEntry native fpp_analysis::semantics::ParamEntry {
+        fields {
+            instance: rewrap(InterfaceInstance::Component),
+            param: entity(Param),
         }
     }
 
@@ -754,6 +803,9 @@ fpp_python_macros::fpp_sem_bindings! {
 
     entity QualifiedName native fpp_analysis::semantics::QualifiedName repr display {
         methods {
+            base -> ref str,
+            qualifier -> ref list(str),
+            short_name(enclosing_names: ref list(string)) -> entity(QualifiedName),
             to_ident_list -> list(str),
         }
     }
@@ -769,16 +821,14 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Scope native fpp_analysis::semantics::Scope {
+    entity RecordEntry native fpp_analysis::semantics::RecordEntry {
+        fields {
+            instance: rewrap(InterfaceInstance::Component),
+            record: entity(Record),
+        }
     }
 
-    entity SpecLocEntry native fpp_analysis::semantics::SpecLocEntry {
-        fields {
-            spec_span: span,
-            file_span: span,
-            file_value: str,
-            is_dictionary_def: bool,
-        }
+    entity Scope native fpp_analysis::semantics::Scope {
     }
 
     entity StateMachine native fpp_analysis::semantics::StateMachine {
@@ -880,6 +930,28 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
+    entity TlmChannelEntry native fpp_analysis::semantics::TlmChannelEntry repr name(get_qualified_name) {
+        fields {
+            instance: rewrap(InterfaceInstance::Component),
+            tlm_channel: entity(TlmChannel),
+        }
+        methods {
+            get_qualified_name -> str,
+        }
+    }
+
+    entity TlmChannelIdentifier native fpp_analysis::semantics::TlmChannelIdentifier repr display {
+        fields {
+            node: skip,
+            component_instance: rewrap(InterfaceInstance::Component),
+            tlm_channel: entity(TlmChannel),
+        }
+        methods {
+            get_qualified_name -> str,
+            get_unqualified_name -> str,
+        }
+    }
+
     entity TlmPacket native fpp_analysis::semantics::TlmPacket repr name(get_name) {
         fields {
             node: astdef(SpecTlmPacket),
@@ -973,14 +1045,6 @@ fpp_python_macros::fpp_sem_bindings! {
     entity TransitionGraphNode native fpp_analysis::semantics::transition_graph::Node {
         fields {
             soc: union(StateOrChoice),
-        }
-    }
-
-    entity UseDefMatching native fpp_analysis::semantics::UseDefMatching repr symbol_name(symbol, get_qualified_name) {
-        fields {
-            node: node,
-            qualified_name: entity(QualifiedName),
-            symbol: union(Symbol),
         }
     }
 

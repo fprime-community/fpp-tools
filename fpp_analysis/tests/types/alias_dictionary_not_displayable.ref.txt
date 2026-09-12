@@ -2,4 +2,14 @@
   |
 2 | dictionary type T2 = T1
   | ^^^^^^^^^^^^^^^^^^^^^^^ dictionary type is not displayable
+  |
+ ::: [ local path prefix ]/types/alias_dictionary_not_displayable.fpp:2:22
+  |
+2 | dictionary type T2 = T1
+  |                      -- because this type is not displayable
+  |
+ ::: [ local path prefix ]/types/alias_dictionary_not_displayable.fpp:1:1
+  |
+1 | type T1
+  | ------- type is defined here
 

@@ -2,4 +2,29 @@
    |
 19 |   telemetry C: S1
    |                ^^ type of telemetry channel is not displayable
+   |
+  ::: [ local path prefix ]/tlm_channel/not_displayable.fpp:6:16
+   |
+ 6 | struct S1 { x: S2 }
+   |                -- because this type is not displayable
+   |
+  ::: [ local path prefix ]/tlm_channel/not_displayable.fpp:8:16
+   |
+ 8 | struct S2 { x: A1 }
+   |                -- because this type is not displayable
+   |
+  ::: [ local path prefix ]/tlm_channel/not_displayable.fpp:10:16
+   |
+10 | array A1 = [3] A2
+   |                -- because this type is not displayable
+   |
+  ::: [ local path prefix ]/tlm_channel/not_displayable.fpp:12:16
+   |
+12 | array A2 = [3] T
+   |                - because this type is not displayable
+   |
+  ::: [ local path prefix ]/tlm_channel/not_displayable.fpp:14:1
+   |
+14 | type T
+   | ------ type is defined here
 

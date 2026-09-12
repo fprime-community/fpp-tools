@@ -1,3 +1,4 @@
+use crate::Analysis;
 use crate::semantics::QualifiedName;
 use fpp_core::Spanned;
 
@@ -17,6 +18,26 @@ pub struct ImpliedUseSet {
     pub types: Vec<ImpliedUse>,
 }
 
+impl ImpliedUseSet {
+    /// Gets the implied uses of the given kind
+    pub fn get(&self, kind: ImpliedUseKind) -> &[ImpliedUse] {
+        match kind {
+            ImpliedUseKind::Constant => &self.constants,
+            ImpliedUseKind::Port => &self.ports,
+            ImpliedUseKind::Type => &self.types,
+        }
+    }
+
+    /// Adds an implied use of the given kind
+    pub fn add(&mut self, kind: ImpliedUseKind, iu: ImpliedUse) {
+        match kind {
+            ImpliedUseKind::Constant => self.constants.push(iu),
+            ImpliedUseKind::Port => self.ports.push(iu),
+            ImpliedUseKind::Type => self.types.push(iu),
+        }
+    }
+}
+
 /// An implied use of an FPP symbol
 #[derive(Clone, Debug)]
 pub struct ImpliedUse {
@@ -24,20 +45,39 @@ pub struct ImpliedUse {
     name: QualifiedName,
     /// The AST node id associated with the implied use
     id: fpp_core::Node,
+    /// Optional annotations for error reporting
+    annotations: Vec<String>,
 }
 
 impl ImpliedUse {
     pub fn new(name: QualifiedName, id: fpp_core::Node) -> ImpliedUse {
-        ImpliedUse { name, id }
+        ImpliedUse {
+            name,
+            id,
+            annotations: Vec::new(),
+        }
     }
 
-    /// Construct an implied use from an identifier list, replicating the node id
-    /// so the implied use has its own stable, distinct node id
-    pub fn from_ident_list_and_id(idents: Vec<String>, id: fpp_core::Node) -> ImpliedUse {
+    /// Construct an implied use from a name and a node id
+    pub fn from_name_and_id(
+        name: QualifiedName,
+        id: fpp_core::Node,
+        annotations: Vec<String>,
+    ) -> ImpliedUse {
         ImpliedUse {
-            name: idents.into(),
-            id: ImpliedUse::replicate_node_id(id),
+            name,
+            id,
+            annotations,
         }
+    }
+
+    /// Construct an implied use from an identifier list and a node id
+    pub fn from_ident_list_and_id(
+        idents: Vec<String>,
+        id: fpp_core::Node,
+        annotations: Vec<String>,
+    ) -> ImpliedUse {
+        ImpliedUse::from_name_and_id(idents.into(), id, annotations)
     }
 
     pub fn id(&self) -> fpp_core::Node {
@@ -48,8 +88,62 @@ impl ImpliedUse {
         &self.name
     }
 
+    pub fn annotations(&self) -> &[String] {
+        &self.annotations
+    }
+
+    /// The qualified names of implied type uses. Each name is a list of
+    /// identifiers.
+    pub fn get_topology_types(a: &Analysis) -> Vec<Vec<String>> {
+        if !a.dictionary_generation {
+            return Vec::new();
+        }
+        let mut out = vec![
+            vec![
+                "Fw".to_string(),
+                "DpCfg".to_string(),
+                "ProcType".to_string(),
+            ],
+            vec!["Fw".to_string(), "DpState".to_string()],
+        ];
+        out.extend(
+            [
+                "FwChanIdType",
+                "FwDpIdType",
+                "FwDpPriorityType",
+                "FwEventIdType",
+                "FwOpcodeType",
+                "FwPacketDescriptorType",
+                "FwSizeType",
+                "FwSizeStoreType",
+                "FwTimeBaseStoreType",
+                "FwTimeContextStoreType",
+                "FwTlmPacketizeIdType",
+            ]
+            .into_iter()
+            .map(|name| vec![name.to_string()]),
+        );
+        out
+    }
+
+    /// The qualified names of implied constant uses. Each name is a list of
+    /// identifiers.
+    pub fn get_topology_constants(a: &Analysis) -> Vec<Vec<String>> {
+        if !a.dictionary_generation {
+            return Vec::new();
+        }
+        vec![
+            vec![
+                "Fw".to_string(),
+                "DpCfg".to_string(),
+                "CONTAINER_USER_DATA_SIZE".to_string(),
+            ],
+            vec!["FW_FIXED_LENGTH_STRING_SIZE".to_string()],
+        ]
+    }
+
     /// Create a new ID at the same location as id
-    fn replicate_node_id(id: fpp_core::Node) -> fpp_core::Node {
+    pub fn replicate_id(id: fpp_core::Node) -> fpp_core::Node {
         fpp_core::Node::new(id.span())
     }
 
@@ -79,7 +173,7 @@ impl ImpliedUse {
     }
 
     pub fn as_unique_expr(&self) -> fpp_ast::Expr {
-        self.as_expr_impl(ImpliedUse::replicate_node_id)
+        self.as_expr_impl(ImpliedUse::replicate_id)
     }
 
     pub fn as_qual_ident(&self) -> fpp_ast::QualIdent {

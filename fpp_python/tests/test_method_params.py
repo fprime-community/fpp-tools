@@ -265,14 +265,23 @@ def test_cross_model_entity_argument_is_rejected(m, other):
         mine.implements(theirs)
 
 
-def test_field_getter_and_get_field_method_coexist(m):
-    """`Analysis.interface` (a field) and `Analysis.get_interface(node)` (a method).
+def test_under_construction_cursors_are_not_exposed(m):
+    """The `Analysis` fields that hold a partially built entity stay in Rust.
 
-    PyO3 derives a getter's symbol from its Rust ident and a method's from its Python
-    name, so these two collide unless the generator renames one; both must survive.
+    Each is only populated while the pass that builds it is running, so it is
+    `None` by the time a model reaches Python. The `get_*` query methods that
+    read the finished maps are the supported way in.
     """
     analysis = m.analysis
-    assert analysis.interface is None or analysis.interface is not None  # readable
-    assert callable(analysis.get_interface)
-    assert analysis.component_instance is None or True
-    assert callable(analysis.get_component_instance)
+    for cursor in (
+        "component",
+        "component_instance",
+        "interface",
+        "topology",
+        "dictionary",
+        "tlm_packet_set",
+        "parent_symbol",
+    ):
+        assert not hasattr(analysis, cursor), cursor
+    for query in ("get_component", "get_component_instance", "get_interface", "get_dictionary"):
+        assert callable(getattr(analysis, query)), query

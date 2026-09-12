@@ -122,6 +122,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
             SemanticError::InvalidType {
                 loc: node.span(),
                 msg: "enum must define at least one constant".to_string(),
+                notes: vec![],
             }
             .emit();
         }
@@ -137,6 +138,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
                             SemanticError::InvalidType {
                                 loc: type_name.span(),
                                 msg: "primitive integer type must be used".to_string(),
+                                notes: vec![],
                             }
                             .emit();
                             IntegerKind::I32

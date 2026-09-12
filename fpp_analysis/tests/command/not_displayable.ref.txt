@@ -2,4 +2,14 @@
    |
 20 |   async command C(a1: S)
    |                       ^ type of command parameter is not displayable
+   |
+  ::: [ local path prefix ]/command/not_displayable.fpp:10:6
+   |
+10 |   x: T
+   |      - because this type is not displayable
+   |
+  ::: [ local path prefix ]/command/not_displayable.fpp:7:1
+   |
+ 7 | type T
+   | ------ type is defined here
 

@@ -2,4 +2,9 @@
    |
 14 |   param P: T
    |            ^ type of parameter is not displayable
+   |
+  ::: [ local path prefix ]/param/not_displayable.fpp:6:1
+   |
+ 6 | type T
+   | ------ type is defined here
 

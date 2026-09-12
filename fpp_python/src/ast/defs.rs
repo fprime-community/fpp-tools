@@ -27,7 +27,7 @@ fpp_python_macros::fpp_ast_bindings! {
         Unop { Minus },
     }
 
-    shadowed { Connection, PortInstanceIdentifier }
+    shadowed { Connection, PortInstanceIdentifier, TlmChannelIdentifier }
 
     node Connection {
         is_unmatched: bool,

@@ -2,4 +2,9 @@
    |
 15 |   event E(x: T) severity activity low format "{}"
    |              ^ type of event is not displayable
+   |
+  ::: [ local path prefix ]/event/not_displayable.fpp:7:1
+   |
+ 7 | type T
+   | ------ type is defined here
 

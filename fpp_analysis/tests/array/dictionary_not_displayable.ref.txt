@@ -2,4 +2,14 @@
   |
 2 | dictionary array A = [3] T
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ dictionary type is not displayable
+  |
+ ::: [ local path prefix ]/array/dictionary_not_displayable.fpp:2:26
+  |
+2 | dictionary array A = [3] T
+  |                          - because this type is not displayable
+  |
+ ::: [ local path prefix ]/array/dictionary_not_displayable.fpp:1:1
+  |
+1 | type T
+  | ------ type is defined here
 

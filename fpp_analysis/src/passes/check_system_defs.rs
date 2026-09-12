@@ -81,11 +81,20 @@ impl<'ast> Visitor<'ast> for CheckSystemDefs {
             .get(&topology_symbol)
             .cloned()
             .expect("every topology is resolved by CheckTopologyDefs");
+        let dictionary = match a.get_dictionary(node.topology.id()) {
+            Ok(Some(d)) => d,
+            Ok(None) => return ControlFlow::Continue(()),
+            Err(err) => {
+                err.emit();
+                return ControlFlow::Continue(());
+            }
+        };
         a.system_map.insert(
             symbol,
             FppSystem {
                 node: Arc::new(node.clone()),
                 topology,
+                dictionary,
             },
         );
         ControlFlow::Continue(())

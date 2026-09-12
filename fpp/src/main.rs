@@ -11,6 +11,7 @@ fn compiler_main() -> String {
     let mut ast = fpp_parser::parse(src, |p| p.trans_unit(), None);
 
     let mut a = fpp_analysis::Analysis::new();
+    a.input_file_set.insert(fpp_core::File::StdIn);
 
     let _ = fpp_analysis::resolve_includes(&mut a, fpp_fs::FsReader {}, &mut ast);
     fpp_analysis::add_state_enums(&mut ast);

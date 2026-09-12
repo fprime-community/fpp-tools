@@ -1,7 +1,7 @@
 use crate::analyzers::NestedScopeState;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
-use crate::semantics::{ImpliedUse, QualifiedName};
+use crate::semantics::QualifiedName;
 use fpp_ast::*;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
@@ -180,6 +180,66 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
 
         name_opt(e, VecDeque::new())
     }
+
+    /// Dispatch the implied constant uses recorded at an AST node
+    fn visit_implied_constant_uses(
+        &self,
+        visitor: &V,
+        a: &mut V::State,
+        id: fpp_core::Node,
+    ) -> ControlFlow<V::Break> {
+        if let Some(uses) = a.implied_uses(id) {
+            for iu in &uses.constants {
+                let e = iu.as_expr();
+                visitor.implied_constant_use(a, &e, iu.name().clone())?;
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    /// Dispatch the implied port uses recorded at an AST node
+    fn visit_implied_port_uses(
+        &self,
+        visitor: &V,
+        a: &mut V::State,
+        id: fpp_core::Node,
+    ) -> ControlFlow<V::Break> {
+        if let Some(uses) = a.implied_uses(id) {
+            for iu in &uses.ports {
+                let qi = iu.as_qual_ident();
+                visitor.implied_port_use(a, &qi, iu.name().clone())?;
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    /// Dispatch the implied type uses recorded at an AST node
+    fn visit_implied_type_uses(
+        &self,
+        visitor: &V,
+        a: &mut V::State,
+        id: fpp_core::Node,
+    ) -> ControlFlow<V::Break> {
+        if let Some(uses) = a.implied_uses(id) {
+            for iu in &uses.types {
+                let qi = iu.as_qual_ident();
+                visitor.implied_type_use(a, &qi, iu.name().clone())?;
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    /// Dispatch every implied use recorded at an AST node
+    fn visit_implied_uses(
+        &self,
+        visitor: &V,
+        a: &mut V::State,
+        id: fpp_core::Node,
+    ) -> ControlFlow<V::Break> {
+        self.visit_implied_constant_uses(visitor, a, id)?;
+        self.visit_implied_port_uses(visitor, a, id)?;
+        self.visit_implied_type_uses(visitor, a, id)
+    }
 }
 
 impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
@@ -192,12 +252,18 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                 ci.walk(a, visitor)
             }
             Node::DefTopology(t) => {
+                self.visit_implied_uses(visitor, a, t.node_id)?;
+
                 // Visit port interface uses in the implements clause
                 for i in &t.implements {
                     visitor.interface_use(a, i, i.into())?;
                 }
 
                 t.walk(a, visitor)
+            }
+            Node::DefStateMachine(sm) => {
+                self.visit_implied_uses(visitor, a, sm.node_id)?;
+                self.super_.visit(visitor, a, node)
             }
             Node::DefSystem(s) => {
                 visitor.interface_instance_use(a, &s.topology, (&s.topology).into())?;
@@ -241,26 +307,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                 self.super_.visit(visitor, a, node)
             }
             Node::SpecSpecialPortInstance(pi) => {
-                let name = (match pi.kind {
-                    SpecialPortInstanceKind::CommandRecv => "Cmd",
-                    SpecialPortInstanceKind::CommandReg => "CmdReg",
-                    SpecialPortInstanceKind::CommandResp => "CmdResponse",
-                    SpecialPortInstanceKind::Event => "Log",
-                    SpecialPortInstanceKind::ParamGet => "PrmGet",
-                    SpecialPortInstanceKind::ParamSet => "PrmSet",
-                    SpecialPortInstanceKind::ProductGet => "DpGet",
-                    SpecialPortInstanceKind::ProductRecv => "DpResponse",
-                    SpecialPortInstanceKind::ProductRequest => "DpRequest",
-                    SpecialPortInstanceKind::ProductSend => "DpSend",
-                    SpecialPortInstanceKind::Telemetry => "Tlm",
-                    SpecialPortInstanceKind::TextEvent => "LogText",
-                    SpecialPortInstanceKind::TimeGet => "Time",
-                })
-                .to_string();
-
-                let port_qi = ImpliedUse::new(vec!["Fw".to_string(), name].into(), pi.node_id)
-                    .as_qual_ident();
-                visitor.implied_port_use(a, &port_qi, (&port_qi).into())?;
+                self.visit_implied_port_uses(visitor, a, pi.node_id)?;
                 self.super_.visit(visitor, a, node)
             }
             Node::PortInstanceIdentifier(pii) => visitor.interface_instance_use(
@@ -279,18 +326,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
             Node::TypeName(tn) => match &tn.kind {
                 TypeNameKind::QualIdent(qi) => visitor.type_use(a, qi, qi.into()),
                 TypeNameKind::String(_) => {
-                    // Dispatch the implied uses of the framework definitions
-                    // required by a string type (populated by ConstructImpliedUseMap).
-                    if let Some(uses) = a.implied_uses(tn.node_id) {
-                        for iu in &uses.types {
-                            let qi = iu.as_qual_ident();
-                            visitor.implied_type_use(a, &qi, iu.name().clone())?;
-                        }
-                        for iu in &uses.constants {
-                            let e = iu.as_expr();
-                            visitor.implied_constant_use(a, &e, iu.name().clone())?;
-                        }
-                    }
+                    self.visit_implied_uses(visitor, a, tn.node_id)?;
                     self.super_.visit(visitor, a, node)
                 }
                 _ => ControlFlow::Continue(()),
