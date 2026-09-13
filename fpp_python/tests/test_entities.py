@@ -94,10 +94,12 @@ def test_component_instance_get_port_instance_identifier(m):
     assert pii.interface_instance.qualified_name == "a"
     assert pii.port_instance.unqualified_name == "pOut"
 
-    # A name that isn't a port on the instance's component raises rather than
-    # returning some placeholder.
-    with pytest.raises(ValueError):
+    # A name that isn't a port on the instance's component raises a
+    # `DiagnosticError` (it throws a `SemanticError`) rather than returning
+    # some placeholder.
+    with pytest.raises(f.DiagnosticError) as excinfo:
         inst_a.get_port_instance_identifier("nonexistent")
+    assert "nonexistent" in excinfo.value.diagnostic.message
 
 
 def test_topology_connections(m: f.Model):
@@ -175,7 +177,9 @@ def test_topology_instance_get_port_instance_identifier(nested_m):
     assert pii.interface_instance.qualified_name == "Inner"
     assert pii.port_instance.unqualified_name == "innerPort"
 
-    # A name that isn't a top port of the imported topology raises — "pIn" is
-    # a port on the underlying component, not a top port of Inner itself.
-    with pytest.raises(ValueError):
+    # A name that isn't a top port of the imported topology raises a
+    # `DiagnosticError` — "pIn" is a port on the underlying component, not a
+    # top port of Inner itself.
+    with pytest.raises(f.DiagnosticError) as excinfo:
         inst.get_port_instance_identifier("pIn")
+    assert "pIn" in excinfo.value.diagnostic.message

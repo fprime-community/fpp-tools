@@ -182,13 +182,14 @@ def analysis_detail(a: Analysis) -> int:
 def instance_port_lookups(a: Analysis) -> int:
     """`ComponentInterfaceInstance` and `TopologyInterfaceInstance` both expose
     `get_port_instance_identifier(str) -> PortInstanceIdentifier`, raising
-    `ValueError` if the name doesn't resolve to a port on the instance."""
+    `DiagnosticError` (it throws a `SemanticError`) if the name doesn't
+    resolve to a port on the instance."""
     total = 0
     for ci in a.component_instance_map.values():
         try:
             pii: PortInstanceIdentifier = ci.get_port_instance_identifier("pOut")
             total += len(pii.qualified_name)
-        except ValueError:
+        except DiagnosticError:
             pass
     for top in a.topology_map.values():
         for instance in top.instance_map:
@@ -196,7 +197,7 @@ def instance_port_lookups(a: Analysis) -> int:
                 try:
                     pii = instance.get_port_instance_identifier("pOut")
                     total += len(pii.qualified_name)
-                except ValueError:
+                except DiagnosticError:
                     pass
     return total
 
