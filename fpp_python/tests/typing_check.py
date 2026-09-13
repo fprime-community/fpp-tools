@@ -38,7 +38,6 @@ from fpp import (
     DiagnosticMessage,
     DiagnosticError,
     Endpoint,
-    Ident,
     IntegerKind,
     Loc,
     Model,
@@ -182,30 +181,23 @@ def analysis_detail(a: Analysis) -> int:
 
 def instance_port_lookups(a: Analysis) -> int:
     """`ComponentInterfaceInstance` and `TopologyInterfaceInstance` both expose
-    `get_port_instance_identifier(Ident) -> PortInstanceIdentifier`, raising
-    `ValueError` if the name doesn't resolve to a port on the instance. Reuse
-    any real `Ident` node as the argument — the method just looks up its
-    `.data` string, so which node it came from doesn't matter."""
+    `get_port_instance_identifier(str) -> PortInstanceIdentifier`, raising
+    `ValueError` if the name doesn't resolve to a port on the instance."""
     total = 0
-    ident: Optional[Ident] = None
     for ci in a.component_instance_map.values():
-        ref = ci.node.component
-        if isinstance(ref, Ident):
-            ident = ref
-            try:
-                pii: PortInstanceIdentifier = ci.get_port_instance_identifier(ref)
-                total += len(pii.qualified_name)
-            except ValueError:
-                pass
-    if ident is not None:
-        for top in a.topology_map.values():
-            for instance in top.instance_map:
-                if isinstance(instance, TopologyInterfaceInstance):
-                    try:
-                        pii = instance.get_port_instance_identifier(ident)
-                        total += len(pii.qualified_name)
-                    except ValueError:
-                        pass
+        try:
+            pii: PortInstanceIdentifier = ci.get_port_instance_identifier("pOut")
+            total += len(pii.qualified_name)
+        except ValueError:
+            pass
+    for top in a.topology_map.values():
+        for instance in top.instance_map:
+            if isinstance(instance, TopologyInterfaceInstance):
+                try:
+                    pii = instance.get_port_instance_identifier("pOut")
+                    total += len(pii.qualified_name)
+                except ValueError:
+                    pass
     return total
 
 

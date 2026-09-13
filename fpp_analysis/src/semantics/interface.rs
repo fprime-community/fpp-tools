@@ -800,21 +800,8 @@ impl PortInterface {
     }
 
     /// Get a port instance by name, erroring if it is not present.
-    pub fn get_port_instance(
-        &self,
-        name: &str,
-        loc: Span,
-        interface_name: &str,
-    ) -> SemanticResult<PortInstance> {
-        match self.port_map.get(name) {
-            Some(pi) => Ok(pi.clone()),
-            None => Err(SemanticError::InvalidPortInstanceId {
-                loc,
-                port_name: name.to_string(),
-                instance_type: self.instance_type.clone(),
-                interface_name: interface_name.to_string(),
-            }),
-        }
+    pub fn get_port_instance(&self, name: &str) -> Option<PortInstance> {
+        self.port_map.get(name).cloned()
     }
 
     /// Merge in every port of `interface`, marking each as imported through

@@ -117,8 +117,10 @@ fpp_python_macros::fpp_sem_bindings! {
             as_topology(a: analysis) -> opt(entity(Topology)),
             get_component_instance_opt -> opt(rewrap(InterfaceInstance::Component)),
             get_interface(a: analysis) -> opt(entity(PortInterface)),
-            get_port_instance(a: analysis, name: ref astnode(Ident)) throws -> union(PortInstance),
+            get_port_instance(a: analysis, name: str) -> opt(union(PortInstance)),
+            lookup_port_instance(a: analysis, name: ref astnode(Ident)) throws -> union(PortInstance),
             qualified_name -> str,
+            require_port_instance(a: analysis, name: str, loc: span) throws -> union(PortInstance),
             unqualified_name -> str,
         }
     }
@@ -413,7 +415,7 @@ fpp_python_macros::fpp_sem_bindings! {
             add_init_specifier(spec: entity(InitSpecifier)) throws -> rewrap(InterfaceInstance::Component),
             get_component(a: analysis) -> opt(entity(Component)),
             get_interface(a: analysis) -> opt(entity(PortInterface)),
-            get_port_instance_identifier(a: analysis, name: ref astnode(Ident)) throws -> entity(PortInstanceIdentifier),
+            get_port_instance_identifier(a: analysis, name: str) throws -> entity(PortInstanceIdentifier),
             get_qualified_name -> ref str,
             get_unqualified_name -> ref str,
         }
@@ -532,7 +534,7 @@ fpp_python_macros::fpp_sem_bindings! {
             qualified_name: str,
         }
         methods {
-            get_port_instance_identifier(a: analysis, name: ref astnode(Ident)) throws -> entity(PortInstanceIdentifier),
+            get_port_instance_identifier(a: analysis, name: str) throws -> entity(PortInstanceIdentifier),
         }
     }
 
@@ -789,7 +791,7 @@ fpp_python_macros::fpp_sem_bindings! {
         methods {
             add_imported_interface(interface: ref entity(Interface), import_node: node) throws -> entity(PortInterface),
             add_port_instance(instance: union(PortInstance)) throws -> entity(PortInterface),
-            get_port_instance(name: str, loc: span, interface_name: str) throws -> union(PortInstance),
+            get_port_instance(name: str) -> opt(union(PortInstance)),
             implements(other: ref entity(PortInterface)) throws -> unit,
         }
     }

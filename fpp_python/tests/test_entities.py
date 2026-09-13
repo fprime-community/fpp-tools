@@ -43,29 +43,6 @@ def m():
     return model
 
 
-def _ident_for_port_name(model, name):
-    """Captures an `Ident` for `name` off a `PortInstanceIdentifier` AST node
-    (one of the "shadowed" node types — see test_visitor.py) by walking the
-    model. `get_port_instance_identifier` needs a real `Ident` node; there is
-    no way to construct one from Python."""
-
-    class CapturePortName(f.NodeVisitor):
-        def __init__(self):
-            self.ident = None
-
-        def visit_PortInstanceIdentifier(self, node):
-            if node.port_name.data == name:
-                self.ident = node.port_name
-            super().visit_PortInstanceIdentifier(node)
-
-    v = CapturePortName()
-    for unit in model.ast:
-        for member in unit.members:
-            v.visit(member)
-    assert v.ident is not None
-    return v.ident
-
-
 def test_component_map(m):
     a = m.analysis
     (sym, comp) = next(iter(a.component_map.items()))
@@ -112,8 +89,7 @@ def test_component_instance_get_port_instance_identifier(m):
     insts = {ci.qualified_name: ci for ci in a.component_instance_map.values()}
     inst_a = insts["a"]
 
-    ident = _ident_for_port_name(m, "pOut")
-    pii = inst_a.get_port_instance_identifier(ident)
+    pii = inst_a.get_port_instance_identifier("pOut")
     assert pii.qualified_name == "a.pOut"
     assert pii.interface_instance.qualified_name == "a"
     assert pii.port_instance.unqualified_name == "pOut"
@@ -121,7 +97,7 @@ def test_component_instance_get_port_instance_identifier(m):
     # A name that isn't a port on the instance's component raises rather than
     # returning some placeholder.
     with pytest.raises(ValueError):
-        inst_a.get_port_instance_identifier(inst_a.node.component)
+        inst_a.get_port_instance_identifier("nonexistent")
 
 
 def test_topology_connections(m: f.Model):
@@ -194,12 +170,12 @@ def test_topology_instance_get_port_instance_identifier(nested_m):
     (inst,) = (k for k in outer.instance_map if isinstance(k, TopologyInterfaceInstance))
     assert inst.qualified_name == "Inner"
 
-    ident = _ident_for_port_name(nested_m, "innerPort")
-    pii = inst.get_port_instance_identifier(ident)
+    pii = inst.get_port_instance_identifier("innerPort")
     assert pii.qualified_name == "Inner.innerPort"
     assert pii.interface_instance.qualified_name == "Inner"
     assert pii.port_instance.unqualified_name == "innerPort"
 
-    # A name that isn't a top port of the imported topology raises.
+    # A name that isn't a top port of the imported topology raises — "pIn" is
+    # a port on the underlying component, not a top port of Inner itself.
     with pytest.raises(ValueError):
-        inst.get_port_instance_identifier(_ident_for_port_name(nested_m, "pIn"))
+        inst.get_port_instance_identifier("pIn")
