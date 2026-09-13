@@ -336,7 +336,8 @@ impl<E: DiagnosticEmitter> CompilerContext<E> {
         }
     }
 
-    fn diagnostic_get(&self, diagnostic: Diagnostic) -> DiagnosticData {
+    /// Resolves `diagnostic`'s span(s) against this context
+    pub fn diagnostic_get(&self, diagnostic: Diagnostic) -> DiagnosticData {
         DiagnosticData {
             level: diagnostic.level,
             message: diagnostic.msg,

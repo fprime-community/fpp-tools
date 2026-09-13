@@ -849,9 +849,11 @@ struct MethodDecl {
     assoc: bool,
     name: Ident,
     params: Vec<MethodParam>,
-    /// The native returns `Result<shape, E>`: the generated method raises a
-    /// `ValueError` carrying `{:?}` of the error instead of returning it.
-    throws: bool,
+    /// The native returns `Result<shape, E>`: the generated method raises
+    /// instead of returning it. Carries `E`'s bindgen-rendered name —
+    /// `SemanticError` raises a `DiagnosticError`; anything else falls back to
+    /// a `ValueError` carrying `{:?}` of the error.
+    throws: Option<Ident>,
     /// The native returns `&T` rather than an owned `T` (`ref` in the DSL). Shapes
     /// convert *from* a `&native`, so the call's result is handed to the conversion
     /// as-is instead of being referenced again — see [`ret_vref`].
@@ -1266,14 +1268,18 @@ impl Parse for MethodDecl {
         } else {
             Vec::new()
         };
-        // `throws` marks a native `Result` return: a call-site transform (raise
-        // instead of yield), not a value conversion, so it sits here rather than
-        // inside the shape.
+        // `throws(<ErrorType>)` marks a native `Result` return: a call-site
+        // transform (raise instead of yield), not a value conversion, so it sits
+        // here rather than inside the shape. The error type's name is a required
+        // payload (the bindgen always knows it) rather than an optional one, since
+        // `native_call_stmt` needs it to pick the raise behavior.
         let throws = if peek_kw(input, "throws") {
             input.parse::<Ident>()?;
-            true
+            let content;
+            parenthesized!(content in input);
+            Some(content.parse::<Ident>()?)
         } else {
-            false
+            None
         };
         input.parse::<Token![->]>()?;
         // A leading `ref` means the native returns `&T`; without it the return is
@@ -2041,17 +2047,24 @@ struct MethodArgs {
 }
 
 /// The `let __r = <call>;` statement for a native method call, applying the `throws`
-/// transform: a native `Result` error becomes a raised `ValueError` rendered with
-/// `{:?}` (the bindgen only emits `throws` for error types that impl `Debug`).
-fn native_call_stmt(call: &TokenStream, throws: bool) -> TokenStream {
-    if throws {
-        quote! {
+/// transform. `SemanticError` becomes a raised `DiagnosticError` carrying its
+/// rendered `Diagnostic` (spans resolved against `data`'s retained context —
+/// see `diagnostics::diagnostic_error`); any other native error type falls back
+/// to a `ValueError` rendered with `{:?}` (the bindgen only emits `throws` for
+/// error types that impl `Debug`).
+fn native_call_stmt(call: &TokenStream, throws: &Option<Ident>, data: &TokenStream) -> TokenStream {
+    match throws {
+        Some(err_ty) if err_ty == "SemanticError" => quote! {
+            let __r = #call.map_err(|__e| {
+                crate::diagnostics::diagnostic_error(&#data.ctx, __e)
+            })?;
+        },
+        Some(_) => quote! {
             let __r = #call.map_err(|__e| {
                 ::pyo3::exceptions::PyValueError::new_err(::std::format!("{:?}", __e))
             })?;
-        }
-    } else {
-        quote!(let __r = #call;)
+        },
+        None => quote!(let __r = #call;),
     }
 }
 
@@ -2104,7 +2117,7 @@ fn emit_union_methods(u: &UnionDecl, reg: &Registry) -> Vec<TokenStream> {
         let expr = m.shape.expr(&vref, &model, &data, reg);
         let ty = m.shape.ty(reg);
         let prelude = &args.prelude;
-        let call_stmt = native_call_stmt(&call, m.throws);
+        let call_stmt = native_call_stmt(&call, &m.throws, &data);
         // The native call may read the retained compiler context (annotations,
         // `Node::span`), so it runs under `run_ref`. This enters the context only
         // for the duration of the call/conversion; the conversion itself never
@@ -2263,7 +2276,7 @@ fn emit_subclass_getters(
                 let expr = m.shape.expr(&vref, &model, &data, reg);
                 let ty = m.shape.ty(reg);
                 let prelude = &args.prelude;
-                let call_stmt = native_call_stmt(&call, m.throws);
+                let call_stmt = native_call_stmt(&call, &m.throws, &data);
                 // The native call may read the retained compiler context, so it
                 // runs under `run_ref` (see `emit_union_methods`).
                 let body = quote! {
@@ -2798,7 +2811,7 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStr
         };
         let expr = m.shape.expr(&ret_vref(m.ret_ref), &model, &data, reg);
         let prelude = &args.prelude;
-        let call_stmt = native_call_stmt(&call, m.throws);
+        let call_stmt = native_call_stmt(&call, &m.throws, &data);
         // The native call may read the retained compiler context, so it runs
         // under `run_ref` (see `emit_union_methods`).
         getters.push(getter_tokens(&Getter {
@@ -2976,7 +2989,7 @@ fn emit_analysis(a: &AnalysisDecl, reg: &Registry) -> (TokenStream, TokenStream)
         };
         let expr = m.shape.expr(&ret_vref(m.ret_ref), &model, &data, reg);
         let prelude = &args.prelude;
-        let call_stmt = native_call_stmt(&call, m.throws);
+        let call_stmt = native_call_stmt(&call, &m.throws, &data);
         // The native call may read the retained compiler context, so it runs
         // under `run_ref` (see `emit_union_methods`).
         getters.push(getter_tokens(&Getter {

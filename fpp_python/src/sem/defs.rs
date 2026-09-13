@@ -43,32 +43,32 @@ fpp_python_macros::fpp_sem_bindings! {
             system_map: map(union(Symbol), entity(FppSystem)),
         }
         methods {
-            check_displayable_params(params: ref list(astnode(FormalParam)), msg: str) throws -> unit,
-            check_displayable_type(node: node, loc: span, msg: str) throws -> unit,
-            get_array_size(node: node, loc: span) throws -> i128,
-            get_array_size_opt(expr: ref opt(astnode(Expr))) throws -> i128,
+            check_displayable_params(params: ref list(astnode(FormalParam)), msg: str) throws(SemanticError) -> unit,
+            check_displayable_type(node: node, loc: span, msg: str) throws(SemanticError) -> unit,
+            get_array_size(node: node, loc: span) throws(SemanticError) -> i128,
+            get_array_size_opt(expr: ref opt(astnode(Expr))) throws(SemanticError) -> i128,
             get_big_int_value(node: node) -> opt(i128),
             get_big_int_value_opt(expr: ref opt(astnode(Expr))) -> opt(i128),
-            get_component(id: node) throws -> opt(entity(Component)),
-            get_component_instance(id: node) throws -> opt(rewrap(InterfaceInstance::Component)),
-            get_component_instance_symbol(id: node) throws -> opt(union(Symbol)),
-            get_dictionary(id: node) throws -> opt(entity(Dictionary)),
+            get_component(id: node) throws(SemanticError) -> opt(entity(Component)),
+            get_component_instance(id: node) throws(SemanticError) -> opt(rewrap(InterfaceInstance::Component)),
+            get_component_instance_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
+            get_dictionary(id: node) throws(SemanticError) -> opt(entity(Dictionary)),
             get_enclosing_names(symbol: ref union(Symbol)) -> list(str),
             get_finalized_type(node: node) -> opt(union(Type)),
             get_int_value(node: node) -> opt(i128),
-            get_int_value_checked(node: node, loc: span) throws -> i128,
+            get_int_value_checked(node: node, loc: span) throws(SemanticError) -> i128,
             get_interface(id: node) -> opt(entity(Interface)),
             get_interface_instance(id: node) -> opt(union(InterfaceInstance)),
-            get_interface_instance_symbol(id: node) throws -> opt(union(Symbol)),
-            get_interface_symbol(id: node) throws -> opt(union(Symbol)),
-            get_nonnegative_big_int_value(node: node, loc: span) throws -> i128,
-            get_nonnegative_big_int_value_opt(expr: ref opt(astnode(Expr))) throws -> opt(i128),
-            get_nonnegative_int_value(node: node, loc: span) throws -> i128,
+            get_interface_instance_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
+            get_interface_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
+            get_nonnegative_big_int_value(node: node, loc: span) throws(SemanticError) -> i128,
+            get_nonnegative_big_int_value_opt(expr: ref opt(astnode(Expr))) throws(SemanticError) -> opt(i128),
+            get_nonnegative_int_value(node: node, loc: span) throws(SemanticError) -> i128,
             get_qualified_name(symbol: ref union(Symbol)) -> str,
             get_reason_for_non_displayable_type_at(node: node) -> list(tuple(span, str)),
             get_scope(symbol: ref opt(union(Symbol))) -> ref entity(Scope),
-            get_topology(id: node) throws -> opt(entity(Topology)),
-            get_topology_symbol(id: node) throws -> opt(union(Symbol)),
+            get_topology(id: node) throws(SemanticError) -> opt(entity(Topology)),
+            get_topology_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
             implied_uses(node: node) -> opt(entity(ImpliedUseSet)),
         }
     }
@@ -118,9 +118,9 @@ fpp_python_macros::fpp_sem_bindings! {
             get_component_instance_opt -> opt(rewrap(InterfaceInstance::Component)),
             get_interface(a: analysis) -> opt(entity(PortInterface)),
             get_port_instance(a: analysis, name: str) -> opt(union(PortInstance)),
-            lookup_port_instance(a: analysis, name: ref astnode(Ident)) throws -> union(PortInstance),
+            lookup_port_instance(a: analysis, name: ref astnode(Ident)) throws(SemanticError) -> union(PortInstance),
             qualified_name -> str,
-            require_port_instance(a: analysis, name: str, loc: span) throws -> union(PortInstance),
+            require_port_instance(a: analysis, name: str, loc: span) throws(SemanticError) -> union(PortInstance),
             unqualified_name -> str,
         }
     }
@@ -150,7 +150,7 @@ fpp_python_macros::fpp_sem_bindings! {
             get_type -> opt(union(PortInstanceType)),
             get_unqualified_name -> ref str,
             is_async_input -> bool,
-            require_connection_at(loc: span) throws -> unit,
+            require_connection_at(loc: span) throws(SemanticError) -> unit,
             signature_eq(other: ref union(PortInstance)) -> bool,
             with_import_specifier(import_node: node) -> union(PortInstance),
         }
@@ -278,7 +278,7 @@ fpp_python_macros::fpp_sem_bindings! {
             as_anon_array -> opt(rewrap(Type::AnonArray)),
             as_anon_struct -> opt(rewrap(Type::AnonStruct)),
             assoc common_type(t2_a: ref arc(union(Type))) -> opt(union(Type)),
-            assoc convert(to: ref arc(union(Type))) throws -> unit,
+            assoc convert(to: ref arc(union(Type))) throws(TypeConversionError) -> unit,
             def_node_id -> opt(node),
             def_symbol -> opt(union(Symbol)),
             default_value -> opt(union(Value)),
@@ -294,7 +294,7 @@ fpp_python_macros::fpp_sem_bindings! {
             is_promotable_to_array -> bool,
             is_promotable_to_struct -> bool,
             primitive_serialized_size -> opt(i128),
-            serialized_size(a: analysis) throws -> i128,
+            serialized_size(a: analysis) throws(SerializedSizeError) -> i128,
             assoc underlying_type -> union(Type),
         }
     }
@@ -314,17 +314,17 @@ fpp_python_macros::fpp_sem_bindings! {
             Struct => StructValue : payload,
         }
         methods {
-            add(other: ref union(Value)) throws -> union(Value),
+            add(other: ref union(Value)) throws(MathError) -> union(Value),
             as_shift_int -> opt(i128),
             convert(ty_a: ref arc(union(Type))) -> opt(union(Value)),
-            div(other: ref union(Value)) throws -> union(Value),
+            div(other: ref union(Value)) throws(MathError) -> union(Value),
             get_type -> union(Type),
             is_zero -> bool,
-            mul(other: ref union(Value)) throws -> union(Value),
-            negate throws -> union(Value),
-            shl(other: ref union(Value)) throws -> union(Value),
-            shr(other: ref union(Value)) throws -> union(Value),
-            sub(other: ref union(Value)) throws -> union(Value),
+            mul(other: ref union(Value)) throws(MathError) -> union(Value),
+            negate throws(MathError) -> union(Value),
+            shl(other: ref union(Value)) throws(MathError) -> union(Value),
+            shr(other: ref union(Value)) throws(MathError) -> union(Value),
+            sub(other: ref union(Value)) throws(MathError) -> union(Value),
             truncate -> union(Value),
         }
     }
@@ -412,10 +412,10 @@ fpp_python_macros::fpp_sem_bindings! {
             init_specifier_map: map(i128, entity(InitSpecifier)),
         }
         methods {
-            add_init_specifier(spec: entity(InitSpecifier)) throws -> rewrap(InterfaceInstance::Component),
+            add_init_specifier(spec: entity(InitSpecifier)) throws(SemanticError) -> rewrap(InterfaceInstance::Component),
             get_component(a: analysis) -> opt(entity(Component)),
             get_interface(a: analysis) -> opt(entity(PortInterface)),
-            get_port_instance_identifier(a: analysis, name: str) throws -> entity(PortInstanceIdentifier),
+            get_port_instance_identifier(a: analysis, name: str) throws(SemanticError) -> entity(PortInstanceIdentifier),
             get_qualified_name -> ref str,
             get_unqualified_name -> ref str,
         }
@@ -534,7 +534,7 @@ fpp_python_macros::fpp_sem_bindings! {
             qualified_name: str,
         }
         methods {
-            get_port_instance_identifier(a: analysis, name: str) throws -> entity(PortInstanceIdentifier),
+            get_port_instance_identifier(a: analysis, name: str) throws(SemanticError) -> entity(PortInstanceIdentifier),
         }
     }
 
@@ -580,7 +580,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
         methods {
             get_max_id -> i128,
-            get_tlm_channel_by_name(name: ref astnode(Ident)) throws -> entity(TlmChannel),
+            get_tlm_channel_by_name(name: ref astnode(Ident)) throws(SemanticError) -> entity(TlmChannel),
             has_commands -> bool,
             has_data_products -> bool,
             has_events -> bool,
@@ -646,7 +646,7 @@ fpp_python_macros::fpp_sem_bindings! {
             tlm_packet_set_map: map(str, entity(TlmPacketSet)),
         }
         methods {
-            find_numeric_id_for_channel(t: ref entity(Topology), channel_id: ref entity(TlmChannelIdentifier)) throws -> i128,
+            find_numeric_id_for_channel(t: ref entity(Topology), channel_id: ref entity(TlmChannelIdentifier)) throws(SemanticError) -> i128,
         }
     }
 
@@ -743,8 +743,8 @@ fpp_python_macros::fpp_sem_bindings! {
             port_interface: entity(PortInterface),
         }
         methods {
-            add_imported_interface_symbol(symbol: union(Symbol), import: ref astnode(SpecInterfaceImport)) throws -> entity(Interface),
-            add_port_instance(instance: union(PortInstance)) throws -> entity(Interface),
+            add_imported_interface_symbol(symbol: union(Symbol), import: ref astnode(SpecInterfaceImport)) throws(SemanticError) -> entity(Interface),
+            add_port_instance(instance: union(PortInstance)) throws(SemanticError) -> entity(Interface),
             get_unqualified_name -> ref str,
             imports_in_source_order -> list(tuple(union(Symbol), node)),
         }
@@ -789,10 +789,10 @@ fpp_python_macros::fpp_sem_bindings! {
             special_port_map: map(leaf(crate::ast::SpecialPortInstanceKind), rewrap(PortInstance::Special)),
         }
         methods {
-            add_imported_interface(interface: ref entity(Interface), import_node: node) throws -> entity(PortInterface),
-            add_port_instance(instance: union(PortInstance)) throws -> entity(PortInterface),
+            add_imported_interface(interface: ref entity(Interface), import_node: node) throws(SemanticError) -> entity(PortInterface),
+            add_port_instance(instance: union(PortInstance)) throws(SemanticError) -> entity(PortInterface),
             get_port_instance(name: str) -> opt(union(PortInstance)),
-            implements(other: ref entity(PortInterface)) throws -> unit,
+            implements(other: ref entity(PortInterface)) throws(SemanticError) -> unit,
         }
     }
 
@@ -1017,7 +1017,7 @@ fpp_python_macros::fpp_sem_bindings! {
             get_name -> ref str,
             get_port_number(pi: ref union(PortInstance), c: ref entity(Connection)) -> opt(i128),
             get_used_port_numbers(pi: ref union(PortInstance), cs: ref list(entity(Connection))) -> list(i128),
-            look_up_instance_at(instance: ref union(InterfaceInstance), loc: span) throws -> unit,
+            look_up_instance_at(instance: ref union(InterfaceInstance), loc: span) throws(SemanticError) -> unit,
             node -> ref astdef(DefTopology),
             resolve_numbers(c: ref entity(Connection)) -> entity(Connection),
             sort_connections(connections: ref list(entity(Connection))) -> list(entity(Connection)),

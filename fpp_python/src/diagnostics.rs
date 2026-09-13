@@ -596,6 +596,19 @@ fn error_diagnostic(error: &Bound<'_, PyAny>) -> PyResult<Py<Diagnostic>> {
     payload.extract().map_err(PyErr::from)
 }
 
+/// Raises a fpp_analysis::errors::SemanticError error that renders as a `DiagnosticError`
+pub(crate) fn diagnostic_error<E: fpp_core::DiagnosticEmitter>(
+    ctx: &fpp_core::CompilerContext<E>,
+    err: impl Into<fpp_core::Diagnostic>,
+) -> PyErr {
+    let owned = OwnedDiagnostic::from(&ctx.diagnostic_get(err.into()));
+    Python::attach(|py| {
+        let diagnostic = Py::new(py, Diagnostic { data: owned })
+            .expect("allocating a Diagnostic pyclass cannot fail");
+        DiagnosticError::new_err((diagnostic,))
+    })
+}
+
 /// Add the diagnostic classes, and the `DiagnosticError` exception, to the module.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Diagnostic>()?;

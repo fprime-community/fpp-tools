@@ -1834,8 +1834,14 @@ fn render_method(names: &Names, m: &MethodDef) -> String {
     let by_ref = if m.ret_ref { "ref " } else { "" };
     let ret = format!("{by_ref}{}", render_shape(names, &m.ret));
     // `throws` is a call-site transform (the native `Result` becomes a raise), not a
-    // value conversion, so it sits on the method rather than inside the shape.
-    let throws = if m.throws.is_some() { " throws" } else { "" };
+    // value conversion, so it sits on the method rather than inside the shape. The
+    // error type's name is carried as a payload (rather than a bare `throws`) so
+    // the macro can special-case `SemanticError` into a `DiagnosticError` instead
+    // of the generic `ValueError` fallback.
+    let throws = match &m.throws {
+        Some(err_ty) => format!(" throws({err_ty})"),
+        None => String::new(),
+    };
     if m.params.is_empty() {
         format!("{assoc}{}{throws} -> {ret},", m.name)
     } else {

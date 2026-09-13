@@ -10,7 +10,8 @@ as a failure rather than as a silently re-skipped method:
 * `union(N)` / `entity(N)` -- a native semantic value, lent by its Python wrapper
 * `arc(union(N))`         -- an `Arc`-stored native, lent without a clone
 * `opt(..)` / `list(..)`  -- rebuilt containers, including the empty/`None` cases
-* `throws`                -- a native `Result` error raised as `ValueError`
+* `throws`                -- a native `Result` error raised as `DiagnosticError`
+                             (a `SemanticError`) or `ValueError` (anything else)
 
 It also covers the two cross-cutting guarantees: a wrapper from a different `Model`
 is rejected, and a field getter can coexist with a `get_<field>` method.
@@ -129,10 +130,14 @@ def test_span_param_and_ok_result(m, nodes, a_span):
     assert m.analysis.get_array_size(size_expr, a_span) == 4
 
 
-def test_throws_raises_value_error(m, nodes, a_span):
+def test_throws_raises_diagnostic_error(m, nodes, a_span):
+    """`get_nonnegative_int_value` throws a `SemanticError`, which raises as a
+    `DiagnosticError` carrying the rendered diagnostic rather than a generic
+    `ValueError`."""
     neg = next(e for e in of_kind(nodes, "Expr") if m.analysis.get_int_value(e) == -2)
-    with pytest.raises(ValueError):
+    with pytest.raises(f.DiagnosticError) as excinfo:
         m.analysis.get_nonnegative_int_value(neg, a_span)
+    assert "may not be negative" in excinfo.value.diagnostic.message
 
 
 def test_throws_unit_ok_returns_none(m):
