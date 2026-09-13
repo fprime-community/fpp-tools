@@ -29,9 +29,25 @@ pub fn cmp_span(a: &Span, b: &Span) -> Ordering {
 pub struct TopologyInstance {
     /// The topology symbol, used to look up the resolved `Topology`.
     pub symbol: Symbol,
-    /// The fully qualified name of the topology. Cached, because computing it
-    /// needs the enclosing module scope, which is not on the node.
+    /// The fully qualified name of the topology
     pub qualified_name: String,
+}
+
+impl TopologyInstance {
+    /// Builds a port instance identifier for a top-level port on this
+    /// topology instance, by name.
+    pub fn get_port_instance_identifier(
+        &self,
+        a: &Analysis,
+        name: &ast::Ident,
+    ) -> SemanticResult<PortInstanceIdentifier> {
+        let interface_instance = InterfaceInstance::Topology(self.clone());
+        let port_instance = interface_instance.get_port_instance(a, name)?;
+        Ok(PortInstanceIdentifier {
+            interface_instance,
+            port_instance,
+        })
+    }
 }
 
 /// An FPP interface instance: a component instance or an imported topology.

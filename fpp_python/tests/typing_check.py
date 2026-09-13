@@ -38,12 +38,14 @@ from fpp import (
     DiagnosticMessage,
     DiagnosticError,
     Endpoint,
+    Ident,
     IntegerKind,
     Loc,
     Model,
     NodeVisitor,
     NonParamCommand,
     NonParamKind,
+    PortInstanceIdentifier,
     PrimitiveIntType,
     Span,
     SpecCommand,
@@ -52,6 +54,7 @@ from fpp import (
     Symbol,
     SymbolPort,
     SyntaxTree,
+    TopologyInterfaceInstance,
     TransUnit,
     Type,
 )
@@ -174,6 +177,35 @@ def analysis_detail(a: Analysis) -> int:
         machine: StateMachine = sm
         actions: list[StateMachineSymbol] = machine.actions
         total += len(actions)
+    return total
+
+
+def instance_port_lookups(a: Analysis) -> int:
+    """`ComponentInterfaceInstance` and `TopologyInterfaceInstance` both expose
+    `get_port_instance_identifier(Ident) -> PortInstanceIdentifier`, raising
+    `ValueError` if the name doesn't resolve to a port on the instance. Reuse
+    any real `Ident` node as the argument — the method just looks up its
+    `.data` string, so which node it came from doesn't matter."""
+    total = 0
+    ident: Optional[Ident] = None
+    for ci in a.component_instance_map.values():
+        ref = ci.node.component
+        if isinstance(ref, Ident):
+            ident = ref
+            try:
+                pii: PortInstanceIdentifier = ci.get_port_instance_identifier(ref)
+                total += len(pii.qualified_name)
+            except ValueError:
+                pass
+    if ident is not None:
+        for top in a.topology_map.values():
+            for instance in top.instance_map:
+                if isinstance(instance, TopologyInterfaceInstance):
+                    try:
+                        pii = instance.get_port_instance_identifier(ident)
+                        total += len(pii.qualified_name)
+                    except ValueError:
+                        pass
     return total
 
 
@@ -314,6 +346,7 @@ def main() -> int:
     sym: Optional[Symbol] = model.lookup("M.c")
     name = analysis.get_qualified_name(sym) if sym is not None else "<none>"
     total = node_id_sum + analysis_detail(analysis) + connection_spans(analysis)
+    total += instance_port_lookups(analysis)
     total += source_units(model) + len(kind_spelling(IntegerKind.U32))
     total += len(type_spelling(units[0].members[0]))
     total += 1 if first_port_symbol(model) is not None else 0

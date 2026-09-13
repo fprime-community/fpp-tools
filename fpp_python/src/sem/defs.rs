@@ -413,6 +413,7 @@ fpp_python_macros::fpp_sem_bindings! {
             add_init_specifier(spec: entity(InitSpecifier)) throws -> rewrap(InterfaceInstance::Component),
             get_component(a: analysis) -> opt(entity(Component)),
             get_interface(a: analysis) -> opt(entity(PortInterface)),
+            get_port_instance_identifier(a: analysis, name: ref astnode(Ident)) throws -> entity(PortInstanceIdentifier),
             get_qualified_name -> ref str,
             get_unqualified_name -> ref str,
         }
@@ -529,6 +530,9 @@ fpp_python_macros::fpp_sem_bindings! {
         fields {
             symbol: union(Symbol),
             qualified_name: str,
+        }
+        methods {
+            get_port_instance_identifier(a: analysis, name: ref astnode(Ident)) throws -> entity(PortInstanceIdentifier),
         }
     }
 
