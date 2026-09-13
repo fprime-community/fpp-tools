@@ -1,6 +1,8 @@
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
-use crate::semantics::{Component, PortInterface, Symbol};
+use crate::semantics::{
+    Component, InterfaceInstance, PortInstanceIdentifier, PortInterface, Symbol,
+};
 use fpp_ast::{AstNode, ComponentKind, DefComponentInstance, Expr, LitString, SpecInit};
 use fpp_core::{Span, Spanned};
 use rustc_hash::FxHashMap as HashMap;
@@ -102,6 +104,22 @@ impl ComponentInstance {
     /// Gets the port interface of the component this is an instance of
     pub fn get_interface<'a>(&self, a: &'a Analysis) -> Option<&'a PortInterface> {
         self.get_component(a).map(|c| &c.port_interface)
+    }
+
+    /// Builds a port instance identifier for a port on this component
+    /// instance, by name. Errors are annotated at this instance's own
+    /// location, since a plain name carries no span of its own.
+    pub fn get_port_instance_identifier(
+        &self,
+        a: &Analysis,
+        name: &str,
+    ) -> SemanticResult<PortInstanceIdentifier> {
+        let interface_instance = InterfaceInstance::Component(self.clone());
+        let port_instance = interface_instance.require_port_instance(a, name, self.get_loc())?;
+        Ok(PortInstanceIdentifier {
+            interface_instance,
+            port_instance,
+        })
     }
 
     /// Adds an init specifier

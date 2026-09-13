@@ -753,7 +753,7 @@ pub(crate) fn port_instance_at_position<'a>(
         .analysis
         .get_interface_instance(pii.interface_instance.id())?;
     let port_instance = interface_instance
-        .get_port_instance(&state.analysis, &pii.port_name)
+        .lookup_port_instance(&state.analysis, &pii.port_name)
         .ok()?;
 
     // Look up the port name node among the resolved nodes for ranging.

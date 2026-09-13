@@ -730,7 +730,7 @@ module M {
             let interface_instance = InterfaceInstance::from_topology(top);
             let port_instance = top
                 .port_interface
-                .get_port_instance("a", top.get_loc(), &top.unqualified_name())
+                .get_port_instance("a")
                 .expect("the topology port was resolved");
             let pii = PortInstanceIdentifier {
                 interface_instance,

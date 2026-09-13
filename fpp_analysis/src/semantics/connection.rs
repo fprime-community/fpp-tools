@@ -4,7 +4,7 @@ use crate::semantics::{
     ComponentInstance, Direction, Interface, PortInstance, PortInstanceType, PortInterface, Symbol,
     SymbolInterface, Topology,
 };
-use fpp_ast::{self as ast, AstNode};
+use fpp_ast::{self as ast, AstNode, Ident};
 use fpp_core::{Span, Spanned};
 use std::cmp::Ordering;
 
@@ -29,9 +29,27 @@ pub fn cmp_span(a: &Span, b: &Span) -> Ordering {
 pub struct TopologyInstance {
     /// The topology symbol, used to look up the resolved `Topology`.
     pub symbol: Symbol,
-    /// The fully qualified name of the topology. Cached, because computing it
-    /// needs the enclosing module scope, which is not on the node.
+    /// The fully qualified name of the topology
     pub qualified_name: String,
+}
+
+impl TopologyInstance {
+    /// Builds a port instance identifier for a top-level port on this
+    /// topology instance, by name. Errors are annotated at this instance's
+    /// own location, since a plain name carries no span of its own.
+    pub fn get_port_instance_identifier(
+        &self,
+        a: &Analysis,
+        name: &str,
+    ) -> SemanticResult<PortInstanceIdentifier> {
+        let interface_instance = InterfaceInstance::Topology(self.clone());
+        let loc = interface_instance.get_loc();
+        let port_instance = interface_instance.require_port_instance(a, name, loc)?;
+        Ok(PortInstanceIdentifier {
+            interface_instance,
+            port_instance,
+        })
+    }
 }
 
 /// An FPP interface instance: a component instance or an imported topology.
@@ -99,15 +117,38 @@ impl InterfaceInstance {
     }
 
     /// Look up a port instance by name in this interface instance.
-    pub fn get_port_instance(
-        &self,
-        a: &Analysis,
-        name: &ast::Ident,
-    ) -> SemanticResult<PortInstance> {
+    pub fn get_port_instance(&self, a: &Analysis, name: &str) -> Option<PortInstance> {
         let interface = self
             .get_interface(a)
             .expect("interface instance references a resolved component or topology");
-        interface.get_port_instance(&name.data, name.span(), &self.unqualified_name())
+        interface.get_port_instance(name)
+    }
+
+    /// Look up a port instance by name, erroring at `loc` if it is not
+    /// present on this interface instance.
+    pub fn require_port_instance(
+        &self,
+        a: &Analysis,
+        name: &str,
+        loc: Span,
+    ) -> SemanticResult<PortInstance> {
+        self.get_port_instance(a, name)
+            .ok_or_else(|| SemanticError::InvalidPortInstanceId {
+                loc,
+                port_name: name.to_string(),
+                instance_type: self
+                    .get_interface(a)
+                    .expect("interface instance references a resolved component or topology")
+                    .instance_type
+                    .clone(),
+                interface_name: self.unqualified_name(),
+            })
+    }
+
+    /// Look up a port instance from an AST reference, erroring at the
+    /// reference's own span if it is not present.
+    pub fn lookup_port_instance(&self, a: &Analysis, name: &Ident) -> SemanticResult<PortInstance> {
+        self.require_port_instance(a, &name.data, name.span())
     }
 }
 
@@ -197,7 +238,7 @@ impl PortInstanceIdentifier {
         else {
             return Ok(None);
         };
-        let port_instance = interface_instance.get_port_instance(a, &node.port_name)?;
+        let port_instance = interface_instance.lookup_port_instance(a, &node.port_name)?;
         Ok(Some(PortInstanceIdentifier {
             interface_instance,
             port_instance,
