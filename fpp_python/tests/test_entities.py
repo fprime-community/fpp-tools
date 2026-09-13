@@ -116,6 +116,102 @@ def test_topology_connections(m: f.Model):
     assert conn.is_unmatched is False
 
 
+PORT_NUMBER_SRC = """
+port P
+passive component C {
+  sync input port pIn: [3] P
+  output port pOut: [3] P
+}
+instance a: C base id 0x100
+instance b: C base id 0x200
+topology T {
+  instance a
+  instance b
+  connections C1 {
+    a.pOut -> b.pIn
+    a.pOut -> b.pIn
+    a.pOut[2] -> b.pIn[1]
+  }
+}
+"""
+
+
+@pytest.fixture(scope="module")
+def numbered_top():
+    model = f.analyze(source=PORT_NUMBER_SRC, uri="numbering.fpp")
+    assert not model.has_errors, [d.message for d in model.diagnostics]
+    (top,) = model.analysis.topology_map.values()
+    return top
+
+
+def test_endpoint_port_number_is_the_written_index(numbered_top):
+    """`Endpoint.port_number` is what the source wrote, not what analysis resolved.
+
+    Only the third connection carries explicit indices, so the first two report
+    `None` on both endpoints even though the topology is fully analyzed.
+    """
+    written = [
+        (c.from_.port_number, c.to.port_number) for c in numbered_top.connection_map["C1"]
+    ]
+    assert written == [(None, None), (None, None), (2, 1)]
+
+
+def test_resolved_port_numbers(numbered_top):
+    """The numbering pass's output is on the topology, keyed by connection.
+
+    Reachable two equivalent ways: `get_port_number`, which picks the from- or
+    to-side map from the direction of the port instance handed to it, and the maps
+    themselves. The two implicit output connections get distinct numbers; input
+    connections share number 0 unless written otherwise.
+    """
+    resolved = []
+    for c in numbered_top.connection_map["C1"]:
+        got = (
+            numbered_top.get_port_number(c.from_.port.port_instance, c),
+            numbered_top.get_port_number(c.to.port.port_instance, c),
+        )
+        # A connection keys the number-map dicts by value, so a wrapper rebuilt by
+        # any other getter finds the same entry.
+        assert got == (
+            numbered_top.from_port_number_map[c],
+            numbered_top.to_port_number_map[c],
+        )
+        resolved.append(got)
+    assert resolved == [(0, 0), (1, 0), (2, 1)]
+
+
+def test_resolve_numbers_fills_in_the_endpoints(numbered_top):
+    """`resolve_numbers` is the ergonomic read: a copy with both numbers written in.
+
+    Because an endpoint compares by port name *and* written index, that copy is a
+    different connection from the original — so it is the original, not the
+    resolved image, that keys the number maps.
+    """
+    c = numbered_top.connection_map["C1"][1]
+    resolved = numbered_top.resolve_numbers(c)
+    assert (resolved.from_.port_number, resolved.to.port_number) == (1, 0)
+    assert resolved != c
+    assert resolved not in numbered_top.from_port_number_map
+
+
+def test_connection_is_a_usable_dict_key(numbered_top):
+    """Value equality + hashing, so the two duplicate connections stay distinct.
+
+    They differ only in where they are written, which is exactly what keeps them
+    apart in the port-number maps above.
+    """
+    first, second, third = numbered_top.connection_map["C1"]
+    # Freshly built wrappers over the same connection, never the same object.
+    again = numbered_top.connection_map["C1"][0]
+    assert again is not first
+    assert again == first and hash(again) == hash(first)
+    assert first != second and first != third
+    assert len({first, second, third, again}) == 3
+    # Endpoints compare by port name + written index, so both duplicates' from-ends
+    # are equal while the connections are not.
+    assert first.from_ == second.from_
+
+
 def test_span_resolves(m):
     # `Endpoint.loc` is a lazy `Span`; the node getters hand back resolved `Loc`s.
     (top,) = m.analysis.topology_map.values()

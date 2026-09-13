@@ -593,7 +593,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Connection native fpp_analysis::semantics::Connection {
+    entity Connection native fpp_analysis::semantics::Connection identity native {
         fields {
             from: entity(Endpoint),
             to: entity(Endpoint),
@@ -650,7 +650,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Endpoint native fpp_analysis::semantics::Endpoint {
+    entity Endpoint native fpp_analysis::semantics::Endpoint identity native {
         fields {
             loc: span,
             port: entity(PortInstanceIdentifier),
@@ -807,7 +807,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity QualifiedName native fpp_analysis::semantics::QualifiedName repr display {
+    entity QualifiedName native fpp_analysis::semantics::QualifiedName identity native repr display {
         methods {
             base -> ref str,
             qualifier -> ref list(str),
@@ -936,7 +936,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity TlmChannelEntry native fpp_analysis::semantics::TlmChannelEntry repr name(get_qualified_name) {
+    entity TlmChannelEntry native fpp_analysis::semantics::TlmChannelEntry identity native repr name(get_qualified_name) {
         fields {
             instance: rewrap(InterfaceInstance::Component),
             tlm_channel: entity(TlmChannel),
@@ -1048,7 +1048,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity TransitionGraphNode native fpp_analysis::semantics::transition_graph::Node {
+    entity TransitionGraphNode native fpp_analysis::semantics::transition_graph::Node identity native {
         fields {
             soc: union(StateOrChoice),
         }

@@ -30,7 +30,7 @@
 //!     methods { … }
 //! }
 //! entity <PyName> native <path> [ field <ident> ]
-//!        [identity <node | qualified_name[(<method>)] | raw_handle>] [repr <reprmode>] {
+//!        [identity <node | qualified_name[(<method>)] | native>] [repr <reprmode>] {
 //!     extras  { <name>: <shape>, … }   // clone-handle only: build-time scalars
 //!     fields  { <name>: <shape>, … }
 //!     methods { … }
@@ -43,7 +43,8 @@
 //! `loc_from_node` emits a base `loc` getter resolving the location from the
 //! native's node id. `identity` emits `__eq__`/`__hash__` (`node`: native `==` +
 //! hash by node id; `identical`: value equality + node-id hash via the carried
-//! `(eq_fn, node_id_method)` idents). A `leaf_enum` emits a
+//! `(eq_fn, node_id_method)` idents; `qualified_name`: by the named string method;
+//! `native`: straight to the native's own `Eq`/`Hash`). A `leaf_enum` emits a
 //! `#[pyclass(eq, eq_int)]` mirror (not an `enum.Enum` subclass) with
 //! `.name`/`.value` getters, + `From<&native>`.
 //!
@@ -997,8 +998,10 @@ enum EntityIdentity {
     /// `__eq__`/`__hash__` from `self.<field>.<method>()` (a `String`); the carried
     /// `Ident` names that method (e.g. `qualified_name`).
     QualifiedName(Ident),
-    /// Delegate to the native's `PartialEq`/`Hash` (native: `Copy + Hash + Eq`).
-    RawHandle,
+    /// Delegate to the native's own `PartialEq`/`Hash` (native: `Hash + Eq`), so
+    /// the Python wrapper keys a `dict` exactly as the native keys the analysis's
+    /// own maps.
+    Native,
 }
 
 /// A standalone `entity` item (see [`EntityHandle`] for the two storage shapes).
@@ -1519,13 +1522,13 @@ impl Parse for EntityDecl {
                         format_ident!("qualified_name")
                     })?)
                 }
-                "raw_handle" => EntityIdentity::RawHandle,
+                "native" => EntityIdentity::Native,
                 other => {
                     return Err(syn::Error::new(
                         mode.span(),
                         format!(
                             "unknown identity mode `{other}` \
-                             (expected node/qualified_name/raw_handle)"
+                             (expected node/qualified_name/native)"
                         ),
                     ));
                 }
@@ -2727,7 +2730,7 @@ fn emit_entity_identity(e: &EntityDecl, field: &Ident) -> Vec<TokenStream> {
                 __h.finish()
             }
         }],
-        EntityIdentity::RawHandle => vec![quote! {
+        EntityIdentity::Native => vec![quote! {
             fn __eq__(&self, other: &::pyo3::Bound<'_, ::pyo3::PyAny>) -> bool {
                 match other.cast::<#py>() {
                     ::std::result::Result::Ok(o) => self.#field == o.borrow().#field,

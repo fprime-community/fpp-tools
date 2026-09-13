@@ -7,6 +7,7 @@ use crate::semantics::{
 use fpp_ast::{self as ast, AstNode, Ident};
 use fpp_core::{Span, Spanned};
 use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 
 /// Compare two spans deterministically by (file path, start byte position),
 /// used for connection sorting.
@@ -284,6 +285,14 @@ impl Ord for Endpoint {
         }
     }
 }
+impl Hash for Endpoint {
+    /// Hash over exactly the members [`Ord::cmp`] compares — the qualified port
+    /// name and the explicit port number, not `loc` or `topology_port`.
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.port.qualified_name().hash(state);
+        self.port_number.hash(state);
+    }
+}
 
 impl Endpoint {
     /// Build an endpoint from AST info. Returns `None` if unresolved.
@@ -377,8 +386,11 @@ pub struct Connection {
 }
 
 impl PartialEq for Connection {
+    /// Two connections are the same connection when both endpoints match and they
+    /// were written at the same place — the from-endpoint span compared as a raw
+    /// handle, which (unlike [`cmp_span`]) needs no live compiler context.
     fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
+        self.from == other.from && self.to == other.to && self.from.loc == other.from.loc
     }
 }
 impl Eq for Connection {}
@@ -389,11 +401,33 @@ impl PartialOrd for Connection {
 }
 impl Ord for Connection {
     /// Compare two connections.
+    ///
+    /// [`cmp_span`] orders the from-endpoint locations by (file path, start
+    /// position) so that iteration over the `BTreeMap`s a [`Topology`] keys by
+    /// connection is stable across runs. Spans are allocated rather than interned,
+    /// so that leaves two separately-recorded spans over the same position
+    /// indistinguishable; the raw-handle tie-break after it is what keeps
+    /// `cmp(a, b) == Equal` in step with `a == b`.
     fn cmp(&self, other: &Self) -> Ordering {
         self.from
             .cmp(&other.from)
             .then_with(|| self.to.cmp(&other.to))
             .then_with(|| cmp_span(&self.from.loc, &other.from.loc))
+            .then_with(|| self.from.loc.cmp(&other.from.loc))
+    }
+}
+impl Hash for Connection {
+    /// Hash over exactly what [`PartialEq`] compares — both endpoints and the
+    /// from-endpoint span, not `is_unmatched`.
+    ///
+    /// A connection is the key of the port-number maps, so it has to hash the way
+    /// it compares: that is what lets a caller holding a connection look its
+    /// number up in a `HashMap` — or in the Python `dict` the bindings project
+    /// those maps into — instead of only being able to iterate.
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.from.hash(state);
+        self.to.hash(state);
+        self.from.loc.hash(state);
     }
 }
 

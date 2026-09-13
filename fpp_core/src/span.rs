@@ -5,7 +5,15 @@ use crate::interface::with;
 use crate::{BytePos, Spanned};
 use std::fmt::{Debug, Display, Formatter};
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+/// An opaque handle to a span recorded in the compiler context.
+///
+/// Every derived trait here compares the raw handle, which needs no live context
+/// (unlike [`Span::start`] / [`Span::file`], which resolve through it). Handles are
+/// allocated, not interned, so two spans over the same text are distinct — and the
+/// `Ord` is allocation order, which is not source order. Order spans for output
+/// with something position-based (e.g. `fpp_analysis::semantics::cmp_span`); use
+/// this `Ord` only as a tie-breaker that keeps `cmp` consistent with `==`.
+#[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Span {
     pub(crate) handle: usize,
 }

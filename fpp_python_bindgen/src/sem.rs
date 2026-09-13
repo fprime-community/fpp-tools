@@ -184,9 +184,21 @@ pub struct EntityDef {
     impl_id: Id,
     fields: Vec<(String, Shape)>,
     methods: Vec<MethodDef>,
-    /// `identity qualified_name` iff the type has a no-arg
-    /// `qualified_name(&self)->String`.
-    identity_qualified: bool,
+    /// Which `identity` directive the entity gets (see [`entity_identity`]).
+    identity: EntityIdentity,
+}
+
+/// The `identity` directive an entity's Python wrapper gets — i.e. what
+/// `__eq__`/`__hash__` compare, if anything.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum EntityIdentity {
+    /// No directive: the wrapper falls back to PyO3's object identity, so a
+    /// freshly-built wrapper never matches an existing `dict` key.
+    None,
+    /// By the native's no-arg `qualified_name(&self) -> String`.
+    QualifiedName,
+    /// Straight to the native's own `Eq`/`Hash`.
+    Native,
 }
 
 /// A reflected `payload` struct (a union variant's bare payload).
@@ -1390,6 +1402,28 @@ fn struct_pub_fields(ctx: &mut Ctx, sid: Id, enq: &mut Vec<Id>) -> Vec<(String, 
     out
 }
 
+/// Pick an entity's `identity` directive: what its Python wrapper's
+/// `__eq__`/`__hash__` compare.
+///
+/// The qualified name comes first because it is the spelling that identifies a
+/// thing across the whole model, and it is stable whether or not the native
+/// bothers to implement `Hash`. Failing that, a native that implements BOTH `Eq`
+/// and `Hash` has already declared what makes two of its values the same, so the
+/// wrapper delegates rather than inventing a second answer — this is what lets a
+/// map key rebuilt by a getter (`Connection`, which every `Topology` port-number
+/// map is keyed by) find its entry in the Python `dict`. `Hash` alone is not
+/// enough: without `Eq` the two halves of the contract cannot be checked against
+/// each other. See [`warn_identityless_map_keys`] for what is left over.
+fn entity_identity(ctx: &Ctx, impl_owner: Id) -> EntityIdentity {
+    if has_qualified_name(ctx, impl_owner) {
+        EntityIdentity::QualifiedName
+    } else if impls_std_marker(ctx, impl_owner, "Hash") && impls_std_marker(ctx, impl_owner, "Eq") {
+        EntityIdentity::Native
+    } else {
+        EntityIdentity::None
+    }
+}
+
 /// Whether a type has a no-arg `qualified_name(&self) -> String` inherent/trait
 /// method (→ `identity qualified_name`).
 fn has_qualified_name(ctx: &Ctx, impl_owner: Id) -> bool {
@@ -1601,13 +1635,13 @@ fn build_entity(ctx: &mut Ctx, id: Id, impl_id: Id) -> EntityDef {
     let fields = struct_pub_fields(ctx, impl_id, &mut enq);
     let mut methods = methods_for(ctx, impl_id, &mut enq);
     drop_field_shadowing_methods(ctx, &ctx.last_segment(id), &fields, &mut methods);
-    let identity_qualified = has_qualified_name(ctx, impl_id);
+    let identity = entity_identity(ctx, impl_id);
     EntityDef {
         id,
         impl_id,
         fields,
         methods,
-        identity_qualified,
+        identity,
     }
 }
 
@@ -2369,7 +2403,7 @@ pub fn warn_identityless_map_keys(
     let entity_has_identity: BTreeMap<u32, bool> = r
         .entities
         .iter()
-        .map(|e| (e.id.0, e.identity_qualified))
+        .map(|e| (e.id.0, e.identity != EntityIdentity::None))
         .collect();
 
     let mut key_unions: BTreeSet<u32> = BTreeSet::new();
@@ -2616,10 +2650,10 @@ fn emit_payload(
 
 fn emit_entity(ctx: &Ctx, names: &Names, e: &EntityDef, out: &mut String, skips: &mut Vec<String>) {
     let name = names.entity(e.id).to_string();
-    let identity = if e.identity_qualified {
-        " identity qualified_name(qualified_name)"
-    } else {
-        ""
+    let identity = match e.identity {
+        EntityIdentity::QualifiedName => " identity qualified_name(qualified_name)",
+        EntityIdentity::Native => " identity native",
+        EntityIdentity::None => "",
     };
     let repr = repr_directive(ctx, e.impl_id);
     out.push_str(&format!(
