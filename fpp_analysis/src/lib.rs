@@ -109,8 +109,7 @@ pub mod passes {
 }
 
 pub mod transform {
-    mod add_state_enums;
-    pub use add_state_enums::*;
+    pub use fpp_parser::add_state_enums;
 }
 pub use transform::add_state_enums;
 

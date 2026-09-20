@@ -77,6 +77,7 @@ jobs:
             fpp_lsp_parser
             fpp_parser
             fpp_format
+            fpp_query
             fpp_analysis
             fpp
             fpp_diagram

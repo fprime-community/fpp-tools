@@ -1,0 +1,77 @@
+# The files `fpp-to-cpp` generates, reproducing upstream `fpp-filenames`'s default
+# mode byte for byte. Copy this into your project and pass it as `--rules`.
+#
+#   fpp-query --rules autocode.toml -d "$OUT" --filenames "$OUT/names.txt" -- *.fpp
+#
+# `fpp_query/tests/filenames.rs` runs this file against the Scala compiler's own
+# `fpp-filenames` test suite, so it is the tested spelling of these rules, not a
+# transcription of them.
+[[group]]
+node = "DefConstant"
+name = '"FppConstants"'
+generate = ["Ac.hpp", "Ac.cpp"]
+
+# `type X = T` is header-only. Abstract `type T` generates nothing at all, so it
+# has no group.
+[[group]]
+node = "DefAliasType"
+generate = ["AliasAc.hpp"]
+
+[[group]]
+node = "DefArray"
+generate = ["ArrayAc.hpp", "ArrayAc.cpp"]
+
+[[group]]
+node = "DefEnum"
+generate = ["EnumAc.hpp", "EnumAc.cpp"]
+
+# `struct` is SerializableAc, not StructAc.
+[[group]]
+node = "DefStruct"
+generate = ["SerializableAc.hpp", "SerializableAc.cpp"]
+
+[[group]]
+node = "DefPort"
+generate = ["PortAc.hpp", "PortAc.cpp"]
+
+[[group]]
+node = "DefComponent"
+generate = ["ComponentAc.hpp", "ComponentAc.cpp"]
+
+# Only a *bodied* state machine generates anything; a bodyless `state machine SM`
+# is external.
+[[group]]
+node = "DefStateMachine"
+where = '$.members != null'
+generate = ["StateMachineAc.hpp", "StateMachineAc.cpp"]
+
+# ...and it gets a second pair from the `enum State` upstream synthesizes for it.
+# This file reads the model as parsed, which does not contain that enum, so the
+# stem is asked for directly. See `autocode-expanded.toml` for the other spelling.
+[[group]]
+node = "DefStateMachine"
+where = '$.members != null'
+name = '$@stem + "_State"'
+generate = ["EnumAc.hpp", "EnumAc.cpp"]
+
+# Only a deployment topology.
+[[group]]
+node = "DefTopology"
+where = '$.is_deployment'
+generate = ["TopologyAc.hpp", "TopologyAc.cpp", "TopologyDictionary.json"]
+
+# A telemetry packet set is named for its enclosing topology, and only inside a
+# deployment one: `Top_PktsTlmPacketsAc.*`.
+[[group]]
+node = "SpecTlmPacketSet"
+where = '$^DefTopology.is_deployment'
+name = '$^DefTopology.name + "_" + $.name'
+generate = ["TlmPacketsAc.hpp", "TlmPacketsAc.cpp"]
+
+# `system` is the one place a module name reaches the filename: `system Sys` in
+# `module M` gives `M_SysSystemDictionary.json`. Everywhere else module nesting is
+# ignored.
+[[group]]
+node = "DefSystem"
+name = 'replace($@qualified, ".", "_")'
+generate = ["SystemDictionary.json"]

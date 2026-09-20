@@ -48,17 +48,11 @@ enum Shape {
     Str,
     Node,
     Span,
-    /// The unit type `()` → Python `None`. Only reachable as the `Ok` half of a
-    /// `Result<(), E>` return (a pure check that raises on failure).
     Unit,
-    /// A payload-bearing local enum → the union wrapper (by `Id`).
     Union(Id),
-    /// A bare-payload-struct wrapped back into its owning union variant. Carries
     /// the union `Id` and the **native** variant ident.
     Rewrap(Id, String),
-    /// A reflected local struct / alias → its own entity wrapper (by `Id`).
     Entity(Id),
-    /// An all-unit local enum → `leaf(crate::sem::<PyName>)` (by `Id`).
     LeafEnum(Id),
     /// An `fpp_ast` fieldless enum → `leaf(crate::ast::<Name>)`.
     LeafAst(String),
@@ -169,7 +163,6 @@ struct VariantDef {
     payload: VariantPayload,
 }
 
-/// A reflected union (payload-bearing local enum).
 pub struct UnionDef {
     id: Id,
     variants: Vec<VariantDef>,
@@ -403,36 +396,27 @@ fn insert_shorter(best: &mut BTreeMap<u32, Vec<String>>, id: u32, p: Vec<String>
     }
 }
 
-// ---------------------------------------------------------------------------
-// Small rustdoc helpers
-// ---------------------------------------------------------------------------
-
 /// Whether `imp` is an impl **on** `id` — i.e. `id` is the impl's `for` type.
 ///
 /// Load-bearing filter: rustdoc lists an impl under `Struct::impls` / `Enum::impls`
-/// whenever the type appears anywhere in the impl's *trait* generic arguments, not
-/// only when it is the `for` type. `fpp_analysis` has several
-/// `impl UseAnalysisPass<'ast, Analysis> for CheckUses<'ast>`-shaped pass impls, so
-/// `Analysis`'s `impls` list carries `CheckUses`' methods. Reflecting one of those
-/// would emit `self.data.analysis.<method>(…)` for a method `Analysis` does not
-/// have — a hard compile break in the generated crate. Every `X::impls` walk in
-/// this module therefore goes through here.
+/// whenever the type appears anywhere in the impl's *trait* generic arguments, so
+/// `Analysis`'s `impls` list carries the methods of every
+/// `impl UseAnalysisPass<'ast, Analysis> for CheckUses<'ast>`-shaped pass.
+/// Reflecting one of those emits a call to a method `Analysis` does not have — a
+/// hard compile break in the generated crate. Every `X::impls` walk in this module
+/// therefore goes through here.
 fn impl_is_for(imp: &rustdoc_types::Impl, id: Id) -> bool {
-    // The `for_` type is matched WITHOUT peeling `Box`/`Arc`/`Rc`: an impl on
-    // `Arc<X>` is not an impl on `X`, and `peel_wrappers` keys on the last path
-    // segment with no locality check — so peeling here would make a local type named
-    // `Arc` (this crate has `transition_graph::Arc`) stop matching its own impls the
-    // moment it gained a type parameter, silently emptying its method/trait set.
+    // `Box`/`Arc`/`Rc` are deliberately not peeled: `peel_wrappers` keys on the
+    // last path segment with no locality check, so peeling would make a local type
+    // named `Arc` (`transition_graph::Arc`) stop matching its own impls the moment
+    // it gained a type parameter.
     match &imp.for_ {
         Type::ResolvedPath(p) => p.id == id,
-        // An impl written `impl Trait for Self` inside the type's own scope.
         Type::Generic(g) => g == "Self",
         _ => false,
     }
 }
 
-/// The `Impl`s declared **on** `id` (inherent + trait), foreign trait-arg impls
-/// filtered out by [`impl_is_for`].
 fn impls_on(ctx: &Ctx, id: Id) -> Vec<rustdoc_types::Impl> {
     let impl_ids: Vec<Id> = match ctx.item(id).map(|it| &it.inner) {
         Some(ItemEnum::Struct(s)) => s.impls.clone(),
@@ -2073,19 +2057,13 @@ fn assert_def_module_stub(ctx: &Ctx) {
 }
 
 /// FAIL LOUD if a union that *structurally* requires a special handle would be
-/// emitted as a plain `clone` (the silent-downgrade hazard behind [finding #1]).
-/// Two independent structural signals gate the check:
-///   * arc-shared — the enum is handed across the `fpp_analysis` API behind `Arc<…>`
-///     (only `Type` today); such a union MUST use the `arc_type` handle.
-///   * symbol-keyed — the enum implements `SymbolInterface` AND keys one of the
-///     root `Analysis` struct's own map fields (only `Symbol` today; the nested
-///     `StateMachineSymbol` also implements the trait but never keys an `Analysis`
-///     field, so the map-key refinement is what isolates the identity-bearing
-///     case); such a union MUST keep the `symbol` handle + an `identity` directive.
-///
-/// A future `fpp_analysis` rename that slips a special union through the native-path
-/// match in [`union_directives`] trips one of these and aborts the generator with a
-/// clear message, instead of silently shipping a broken binding.
+/// emitted as a plain `clone`. Two independent structural signals gate the check:
+/// arc-shared (handed across the `fpp_analysis` API behind `Arc<…>`, which demands
+/// the `arc_type` handle) and symbol-keyed (implements `SymbolInterface` *and* keys
+/// one of the root `Analysis` struct's own map fields, which demands the `symbol`
+/// handle plus an `identity` directive). A rename that slips a special union past
+/// the native-path match in [`union_directives`] trips one of these instead of
+/// silently shipping a broken binding.
 pub fn assert_special_union_handles(ctx: &Ctx, r: &Reflected) {
     let arc_ids = arc_api_enum_ids(ctx);
     assert_arc_signal_live(ctx, r, &arc_ids);

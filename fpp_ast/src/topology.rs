@@ -2,7 +2,7 @@ use crate::*;
 
 /// Topology definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct DefTopology {
     #[visitable(ignore)]
     pub is_deployment: bool,
@@ -13,7 +13,7 @@ pub struct DefTopology {
 
 /// System definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct DefSystem {
     pub name: Name,
     pub topology: QualIdent,
@@ -21,7 +21,7 @@ pub struct DefSystem {
 
 /// Topology member
 #[ast]
-#[derive(AstAnnotated, Clone, DirectWalkable)]
+#[derive(AstAnnotated, Clone, DirectWalkable, serde::Serialize)]
 pub enum TopologyMember {
     SpecInstance(SpecInstance),
     SpecDirectConnectionGraph(SpecDirectConnectionGraph),
@@ -33,14 +33,14 @@ pub enum TopologyMember {
 
 /// Component instance specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecInstance {
     pub instance: QualIdent,
 }
 
 /// Port instance identifier
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable)]
+#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
 pub struct PortInstanceIdentifier {
     pub interface_instance: QualIdent,
     pub port_name: Ident,
@@ -48,7 +48,7 @@ pub struct PortInstanceIdentifier {
 
 /// Connection
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable)]
+#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
 pub struct Connection {
     #[visitable(ignore)]
     pub is_unmatched: bool,
@@ -58,7 +58,7 @@ pub struct Connection {
     pub to_index: Option<Expr>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum ConnectionPatternKind {
     Command,
     Event,
@@ -71,7 +71,7 @@ pub enum ConnectionPatternKind {
 
 /// Connection graph specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecDirectConnectionGraph {
     pub name: Name,
     pub connections: Vec<Connection>,
@@ -79,7 +79,7 @@ pub struct SpecDirectConnectionGraph {
 
 /// Connection graph specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecPatternConnectionGraph {
     #[visitable(ignore)]
     pub kind: ConnectionPatternKind,
@@ -89,7 +89,7 @@ pub struct SpecPatternConnectionGraph {
 
 /// Telemetry channel identifier
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable)]
+#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
 pub struct TlmChannelIdentifier {
     pub component_instance: QualIdent,
     pub channel_name: Ident,
@@ -97,7 +97,7 @@ pub struct TlmChannelIdentifier {
 
 /// Topology port specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecTopPort {
     pub name: Name,
     pub underlying_port: PortInstanceIdentifier,
@@ -105,7 +105,7 @@ pub struct SpecTopPort {
 
 /// Telemetry packet set specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecTlmPacketSet {
     pub name: Name,
     pub members: Vec<TlmPacketSetMember>,
@@ -114,7 +114,7 @@ pub struct SpecTlmPacketSet {
 
 /// Telemetry packet set member
 #[ast]
-#[derive(AstAnnotated, Clone, DirectWalkable)]
+#[derive(AstAnnotated, Clone, DirectWalkable, serde::Serialize)]
 pub enum TlmPacketSetMember {
     SpecInclude(SpecInclude),
     SpecTlmPacket(SpecTlmPacket),
@@ -122,7 +122,7 @@ pub enum TlmPacketSetMember {
 
 /// Telemetry packet specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecTlmPacket {
     pub name: Name,
     pub id: Option<Expr>,
@@ -132,7 +132,7 @@ pub struct SpecTlmPacket {
 
 /// Telemetry packet member
 #[ast]
-#[derive(DirectWalkable, Clone)]
+#[derive(DirectWalkable, Clone, serde::Serialize)]
 pub enum TlmPacketMember {
     SpecInclude(SpecInclude),
     TlmChannelIdentifier(TlmChannelIdentifier),

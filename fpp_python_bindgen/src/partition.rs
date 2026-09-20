@@ -100,27 +100,14 @@ pub struct Registry {
     pub unions: BTreeMap<String, UnionDef>,
     pub kinds: BTreeMap<String, KindDef>,
     pub leaf_enums: BTreeSet<String>,
-    // leaf enum -> its variants (name + payload kind), for the Python-enum mirror
     pub leaf_defs: BTreeMap<String, Vec<(String, Payload)>>,
     pub aliases: BTreeMap<String, Type>,
-    // categorization sets (name membership)
     pub is_node: BTreeSet<String>,
     pub is_union: BTreeSet<String>,
     pub is_kind: BTreeSet<String>,
-    // leaf enums actually referenced (need a Python-enum mirror). Seeded from the
-    // `fpp_ast` fields/variants that reference them, then cross-fed by the sem
-    // generator via `register_used_leaf` (so a leaf reachable only through the
-    // semantic layer still gets a Python-enum mirror in `ast/defs.rs`).
     pub used_leaves: BTreeSet<String>,
-    // collapsed string-leaf type name -> its scalar accessor field (e.g.
-    // `Name`/`LitString` -> `data`), discovered from the source struct.
     pub str_leaf_accessor: BTreeMap<String, String>,
-    // the translation-unit root container (walk entry point), if detected.
     pub root: Option<RootDef>,
-    // Node wrappers whose Python name collides with a semantic class of the same
-    // name (built during navigation, but not stubbed, and opaque as children).
-    // Derived by the driver from the RESOLVED semantic Python names ∩ node names
-    // and installed via `set_shadowed`; rendered into the DSL's `shadowed {…}`.
     pub shadowed: BTreeSet<String>,
 }
 
@@ -147,23 +134,13 @@ const SRC_DENYLIST: &[&str] = &["node.rs", "visit.rs"];
 // AST-reference classification (consulted by the sem generator)
 // ---------------------------------------------------------------------------
 
-/// The result of resolving a bare `fpp_ast::<name>` reference against the real
-/// partition (Rule R1). Shadowing is NOT applied here — a shadowed AST node is
-/// still reported as [`AstRef::AstDef`] and demoted to a skip later, by the
-/// driver's normalize phase, once the resolved semantic names are known.
+/// The result of resolving a bare `fpp_ast::<name>` reference.
 pub enum AstRef {
-    /// A recorded walk node → bridged through `crate::ast::<Name>` (`astdef`).
     AstDef(String),
-    /// A fieldless `fpp_ast` enum → `leaf(crate::ast::<Name>)`.
     Leaf(String),
-    /// No usable mirror (payload-bearing union, kind enum, collapse type, or
-    /// unknown) — the referencing field/variant is emitted as `skip`.
     Skip(String),
 }
 
-/// The membership sets the sem generator needs to classify an `fpp_ast::X`
-/// reference — an owned, immutable snapshot handed to the reflection context so
-/// the mutable [`Registry`] (used-leaf cross-feed + shadowed set) stays free.
 #[derive(Clone, Default)]
 pub struct AstClass {
     pub is_node: BTreeSet<String>,
@@ -179,10 +156,10 @@ impl AstClass {
             AstRef::AstDef(name.to_string())
         } else if self.is_union.contains(name) {
             AstRef::Skip(format!(
-                "fpp_ast::{name} (payload-bearing AST union; no leaf mirror in crate::ast)"
+                "fpp_ast::{name} (AST union. no leaf mirror in crate::ast)"
             ))
         } else if self.is_kind.contains(name) {
-            AstRef::Skip(format!("fpp_ast::{name} (AST kind enum; no leaf mirror)"))
+            AstRef::Skip(format!("fpp_ast::{name} (AST kind enum. no leaf mirror)"))
         } else if self.leaf_enums.contains(name) {
             AstRef::Leaf(name.to_string())
         } else {

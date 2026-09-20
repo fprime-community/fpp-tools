@@ -1,0 +1,27 @@
+# Packages the `fpp-query` Rust binary as a pip-installable distribution.
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "fprime-fpp-query"
+description = "Query the FPP syntactic model and list the files an autocoder would generate"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Andrei Tumbar", email = "andrei.tumbar@jpl.nasa.gov" }]
+keywords = ["fprime", "fpp", "autocoder", "cmake"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Build Tools",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/fprime-community/fpp-tools"
+Repository = "https://github.com/fprime-community/fpp-tools"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "Cargo.toml"

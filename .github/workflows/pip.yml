@@ -3,6 +3,7 @@ name: Pip Packages
 # Builds pip wheels + sdists for the FPP Rust distributions:
 #   - fprime-fpp-lsp     (from fpp_lsp_server)  — executable
 #   - fprime-fpp-format  (from fpp_format)      — executable
+#   - fprime-fpp-query   (from fpp_query)       — executable
 #   - fprime-fpp-python  (from fpp_python)      — abi3 PyO3 extension (import `fpp`)
 
 on:
@@ -30,6 +31,8 @@ jobs:
             dir: fpp_lsp_server
           - name: fprime-fpp-format
             dir: fpp_format
+          - name: fprime-fpp-query
+            dir: fpp_query
           - name: fprime-fpp-python
             dir: fpp_python
     steps:
@@ -80,6 +83,8 @@ jobs:
             dir: fpp_lsp_server
           - name: fprime-fpp-format
             dir: fpp_format
+          - name: fprime-fpp-query
+            dir: fpp_query
           - name: fprime-fpp-python
             dir: fpp_python
     steps:

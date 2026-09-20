@@ -1,0 +1,5 @@
+# Upstream `fpp-filenames -t`: the implementation template for a component.
+
+[[group]]
+node = "DefComponent"
+generate = [".template.hpp", ".template.cpp"]

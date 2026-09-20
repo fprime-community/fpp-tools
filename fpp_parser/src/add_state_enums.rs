@@ -1,17 +1,18 @@
-use crate::semantics::state_machine::State;
+//! The `State` enum every internal state machine implicitly defines.
+
 use fpp_ast::{
     ComponentMember, DefEnum, DefEnumConstant, DefState, DefStateMachine, IntegerKind,
-    ModuleMember, Name, StateMachineMember, TransUnit, TypeName, TypeNameKind,
+    ModuleMember, Name, StateMachineMember, StateMember, TransUnit, TypeName, TypeNameKind,
 };
 use fpp_core::{Annotated, Node, Spanned};
 
 /// Add state enums to state machines.
 ///
-/// This transform runs after include resolution and before semantic analysis.
-/// For each internal state
-/// machine it prepends a synthesized `enum State { __FPRIME_UNINITIALIZED, ... }`
-/// with one constant per leaf state (named by its qualified path) and an integer
-/// representation type sized to the number of constants.
+/// This transform runs after include resolution and before semantic analysis. For
+/// each internal state machine it prepends a synthesized
+/// `enum State { __FPRIME_UNINITIALIZED, ... }` with one constant per leaf state
+/// (named by its qualified path) and an integer representation type sized to the
+/// number of constants.
 pub fn add_state_enums(ast: &mut TransUnit) {
     for member in &mut ast.0 {
         trans_module_member(member);
@@ -135,9 +136,22 @@ struct LeafState {
     post: Vec<String>,
 }
 
+/// The states nested directly inside `state`, without reaching for
+/// `fpp_analysis`'s `State::get_substates`, which this crate cannot depend on.
+fn substates(state: &DefState) -> Vec<&DefState> {
+    state
+        .members
+        .iter()
+        .filter_map(|m| match m {
+            StateMember::DefState(node) => Some(node),
+            _ => None,
+        })
+        .collect()
+}
+
 fn collect_leaf_states(state: &DefState, prefix: &mut Vec<String>, out: &mut Vec<LeafState>) {
     prefix.push(state.name.data.clone());
-    let substates = State::get_substates(state);
+    let substates = substates(state);
     if substates.is_empty() {
         out.push(LeafState {
             name: prefix.join("_"),

@@ -2,7 +2,7 @@ use crate::*;
 
 /// State machine definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct DefStateMachine {
     pub name: Name,
     pub members: Option<Vec<StateMachineMember>>,
@@ -10,7 +10,7 @@ pub struct DefStateMachine {
 
 /// State machine member
 #[ast]
-#[derive(AstAnnotated, Clone, DirectWalkable)]
+#[derive(AstAnnotated, Clone, DirectWalkable, serde::Serialize)]
 pub enum StateMachineMember {
     DefAbsType(DefAbsType),
     DefAliasType(DefAliasType),
@@ -29,7 +29,7 @@ pub enum StateMachineMember {
 
 /// Action definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct DefAction {
     pub name: Name,
     pub type_name: Option<TypeName>,
@@ -37,7 +37,7 @@ pub struct DefAction {
 
 /// Choice definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct DefChoice {
     pub name: Name,
     pub guard: Ident,
@@ -47,7 +47,7 @@ pub struct DefChoice {
 
 /// Guard definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct DefGuard {
     pub name: Name,
     pub type_name: Option<TypeName>,
@@ -55,7 +55,7 @@ pub struct DefGuard {
 
 /// Transition expression
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable)]
+#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
 pub struct TransitionExpr {
     pub actions: Option<DoExpr>,
     pub target: QualIdent,
@@ -63,7 +63,7 @@ pub struct TransitionExpr {
 
 /// Signal definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct DefSignal {
     pub name: Name,
     pub type_name: Option<TypeName>,
@@ -71,7 +71,7 @@ pub struct DefSignal {
 
 /// State definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct DefState {
     pub name: Name,
     pub members: Vec<StateMember>,
@@ -79,7 +79,7 @@ pub struct DefState {
 
 /// State member
 #[ast]
-#[derive(AstAnnotated, Clone, DirectWalkable)]
+#[derive(AstAnnotated, Clone, DirectWalkable, serde::Serialize)]
 pub enum StateMember {
     DefChoice(DefChoice),
     DefState(DefState),
@@ -92,28 +92,28 @@ pub enum StateMember {
 
 /// Initial state specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecInitialTransition {
     pub transition: TransitionExpr,
 }
 
 /// State entry specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecStateEntry {
     pub actions: DoExpr,
 }
 
 /// State exit specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecStateExit {
     pub actions: DoExpr,
 }
 
 /// Transition specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable)]
+#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
 pub struct SpecStateTransition {
     pub signal: Ident,
     pub guard: Option<Ident>,
@@ -121,13 +121,13 @@ pub struct SpecStateTransition {
 }
 
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable)]
+#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
 pub struct DoExpr {
     pub actions: Vec<Ident>,
 }
 
 /// Transition or do within transition specifier
-#[derive(Debug, Clone, DirectWalkable)]
+#[derive(Debug, Clone, DirectWalkable, serde::Serialize)]
 pub enum TransitionOrDo {
     Transition(TransitionExpr),
     Do(DoExpr),

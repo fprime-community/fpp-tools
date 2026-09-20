@@ -11,3 +11,4 @@ repository.workspace = true
 [dependencies]
 fpp_core = { path = "../fpp_core", version = "=0.0.0" }
 fpp_macros = { path = "../fpp_macros", version = "=0.0.0" }
+serde = { version = "1.0.228", features = ["derive"] }
