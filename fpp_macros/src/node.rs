@@ -34,7 +34,10 @@ pub(crate) fn ast_node_struct(input: &ItemStruct) -> TokenStream {
             let node_id_field_ident = format_ident!("node_id");
             let node_id_field_type: Type = syn::parse_quote!(fpp_core::Node);
             let node_id_field = Field {
-                attrs: Vec::new(),
+                attrs: vec![syn::parse_quote!(#[serde(
+                    rename = "annotations",
+                    serialize_with = "crate::serde_annotate::serialize"
+                )])],
                 vis: syn::Visibility::Public(syn::parse_quote!(pub)),
                 mutability: syn::FieldMutability::None,
                 ident: Some(node_id_field_ident.clone()),

@@ -22,6 +22,9 @@ use synstructure::decl_derive;
 ///
 /// Enums require all variants to be AstNodes
 ///
+/// A struct using this attribute must also derive `serde::Serialize`: the injected
+/// `node_id` field serializes as `annotations`, via `crate::serde_annotate::serialize`.
+///
 /// # Examples
 ///
 /// For structures:

@@ -1,0 +1,28 @@
+[package]
+name = "fpp_query"
+description = "Query the FPP syntactic model and list the files an autocoder would generate"
+
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "fpp-query"
+path = "src/main.rs"
+
+[dependencies]
+fpp_core = { path = "../fpp_core", version = "=0.0.0" }
+fpp_ast = { path = "../fpp_ast", version = "=0.0.0" }
+fpp_parser = { path = "../fpp_parser", version = "=0.0.0" }
+fpp_fs = { path = "../fpp_fs", version = "=0.0.0" }
+fpp_errors = { path = "../fpp_errors", version = "=0.0.0" }
+clap = { version = "4.5.60", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+toml = "1.1.4"
+anstream = "0.6.21"
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"

@@ -11,6 +11,7 @@ members = [
     "fpp_lsp_parser",
     "fpp_macros",
     "fpp_parser",
+    "fpp_query",
     "fpp_util",
     "fpp_format",
     "fpp_diagram",

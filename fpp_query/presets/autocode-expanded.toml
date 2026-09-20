@@ -1,0 +1,67 @@
+# `autocode.toml`, written against the *expanded* model.
+#
+# The only difference is the state enum. `autocode.toml` hand-encodes the
+# `enum State` that `fpp-to-cpp` synthesizes for each internal state machine, as a
+# second `DefStateMachine` group with `name = '$@stem + "_State"'`. Setting
+# `expand = true` runs that synthesis for real, so the plain `DefEnum` group below
+# picks the enum up like any other, and the special-case group is not needed.
+#
+# Both files produce byte-identical output; `tests/filenames.rs` holds each of them
+# to the same upstream `fpp-filenames` references. Prefer this one when you want the
+# model a query sees to match what `fpp-to-cpp` compiles, and `autocode.toml` when
+# you want the tool to touch nothing the parser did not produce.
+expand = true
+
+[[group]]
+node = "DefConstant"
+name = '"FppConstants"'
+generate = ["Ac.hpp", "Ac.cpp"]
+
+[[group]]
+node = "DefAliasType"
+generate = ["AliasAc.hpp"]
+
+[[group]]
+node = "DefArray"
+generate = ["ArrayAc.hpp", "ArrayAc.cpp"]
+
+# Also matches each internal state machine's synthesized `State`, which is what
+# replaces `autocode.toml`'s dedicated group.
+[[group]]
+node = "DefEnum"
+generate = ["EnumAc.hpp", "EnumAc.cpp"]
+
+[[group]]
+node = "DefStruct"
+generate = ["SerializableAc.hpp", "SerializableAc.cpp"]
+
+[[group]]
+node = "DefPort"
+generate = ["PortAc.hpp", "PortAc.cpp"]
+
+[[group]]
+node = "DefComponent"
+generate = ["ComponentAc.hpp", "ComponentAc.cpp"]
+
+# Still needed: expansion adds the enum, it does not generate the state machine's
+# own pair. An external (bodyless) state machine generates neither.
+[[group]]
+node = "DefStateMachine"
+where = '$.members != null'
+generate = ["StateMachineAc.hpp", "StateMachineAc.cpp"]
+
+[[group]]
+node = "DefTopology"
+where = '$.is_deployment'
+generate = ["TopologyAc.hpp", "TopologyAc.cpp", "TopologyDictionary.json"]
+
+[[group]]
+node = "SpecTlmPacketSet"
+where = '$^DefTopology.is_deployment'
+name = '$^DefTopology.name + "_" + $.name'
+generate = ["TlmPacketsAc.hpp", "TlmPacketsAc.cpp"]
+
+[[group]]
+node = "DefSystem"
+name = 'replace($@qualified, ".", "_")'
+generate = ["SystemDictionary.json"]

@@ -382,6 +382,7 @@ version = "0.0.0"
 dependencies = [
  "fpp_core",
  "fpp_macros",
+ "serde",
 ]
 
 [[package]]
@@ -539,6 +540,23 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "fpp_query"
+version = "0.0.0"
+dependencies = [
+ "anstream",
+ "clap",
+ "fpp_ast",
+ "fpp_core",
+ "fpp_errors",
+ "fpp_fs",
+ "fpp_parser",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "toml 1.1.4+spec-1.1.0",
 ]
 
 [[package]]

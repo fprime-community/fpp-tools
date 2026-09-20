@@ -1,0 +1,6 @@
+# Upstream `fpp-filenames -u -t -a`: the unit-test template without the helpers,
+# which `-a` moves into the autocode set.
+
+[[group]]
+node = "DefComponent"
+generate = ["Tester.hpp", "Tester.cpp", "TestMain.cpp"]

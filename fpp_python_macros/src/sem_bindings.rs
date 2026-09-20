@@ -1713,8 +1713,6 @@ fn parse_repr(input: ParseStream) -> syn::Result<Repr> {
     })
 }
 
-/// The `(<method>)` payload of a repr mode that requires one — unlike the
-/// back-compat directives, a name-bearing repr has no sensible default method.
 fn input_ident_payload(input: ParseStream, mode: &str) -> syn::Result<Ident> {
     if !input.peek(syn::token::Paren) {
         return Err(input.error(format!("repr {mode} requires a `(<method>)` payload")));
@@ -1799,9 +1797,6 @@ struct Getter {
     via_super: bool,
     extra_params: TokenStream,
     is_method: bool,
-    /// A distinct Rust fn ident, with `name` kept as the Python name via
-    /// `#[pyo3(name = …)]`. Set only to break a PyO3 symbol collision — see
-    /// [`field_getter_symbols`].
     rust_name: Option<Ident>,
 }
 
@@ -1830,17 +1825,7 @@ fn method_name_set(methods: &[MethodDecl]) -> std::collections::BTreeSet<String>
 }
 
 /// Disambiguate a field getter's Rust ident when a *method* in the same
-/// `#[pymethods]` block already owns the symbol PyO3 would generate for it.
-///
-/// PyO3 derives a getter's generated item from its **Rust ident**
-/// (`__pymethod_get_<ident>__`) but a method's from its **Python name**
-/// (`__pymethod_<python_name>__`). So the getter for a field `interface` and a method
-/// `get_interface` land on the same symbol. Their Python names (`interface` and
-/// `get_interface`) do not clash and both are wanted, so the getter keeps its Python
-/// name via `#[pyo3(name = …)]` and only its Rust ident moves — which is why the
-/// rename goes on the getter rather than the method. (An *exact*-name clash is a
-/// genuine Python-attribute conflict, and the bindgen resolves that one by dropping
-/// the method.)
+/// `#[pymethods]` block already owns the symbol PyO3 would generate for it
 fn avoid_getter_symbol_clash(g: &mut Getter, method_names: &std::collections::BTreeSet<String>) {
     if method_names.contains(&format!("get_{}", py_getter_ident(&g.name))) {
         g.rust_name = Some(format_ident!("{}__field", g.name));
@@ -3139,18 +3124,9 @@ pub fn expand(input: TokenStream) -> TokenStream {
         .map(|p| quote!(#[allow(unused_imports)] use #p as _;));
 
     quote! {
-        // The single load-bearing `fpp_analysis` trait dependency of the generated
-        // code: the `.node()` accessor (called by the `loc_from_node` getter and by
-        // the `node` identity `__hash__`, on unions/entities and the symbol-keyed
-        // scaffolding) is a `SymbolInterface` trait method, so the trait must be in
-        // scope for method resolution. Unlike the `traits {…}` imports above it is
-        // NOT reachable from a DSL method entry — those call sites are emitted by the
-        // macro itself — so it stays hand-written here. The method NAME `node` is
-        // likewise not a DSL payload: it is a stable trait method, and parameterizing
-        // it would not remove this import (a trait method needs its trait imported
-        // regardless of name). A rename of the trait or of `node` is a deliberate
-        // `fpp_analysis` change that updates this one line + the `.node()` call
-        // sites together.
+        // Hand-written rather than a `traits {…}` entry: the `.node()` call sites
+        // that need this trait in scope are emitted by the macro itself, so no DSL
+        // method entry reaches it.
         use fpp_analysis::semantics::SymbolInterface as _;
         #(#trait_imports)*
         use ::pyo3::prelude::*;

@@ -1,0 +1,5 @@
+# Upstream `fpp-filenames -u`: the unit-test base classes.
+
+[[group]]
+node = "DefComponent"
+generate = ["GTestBase.hpp", "GTestBase.cpp", "TesterBase.hpp", "TesterBase.cpp"]

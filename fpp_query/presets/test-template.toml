@@ -1,0 +1,6 @@
+# Upstream `fpp-filenames -u -t`: the unit-test template. The helpers belong here
+# because upstream emits them when `-a` is *off*.
+
+[[group]]
+node = "DefComponent"
+generate = ["Tester.hpp", "Tester.cpp", "TestMain.cpp", "TesterHelpers.cpp"]
