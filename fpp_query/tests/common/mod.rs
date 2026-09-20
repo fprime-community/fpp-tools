@@ -4,7 +4,7 @@
 //! There is one way to give the tool rules — a `--rules` file — so every suite
 //! writes one, and [`query`] is the shape almost every test wants.
 
-#[allow(dead_code)]
+#![allow(dead_code)]
 
 use std::fs;
 use std::path::{Path, PathBuf};
