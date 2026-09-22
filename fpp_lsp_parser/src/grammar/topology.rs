@@ -4,7 +4,7 @@ pub(super) fn def_topology(p: &mut Parser) {
     assert!(p.at(TOPOLOGY_KW) || p.at(DEPLOYMENT_KW));
     let m = p.start();
     p.eat(DEPLOYMENT_KW);
-    p.bump(TOPOLOGY_KW);
+    p.expect(TOPOLOGY_KW);
     if !name(p) {
         m.abandon(p);
         return;
