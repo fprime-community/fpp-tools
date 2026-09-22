@@ -194,7 +194,7 @@ pub(super) fn def_constant(p: &mut Parser) {
     assert!(p.at(CONSTANT_KW) || p.at(DICTIONARY_KW));
     let m = p.start();
     p.eat(DICTIONARY_KW);
-    p.bump(CONSTANT_KW);
+    p.expect(CONSTANT_KW);
 
     name_r(p, MEMBER_RECOVERY_SET);
 

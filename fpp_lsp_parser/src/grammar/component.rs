@@ -350,7 +350,7 @@ fn spec_port_matching(p: &mut Parser) {
 fn spec_param(p: &mut Parser) {
     let m = p.start();
     p.eat(EXTERNAL_KW);
-    p.bump(PARAM_KW);
+    p.expect(PARAM_KW);
     name_r(p, MEMBER_RECOVERY_SET);
     p.expect(COLON);
     types::type_name(p);
