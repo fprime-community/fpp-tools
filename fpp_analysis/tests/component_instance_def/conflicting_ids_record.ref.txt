@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/component_instance_def/conflicting_ids_record.fpp:19:1
+   |
+19 | instance c2: C base id 0x200
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ base id 512 of instance c2 is in the id range [256, 512] of instance c1
+   |
+  ::: [ local path prefix ]/component_instance_def/conflicting_ids_record.fpp:18:1
+   |
+18 | instance c1: C base id 0x100
+   | ---------------------------- conflicting instance is here
+

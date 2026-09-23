@@ -726,6 +726,7 @@ impl Component {
             max_in_map(&self.container_map),
             max_in_map(&self.event_map),
             max_in_map(&self.param_map),
+            max_in_map(&self.record_map),
             max_in_map(&self.tlm_channel_map),
         ]
         .into_iter()
