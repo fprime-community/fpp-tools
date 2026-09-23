@@ -135,6 +135,7 @@ jobs:
         package:
           - name: fprime-fpp-lsp
           - name: fprime-fpp-format
+          - name: fprime-fpp-query
           - name: fprime-fpp-python
     steps:
       - name: Download distributions
