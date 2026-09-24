@@ -252,3 +252,226 @@ fn locs_mode_resolves_uses_through_symlinked_root() {
         "the use of `A` in `constant B = A` was not resolved"
     );
 }
+
+/// The definitions a deployment topology needs before it can have a telemetry
+/// dictionary: two instances of a component with one channel each.
+const TLM_PACKET_DEFS: &str = "\
+module Fw {
+  port Time
+  port Tlm
+}
+
+passive component C {
+  time get port timeGetOut
+  telemetry port tlmOut
+  telemetry T: U32
+}
+
+instance c1: C base id 0x100
+instance c2: C base id 0x200
+
+";
+
+/// Index `top` as a deployment topology, open it in the VFS, and return the
+/// quick fixes offered at zero-based `line`/`character`.
+fn code_actions_at(
+    name: &str,
+    top: &str,
+    line: u32,
+    character: u32,
+) -> (String, Vec<lsp_types::CodeActionOrCommand>) {
+    let dir = fixture_dir(name);
+    let text = format!("{TLM_PACKET_DEFS}{top}");
+    std::fs::write(dir.join("Top.fpp"), &text).unwrap();
+    std::fs::write(dir.join(".fpp-lsp"), "scanWorkspace: true\n").unwrap();
+
+    let mut state = index_workspace(&dir);
+    let top_uri = crate::uri::from_file_path(dir.join("Top.fpp")).unwrap();
+    let uri = Uri::from_str(&top_uri).unwrap();
+    state.vfs.did_open(lsp_types::DidOpenTextDocumentParams {
+        text_document: lsp_types::TextDocumentItem {
+            uri: uri.clone(),
+            language_id: "fpp".into(),
+            version: 1,
+            text: text.clone(),
+        },
+    });
+
+    // The definitions are prepended, so callers give positions relative to `top`.
+    let line = line + TLM_PACKET_DEFS.lines().count() as u32;
+    let position = lsp_types::Position { line, character };
+    let params = lsp_types::CodeActionParams {
+        text_document: lsp_types::TextDocumentIdentifier { uri },
+        range: lsp_types::Range {
+            start: position,
+            end: position,
+        },
+        context: Default::default(),
+        work_done_progress_params: Default::default(),
+        partial_result_params: Default::default(),
+    };
+
+    let actions = fpp_core::run_ref(&state.context, || {
+        crate::handlers::handle_code_action(&state, params)
+    })
+    .expect("code action request should not error")
+    .unwrap_or_default();
+    (text, actions)
+}
+
+/// Apply the single edit of the single quick fix to `text`.
+fn apply_only_fix(text: &str, actions: &[lsp_types::CodeActionOrCommand]) -> String {
+    let [lsp_types::CodeActionOrCommand::CodeAction(action)] = actions else {
+        panic!("expected exactly one quick fix, got {actions:?}");
+    };
+    assert_eq!(action.kind, Some(lsp_types::CodeActionKind::QUICKFIX));
+    let edits: Vec<lsp_types::TextEdit> = action
+        .edit
+        .clone()
+        .and_then(|edit| edit.changes)
+        .expect("quick fix should carry a workspace edit")
+        .into_values()
+        .flatten()
+        .collect();
+    let [edit] = &edits[..] else {
+        panic!("quick fix should be a single text edit, got {edits:?}");
+    };
+
+    let lines = fpp_core::LineIndex::new(text);
+    let offset = |position: &lsp_types::Position| {
+        usize::from(
+            lines
+                .offset(fpp_core::LineCol {
+                    line: position.line,
+                    col: position.character,
+                })
+                .unwrap(),
+        )
+    };
+    let mut out = text.to_string();
+    out.replace_range(
+        offset(&edit.range.start)..offset(&edit.range.end),
+        &edit.new_text,
+    );
+    out
+}
+
+#[test]
+fn quick_fix_opens_an_omit_block_for_uncovered_channels() {
+    let top = "\
+deployment topology T {
+  instance c1
+  instance c2
+  telemetry packets P {
+    packet P group 0 {
+      c1.T
+    }
+  }
+}
+";
+    // Cursor on the `telemetry packets P` line.
+    let (text, actions) = code_actions_at("ws_omit_new_block", top, 3, 4);
+    let [lsp_types::CodeActionOrCommand::CodeAction(action)] = &actions[..] else {
+        panic!("expected exactly one quick fix, got {actions:?}");
+    };
+    assert_eq!(action.title, "Omit 1 telemetry channel");
+    assert!(
+        apply_only_fix(&text, &actions).ends_with(
+            "\
+  telemetry packets P {
+    packet P group 0 {
+      c1.T
+    }
+  } omit {
+    c2.T
+  }
+}
+"
+        ),
+        "unexpected fix result:\n{}",
+        apply_only_fix(&text, &actions)
+    );
+}
+
+#[test]
+fn quick_fix_appends_to_an_existing_omit_block() {
+    let top = "\
+deployment topology T {
+  instance c1
+  instance c2
+  telemetry packets P {
+    packet P group 0 {
+    }
+  } omit {
+    c1.T
+  }
+}
+";
+    let (text, actions) = code_actions_at("ws_omit_append", top, 3, 4);
+    assert!(
+        apply_only_fix(&text, &actions).ends_with(
+            "\
+  } omit {
+    c1.T
+    c2.T
+  }
+}
+"
+        ),
+        "unexpected fix result:\n{}",
+        apply_only_fix(&text, &actions)
+    );
+}
+
+#[test]
+fn quick_fix_fills_in_an_empty_omit_block() {
+    let top = "\
+deployment topology T {
+  instance c1
+  instance c2
+  telemetry packets P {
+    packet P group 0 {
+    }
+  } omit {}
+}
+";
+    let (text, actions) = code_actions_at("ws_omit_empty_block", top, 3, 4);
+    let [lsp_types::CodeActionOrCommand::CodeAction(action)] = &actions[..] else {
+        panic!("expected exactly one quick fix, got {actions:?}");
+    };
+    assert_eq!(action.title, "Omit 2 telemetry channels");
+    assert!(
+        apply_only_fix(&text, &actions).ends_with(
+            "\
+  } omit {
+    c1.T
+    c2.T
+  }
+}
+"
+        ),
+        "unexpected fix result:\n{}",
+        apply_only_fix(&text, &actions)
+    );
+}
+
+#[test]
+fn no_quick_fix_when_every_channel_is_covered() {
+    let top = "\
+deployment topology T {
+  instance c1
+  instance c2
+  telemetry packets P {
+    packet P group 0 {
+      c1.T
+      c2.T
+    }
+  }
+}
+";
+    let (_, actions) = code_actions_at("ws_omit_covered", top, 3, 4);
+    assert!(
+        actions.is_empty(),
+        "a packet set that covers its dictionary should offer no fix, got {actions:?}"
+    );
+}

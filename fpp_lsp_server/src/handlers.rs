@@ -11,19 +11,21 @@ use crate::util::{
     sm_def_at_position, sm_symbol_at_position, symbol_at_position, symbol_to_completion_item,
 };
 use anyhow::Result;
-use fpp_analysis::semantics::{NameGroup, SymbolInterface};
-use fpp_ast::{AstNode, Node};
+use fpp_analysis::semantics::{NameGroup, Symbol as SymbolKind, SymbolInterface, TlmPacketSet};
+use fpp_ast::{AstNode, Node, TopologyMember};
 use fpp_core::{LineCol, LineIndex, SourceFile};
 use fpp_lsp_parser::{
-    SyntaxKind, SyntaxNode, SyntaxToken, TextRange, TokenAtOffset, VisitorResult,
+    SyntaxKind, SyntaxNode, SyntaxToken, TextRange, TextSize, TokenAtOffset, VisitorResult,
 };
 use lsp_types::{
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, CodeActionResponse,
     CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse,
     DidChangeTextDocumentParams, DidChangeWatchedFilesParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DocumentDiagnosticReportResult, DocumentFormattingParams,
     DocumentLink, DocumentRangeFormattingParams, FileChangeType, GotoDefinitionParams,
     GotoDefinitionResponse, Hover, HoverParams, Location, Position, Range, ReferenceParams,
     SemanticTokensFullDeltaResult, SemanticTokensRangeResult, SemanticTokensResult, TextEdit, Uri,
+    WorkspaceEdit,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -1262,6 +1264,198 @@ fn resolve_format_options(uri: &lsp_types::Uri) -> fpp_format::FormatOptions {
             );
             fpp_format::FormatOptions::default()
         }
+    }
+}
+
+/// The leading whitespace of the line that `offset` falls on
+fn line_indent(text: &str, offset: usize) -> &str {
+    let line_start = text[..offset].rfind('\n').map_or(0, |i| i + 1);
+    let line = &text[line_start..];
+    &line[..line.len() - line.trim_start_matches([' ', '\t']).len()]
+}
+
+fn first_child(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxNode> {
+    node.children().find(|child| child.kind() == kind)
+}
+
+fn last_child(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxNode> {
+    node.children().filter(|child| child.kind() == kind).last()
+}
+
+/// The edit that adds `channels` to the `omit` block of the telemetry packet set
+/// `set`, opening a block if the set does not have one yet.
+fn omit_channels_edit(
+    text: &str,
+    lines: &LineIndex,
+    set: &SyntaxNode,
+    channels: &[String],
+    indent_width: usize,
+) -> Option<TextEdit> {
+    let indent = line_indent(text, set.text_range().start().into());
+    let omit_list = first_child(set, SyntaxKind::TLM_PACKET_OMIT)
+        .as_ref()
+        .and_then(|omit| first_child(omit, SyntaxKind::TLM_PACKET_OMIT_MEMBER_LIST));
+    let last_omitted = omit_list
+        .as_ref()
+        .and_then(|list| last_child(list, SyntaxKind::TLM_CHANNEL_IDENTIFIER));
+
+    // Lay the channels out the way the set already lays out a member: a channel
+    // already marked omitted, else one of its packets. A set with neither falls
+    // back to the configured indent width.
+    let sibling = last_omitted.clone().or_else(|| {
+        first_child(set, SyntaxKind::TLM_PACKET_SET_MEMBER_LIST)
+            .as_ref()
+            .and_then(|list| first_child(list, SyntaxKind::SPEC_TLM_PACKET))
+    });
+    let member_indent = match &sibling {
+        Some(sibling) => line_indent(text, sibling.text_range().start().into()).to_string(),
+        None => format!("{indent}{}", " ".repeat(indent_width)),
+    };
+    // The canonical style separates omitted channels by newlines rather than by
+    // commas; see the `omit` blocks the formatter emits.
+    let members: String = channels
+        .iter()
+        .map(|channel| format!("\n{member_indent}{channel}"))
+        .collect();
+
+    let (range, new_text) = match (&omit_list, &last_omitted) {
+        // No `omit` block yet: open one after the packet set's member list.
+        (None, _) => {
+            let set_list = first_child(set, SyntaxKind::TLM_PACKET_SET_MEMBER_LIST)?;
+            (
+                TextRange::empty(set_list.text_range().end()),
+                format!(" omit {{{members}\n{indent}}}"),
+            )
+        }
+        // Append after the last channel already marked omitted, so that anything
+        // else in the block is left alone.
+        (Some(_), Some(last)) => (TextRange::empty(last.text_range().end()), members),
+        // An empty block has no member to append to: fill in its body.
+        (Some(list), None) => {
+            let open = list.first_child_or_token_by_kind(&|kind| kind == SyntaxKind::LEFT_CURLY)?;
+            let close =
+                list.first_child_or_token_by_kind(&|kind| kind == SyntaxKind::RIGHT_CURLY)?;
+            (
+                TextRange::new(open.text_range().end(), close.text_range().start()),
+                format!("{members}\n{indent}"),
+            )
+        }
+    };
+
+    Some(TextEdit {
+        range: text_range_to_range(lines, range),
+        new_text,
+    })
+}
+
+/// The quick fix that marks every telemetry channel left uncovered by the packet
+/// set under the request's cursor as omitted.
+///
+/// The fix is offered anywhere inside the packet set rather than on the channels
+/// themselves: an uncovered channel has no mention in the packet set at all, and
+/// that is where the error is reported.
+fn omit_uncovered_channels_action(
+    state: &GlobalState,
+    request: &CodeActionParams,
+) -> Option<CodeAction> {
+    let uri = &request.text_document.uri;
+    let offset = position_to_offset(state, uri, &request.range.start);
+    let set_node =
+        nodes_at_offset(state, uri, offset)?
+            .into_iter()
+            .find_map(|node| match node {
+                Node::SpecTlmPacketSet(node) => Some(node),
+                _ => None,
+            })?;
+
+    // The topology whose dictionary the packet set has to cover. Only deployment
+    // topologies have a dictionary, and `include` members have already been
+    // spliced into `members`, so the packet set is a direct member of the
+    // topology even when it is written in a separate file.
+    let analysis = &state.analysis;
+    let (topology, dictionary) = analysis.dictionary_map.iter().find_map(|(symbol, d)| {
+        let SymbolKind::Topology(def) = symbol else {
+            return None;
+        };
+        let contains_set = def.members.iter().any(|member| {
+            matches!(member, TopologyMember::SpecTlmPacketSet(node) if node.id() == set_node.id())
+        });
+        if !contains_set {
+            return None;
+        }
+        Some((analysis.topology_map.get(symbol)?, d))
+    })?;
+
+    let channels: Vec<String> =
+        TlmPacketSet::get_uncovered_channels_for_node(analysis, dictionary, topology, set_node)
+            .into_iter()
+            .map(|entry| entry.get_qualified_name())
+            .collect();
+    if channels.is_empty() {
+        return None;
+    }
+
+    let (text, _, parse) = parse_text_document(state, uri).ok()?;
+    if !parse.errors().is_empty() {
+        tracing::warn!(
+            "Cannot edit an omit block with parse errors: {:?}",
+            parse.errors()
+        );
+        return None;
+    }
+    let lines = state.vfs.get_lines(uri.as_str()).ok()?;
+    let set = parse
+        .syntax_node()
+        .covering_element(TextRange::empty(TextSize::new(offset)))
+        .ancestors()
+        .find(|node| node.kind() == SyntaxKind::TLM_PACKET_SET)?;
+    let indent_width = resolve_format_options(uri).indent_width;
+    let edit = omit_channels_edit(&text, &lines, &set, &channels, indent_width)?;
+
+    // Attaching the diagnostics the fix addresses lets the client surface the
+    // action on the squiggle rather than only in the refactor menu.
+    let set_range = text_range_to_range(&lines, set.text_range());
+    let diagnostics: Vec<lsp_types::Diagnostic> = request
+        .context
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| {
+            diagnostic.source.as_deref() == Some("fpp")
+                && diagnostic.range.start <= set_range.end
+                && diagnostic.range.end >= set_range.start
+        })
+        .cloned()
+        .collect();
+
+    Some(CodeAction {
+        title: format!(
+            "Omit {} telemetry channel{}",
+            channels.len(),
+            if channels.len() == 1 { "" } else { "s" }
+        ),
+        kind: Some(CodeActionKind::QUICKFIX),
+        diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
+        edit: Some(WorkspaceEdit {
+            changes: Some([(uri.clone(), vec![edit])].into_iter().collect()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    })
+}
+
+pub fn handle_code_action(
+    state: &GlobalState,
+    request: CodeActionParams,
+) -> Result<Option<CodeActionResponse>> {
+    let actions: Vec<CodeActionOrCommand> = omit_uncovered_channels_action(state, &request)
+        .map(CodeActionOrCommand::CodeAction)
+        .into_iter()
+        .collect();
+
+    if actions.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(actions))
     }
 }
 

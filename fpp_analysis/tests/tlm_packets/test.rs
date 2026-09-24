@@ -30,6 +30,14 @@ fn channel_neither_used_nor_omitted() {
 }
 
 #[test]
+fn channels_neither_used_nor_omitted() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/channels_neither_used_nor_omitted",
+    )
+}
+
+#[test]
 fn level_not_numeric() {
     run_test_with(&["tlm_packets/instances"], "tlm_packets/level_not_numeric")
 }

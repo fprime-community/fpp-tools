@@ -1,14 +1,10 @@
- --> [ local path prefix ]/tlm_packets/duplicate_set_name.fpp:7:3
+ --> [ local path prefix ]/tlm_packets/duplicate_set_name.fpp:7:21
   |
-7 | /   telemetry packets P {
-8 | |
-9 | |   }
-  | |___^ duplicate telemetry packet set P
+7 |   telemetry packets P {
+  |                     ^ duplicate telemetry packet set P
   |
- ::: [ local path prefix ]/tlm_packets/duplicate_set_name.fpp:3:3
+ ::: [ local path prefix ]/tlm_packets/duplicate_set_name.fpp:3:21
   |
-3 | /   telemetry packets P {
-4 | |
-5 | |   }
-  | |___- previous set is here
+3 |   telemetry packets P {
+  |                     - previous set is here
 
