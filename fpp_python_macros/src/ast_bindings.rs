@@ -1,7 +1,7 @@
 //! The `fpp_ast_bindings!` function-like macro: expands a declarative mirror of
 //! the `fpp_ast` grammar (emitted by the `bindgen` binary into
 //! `fpp_python/src/ast/defs.rs`) into the PyO3 AST-node wrappers, the recording
-//! walk, and the typed `visit_*` methods of `crate::visitor::NodeVisitor`.
+//! walk, and the typed `visit_*` methods of `crate::visitor::AstVisitor`.
 //!
 //! The DSL is parsed into a `Registry`/`Shape`/`Card` model; `emit_walk`/`emit_py`
 //! emit tokens parameterized only by `&Registry`. The macro never reads `fpp_ast`
@@ -856,7 +856,7 @@ fn emit_visitor_method(py_name: &str, param_ty: &proc_macro2::Ident) -> TokenStr
     quote! {
         #[pyo3(name = #py_method)]
         fn #fn_id(slf: PyRef<'_, Self>, node: &Bound<'_, #param_ty>) -> PyResult<Py<PyAny>> {
-            NodeVisitor::delegate_to_generic_visit(slf, node.as_any())
+            AstVisitor::delegate_to_generic_visit(slf, node.as_any())
         }
     }
 }
@@ -1200,7 +1200,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
 
         #[gen_stub_pymethods]
         #[pymethods]
-        impl NodeVisitor {
+        impl AstVisitor {
             #(#visitor_methods)*
         }
 
@@ -1482,7 +1482,7 @@ pub fn expand(input: TokenStream) -> TokenStream {
     quote! {
         use crate::ir_core::Loc;
         use crate::model::Model;
-        use crate::visitor::NodeVisitor;
+        use crate::visitor::AstVisitor;
         use fpp_ast::AstNode as _;
         use fpp_core::Node;
         use pyo3::prelude::*;

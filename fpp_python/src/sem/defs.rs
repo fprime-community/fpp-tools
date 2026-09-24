@@ -34,7 +34,6 @@ fpp_python_macros::fpp_sem_bindings! {
             component_map: map(union(Symbol), entity(Component)),
             component_instance_map: map(union(Symbol), rewrap(InterfaceInstance::Component)),
             interface_map: map(union(Symbol), entity(Interface)),
-            partial_topology_map: map(union(Symbol), entity(Topology)),
             topology_map: map(union(Symbol), entity(Topology)),
             state_machine_map: map(union(Symbol), entity(StateMachine)),
             dictionary_map: map(union(Symbol), entity(Dictionary)),

@@ -19,7 +19,7 @@
 //! [`crate::ast`], and the semantic wrappers from `fpp_sem_bindings!` over
 //! [`crate::sem`] (with `sem::hand` supplying `build_type`, the one escape hatch
 //! the macro cannot produce). The same AST macro also emits the typed `visit_*`
-//! methods of [`crate::visitor`]'s `NodeVisitor`, whose traversal logic is
+//! methods of [`crate::visitor`]'s `AstVisitor`, whose traversal logic is
 //! hand-written. Everything else is the hand-written core: `ir_core`,
 //! `lower_core`, `noderef`, `pipeline`, `model`, `visitor`, and `diagnostics`.
 
@@ -46,7 +46,7 @@ fn fpp(m: &Bound<'_, PyModule>) -> PyResult<()> {
     diagnostics::register(m)?;
     m.add_class::<ir_core::Loc>()?;
     m.add_class::<ir_core::Span>()?;
-    m.add_class::<visitor::NodeVisitor>()?;
+    m.add_class::<visitor::AstVisitor>()?;
     ast::register(m)?;
     sem::register(m)?;
     Ok(())
