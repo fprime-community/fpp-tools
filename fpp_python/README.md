@@ -58,11 +58,11 @@ tree = fpp.parse(["A.fpp", "B.fpp"])
 [u.uri for u in tree.units]                  # ['A.fpp', 'B.fpp']
 ```
 
-Subclass `NodeVisitor` and override `visit_<type(node).__name__>`. Traversal is
+Subclass `AstVisitor` and override `visit_<type(node).__name__>`. Traversal is
 deep by default: `super()` descends, omitting it prunes.
 
 ```python
-class Constants(fpp.NodeVisitor):
+class Constants(fpp.AstVisitor):
     def __init__(self):
         self.values = {}
 
@@ -117,7 +117,7 @@ except fpp.DiagnosticError as error:
 
 `fpp.pyi` is the reference for the rest — every class, getter and return type —
 and the docstrings carry the contracts: `help(fpp.analyze)`, `help(fpp.Model)`,
-`help(fpp.NodeVisitor)`.
+`help(fpp.AstVisitor)`.
 
 ## Development
 

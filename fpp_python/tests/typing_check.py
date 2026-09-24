@@ -7,7 +7,7 @@ and `analyze` (a `Model`) — and the semantic surface: the `Analysis` root, its
 (`dict[Symbol, Component]`, `dict[int, Command]`), the `Type` / `Command` /
 `NonParamKind` union base+subclass hierarchies (narrowed with `isinstance`), the
 resolved `Loc` and lazy `Span` location types, the state-machine model, and the AST
-traversal surface (`AstNode.children` plus a `NodeVisitor` subclass overriding typed
+traversal surface (`AstNode.children` plus a `AstVisitor` subclass overriding typed
 `visit_*` methods). It also covers the contracts the stub is easiest to get wrong
 about: a leaf enum's `str`-typed `.name`/`.value`, `str()` of a union base,
 `lookup(kind=…)` / `lookup_all`, a symbol's `int` `node_id` beside its node
@@ -41,7 +41,7 @@ from fpp import (
     IntegerKind,
     Loc,
     Model,
-    NodeVisitor,
+    AstVisitor,
     NonParamCommand,
     NonParamKind,
     PortInstanceIdentifier,
@@ -218,7 +218,7 @@ def connection_spans(a: Analysis) -> int:
     return total
 
 
-class CommandCollector(NodeVisitor):
+class CommandCollector(AstVisitor):
     """A typed traversal: each overridden `visit_*` receives its concrete node
     class, and `super().visit_<TypeName>(node)` continues into the children."""
 

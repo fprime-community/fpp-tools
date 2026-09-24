@@ -405,7 +405,7 @@ def test_anon_struct_members_are_declaration_ordered():
 def test_string_size_is_recorded_in_every_context_that_accepts_one():
     m = analyzed(STRING_SIZES_SRC)
 
-    class Strings(f.NodeVisitor):
+    class Strings(f.AstVisitor):
         def __init__(self):
             self.sizes = []
 
@@ -485,7 +485,7 @@ def test_everything_parse_returns_is_a_source():
 # --- the visitor takes a whole model ------------------------------------
 
 
-class Components(f.NodeVisitor):
+class Components(f.AstVisitor):
     def __init__(self):
         self.names = []
 
@@ -519,15 +519,15 @@ def test_visit_accepts_a_syntax_tree():
 
 def test_visit_rejects_anything_else():
     with pytest.raises(TypeError):
-        f.NodeVisitor().visit(42)
+        f.AstVisitor().visit(42)
     with pytest.raises(TypeError):
-        f.NodeVisitor().visit("module M {}")
+        f.AstVisitor().visit("module M {}")
 
 
 def test_the_container_entry_points_are_overridable():
     m = analyzed(ORDER_SRC)
 
-    class Counting(f.NodeVisitor):
+    class Counting(f.AstVisitor):
         def __init__(self):
             self.units = 0
 
@@ -546,7 +546,7 @@ def test_generic_visit_still_takes_ast_nodes_only():
     # `generic_visit(self, node: AstNode)` override valid.
     m = analyzed(ORDER_SRC)
 
-    class OnlyNodes(f.NodeVisitor):
+    class OnlyNodes(f.AstVisitor):
         def __init__(self):
             self.seen = []
 
