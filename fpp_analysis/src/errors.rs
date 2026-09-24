@@ -292,13 +292,22 @@ pub enum SemanticError {
         name: String,
         msg: String,
     },
-    /// Invalid telemetry packet set, reported against one of its channels
-    InvalidTlmPacketSetChannel {
+    /// Telemetry channels of a packet set that are neither used nor marked as
+    /// omitted
+    TlmPacketSetChannelsNotCovered {
         loc: Span,
         name: String,
-        msg: String,
-        /// Locations explaining the error, rendered as span notes
-        notes: Vec<(Span, String)>,
+        /// The qualified names of the uncovered channels, in channel ID order
+        channels: Vec<String>,
+    },
+    /// Telemetry channels of a packet set that are both used and marked as
+    /// omitted
+    TlmPacketSetChannelsUsedAndOmitted {
+        loc: Span,
+        name: String,
+        /// For each channel, its qualified name, a location where it is used,
+        /// and a location where it is marked as omitted, in channel ID order
+        channels: Vec<(String, Span, Span)>,
     },
     /// A telemetry channel identifier that names no channel of the topology
     ChannelNotInDictionary {
@@ -511,6 +520,11 @@ impl SemanticError {
     pub fn emit(self) {
         Into::<Diagnostic>::into(self).emit();
     }
+}
+
+/// Renders `n` as a count of telemetry channels, e.g. `1 telemetry channel`
+fn count_telemetry_channels(n: usize) -> String {
+    format!("{} telemetry channel{}", n, if n == 1 { "" } else { "s" })
 }
 
 impl From<SemanticError> for Diagnostic {
@@ -882,21 +896,36 @@ impl From<SemanticError> for Diagnostic {
                 format!("invalid telemetry packet set {}", name),
             )
             .note(msg),
-            SemanticError::InvalidTlmPacketSetChannel {
-                loc,
-                name,
-                msg,
-                notes,
-            } => {
+            SemanticError::TlmPacketSetChannelsNotCovered { loc, name, channels } => {
                 let diag = Diagnostic::new(
                     loc,
                     Level::Error,
                     format!("invalid telemetry packet set {}", name),
                 )
-                .note(msg);
-                notes
+                .note(format!(
+                    "{} {} neither used nor marked as omitted",
+                    count_telemetry_channels(channels.len()),
+                    if channels.len() == 1 { "is" } else { "are" },
+                ));
+                channels.into_iter().fold(diag, Diagnostic::note)
+            }
+            SemanticError::TlmPacketSetChannelsUsedAndOmitted { loc, name, channels } => {
+                let diag = Diagnostic::new(
+                    loc,
+                    Level::Error,
+                    format!("invalid telemetry packet set {}", name),
+                )
+                .note(format!(
+                    "{} {} both used and marked as omitted",
+                    count_telemetry_channels(channels.len()),
+                    if channels.len() == 1 { "is" } else { "are" },
+                ));
+                channels
                     .into_iter()
-                    .fold(diag, |diag, (loc, note)| diag.span_note(loc, note))
+                    .fold(diag, |diag, (channel, used_loc, omitted_loc)| {
+                        diag.span_note(used_loc, format!("{} is used here", channel))
+                            .span_note(omitted_loc, format!("{} is marked omitted here", channel))
+                    })
             }
             SemanticError::ChannelNotInDictionary {
                 loc,

@@ -1,7 +1,8 @@
 //! Advertises the capabilities of the LSP Server.
 use fpp_core::WideEncoding;
 use lsp_types::{
-    CompletionOptions, FileOperationFilter, FileOperationPattern, FileOperationPatternKind,
+    CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CompletionOptions,
+    FileOperationFilter, FileOperationPattern, FileOperationPatternKind,
     FileOperationRegistrationOptions, OneOf, PositionEncodingKind, SaveOptions,
     SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
@@ -116,6 +117,11 @@ pub fn server_capabilities(caps: &ClientCapabilities) -> ServerCapabilities {
             resolve_provider: Some(true),
             work_done_progress_options: Default::default(),
         }),
+        code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
+            code_action_kinds: Some(vec![CodeActionKind::QUICKFIX]),
+            resolve_provider: None,
+            work_done_progress_options: Default::default(),
+        })),
         document_formatting_provider: Some(OneOf::Left(true)),
         document_range_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()

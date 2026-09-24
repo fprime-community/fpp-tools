@@ -29,7 +29,7 @@ impl TlmPacket {
 
     /// Gets the location of the packet specifier
     pub fn get_loc(&self) -> Span {
-        self.node.span()
+        self.node.name.span()
     }
 
     /// Creates a telemetry packet from a telemetry packet specifier
