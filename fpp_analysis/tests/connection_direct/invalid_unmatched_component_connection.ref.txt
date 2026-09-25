@@ -1,4 +1,4 @@
-  --> [ local path prefix ]/connection_direct/invalid_unmatched_connection.fpp:25:15
+  --> [ local path prefix ]/connection_direct/invalid_unmatched_component_connection.fpp:25:15
    |
 25 |     unmatched c1.pOut -> c2.pIn
    |               ^^^^^^^ unmatched connection must go from or to a matched port
