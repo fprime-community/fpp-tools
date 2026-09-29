@@ -20,7 +20,7 @@ When you open a `.fpp` file, the extension locates `fpp_lsp_server` automaticall
 
 1. the `fpp.serverPath` setting, if you set it explicitly;
 2. the workspace Python venv — discovered via the [Python extension][py-ext] or by
-   scanning for a `.venv`/`venv`/`env` directory (override with `fpp.pythonVenv`);
+   scanning for a `fprime-venv`/`.venv`/`venv`/`env` directory (override with `fpp.pythonVenv`);
 3. `fpp_lsp_server` on your `PATH`.
 
 If a venv is found but `fprime-fpp-lsp` is not installed, the extension offers to run
