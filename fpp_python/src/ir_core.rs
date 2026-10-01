@@ -122,6 +122,48 @@ pub(crate) fn same_model(recv: &Arc<ModelData>, arg: &Arc<ModelData>) -> PyResul
     }
 }
 
+/// Attach a closed union's variants to its base as nested classes, then publish the
+/// closed union itself as `<Base>.Variant`.
+///
+/// Called from both generated layers — the semantic unions and the AST kind enums —
+/// which is the point: the two macros would otherwise each carry their own copy of
+/// this.
+///
+/// `variants` is `(bare name, qualified name, class)` in declaration order. A variant
+/// is deliberately NOT added to the module: `PyModule::add` appends to `__all__` as
+/// well as setting the attribute, and bare variant names are not unique across unions
+/// — `Choice` belongs to four of them — so several classes would fight over one module
+/// attribute and `__all__` would carry duplicates. `include_base` appends the bare
+/// base to the union, which only the `Type` hierarchy wants: an unknown type whose
+/// definition node is absent from the walk surfaces as the base itself.
+pub(crate) fn register_nested_union(
+    base: &Bound<'_, pyo3::types::PyType>,
+    variants: Vec<(&'static str, &'static str, Bound<'_, pyo3::types::PyType>)>,
+    include_base: bool,
+) -> PyResult<()> {
+    let mut members: Vec<Bound<'_, PyAny>> = Vec::with_capacity(variants.len() + 1);
+    for (bare, qualified, class) in variants {
+        // `__name__` stays the bare variant and `__module__` comes from the wrapper's
+        // `#[pyclass(module = …)]`; `__qualname__` is the one piece PyO3 cannot be told,
+        // and it is what carries the nesting into tracebacks and `repr(cls)`.
+        class.setattr("__qualname__", qualified)?;
+        base.setattr(bare, &class)?;
+        members.push(class.into_any());
+    }
+    if include_base {
+        members.push(base.clone().into_any());
+    }
+
+    // Attached first, so the union's members render with their final `__qualname__`.
+    let mut it = members.into_iter();
+    let mut acc = it.next().expect("a union has at least one member");
+    for c in it {
+        acc = acc.call_method1("__or__", (c,))?;
+    }
+    base.setattr("Variant", acc)?;
+    Ok(())
+}
+
 #[gen_stub_pymethods]
 #[pymethods]
 impl Span {

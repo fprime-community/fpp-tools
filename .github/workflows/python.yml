@@ -74,12 +74,12 @@ jobs:
       - name: Regenerate declarations
         run: make -C fpp_python bindgen
 
-      - name: Regenerate type stub
+      - name: Regenerate type stubs
         run: make -C fpp_python stubs
 
       - name: Check for drift
         run: |
-          if ! git diff --exit-code -- fpp_python/src/ast/defs.rs fpp_python/src/sem/defs.rs fpp_python/fpp.pyi; then
+          if ! git diff --exit-code -- fpp_python/src/ast/defs.rs fpp_python/src/sem/defs.rs fpp_python/python/fpp/__init__.pyi fpp_python/python/fpp/ast.pyi; then
             echo "::error::checked-in declaration/stub is stale; run \`make -C fpp_python codegen\` and commit the result."
             exit 1
           fi

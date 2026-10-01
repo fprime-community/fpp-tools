@@ -9,16 +9,14 @@ import pytest
 
 import fpp as f
 from fpp import (
-    ComponentKind,
     Direction,
-    GeneralPortInstance,
+    InterfaceInstance,
     Loc,
     PortInstance,
     Span,
-    SymbolComponent,
-    SymbolTopology,
-    TopologyInterfaceInstance,
+    Symbol,
 )
+from fpp.ast import ComponentKind
 
 SRC = """
 port P
@@ -46,7 +44,7 @@ def m():
 def test_component_map(m):
     a = m.analysis
     (sym, comp) = next(iter(a.component_map.items()))
-    assert isinstance(sym, SymbolComponent)
+    assert isinstance(sym, Symbol.Component)
     # Symbol keys support value lookup.
     assert a.component_map[sym] is not None
     assert a.get_qualified_name(sym) == "C"
@@ -63,7 +61,7 @@ def test_component_ports(m):
     assert set(ports) == {"pIn", "pOut"}
     # Both are general (non-special) ports, so they land on the same union member.
     assert all(isinstance(p, PortInstance) for p in ports.values())
-    assert all(isinstance(p, GeneralPortInstance) for p in ports.values())
+    assert all(isinstance(p, PortInstance.General) for p in ports.values())
     dirs = {n: p.direction for n, p in ports.items()}
     assert dirs == {"pIn": Direction.Input, "pOut": Direction.Output}
     # `Component.port_map` mirrors the interface's map (fresh wrappers, so compare
@@ -105,7 +103,7 @@ def test_component_instance_get_port_instance_identifier(m):
 def test_topology_connections(m: f.Model):
     a = m.analysis
     (tsym, top) = next(iter(a.topology_map.items()))
-    assert isinstance(tsym, SymbolTopology)
+    assert isinstance(tsym, Symbol.Topology)
     assert top.name == "T"
     # `connection_map` is keyed by connection-graph name.
     assert set(top.connection_map) == {"C1"}
@@ -169,7 +167,7 @@ def nested_m():
 def test_topology_instance_get_port_instance_identifier(nested_m):
     a = nested_m.analysis
     outer = next(top for top in a.topology_map.values() if top.unqualified_name == "Outer")
-    (inst,) = (k for k in outer.instance_map if isinstance(k, TopologyInterfaceInstance))
+    (inst,) = (k for k in outer.instance_map if isinstance(k, InterfaceInstance.Topology))
     assert inst.qualified_name == "Inner"
 
     pii = inst.get_port_instance_identifier("innerPort")

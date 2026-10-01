@@ -33,10 +33,10 @@ for d in model.diagnostics:
     print(d)                                 # the compiler's console rendering
 
 (unit,) = model.ast                          # one translation unit per input
-(module,) = unit.members
+(module,) = unit.members                     # fpp.ast.DefModule
 [type(m).__name__ for m in module.members]   # ['DefArray', 'DefConstant']
 
-arr = model.lookup("M.Arr")                                     # SymbolArrayType
+arr = model.lookup("M.Arr")                                     # Symbol.ArrayType
 arr.definition.resolved_type.array_size                         # 4
 model.lookup("M.answer").definition.value.resolved_value.value  # 42
 ```
@@ -58,8 +58,24 @@ tree = fpp.parse(["A.fpp", "B.fpp"])
 [u.uri for u in tree.units]                  # ['A.fpp', 'B.fpp']
 ```
 
-Subclass `AstVisitor` and override `visit_<type(node).__name__>`. Traversal is
-deep by default: `super()` descends, omitting it prunes.
+The syntax tree lives in the `fpp.ast` submodule — one class per grammar
+production, plus the `AstNode` base and the enums the grammar spells
+(`fpp.ast.IntegerKind`, `fpp.ast.ComponentKind`). `fpp` itself is the analysis:
+`Model`, `Analysis`, the symbol/type/value unions, and the semantic entities. The
+split is what lets both keep the compiler's own names, since three of them belong
+to each — `fpp.Connection` is the analyzed connection, `fpp.ast.Connection` the
+syntax it came from.
+
+```python
+from fpp.ast import DefArray
+
+isinstance(module.members[0], DefArray)      # True
+type(module.members[0]).__module__           # 'fpp.ast'
+```
+
+Subclass `fpp.AstVisitor` — it takes AST nodes, but it is an entry point, so it
+stays in `fpp` beside `analyze` — and override `visit_<type(node).__name__>`.
+Traversal is deep by default: `super()` descends, omitting it prunes.
 
 ```python
 class Constants(fpp.AstVisitor):
@@ -75,14 +91,28 @@ consts.visit(model)                          # or a SyntaxTree, TransUnit, or no
 consts.values                                # {'answer': 42}
 ```
 
-Semantic types are closed unions, so narrow them with `isinstance` or `match`
-rather than a string tag.
+Semantic types are closed unions.
 
 ```python
 match arr.definition.resolved_type:
-    case fpp.ArrayType() as a:
+    case fpp.Type.Array() as a:
         elt = a.anon_array.elt_type
-        isinstance(elt, fpp.PrimitiveIntType) and elt.value == fpp.IntegerKind.U32
+        isinstance(elt, fpp.Type.PrimitiveInt) and elt.value == fpp.ast.IntegerKind.U32
+```
+
+Annotate with `<Base>.Variant` — `fpp.Type.Variant`, `fpp.Value.Variant` — rather
+than the base class. It is the closed union over the variants, so a type checker can tell you which `case` you forgot.
+
+```python
+def describe(v: fpp.Value.Variant) -> str:
+    match v:
+        case fpp.Value.Integer():
+            return f"integer {v.value}"
+        case fpp.Value.String():
+            return f"string {v.value}"
+        ...
+        case _:
+            typing.assert_never(v)   # fails while any variant is unhandled
 ```
 
 Findings of your own report like compiler errors: build a `Diagnostic` against
@@ -115,10 +145,6 @@ except fpp.DiagnosticError as error:
     raise
 ```
 
-`fpp.pyi` is the reference for the rest — every class, getter and return type —
-and the docstrings carry the contracts: `help(fpp.analyze)`, `help(fpp.Model)`,
-`help(fpp.AstVisitor)`.
-
 ## Development
 
 A Cargo workspace member of
@@ -128,15 +154,14 @@ declarations (`src/ast/defs.rs`, `src/sem/defs.rs`); the core (`pipeline`,
 `ir_core`, `lower_core`, `noderef`, `model`, `visitor`, `diagnostics`) is
 hand-written.
 
-Those declarations and `fpp.pyi` are generated and checked in — change the
-generator or the macro, never the file, and re-run `make`. CI fails on drift.
+Those declarations and the two stubs are generated and checked in. Change the generator or the macro, never the file, and re-run `make`. CI fails on drift.
 
 ```sh
 maturin develop            # build + install into the active venv
 pytest tests/              # run the tests
 
 make nightly               # one-time: the nightly the bindgen's rustdoc needs
-make                       # regenerate the declarations, then the stub
+make                       # regenerate the declarations, then the stubs
 make help                  # the individual codegen targets
 ```
 

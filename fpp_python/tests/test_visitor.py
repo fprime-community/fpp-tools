@@ -8,7 +8,8 @@ deep-vs-pruned recursion, the `generic_visit` funnel, and early exit by raising.
 """
 
 import fpp as f
-from fpp import AstNode, DefComponent, AstVisitor
+from fpp import AstVisitor
+from fpp.ast import AstNode, DefComponent
 
 MODULE_SRC = """
 module M {
@@ -19,8 +20,8 @@ module M {
 """
 
 # Mirrors fpp_analysis/tests/port_numbering/ok.fpp, trimmed to one connection.
-# Exercises `Connection` and `PortInstanceIdentifier` — the two `shadowed` node
-# types, whose generated `visit_*` methods take the `AstNode` base.
+# Exercises `Connection` and `PortInstanceIdentifier` — two node types whose names
+# a semantic entity also carries.
 TOPOLOGY_SRC = """
 port P
 
@@ -110,7 +111,7 @@ def test_children_flatten_through_kind_enums():
     # are the sub-expressions inside it rather than the kind wrapper.
     (mod,) = _roots(_model(MODULE_SRC))
     expr = mod.children[0].value
-    assert type(expr.kind).__name__ == "ExprBinop"
+    assert type(expr.kind).__qualname__ == "ExprKind.Binop"
     left, right = expr.children
     assert _type_names([left, right]) == ["Expr", "Expr"]
     # 1 + (2 * 3): the right operand is itself a binop with two operands.
@@ -279,10 +280,10 @@ def test_raising_aborts_the_traversal():
     assert len(v.visited) < len(_trace(_model(MODULE_SRC)))
 
 
-def test_shadowed_node_types_are_visitable():
-    # `Connection` and `PortInstanceIdentifier` collide with semantic-layer class
-    # names, so their generated methods take the `AstNode` base. Dispatch is by
-    # runtime class name, so they still resolve, and super() still descends.
+def test_nodes_sharing_an_entity_name_are_visitable():
+    # `Connection` and `PortInstanceIdentifier` are semantic-layer class names too.
+    # Dispatch is by `type(node).__name__`, which is the bare name in either
+    # namespace, so these resolve like any other node and super() still descends.
     class Conns(AstVisitor):
         def __init__(self):
             self.connections = 0

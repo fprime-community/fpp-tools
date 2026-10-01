@@ -12,12 +12,34 @@
 //! sub-field cloned); `String`/`bool`/`Span` are builtin scalars; a name in
 //! `leaves {…}` is a rendered leaf; a `kind` name is an inline kind-enum; a
 //! `node`/`union` name is a child; anything else is opaque.
+//!
+//! A `kind` enum becomes a base class named for the kind, carrying one nested class per
+//! variant (`ExprKind.Binop`), plus the closed union `ExprKind.Variant` that every
+//! kind-typed getter annotates — the same shape the semantic unions take, and the
+//! reason `isinstance(x, ExprKind)` is answerable at all. Only the Python name nests;
+//! the Rust ident stays `<Kind without its `Kind` suffix>` ++ `<Variant>`
+//! ([`kind_variant_wid`]), because these wrappers share one flat module where four bare
+//! variant names are already taken by a leaf enum or a node.
+//!
+//! Everything emitted here lands in the [`PY_MODULE`] submodule, not in the package
+//! root: an AST node's name is the grammar's, and three of them (`Connection`,
+//! `PortInstanceIdentifier`, `TlmChannelIdentifier`) are also semantic-entity names.
+//! One namespace per layer is what lets both keep the name the compiler gives it.
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::collections::{BTreeMap, BTreeSet};
 use syn::parse::{Parse, ParseStream};
-use syn::{Ident, Token, braced, bracketed, parenthesized};
+use syn::{Ident, LitStr, Token, braced, bracketed, parenthesized};
+
+/// The Python module every wrapper emitted here belongs to: the `ast` submodule of
+/// the package the extension is imported as.
+///
+/// Written out as a literal because `#[pyclass(module = ...)]` takes one, and it is the
+/// single source of truth — `crate::ast::PY_MODULE` re-exports it for `register` and
+/// for the stub generator, which asserts it against the module name resolved from
+/// `pyproject.toml`.
+const PY_MODULE: &str = "fpp.ast";
 
 // ---------------------------------------------------------------------------
 // Model
@@ -120,7 +142,6 @@ struct Registry {
     leaf_enums: BTreeMap<String, LeafEnumDef>,
     is_node: BTreeSet<String>,
     is_union: BTreeSet<String>,
-    shadowed: BTreeSet<String>,
     root: Option<RootDef>,
 }
 
@@ -329,17 +350,9 @@ impl Parse for RootDecl {
 struct Dsl {
     root: Option<RootDecl>,
     leaves: Vec<LeafEnumDecl>,
-    shadowed: Vec<Ident>,
     nodes: Vec<(Ident, Vec<FieldDecl>)>,
     unions: Vec<(Ident, Vec<UnionVariantDecl>)>,
     kinds: Vec<(Ident, Vec<KindVariantDecl>)>,
-}
-
-fn parse_ident_list(input: ParseStream) -> syn::Result<Vec<Ident>> {
-    let content;
-    braced!(content in input);
-    let items = content.parse_terminated(Ident::parse, Token![,])?;
-    Ok(items.into_iter().collect())
 }
 
 impl Parse for Dsl {
@@ -347,7 +360,6 @@ impl Parse for Dsl {
         let mut dsl = Dsl {
             root: None,
             leaves: Vec::new(),
-            shadowed: Vec::new(),
             nodes: Vec::new(),
             unions: Vec::new(),
             kinds: Vec::new(),
@@ -362,7 +374,6 @@ impl Parse for Dsl {
                     let items = content.parse_terminated(LeafEnumDecl::parse, Token![,])?;
                     dsl.leaves = items.into_iter().collect();
                 }
-                "shadowed" => dsl.shadowed = parse_ident_list(input)?,
                 "node" => {
                     let name: Ident = input.parse()?;
                     let content;
@@ -387,9 +398,7 @@ impl Parse for Dsl {
                 other => {
                     return Err(syn::Error::new(
                         kw.span(),
-                        format!(
-                            "unknown section `{other}` (expected root/leaves/shadowed/node/union/kind)"
-                        ),
+                        format!("unknown section `{other}` (expected root/leaves/node/union/kind)"),
                     ));
                 }
             }
@@ -448,7 +457,6 @@ fn build_registry(dsl: Dsl) -> Registry {
         leaf_enums,
         is_node: dsl.nodes.iter().map(|(n, _)| n.to_string()).collect(),
         is_union: dsl.unions.iter().map(|(n, _)| n.to_string()).collect(),
-        shadowed: dsl.shadowed.iter().map(|i| i.to_string()).collect(),
         root: dsl.root.map(|r| RootDef {
             container: r.container.to_string(),
             field: r.field,
@@ -539,10 +547,6 @@ fn snake(s: &str) -> String {
     out
 }
 
-fn kind_base(name: &str) -> String {
-    name.strip_suffix("Kind").unwrap_or(name).to_string()
-}
-
 fn ast_ty(name: &str) -> proc_macro2::Ident {
     format_ident!("{}", name)
 }
@@ -567,8 +571,15 @@ fn kind_ref_ident(name: &str) -> proc_macro2::Ident {
     format_ident!("{}Ref", name)
 }
 
+/// The RUST ident of one kind-variant wrapper: `<Kind without its `Kind` suffix>` ++
+/// `<Variant>`, e.g. `ExprKind::Binop` -> `ExprBinop`.
+///
+/// Python sees `ExprKind.Binop` instead; this spelling exists only because the
+/// generated wrappers share one flat module, where four bare variant names — `Binop`,
+/// `Ident`, `Transition`, `Unop` — are already taken by a leaf enum or a node.
 fn kind_variant_wid(kind_name: &str, variant: &str) -> proc_macro2::Ident {
-    format_ident!("{}{}", kind_base(kind_name), variant)
+    let base = kind_name.strip_suffix("Kind").unwrap_or(kind_name);
+    format_ident!("{}{}", base, variant)
 }
 
 fn union_ref_ident(name: &str) -> proc_macro2::Ident {
@@ -586,7 +597,7 @@ fn collect_union_members(name: &str, reg: &Registry, out: &mut BTreeSet<String>)
         for (_variant, inner) in &u.variants {
             if reg.is_union.contains(inner) {
                 collect_union_members(inner, reg, out);
-            } else if reg.is_node.contains(inner) && !reg.shadowed.contains(inner) {
+            } else if reg.is_node.contains(inner) {
                 out.insert(inner.clone());
             }
         }
@@ -600,9 +611,7 @@ enum ChildConv {
 }
 
 fn classify_child(ty: &str, reg: &Registry) -> ChildConv {
-    if reg.shadowed.contains(ty) {
-        ChildConv::Opaque
-    } else if reg.is_union.contains(ty) {
+    if reg.is_union.contains(ty) {
         if union_node_members(ty, reg).is_empty() {
             ChildConv::Opaque
         } else {
@@ -842,12 +851,12 @@ fn emit_walk(reg: &Registry) -> TokenStream {
 // Emit: the PyO3 wrappers (AstNode + node/kind/union wrappers + construct/register)
 // ---------------------------------------------------------------------------
 
-fn stub_attrs(name: &str, reg: &Registry) -> (TokenStream, TokenStream) {
-    if reg.shadowed.contains(name) {
-        (quote!(), quote!())
-    } else {
-        (quote!(#[gen_stub_pyclass]), quote!(#[gen_stub_pymethods]))
-    }
+/// The `module = "fpp.ast"` argument every emitted `#[pyclass]` carries, as a literal
+/// token. It sets both `__module__` at runtime and the stub's owning module, which is
+/// what qualifies these names as `ast.X` when the semantic layer refers to them.
+fn py_module_arg() -> TokenStream {
+    let lit = LitStr::new(PY_MODULE, proc_macro2::Span::call_site());
+    quote!(module = #lit)
 }
 
 fn emit_visitor_method(py_name: &str, param_ty: &proc_macro2::Ident) -> TokenStream {
@@ -873,19 +882,15 @@ fn emit_py(reg: &Registry) -> TokenStream {
     let mut construct_arms = Vec::new();
     let mut register_calls = Vec::new();
     let mut visitor_methods = Vec::new();
+    let pymod = py_module_arg();
+    let pymod_name = LitStr::new(PY_MODULE, proc_macro2::Span::call_site());
 
     for (name, def) in &reg.node_structs {
         let wid = format_ident!("{}", name);
         let ty = ast_ty(name);
         let kind = node_kind_ident(name);
-        let (gsc, gsm) = stub_attrs(name, reg);
         register_calls.push(quote!(m.add_class::<#wid>()?;));
-        let param_ty = if reg.shadowed.contains(name) {
-            format_ident!("AstNode")
-        } else {
-            wid.clone()
-        };
-        visitor_methods.push(emit_visitor_method(name, &param_ty));
+        visitor_methods.push(emit_visitor_method(name, &wid));
         construct_arms.push(quote! {
             Some(NodeKind::#kind) => Bound::new(py, PyClassInitializer::from(AstNode { data: data.clone(), model: model.clone_ref(py), node }).add_subclass(#wid))?.into_super().unbind()
         });
@@ -901,10 +906,10 @@ fn emit_py(reg: &Registry) -> TokenStream {
 
         let repr = format!("<{} #{{}}>", name);
         wrappers.push(quote! {
-            #gsc
-            #[pyclass(extends = AstNode, frozen)]
+            #[gen_stub_pyclass]
+            #[pyclass(extends = AstNode, frozen, #pymod)]
             pub struct #wid;
-            #gsm
+            #[gen_stub_pymethods]
             #[pymethods]
             impl #wid {
                 #(#getters)*
@@ -917,37 +922,112 @@ fn emit_py(reg: &Registry) -> TokenStream {
     }
 
     let mut kind_wrappers = Vec::new();
+    let mut kind_stub_entries = Vec::new();
     for (name, def) in &reg.kinds {
         let kty = ast_ty(name);
         let buildfn = build_kind_fn_ident(name);
         let refty = kind_ref_ident(name);
+        // The namespace class takes the kind's own name (`ExprKind`), and each variant
+        // nests on it (`ExprKind.Binop`). The base carries no data of its own — a
+        // variant's fields are all its own — so it exists purely to hold the nesting
+        // and to make `isinstance(x, ExprKind)` answerable, which it was not when the
+        // variants were unrelated classes.
+        let base = format_ident!("{}", name);
+        let base_name = LitStr::new(name, proc_macro2::Span::call_site());
+        let variant_alias = LitStr::new(&format!("{name}.Variant"), proc_macro2::Span::call_site());
         let mut build_arms = Vec::new();
         let mut variant_wids = Vec::new();
+        let mut nested_bare = Vec::new();
+        let mut nested_qualified = Vec::new();
+
+        kind_wrappers.push(quote! {
+            #[gen_stub_pyclass]
+            #[pyclass(subclass, frozen, name = #base_name, #pymod)]
+            pub struct #base;
+        });
+        register_calls.push(quote!(m.add_class::<#base>()?;));
+
         for v in &def.variants {
             let wid = kind_variant_wid(name, &v.name);
             let vid = format_ident!("{}", v.name);
+            // The Rust ident keeps carrying the kind (`ExprBinop`): these wrappers share
+            // one flat module, and four bare variant names — `Binop`, `Ident`,
+            // `Transition`, `Unop` — are already taken there by a leaf enum or a node.
+            let bare = LitStr::new(&v.name, proc_macro2::Span::call_site());
+            let qualified = LitStr::new(
+                &format!("{}.{}", name, v.name),
+                proc_macro2::Span::call_site(),
+            );
             variant_wids.push(wid.clone());
-            register_calls.push(quote!(m.add_class::<#wid>()?;));
+            nested_bare.push(bare.clone());
+            nested_qualified.push(qualified.clone());
+            // As with the semantic unions, the stub needs the nested name and PyO3
+            // rejects a dotted `name =`, so the two inventory items `gen_stub_pyclass`
+            // would derive are written out by hand.
+            //
+            // `type_output` stays UNQUALIFIED (`ExprKind.Binop`, not `ast.ExprKind.Binop`)
+            // because the only thing that reads it is `union_typeinfo`, whose result is
+            // written verbatim into the `Variant` alias inside this same module.
+            let stub_meta = quote! {
+                impl pyo3_stub_gen::PyStubType for #wid {
+                    fn type_output() -> pyo3_stub_gen::TypeInfo {
+                        pyo3_stub_gen::TypeInfo::unqualified(#qualified)
+                    }
+                }
+                impl pyo3_stub_gen::runtime::PyRuntimeType for #wid {
+                    fn runtime_type_object(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+                        Ok(py.get_type::<Self>().into_any())
+                    }
+                }
+                pyo3_stub_gen::inventory::submit! {
+                    pyo3_stub_gen::type_info::PyClassInfo {
+                        pyclass_name: #qualified,
+                        struct_id: std::any::TypeId::of::<#wid>,
+                        module: Some(#pymod_name),
+                        doc: "",
+                        getters: &[],
+                        setters: &[],
+                        bases: &[|| <#base as pyo3_stub_gen::PyStubType>::type_output()],
+                        has_eq: false,
+                        has_ord: false,
+                        has_hash: false,
+                        has_str: false,
+                        subclass: false,
+                    }
+                }
+            };
+            // A variant is built as its base plus itself, the same two-layer
+            // initializer the node wrappers use.
+            let new_variant = |fields: TokenStream| {
+                quote! {
+                    Bound::new(py, PyClassInitializer::from(#base).add_subclass(#wid #fields))?
+                        .into_any()
+                        .unbind()
+                }
+            };
+
             match &v.field {
                 KindField::Unit => {
                     kind_wrappers.push(quote! {
-                        #[gen_stub_pyclass]
-                        #[pyclass(frozen)] pub struct #wid {}
+                        #[pyclass(extends = #base, frozen, name = #bare, #pymod)]
+                        pub struct #wid;
+                        #stub_meta
                     });
-                    build_arms
-                        .push(quote!(fpp_ast::#kty::#vid => Py::new(py, #wid {})?.into_any()));
+                    let ctor = new_variant(quote!());
+                    build_arms.push(quote!(fpp_ast::#kty::#vid => #ctor));
                 }
                 KindField::Unnamed(sh) => {
                     if matches!(sh, Shape::Skip) {
-                        kind_wrappers.push(
-                            quote!(#[gen_stub_pyclass] #[pyclass(frozen)] pub struct #wid {}),
-                        );
-                        build_arms.push(
-                            quote!(fpp_ast::#kty::#vid(_) => Py::new(py, #wid {})?.into_any()),
-                        );
+                        kind_wrappers.push(quote! {
+                            #[pyclass(extends = #base, frozen, name = #bare, #pymod)]
+                            pub struct #wid;
+                            #stub_meta
+                        });
+                        let ctor = new_variant(quote!());
+                        build_arms.push(quote!(fpp_ast::#kty::#vid(_) => #ctor));
                     } else {
                         let fname = single_field_name(sh);
-                        let (decl, ctor, getter, needs_model) =
+                        let (decl, ctor_init, getter, needs_model) =
                             kind_field_parts(&fname, sh, quote!(f0), reg);
                         let model_decl = if needs_model {
                             quote!(model: Py<Model>,)
@@ -960,14 +1040,14 @@ fn emit_py(reg: &Registry) -> TokenStream {
                             quote!()
                         };
                         kind_wrappers.push(quote! {
-                            #[gen_stub_pyclass]
-                            #[pyclass(frozen)] pub struct #wid { #model_decl #decl }
+                            #[pyclass(extends = #base, frozen, name = #bare, #pymod)]
+                            pub struct #wid { #model_decl #decl }
+                            #stub_meta
                             #[gen_stub_pymethods]
                             #[pymethods] impl #wid { #getter }
                         });
-                        build_arms.push(quote! {
-                            fpp_ast::#kty::#vid(f0) => Py::new(py, #wid { #model_init #ctor })?.into_any()
-                        });
+                        let ctor = new_variant(quote!({ #model_init #ctor_init }));
+                        build_arms.push(quote!(fpp_ast::#kty::#vid(f0) => #ctor));
                     }
                 }
                 KindField::Named(fields) => {
@@ -1000,20 +1080,61 @@ fn emit_py(reg: &Registry) -> TokenStream {
                         quote!()
                     };
                     kind_wrappers.push(quote! {
-                        #[gen_stub_pyclass]
-                        #[pyclass(frozen)] pub struct #wid { #model_decl #(#decls,)* }
+                        #[pyclass(extends = #base, frozen, name = #bare, #pymod)]
+                        pub struct #wid { #model_decl #(#decls,)* }
+                        #stub_meta
                         #[gen_stub_pymethods]
                         #[pymethods] impl #wid { #(#getters)* }
                     });
-                    build_arms.push(quote! {
-                        fpp_ast::#kty::#vid { #(#binds,)* .. } => Py::new(py, #wid { #model_init #(#ctor_inits,)* })?.into_any()
-                    });
+                    let ctor = new_variant(quote!({ #model_init #(#ctor_inits,)* }));
+                    build_arms.push(quote!(fpp_ast::#kty::#vid { #(#binds,)* .. } => #ctor));
                 }
             }
         }
+
+        register_calls.push(quote! {
+            crate::ir_core::register_nested_union(
+                &m.py().get_type::<#base>(),
+                ::std::vec![
+                    #( (#nested_bare, #nested_qualified, m.py().get_type::<#variant_wids>()) ),*
+                ],
+                false,
+            )?;
+        });
+        kind_stub_entries.push(quote! {
+            crate::UnionStub {
+                module: ::std::option::Option::Some(#pymod_name),
+                base: #base_name,
+                variants: ::std::vec![ #( (#nested_qualified, #nested_bare) ),* ],
+                variant_rhs: #refty::union_typeinfo().name,
+            }
+        });
+
         kind_wrappers.push(quote! {
             pub struct #refty(Py<PyAny>);
-            pyo3_stub_gen::impl_stub_type!(#refty = #(#variant_wids)|*);
+            // `locally_defined` rather than `unqualified`: it writes the name out as
+            // `ast.<Kind>.Variant`, which pyo3-stub-gen de-qualifies back to
+            // `<Kind>.Variant` in this module and leaves qualified everywhere else.
+            impl pyo3_stub_gen::PyStubType for #refty {
+                fn type_output() -> pyo3_stub_gen::TypeInfo {
+                    pyo3_stub_gen::TypeInfo::locally_defined(#variant_alias, PY_MODULE.into())
+                }
+            }
+            impl #refty {
+                /// The `<Kind>.A | <Kind>.B | …` RHS of the nested `Variant` alias.
+                ///
+                /// Every member renders qualified by its BASE, which the nesting depends
+                /// on: inside `class ExprKind:` a bare variant name is a class-scope
+                /// binding, and four of them would otherwise capture a module-level class.
+                /// The module is not part of it — the alias is written inside the module
+                /// that defines it.
+                pub fn union_typeinfo() -> pyo3_stub_gen::TypeInfo {
+                    let parts: Vec<pyo3_stub_gen::TypeInfo> = ::std::vec![
+                        #( <#variant_wids as pyo3_stub_gen::PyStubType>::type_output() ),*
+                    ];
+                    parts.into_iter().reduce(|a, b| a | b).expect("a kind has at least one variant")
+                }
+            }
             impl<'py> IntoPyObject<'py> for #refty {
                 type Target = PyAny;
                 type Output = Bound<'py, PyAny>;
@@ -1091,7 +1212,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
         leaf_defs.push(quote! {
             #[doc = #doc]
             #[gen_stub_pyclass_enum]
-            #[pyclass(eq, eq_int, frozen, hash, skip_from_py_object)]
+            #[pyclass(eq, eq_int, frozen, hash, skip_from_py_object, #pymod)]
             // `Ord` is Rust-only (`#[pyclass(ord)]` stays off, so nothing appears in
             // the stub): it is what lets a map keyed by this mirror iterate in
             // native declaration order — see `sem_bindings::KeyOrder`.
@@ -1130,7 +1251,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
         /// node, and the getters common to all nodes. Node wrappers are
         /// `#[pyclass(extends = AstNode)]` unit subclasses.
         #[gen_stub_pyclass]
-        #[pyclass(subclass, frozen)]
+        #[pyclass(subclass, frozen, #pymod)]
         // `data` is the backing model data, captured once at construction (the same
         // `Arc` as `model.borrow(py).data`) and read directly by every getter —
         // mirroring the semantic-layer wrappers. `model` is kept only to build child
@@ -1205,7 +1326,7 @@ fn emit_py(reg: &Registry) -> TokenStream {
         }
 
         #[gen_stub_pyclass]
-        #[pyclass(extends = AstNode, frozen)]
+        #[pyclass(extends = AstNode, frozen, #pymod)]
         pub struct Opaque;
         #[gen_stub_pymethods]
         #[pymethods]
@@ -1217,11 +1338,25 @@ fn emit_py(reg: &Registry) -> TokenStream {
             }
         }
 
+        /// The Python module these wrappers belong to — the `ast` submodule of the
+        /// package the extension is imported as, matching the `module =` every
+        /// `#[pyclass]` here carries.
+        pub const PY_MODULE: &str = #pymod_name;
+
+        /// Register every AST wrapper with the `ast` submodule (NOT the package root;
+        /// see [`PY_MODULE`]). `crate::ast::register` builds that submodule and calls
+        /// this with it.
         pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
             m.add_class::<AstNode>()?;
             m.add_class::<Opaque>()?;
             #(#register_calls)*
             Ok(())
+        }
+
+        /// One `crate::UnionStub` per kind enum — the peer of the semantic layer's
+        /// `union_stubs`, consumed by the same `stub_gen` nesting pass.
+        pub fn kind_stubs() -> Vec<crate::UnionStub> {
+            ::std::vec![ #(#kind_stub_entries),* ]
         }
     }
 }
@@ -1347,6 +1482,16 @@ fn emit_getter(
     }
 }
 
+/// One stored field of a kind-variant wrapper: `(field declaration, constructor
+/// initializer, `#[getter]`, whether the wrapper needs a `model` handle)`.
+///
+/// Every Python-visible member comes back as a `#[getter]` in the `#[pymethods]`
+/// block, never as a `#[pyo3(get)]` field attribute. The eager scalar shapes could use
+/// the attribute — they did once — but a variant's stub metadata is hand-written in
+/// order to carry its nested name, and a hand-written `PyClassInfo` has no practical
+/// way to reproduce what the derive would have put in `getters`. Routing everything
+/// through `#[pymethods]` means `gen_stub_pymethods` keeps describing the whole
+/// surface, keyed by `TypeId`, and `getters: &[]` is correct by construction.
 fn kind_field_parts(
     fname: &proc_macro2::Ident,
     shape: &Shape,
@@ -1355,51 +1500,63 @@ fn kind_field_parts(
 ) -> (TokenStream, TokenStream, TokenStream, bool) {
     match shape {
         Shape::Str => (
-            quote!(#[pyo3(get)] #fname: String),
+            quote!(#fname: String),
             quote!(#fname: #bind.clone()),
-            quote!(),
+            quote! {
+                #[getter] fn #fname(&self) -> String { self.#fname.clone() }
+            },
             false,
         ),
         Shape::StrLeaf(acc) => {
             let acc = format_ident!("{}", acc);
             (
-                quote!(#[pyo3(get)] #fname: String),
+                quote!(#fname: String),
                 quote!(#fname: #bind.#acc.clone()),
-                quote!(),
+                quote! {
+                    #[getter] fn #fname(&self) -> String { self.#fname.clone() }
+                },
                 false,
             )
         }
         Shape::Leaf(l) => {
             let ety = format_ident!("{}", l);
             (
-                quote!(#[pyo3(get)] #fname: #ety),
+                quote!(#fname: #ety),
                 quote!(#fname: #ety::from(#bind)),
-                quote!(),
+                quote! {
+                    #[getter] fn #fname(&self) -> #ety { self.#fname }
+                },
                 false,
             )
         }
         Shape::StrLeafOpt(acc) => {
             let acc = format_ident!("{}", acc);
             (
-                quote!(#[pyo3(get)] #fname: Option<String>),
+                quote!(#fname: Option<String>),
                 quote!(#fname: #bind.as_ref().map(|v| v.#acc.clone())),
-                quote!(),
+                quote! {
+                    #[getter] fn #fname(&self) -> Option<String> { self.#fname.clone() }
+                },
                 false,
             )
         }
         Shape::LeafOpt(l) => {
             let ety = format_ident!("{}", l);
             (
-                quote!(#[pyo3(get)] #fname: Option<#ety>),
+                quote!(#fname: Option<#ety>),
                 quote!(#fname: #bind.as_ref().map(|v| #ety::from(v))),
-                quote!(),
+                quote! {
+                    #[getter] fn #fname(&self) -> Option<#ety> { self.#fname }
+                },
                 false,
             )
         }
         Shape::Bool => (
-            quote!(#[pyo3(get)] #fname: bool),
+            quote!(#fname: bool),
             quote!(#fname: *#bind),
-            quote!(),
+            quote! {
+                #[getter] fn #fname(&self) -> bool { self.#fname }
+            },
             false,
         ),
         Shape::Child(Card::One, ty) => {

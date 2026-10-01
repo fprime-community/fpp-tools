@@ -116,9 +116,18 @@
 //!
 //! # Python names
 //!
-//! CLASS names arrive pre-resolved in the declaration (`Variant => PyName : …`);
-//! the macro never invents one. They are the bindgen's `qualify`: `<Variant><Union>`
-//! for a union subclass, `<Union><Variant>` for the two symbol unions.
+//! A union's base class takes the union's plain name from its `alias` directive
+//! (`Type`), and each variant is a NESTED class on it named for the native variant
+//! (`Type.Alias`). The closed union over all of them is a further nested member,
+//! `Type.Variant`, which is what every union-typed getter and parameter annotates —
+//! the base class alone cannot express a closed set, so a `match` over it would get
+//! no exhaustiveness checking.
+//!
+//! Only the base is added to the module. A variant's `PyName` in the declaration
+//! (`Variant => PyName : …`) is its RUST ident, not its Python name: one flat module
+//! needs unique idents and the `payload` declarations are keyed on them, so it stays
+//! the bindgen's `qualify` spelling (`<Variant><Union>`, or `<Union><Variant>` for
+//! the two symbol unions).
 //!
 //! A member's Python name is its native name verbatim, with three exceptions: a
 //! native named after a Python keyword gains a trailing `_` ([`py_getter_ident`]);
@@ -131,6 +140,25 @@
 //! `__eq__`/`__hash__` in the clone-entity `#[pymethods]` block; its `repr`
 //! directive is the same one a union takes, and every clone-entity gets a
 //! `__repr__` whether or not it declares one.
+
+/// The Python module every wrapper emitted here belongs to: the package the extension
+/// is imported as, with no submodule of its own.
+///
+/// A literal because a cross-module annotation has to be written out qualified
+/// (`fpp.Symbol.Variant`) for pyo3-stub-gen to de-qualify it again in this module, and
+/// its deferred "default module" placeholder only works for an UNdotted name. The
+/// generated `PY_MODULE` re-exports it as `crate::PACKAGE`, where `stub_gen` checks it
+/// against the module name resolved from `pyproject.toml`.
+const PY_MODULE: &str = "fpp";
+
+/// The `module = "fpp"` argument every emitted `#[pyclass]` carries, as a literal
+/// token. It sets `__module__` at runtime — without it a class reports `builtins` and
+/// `repr(cls)` falls back to `tp_name` — and names the stub's owning module, which is
+/// what lets the AST submodule refer to these classes as `fpp.X`.
+fn py_module_arg() -> TokenStream {
+    let lit = LitStr::new(PY_MODULE, proc_macro2::Span::call_site());
+    quote!(module = #lit)
+}
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -663,8 +691,9 @@ impl Arg {
     /// takes exactly `X`, because it reborrows the live node as `fpp_ast::X`.
     ///
     /// A union arg wraps that `PyRef` in the generated `<Union>Arg` newtype, whose
-    /// only job is to render as the union alias in the `.pyi` (`Type`, not
-    /// `TypeBase`) — extraction and the borrow it hands out are the `PyRef`'s.
+    /// only job is to render as the closed union in the `.pyi` (`Type.Variant`, not
+    /// the bare base `Type`) — extraction and the borrow it hands out are the
+    /// `PyRef`'s.
     fn sig_ty(&self) -> TokenStream {
         match self {
             Arg::Scalar(s) => match s {
@@ -913,10 +942,10 @@ enum Identity {
 }
 
 /// How a class renders itself: `__repr__` is always `<PythonClassName …>`, and this
-/// directive says what the `…` is. The class name is the CONCRETE one (a union
-/// emits a `__repr__` per subclass), so with subclasses named for their union
-/// ([`crate::sem_bindings`]'s class-name note) the repr already carries the variant
-/// — `<SymbolPort 'Fw.Time'>`, not `<Symbol Port 'Fw.Time'>`.
+/// directive says what the `…` is. The class name is the CONCRETE one (a union emits
+/// a `__repr__` per subclass), spelled with its nesting so the variant is named
+/// unambiguously — `<Symbol.Port 'Fw.Time'>`, not `<Port 'Fw.Time'>`, which 15 bare
+/// variant names shared across unions would make ambiguous.
 ///
 /// The method identifiers are carried as DSL payloads (not hardcoded here) so a
 /// rename in `fpp_analysis` regenerates a still-correct call site. Which form a
@@ -2346,7 +2375,8 @@ fn repr_this(via_super: bool) -> TokenStream {
 /// `class` is a LITERAL, so a union emits this once per subclass (each with its own
 /// name) rather than matching the native discriminant at runtime: the concrete
 /// Python class is what a reader wants named, and it is known statically at the one
-/// place each subclass is emitted.
+/// place each subclass is emitted. For a union subclass it is the dotted spelling,
+/// matching the class's `__qualname__`.
 ///
 /// The body runs inside `run_ref` — a native `Display` or name method may read the
 /// retained compiler context, exactly as every generated method call may.
@@ -2429,15 +2459,20 @@ fn emit_union(
     Vec<TokenStream>,
     (String, TokenStream),
 ) {
+    let pymod = py_module_arg();
     let base = &u.py;
-    let base_name = LitStr::new(&format!("{}Base", base), base.span());
+    // The base class owns the union's plain Python name (`Type`); each variant is a
+    // nested class on it (`Type.Alias`), and the closed union is `Type.Variant`.
+    let base_name = u.alias.clone();
+    let variant_alias = LitStr::new(&format!("{}.Variant", base_name.value()), base.span());
+    assert_variant_names_free(u, &base_name.value());
     let handle_field = &u.accessor;
     let handle_ty = u.handle.field_ty(&u.native);
 
     // Base struct: data/model + the native handle.
     let base_struct = quote! {
         #[::pyo3_stub_gen::derive::gen_stub_pyclass]
-        #[::pyo3::pyclass(subclass, frozen, name = #base_name)]
+        #[::pyo3::pyclass(subclass, frozen, name = #base_name, #pymod)]
         pub struct #base {
             pub(crate) data: ::std::sync::Arc<crate::ir_core::ModelData>,
             pub(crate) model: ::pyo3::Py<crate::model::Model>,
@@ -2447,15 +2482,25 @@ fn emit_union(
 
     // Subclasses + their field getters.
     let mut subclass_defs = Vec::new();
-    let mut register_calls = vec![quote!(m.add_class::<#base>()?;)];
     let mut dispatch_arms = Vec::new();
     let mut ref_members: Vec<TokenStream> = Vec::new();
+    // `(bare Python name, dotted Python name, Rust ident)` per variant, consumed by
+    // the generated `register` and by `union_stubs`.
+    let mut nested: Vec<(LitStr, LitStr, &Ident)> = Vec::new();
 
     for v in &u.variants {
         let sub = &v.subclass;
         let variant = &v.native_variant;
         let native = &u.native;
-        register_calls.push(quote!(m.add_class::<#sub>()?;));
+        // The Rust ident stays the bindgen's qualified spelling (`AliasType`) — one
+        // flat module needs unique idents, and the payload declarations are keyed on
+        // it — while Python sees the native variant name, nested on the base.
+        let bare = LitStr::new(&variant.to_string(), variant.span());
+        let dotted = LitStr::new(
+            &format!("{}.{}", base_name.value(), variant),
+            variant.span(),
+        );
+        nested.push((bare.clone(), dotted.clone(), sub));
         ref_members.push(quote!(#sub));
         dispatch_arms.push(quote! {
             #native::#variant { .. } => ::pyo3::Bound::new(
@@ -2466,14 +2511,52 @@ fn emit_union(
 
         let payload = payloads.iter().find(|p| p.name == v.subclass);
         let getters = emit_subclass_getters(u, v, payload, reg);
-        // Named for the concrete subclass, not the union: the class is what a
-        // reader `isinstance`s against, and under the bindgen's naming it already
-        // carries the variant (`<SymbolPort 'Fw.Time'>`, `<StructType S>`).
-        let repr = emit_repr(&sub.to_string(), &u.repr, true, handle_field);
+        // Named for the concrete subclass, not the union: the class is what a reader
+        // `isinstance`s against, and the dotted spelling is the one that names it
+        // unambiguously (`<Symbol.Port 'Fw.Time'>`, `<Type.Struct S>`) — 15 bare
+        // variant names are shared by more than one union.
+        let repr = emit_repr(&dotted.value(), &u.repr, true, handle_field);
+        // `gen_stub_pyclass` would derive the stub's class name from the pyclass
+        // `name`, which PyO3 requires to be a single identifier. The stub needs the
+        // dotted spelling (it is what every annotation referring to this class must
+        // say), so the two inventory items the derive would emit are written out
+        // here instead. `gen_stub_pymethods` stays: `PyMethodsInfo` is keyed by
+        // `TypeId`, so the getters still attach to this class.
         subclass_defs.push(quote! {
-            #[::pyo3_stub_gen::derive::gen_stub_pyclass]
-            #[::pyo3::pyclass(extends = #base, frozen)]
+            #[::pyo3::pyclass(extends = #base, frozen, name = #bare, #pymod)]
             pub struct #sub;
+
+            impl ::pyo3_stub_gen::PyStubType for #sub {
+                fn type_output() -> ::pyo3_stub_gen::TypeInfo {
+                    ::pyo3_stub_gen::TypeInfo::unqualified(#dotted)
+                }
+            }
+
+            impl ::pyo3_stub_gen::runtime::PyRuntimeType for #sub {
+                fn runtime_type_object(
+                    py: ::pyo3::Python<'_>,
+                ) -> ::pyo3::PyResult<::pyo3::Bound<'_, ::pyo3::PyAny>> {
+                    Ok(py.get_type::<Self>().into_any())
+                }
+            }
+
+            ::pyo3_stub_gen::inventory::submit! {
+                ::pyo3_stub_gen::type_info::PyClassInfo {
+                    pyclass_name: #dotted,
+                    struct_id: ::std::any::TypeId::of::<#sub>,
+                    module: None,
+                    doc: "",
+                    getters: &[],
+                    setters: &[],
+                    bases: &[|| <#base as ::pyo3_stub_gen::PyStubType>::type_output()],
+                    has_eq: false,
+                    has_ord: false,
+                    has_hash: false,
+                    has_str: false,
+                    subclass: false,
+                }
+            }
+
             #[::pyo3_stub_gen::derive::gen_stub_pymethods]
             #[::pyo3::pymethods]
             impl #sub {
@@ -2482,7 +2565,11 @@ fn emit_union(
             }
         });
     }
-    if u.include_base {
+    // The bare base closes the union only where it is a real instance (the unknown
+    // `Type`); `ref_members` feeds both the stub's `Variant` RHS and the runtime
+    // union, so the two cannot disagree about it.
+    let include_base = u.include_base;
+    if include_base {
         ref_members.push(quote!(#base));
     }
 
@@ -2493,9 +2580,12 @@ fn emit_union(
     let base_repr = emit_repr(&base_name.value(), &u.repr, false, handle_field);
     let str_method = emit_str(&u.repr, false, handle_field);
 
-    // Dispatch + register (base + subclasses + the runtime union object).
+    // Dispatch + register (base + nested variants + the runtime union object).
+    // Split into parallel vectors: `quote!` repetition cannot destructure tuples.
+    let nested_bare: Vec<&LitStr> = nested.iter().map(|(b, _, _)| b).collect();
+    let nested_dotted: Vec<&LitStr> = nested.iter().map(|(_, d, _)| d).collect();
+    let nested_subs: Vec<&Ident> = nested.iter().map(|(_, _, s)| *s).collect();
     let native = &u.native;
-    let alias = &u.alias;
     let ref_ty = format_ident!("{}Ref", base);
     let dispatch = quote! {
         #[::pyo3_stub_gen::derive::gen_stub_pymethods]
@@ -2519,27 +2609,27 @@ fn emit_union(
                 })
             }
 
-            /// Register the base + every subclass, then add the runtime union.
+            /// Add the base as the module's only name for this hierarchy, then hand
+            /// its variants to [`crate::ir_core::register_nested_union`], which
+            /// attaches them as nested classes and publishes `<Base>.Variant`.
             pub(crate) fn register(
                 m: &::pyo3::Bound<'_, ::pyo3::types::PyModule>,
             ) -> ::pyo3::PyResult<()> {
                 use ::pyo3::prelude::*;
-                #(#register_calls)*
-                let __classes: ::std::vec::Vec<::pyo3::Bound<'_, ::pyo3::PyAny>> =
-                    ::std::vec![ #( m.py().get_type::<#ref_members>().into_any() ),* ];
-                let mut __it = __classes.into_iter();
-                let mut __acc = __it.next().expect("a union has at least one member");
-                for __c in __it {
-                    __acc = __acc.call_method1("__or__", (__c,))?;
-                }
-                m.add(#alias, __acc)?;
-                Ok(())
+                m.add_class::<#base>()?;
+                crate::ir_core::register_nested_union(
+                    &m.py().get_type::<#base>(),
+                    ::std::vec![
+                        #( (#nested_bare, #nested_dotted, m.py().get_type::<#nested_subs>()) ),*
+                    ],
+                    #include_base,
+                )
             }
         }
     };
 
     // The `*Ref` return newtype: runtime object is the concrete subclass; its
-    // stub type renders as the union alias.
+    // stub type renders as `<Base>.Variant`, the closed union.
     let ref_newtype = quote! {
         pub struct #ref_ty(pub ::pyo3::Py<::pyo3::PyAny>);
         impl<'py> ::pyo3::IntoPyObject<'py> for #ref_ty {
@@ -2550,13 +2640,22 @@ fn emit_union(
                 ::std::result::Result::Ok(self.0.into_bound(py))
             }
         }
+        // `locally_defined` rather than `unqualified`: the AST submodule annotates with
+        // these too, and only a type that knows where it lives comes out as
+        // `fpp.<Base>.Variant` there while staying bare here.
         impl ::pyo3_stub_gen::PyStubType for #ref_ty {
             fn type_output() -> ::pyo3_stub_gen::TypeInfo {
-                ::pyo3_stub_gen::TypeInfo::unqualified(#alias)
+                ::pyo3_stub_gen::TypeInfo::locally_defined(#variant_alias, PY_MODULE.into())
             }
         }
         impl #ref_ty {
-            /// The `Sub1 | Sub2 | …` expansion used as the `.pyi` alias RHS.
+            /// The `<Base>.Sub1 | <Base>.Sub2 | …` expansion used as the RHS of the
+            /// nested `Variant` alias.
+            ///
+            /// Every member renders DOTTED, which the nesting depends on: inside
+            /// `class <Base>:` a bare variant name is a class-scope binding, so a
+            /// bare RHS would resolve some members to the nested class and others to
+            /// a same-named module-level class.
             pub fn union_typeinfo() -> ::pyo3_stub_gen::TypeInfo {
                 let parts: ::std::vec::Vec<::pyo3_stub_gen::TypeInfo> = ::std::vec![
                     #( <#ref_members as ::pyo3_stub_gen::PyStubType>::type_output() ),*
@@ -2569,12 +2668,13 @@ fn emit_union(
     // The `*Arg` parameter newtype: the input-side mirror of `*Ref`. It extracts as
     // (and derefs to) a `PyRef` of the base class — so any subclass instance is
     // accepted, PyO3 does the type check, and a method body reads the stored native
-    // straight off it — but its stub type is the union alias. Without it the `.pyi`
-    // shows the same value as `Type` coming out and `TypeBase` going in.
+    // straight off it — but its stub type is `<Base>.Variant`. Without it the `.pyi`
+    // shows `Type.Variant` coming out and the bare base `Type` going in.
     //
-    // Narrowing the annotation to the alias loses nothing: `TypeBase` is itself an
-    // alias member for an `include_base` union, and for every other union the base
-    // has no constructor, so no instance of it can exist that is not a subclass.
+    // Narrowing the annotation to the closed union loses nothing: the bare base is
+    // itself a `Variant` member for an `include_base` union, and for every other
+    // union the base has no constructor, so no instance of it can exist that is not
+    // a subclass.
     let arg_ty = format_ident!("{}Arg", base);
     let arg_newtype = quote! {
         pub struct #arg_ty<'py>(pub ::pyo3::PyRef<'py, #base>);
@@ -2596,7 +2696,7 @@ fn emit_union(
         }
         impl ::pyo3_stub_gen::PyStubType for #arg_ty<'_> {
             fn type_output() -> ::pyo3_stub_gen::TypeInfo {
-                ::pyo3_stub_gen::TypeInfo::unqualified(#alias)
+                ::pyo3_stub_gen::TypeInfo::locally_defined(#variant_alias, PY_MODULE.into())
             }
         }
     };
@@ -2661,15 +2761,58 @@ fn emit_union(
         }
     };
 
-    let alias_str = u.alias.value();
-    let alias_entry = quote!(#ref_ty::union_typeinfo().name);
+    // What the stub generator needs to nest this union: the base's Python name, the
+    // `(dotted, bare)` spelling of each variant in declaration order, and the RHS of
+    // the nested `Variant` alias (built in that same order by `union_typeinfo`).
+    // `module: None` is the package's default module — the semantic layer has no
+    // submodule of its own, unlike `crate::ast`.
+    let stub_entry = quote! {
+        crate::UnionStub {
+            module: ::std::option::Option::None,
+            base: #base_name,
+            variants: ::std::vec![ #( (#nested_dotted, #nested_bare) ),* ],
+            variant_rhs: #ref_ty::union_typeinfo().name,
+        }
+    };
 
     (
         quote! { #base_struct #(#subclass_defs)* #dispatch #ref_newtype #arg_newtype #ref_builder #build_default },
         vec![quote!(#base::register(m)?;)],
         Vec::new(),
-        (alias_str, alias_entry),
+        (base_name.value(), stub_entry),
     )
+}
+
+/// Fail the macro when a variant's Python name would collide with a member of the
+/// base class it is attached to.
+///
+/// A variant becomes an attribute of its base, so a variant named after one of the
+/// base's getters would replace that getter's descriptor with a class object — for
+/// every subclass at once, since they inherit it. The failure is silent at runtime,
+/// so it is caught here instead. `Variant` is reserved for the closed-union alias.
+fn assert_variant_names_free(u: &UnionDecl, base_name: &str) {
+    // The base's Python-visible members: the `loc_from_node` getter plus one per
+    // method. PyO3 strips a `get_` prefix from a getter, so both spellings are
+    // reserved — over-approximating costs nothing here.
+    let mut taken: Vec<String> = vec!["Variant".to_string()];
+    if u.loc_from_node {
+        taken.push("loc".to_string());
+    }
+    for m in &u.methods {
+        let name = m.name.to_string();
+        if let Some(stripped) = name.strip_prefix("get_") {
+            taken.push(stripped.to_string());
+        }
+        taken.push(name);
+    }
+    for v in &u.variants {
+        let variant = v.native_variant.to_string();
+        assert!(
+            !taken.contains(&variant),
+            "union `{base_name}` variant `{variant}` collides with a member of its \
+             base class; attaching it would shadow that member for every variant"
+        );
+    }
 }
 
 /// Emit a standalone `entity` item. Returns `(definition, register_call)`.
@@ -2732,6 +2875,7 @@ fn emit_entity_identity(e: &EntityDecl, field: &Ident) -> Vec<TokenStream> {
 /// Emit a standalone `clone`-handle entity: the pyclass struct, its `build`
 /// constructor, and the getter block. Returns `(definition, register_call)`.
 fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStream, TokenStream) {
+    let pymod = py_module_arg();
     let py = &e.py;
     let native = &e.native;
     let model = quote!(&self.model);
@@ -2828,7 +2972,7 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStr
 
     let def = quote! {
         #[::pyo3_stub_gen::derive::gen_stub_pyclass]
-        #[::pyo3::pyclass(frozen)]
+        #[::pyo3::pyclass(frozen, #pymod)]
         pub struct #py {
             pub(crate) data: ::std::sync::Arc<crate::ir_core::ModelData>,
             pub(crate) model: ::pyo3::Py<crate::model::Model>,
@@ -2872,6 +3016,7 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStr
 /// `__richcmp__`/`__hash__`, so the member spelling would otherwise be recoverable
 /// only by parsing `repr`.
 fn emit_leaf_enum(e: &LeafEnumDecl) -> (TokenStream, TokenStream) {
+    let pymod = py_module_arg();
     let py = &e.py;
     let native = &e.native;
     let variant_idents: Vec<&Ident> = e.variants.iter().map(|(v, _)| v).collect();
@@ -2888,7 +3033,7 @@ fn emit_leaf_enum(e: &LeafEnumDecl) -> (TokenStream, TokenStream) {
     let def = quote! {
         #[doc = #doc]
         #[::pyo3_stub_gen::derive::gen_stub_pyclass_enum]
-        #[::pyo3::pyclass(eq, eq_int, frozen, hash, skip_from_py_object)]
+        #[::pyo3::pyclass(eq, eq_int, frozen, hash, skip_from_py_object, #pymod)]
         // `Ord` is Rust-only (`#[pyclass(ord)]` stays off, so nothing appears in the
         // stub): it is what lets a map keyed by this mirror iterate in native
         // declaration order — see [`KeyOrder`].
@@ -2933,6 +3078,7 @@ fn emit_leaf_enum(e: &LeafEnumDecl) -> (TokenStream, TokenStream) {
 /// `build_analysis` constructor, and the register call. Returns
 /// `(definition, register_call)`.
 fn emit_analysis(a: &AnalysisDecl, reg: &Registry) -> (TokenStream, TokenStream) {
+    let pymod = py_module_arg();
     let native = &a.native;
     let model = quote!(&self.model);
     let data = quote!(self.data);
@@ -2997,7 +3143,7 @@ fn emit_analysis(a: &AnalysisDecl, reg: &Registry) -> (TokenStream, TokenStream)
 
     let def = quote! {
         #[::pyo3_stub_gen::derive::gen_stub_pyclass]
-        #[::pyo3::pyclass(frozen)]
+        #[::pyo3::pyclass(frozen, #pymod)]
         pub struct Analysis {
             pub(crate) data: ::std::sync::Arc<crate::ir_core::ModelData>,
             pub(crate) model: ::pyo3::Py<crate::model::Model>,
@@ -3084,15 +3230,13 @@ pub fn expand(input: TokenStream) -> TokenStream {
 
     let mut defs = Vec::new();
     let mut register_calls = Vec::new();
-    let mut alias_names = Vec::new();
-    let mut alias_exprs = Vec::new();
+    let mut stub_entries = Vec::new();
 
     for u in &dsl.unions {
-        let (def, reg, _extra, (alias_name, alias_expr)) = emit_union(u, &dsl.payloads, &union_reg);
+        let (def, reg, _extra, (_base_name, stub_entry)) = emit_union(u, &dsl.payloads, &union_reg);
         defs.push(def);
         register_calls.extend(reg);
-        alias_names.push(alias_name);
-        alias_exprs.push(alias_expr);
+        stub_entries.push(stub_entry);
     }
 
     for e in &dsl.entities {
@@ -3123,6 +3267,8 @@ pub fn expand(input: TokenStream) -> TokenStream {
         .iter()
         .map(|p| quote!(#[allow(unused_imports)] use #p as _;));
 
+    let py_module = LitStr::new(PY_MODULE, proc_macro2::Span::call_site());
+
     quote! {
         // Hand-written rather than a `traits {…}` entry: the `.node()` call sites
         // that need this trait in scope are emitted by the macro itself, so no DSL
@@ -3133,15 +3279,20 @@ pub fn expand(input: TokenStream) -> TokenStream {
 
         #(#defs)*
 
+        /// The Python module these wrappers belong to: the package the extension is
+        /// imported as. Matches `crate::PACKAGE`, which re-exports it, and is asserted
+        /// against the module name `pyproject.toml` resolves to.
+        pub const PY_MODULE: &str = #py_module;
+
         /// Register every generated semantic pyclass with the module.
         pub fn register(m: &::pyo3::Bound<'_, ::pyo3::types::PyModule>) -> ::pyo3::PyResult<()> {
             #(#register_calls)*
             Ok(())
         }
 
-        /// `(alias name, `Sub1 | Sub2 | …` RHS)` for every generated closed union.
-        pub fn union_aliases() -> ::std::vec::Vec<(&'static str, ::std::string::String)> {
-            ::std::vec![ #( (#alias_names, #alias_exprs) ),* ]
+        /// One `crate::UnionStub` per generated closed union.
+        pub fn union_stubs() -> ::std::vec::Vec<crate::UnionStub> {
+            ::std::vec![ #(#stub_entries),* ]
         }
     }
 }

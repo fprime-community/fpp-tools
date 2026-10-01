@@ -1,14 +1,18 @@
 """Typed usage of the native bindings, checked by mypy (not run as a test).
 
 `.github/workflows/python.yml` builds the extension and runs mypy over this file
-so the checked-in `fpp_python/fpp.pyi` stub is validated against real call
-sites. It exercises both entry points — `parse` (a `SyntaxTree` of `TransUnit`s)
+so the checked-in stubs (`fpp_python/python/fpp/__init__.pyi` and `ast.pyi`) are
+validated against real call sites. It exercises both entry points — `parse` (a `SyntaxTree` of `TransUnit`s)
 and `analyze` (a `Model`) — and the semantic surface: the `Analysis` root, its typed maps
-(`dict[Symbol, Component]`, `dict[int, Command]`), the `Type` / `Command` /
-`NonParamKind` union base+subclass hierarchies (narrowed with `isinstance`), the
+(`dict[Symbol.Variant, Component]`, `dict[int, Command.Variant]`), the `Type` /
+`Command` / `NonParamKind` unions — a base class carrying nested variant classes,
+narrowed with `isinstance` and matched exhaustively against `<Base>.Variant` — the
 resolved `Loc` and lazy `Span` location types, the state-machine model, and the AST
 traversal surface (`AstNode.children` plus a `AstVisitor` subclass overriding typed
-`visit_*` methods). It also covers the contracts the stub is easiest to get wrong
+`visit_*` methods). The AST half comes from the `fpp.ast` submodule, so the two
+stub files are checked against each other as well: `PortInstanceIdentifier` is
+imported from `fpp` and is the semantic entity, while `fpp.ast` has a node of that
+name. It also covers the contracts the stub is easiest to get wrong
 about: a leaf enum's `str`-typed `.name`/`.value`, `str()` of a union base,
 `lookup(kind=…)` / `lookup_all`, a symbol's `int` `node_id` beside its node
 `definition`, `Topology.node`, `Diagnostic.display`, the writable `Diagnostic` raised as a
@@ -18,44 +22,47 @@ about: a leaf enum's `str`-typed `.name`/`.value`, `str()` of a union base,
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, assert_never, assert_type
 
 from fpp import (
     analyze,
     parse,
     Analysis,
-    AstNode,
-    AsyncNonParamKind,
     Command,
     Component,
-    DefComponent,
-    DefConstant,
-    DefPort,
-    DefTopology,
     Diagnostic,
     DiagnosticMessageKind,
     DiagnosticLevel,
     DiagnosticMessage,
     DiagnosticError,
     Endpoint,
-    IntegerKind,
+    InterfaceInstance,
     Loc,
     Model,
     AstVisitor,
-    NonParamCommand,
     NonParamKind,
     PortInstanceIdentifier,
-    PrimitiveIntType,
     Span,
-    SpecCommand,
     StateMachine,
     StateMachineSymbol,
     Symbol,
-    SymbolPort,
     SyntaxTree,
-    TopologyInterfaceInstance,
+    Topology,
     TransUnit,
     Type,
+    Value,
+)
+from fpp.ast import (
+    AstNode,
+    Ident,
+    DefComponent,
+    DefConstant,
+    DefPort,
+    DefTopology,
+    Expr,
+    ExprKind,
+    IntegerKind,
+    SpecCommand,
 )
 
 SRC = """
@@ -92,26 +99,168 @@ module M {
 """
 
 
-def command_priority(cmd: Command) -> Optional[int]:
-    """`Command` is itself a union (`NonParamCommand | ParamCommand`); narrowing
-    to `NonParamCommand` gives a `.kind` of the `NonParamKind` union
-    (`AsyncNonParamKind | GuardedNonParamKind | SyncNonParamKind`), narrowed again
-    to the async subclass, which alone exposes `.priority`."""
-    if not isinstance(cmd, NonParamCommand):
+def command_priority(cmd: Command.Variant) -> Optional[int]:
+    """`Command.Variant` is the closed union (`Command.NonParam | Command.Param`);
+    narrowing to `Command.NonParam` gives a `.kind` of `NonParamKind.Variant`,
+    narrowed again to the async variant, which alone exposes `.priority`."""
+    if not isinstance(cmd, Command.NonParam):
         return None
-    kind: NonParamKind = cmd.kind
-    if isinstance(kind, AsyncNonParamKind):
-        return kind.priority  # Optional[int], only on the async subclass
+    kind: NonParamKind.Variant = cmd.kind
+    if isinstance(kind, NonParamKind.Async):
+        return kind.priority  # Optional[int], only on the async variant
     return None
 
 
 def constant_type_kind(node: DefConstant) -> Optional[IntegerKind]:
-    """`.resolved_type` is the `Type` union (`Optional`); `isinstance` narrows it
-    to `PrimitiveIntType`, whose `.value` is the mirrored `IntegerKind` payload."""
-    resolved: Optional[Type] = node.resolved_type
-    if isinstance(resolved, PrimitiveIntType):
+    """`.resolved_type` is `Type.Variant` (`Optional`); `isinstance` narrows it to
+    `Type.PrimitiveInt`, whose `.value` is the mirrored `IntegerKind` payload."""
+    resolved: Optional[Type.Variant] = node.resolved_type
+    if isinstance(resolved, Type.PrimitiveInt):
         return resolved.value
     return None
+
+
+def describe_value(v: Value.Variant) -> str:
+    """Every `Value` variant, matched exhaustively.
+
+    This is what notices a variant added to `fpp_analysis::semantics::Value`:
+    `Value.Variant` is a genuinely closed union, so `assert_never` type-checks only
+    while every arm is present, and mypy names the one that is missing. Annotating
+    the base class `Value` instead would silently accept an incomplete match — a base
+    class is open, so nothing narrows it to `Never`.
+    """
+    match v:
+        case Value.PrimitiveInteger():
+            return f"primitive {v.value} {v.kind.name}"
+        case Value.AbsType():
+            return f"abstract {v.ty.node.name}"
+        case Value.Integer():
+            return f"integer {v.value}"
+        case Value.Float():
+            return f"float {v.value} {v.kind.name}"
+        case Value.Boolean():
+            return f"bool {v.value}"
+        case Value.String():
+            return f"string {v.value}"
+        case Value.EnumConstant():
+            return f"enum constant {v.value[0]}"
+        case Value.AnonArray():
+            return f"anon array {len(v.elements)}"
+        case Value.Array():
+            return f"array {v.ty.node.name}"
+        case Value.AnonStruct():
+            return f"anon struct {len(v.members)}"
+        case Value.Struct():
+            return f"struct {v.ty.node.name}"
+        case _:
+            assert_never(v)
+
+
+def describe_type(t: Type.Variant) -> str:
+    """Every `Type` variant, narrowed through its nested classes.
+
+    Unlike `describe_value` this is NOT an exhaustiveness check, and cannot be:
+    `Type` is the one union whose bare base is a member of its own closed union — an
+    unknown type whose definition node is absent from the walk surfaces as the base —
+    so the `Type()` arm it needs is a class pattern that also matches every variant.
+    Drop an arm above it and that arm absorbs the remainder, leaving `Never` and no
+    complaint. `describe_value` is the canary; this exercises the narrowing.
+
+    The `Type()` arm must come last for the same reason: placed earlier it would
+    swallow everything below it.
+    """
+    match t:
+        case Type.PrimitiveInt():
+            return f"primitive {t.value.name}"
+        case Type.Float():
+            return f"float {t.value.name}"
+        case Type.String():
+            return f"string {t.value}"
+        case Type.Boolean():
+            return "bool"
+        case Type.Integer():
+            return "integer"
+        case Type.Abs():
+            return f"abs {t.node.name}"
+        case Type.Alias():
+            return f"alias {describe_type(t.alias_type)}"
+        case Type.Array():
+            return f"array {t.node.name}"
+        case Type.AnonArray():
+            return f"anon array {t.size}"
+        case Type.Enum():
+            return f"enum {t.node.name}"
+        case Type.Struct():
+            return f"struct {t.node.name}"
+        case Type.AnonStruct():
+            return f"anon struct {len(t.members)}"
+        case Type():
+            return "unknown"
+        case _:
+            assert_never(t)
+
+
+def describe_expr(e: Expr) -> str:
+    """Every `ExprKind` variant, matched exhaustively.
+
+    The AST kind enums nest exactly as the semantic unions do, and none of them has
+    the bare base as a member, so unlike `describe_type` this really is an
+    exhaustiveness check. Before they had a base class at all, `ExprBinop` and
+    `ExprLiteralInt` were unrelated classes and `isinstance(k, ExprKind)` could not be
+    asked.
+    """
+    k: ExprKind.Variant = e.kind
+    match k:
+        case ExprKind.Array():
+            return f"array {len(k.elements)}"
+        case ExprKind.ArraySubscript():
+            return f"{describe_expr(k.e1)}[{describe_expr(k.e2)}]"
+        case ExprKind.Binop():
+            return f"({describe_expr(k.left)} {k.op.name} {describe_expr(k.right)})"
+        case ExprKind.Dot():
+            return f"{describe_expr(k.e)}.{k.id.data}"
+        case ExprKind.Ident():
+            return k.value
+        case ExprKind.LiteralBool():
+            return str(k.value)
+        case ExprKind.LiteralInt() | ExprKind.LiteralFloat() | ExprKind.LiteralString():
+            return k.value
+        case ExprKind.Paren():
+            return f"({describe_expr(k.value)})"
+        case ExprKind.SizeOf():
+            return "sizeof"
+        case ExprKind.Struct():
+            return f"struct {len(k.elements)}"
+        case ExprKind.Unop():
+            return f"{k.op.name}{describe_expr(k.e)}"
+        case _:
+            assert_never(k)
+
+
+def topology_of(instance: InterfaceInstance.Variant) -> Optional[Topology]:
+    """A base-class member annotated with a name one of its own variants shadows.
+
+    `as_topology` returns the `Topology` *entity*, while `InterfaceInstance.Topology`
+    is a variant of this very union — so inside the class body the bare name is
+    ambiguous, and mypy and pyright disagree about which one it means. `stub_gen`
+    qualifies the annotation as `fpp.Topology` to keep it pointing at the entity;
+    `assert_type` is what would catch that regressing, since the wrong reading still
+    type-checks on its own. `expr_dot_id` is the same check on the AST side.
+    """
+    assert_type(instance.as_topology, Optional[Topology])
+    return instance.as_topology
+
+
+def expr_dot_id(e: ExprKind.Dot) -> Ident:
+    """The AST-side peer of `topology_of`, inside `fpp.ast`.
+
+    `ExprKind.Dot.id` is the `Ident` *node*, but `ExprKind.Ident` is a sibling variant
+    binding that name in the enclosing class scope — so `stub_gen` writes the
+    annotation as `fpp.ast.Ident`. `ExprKind.Binop.op` is the same case against a leaf
+    enum rather than a node.
+    """
+    assert_type(e.id, Ident)
+    return e.id
 
 
 def kind_spelling(kind: IntegerKind) -> str:
@@ -126,16 +275,16 @@ def kind_spelling(kind: IntegerKind) -> str:
 def type_spelling(node: AstNode) -> str:
     """`__str__` is declared on the union base (it is the native `Display`), so a
     type renders without narrowing to a subclass first."""
-    resolved: Optional[Type] = node.resolved_type
+    resolved: Optional[Type.Variant] = node.resolved_type
     return str(resolved) if resolved is not None else ""
 
 
-def first_port_symbol(model: Model) -> Optional[SymbolPort]:
+def first_port_symbol(model: Model) -> Optional[Symbol.Port]:
     """`lookup`'s `kind=` takes a symbol class and narrows nothing by itself, so
     the caller still asserts what it asked for; `lookup_all` returns a list."""
-    every: list[Symbol] = model.lookup_all("M.P")
-    found: Optional[Symbol] = model.lookup("M.P", kind=SymbolPort)
-    if isinstance(found, SymbolPort) and every:
+    every: list[Symbol.Variant] = model.lookup_all("M.P")
+    found: Optional[Symbol.Variant] = model.lookup("M.P", kind=Symbol.Port)
+    if isinstance(found, Symbol.Port) and every:
         node_id: int = found.node_id
         definition: DefPort = found.definition
         assert node_id == definition.node_id
@@ -159,7 +308,7 @@ def analysis_detail(a: Analysis) -> int:
     `Optional[Loc]`."""
     total = 0
     for sym, comp in a.component_map.items():
-        symbol: Symbol = sym
+        symbol: Symbol.Variant = sym
         component: Component = comp
         total += len(a.get_qualified_name(symbol))
         loc: Optional[Loc] = component.node.location
@@ -167,20 +316,20 @@ def analysis_detail(a: Analysis) -> int:
             line: int = loc.line
             uri: str = loc.uri
             total += line + len(uri)
-        commands: dict[int, Command] = component.command_map
+        commands: dict[int, Command.Variant] = component.command_map
         for opcode, cmd in commands.items():
             total += opcode + len(cmd.name)
             prio = command_priority(cmd)
             total += prio if prio is not None else 0
     for sm_sym, sm in a.state_machine_map.items():
         machine: StateMachine = sm
-        actions: list[StateMachineSymbol] = machine.actions
+        actions: list[StateMachineSymbol.Variant] = machine.actions
         total += len(actions)
     return total
 
 
 def instance_port_lookups(a: Analysis) -> int:
-    """`ComponentInterfaceInstance` and `TopologyInterfaceInstance` both expose
+    """`InterfaceInstance.Component` and `InterfaceInstance.Topology` both expose
     `get_port_instance_identifier(str) -> PortInstanceIdentifier`, raising
     `DiagnosticError` (it throws a `SemanticError`) if the name doesn't
     resolve to a port on the instance."""
@@ -193,7 +342,7 @@ def instance_port_lookups(a: Analysis) -> int:
             pass
     for top in a.topology_map.values():
         for instance in top.instance_map:
-            if isinstance(instance, TopologyInterfaceInstance):
+            if isinstance(instance, InterfaceInstance.Topology):
                 try:
                     pii = instance.get_port_instance_identifier("pOut")
                     total += len(pii.qualified_name)
@@ -332,16 +481,22 @@ def main() -> int:
         node_id_sum += node.node_id + descendant_count(node)
         if isinstance(node, DefConstant):
             constant_type_kind(node)
+            node_id_sum += len(describe_expr(node.value))
         visitor.visit(node)
     node_id_sum += len(visitor.components) + len(visitor.commands)
 
     analysis: Analysis = model.analysis
-    sym: Optional[Symbol] = model.lookup("M.c")
+    sym: Optional[Symbol.Variant] = model.lookup("M.c")
     name = analysis.get_qualified_name(sym) if sym is not None else "<none>"
     total = node_id_sum + analysis_detail(analysis) + connection_spans(analysis)
     total += instance_port_lookups(analysis)
     total += source_units(model) + len(kind_spelling(IntegerKind.U32))
     total += len(type_spelling(units[0].members[0]))
+    for _sym, comp in analysis.component_map.items():
+        for param in comp.param_map.values():
+            default = param.default
+            if default is not None:
+                total += len(describe_value(default))
     total += 1 if first_port_symbol(model) is not None else 0
     for diag in model.diagnostics:
         total += len(diag.display) + len(str(diag)) + len(diag.children)

@@ -21,7 +21,7 @@ pub(crate) fn leaf_enum_doc(name: &str) -> String {
 
 /// Expand a declarative mirror of the `fpp_ast` grammar (emitted by the
 /// `bindgen` binary into `fpp_python/src/ast/defs.rs`) into the PyO3 AST-node
-/// wrappers + the recording walk. The DSL has `leaves {…}`, `shadowed {…}`,
+/// wrappers + the recording walk. The DSL has `leaves {…}`,
 /// `node X { field: Type, … }`, `union X { Variant(Inner), … }`, and
 /// `kind X { … }` sections; cardinality is `T` / `T?` / `[T]` / `[T]?`. See
 /// [`mod@ast_bindings`] for the grammar + classification rules.

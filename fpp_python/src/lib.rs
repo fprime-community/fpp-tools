@@ -37,6 +37,9 @@ mod visitor;
 
 use model::{Model, SyntaxTree, TransUnit};
 
+pub use ast::PY_MODULE as AST_MODULE;
+pub use sem::PY_MODULE as PACKAGE;
+
 #[pymodule]
 fn fpp(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pipeline::register(m)?;
@@ -53,14 +56,40 @@ fn fpp(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 /// Gather the pyo3-stub-gen [`StubInfo`] for this extension.
+///
+/// Mixed layout (`python-source` in `pyproject.toml`), because the stub spans two
+/// modules and pyo3-stub-gen refuses a submodule in the pure-Rust layout — it has
+/// only one file to write there. The `stub_gen` binary writes the files itself, so
+/// what matters here is that both modules come back resolved against [`PACKAGE`].
 pub fn stub_info() -> pyo3_stub_gen::Result<pyo3_stub_gen::StubInfo> {
     let manifest_dir: &std::path::Path = env!("CARGO_MANIFEST_DIR").as_ref();
-    pyo3_stub_gen::StubInfo::from_pyproject_toml(manifest_dir.join("pyproject.toml"))
+    pyo3_stub_gen::StubInfo::from_project_root(
+        PACKAGE.to_string(),
+        manifest_dir.join("python"),
+        true,
+        Default::default(),
+    )
 }
 
-/// `(alias name, `Sub1 | Sub2 | …` RHS)` for every closed-union type. Consumed by
-/// the `stub_gen` binary to inject `<Alias>: typing.TypeAlias = …` lines that
-/// pyo3-stub-gen cannot express natively.
-pub fn union_aliases() -> Vec<(&'static str, String)> {
-    sem::union_aliases()
+/// What the stub generator needs to nest one closed union.
+pub struct UnionStub {
+    /// The module the base class lives in, or `None` for the package's default module
+    /// (every semantic union — only `crate::ast` declares a module of its own).
+    pub module: Option<&'static str>,
+    /// The base class's Python name.
+    pub base: &'static str,
+    /// The variants' `("<Base>.<Variant>", "<Variant>")` spellings, in declaration
+    /// order.
+    pub variants: Vec<(&'static str, &'static str)>,
+    /// The `<Base>.A | …` RHS of the nested `Variant` alias.
+    pub variant_rhs: String,
+}
+
+/// One [`UnionStub`] per closed union — the semantic unions and the AST kind enums,
+/// which nest identically. Consumed by the `stub_gen` binary, which nests each variant
+/// under its base and adds the `Variant` alias; pyo3-stub-gen derives neither.
+pub fn union_stubs() -> Vec<UnionStub> {
+    let mut stubs = sem::union_stubs();
+    stubs.extend(ast::kind_stubs());
+    stubs
 }
