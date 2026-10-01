@@ -39,9 +39,11 @@ impl<'py> FromPyObject<'_, 'py> for SymbolKind {
             ))
         })?;
         if !ty.is_subclass_of::<crate::sem::Symbol>()? {
+            let base = ty.py().get_type::<crate::sem::Symbol>();
             return Err(PyTypeError::new_err(format!(
-                "kind must be a symbol class (a subclass of SymbolBase), not `{}`",
-                ty.name()?
+                "kind must be a symbol class (a subclass of {}), not `{}`",
+                base.qualname()?,
+                ty.qualname()?
             )));
         }
         Ok(SymbolKind(ty.to_owned().unbind()))
@@ -50,8 +52,9 @@ impl<'py> FromPyObject<'_, 'py> for SymbolKind {
 
 impl pyo3_stub_gen::PyStubType for SymbolKind {
     fn type_output() -> pyo3_stub_gen::TypeInfo {
-        // `Symbol` is the injected union alias over the fifteen symbol classes; the
-        // parameter is the class itself, not an instance.
+        // `Symbol` is the base class the fifteen symbol classes nest under, so
+        // `type[Symbol]` admits any of them; the parameter is the class itself, not
+        // an instance.
         let mut info = pyo3_stub_gen::TypeInfo::unqualified("Symbol");
         info.name = format!("type[{}]", info.name);
         info
@@ -216,7 +219,7 @@ impl Model {
     /// them; pass `kind` to say which you want, or use `lookup_all` to see them
     /// all.
     ///
-    /// `kind` is a symbol class — `model.lookup("Fw.Time", kind=fpp.SymbolAbsType)`
+    /// `kind` is a symbol class — `model.lookup("Fw.Time", kind=fpp.Symbol.AbsType)`
     /// — and matches subclasses, as `isinstance` does. `None` if nothing matches.
     #[pyo3(signature = (qualified_name, *, kind = None))]
     fn lookup(
@@ -267,7 +270,7 @@ impl Model {
     /// but neither key nor declaration order. Sort it yourself if you emit from it.
     ///
     /// One more caveat: a *semantic* map keyed by member name — chiefly
-    /// `AnonStructType.members` — is in name order, not declaration order, because
+    /// `Type.AnonStruct.members` — is in name order, not declaration order, because
     /// the analysis stores those members unordered and so has no declaration order
     /// to give. Read `struct_type.node.members` for the declared order.
     #[getter]

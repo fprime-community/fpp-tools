@@ -2,10 +2,10 @@
 `fpp_analysis::semantics::Type`.
 
 Entities are located by qualified name via `Model.lookup`; their resolved type
-is read through `symbol.definition.resolved_type`. The union is a base
-(`TypeBase`) plus one subclass per variant, with a runtime `Type` alias for
-`isinstance`. Public native fields are getters (`ArrayType.anon_array`,
-`EnumType.rep_type`) and `&self`/`&Arc<Self>` methods are getters too
+is read through `symbol.definition.resolved_type`. `Type` is the base class, each
+variant is a nested subclass of it (`Type.Array`), and `Type.Variant` is the
+closed union over them. Public native fields are getters (`Type.Array.anon_array`,
+`Type.Enum.rep_type`) and `&self`/`&Arc<Self>` methods are getters too
 (`is_int`, `underlying_type`).
 """
 
@@ -13,20 +13,10 @@ import pytest
 
 import fpp as f
 from fpp import (
-    AliasType,
-    AnonArrayType,
-    AnonStructType,
-    ArrayType,
-    EnumType,
-    FloatType,
-    IntegerKind,
-    PrimitiveIntType,
-    StructType,
     Symbol,
-    SymbolArrayType,
-    SymbolEnumType,
     Type,
 )
+from fpp.ast import IntegerKind
 
 SRC = """
 module M {
@@ -52,13 +42,13 @@ def rtype(m, qn):
 
 def test_array_type(m):
     t = rtype(m, "M.Arr")
-    assert isinstance(t, ArrayType)
+    assert isinstance(t, Type.Array)
     assert isinstance(t, Type)
-    # `ArrayType.anon_array` rewraps into the structural anonymous-array type.
+    # `Type.Array.anon_array` rewraps into the structural anonymous-array type.
     aa = t.anon_array
-    assert isinstance(aa, AnonArrayType)
+    assert isinstance(aa, Type.AnonArray)
     assert aa.size == 4
-    assert isinstance(aa.elt_type, PrimitiveIntType)
+    assert isinstance(aa.elt_type, Type.PrimitiveInt)
     assert aa.elt_type.value == IntegerKind.U32
     # The `node` field bridges to the defining AST wrapper; a symbol's `node_id`
     # is that node's id.
@@ -67,28 +57,28 @@ def test_array_type(m):
 
 def test_enum_type(m):
     t = rtype(m, "M.E")
-    assert isinstance(t, EnumType)
+    assert isinstance(t, Type.Enum)
     assert t.rep_type == IntegerKind.I32
     assert t.is_displayable is True
 
 
 def test_struct_type(m: f.Model):
     t = rtype(m, "M.S")
-    assert isinstance(t, StructType)
+    assert isinstance(t, Type.Struct)
     anon = t.anon_struct
     assert [name for name, _ in anon.members] == ["x", "y"]
-    assert isinstance(anon.get_member("x"), PrimitiveIntType)
-    assert isinstance(anon.get_member("y"), FloatType)
+    assert isinstance(anon.get_member("x"), Type.PrimitiveInt)
+    assert isinstance(anon.get_member("y"), Type.Float)
 
 
 def test_alias_type(m):
     t = rtype(m, "M.Alias")
-    assert isinstance(t, AliasType)
+    assert isinstance(t, Type.Alias)
     # `alias_type` is the immediate aliased type; `underlying_type` (a base method
     # getter) follows the alias chain. Both resolve to U16 here.
-    assert isinstance(t.alias_type, PrimitiveIntType)
+    assert isinstance(t.alias_type, Type.PrimitiveInt)
     assert t.alias_type.value == IntegerKind.U16
-    assert isinstance(t.underlying_type, PrimitiveIntType)
+    assert isinstance(t.underlying_type, Type.PrimitiveInt)
     assert t.underlying_type.value == IntegerKind.U16
 
 
@@ -100,9 +90,9 @@ def test_type_predicates(m):
 
 def test_symbols_are_union_subclasses(m):
     arr = m.lookup("M.Arr")
-    assert isinstance(arr, SymbolArrayType)
+    assert isinstance(arr, Symbol.ArrayType)
     assert isinstance(arr, Symbol)
-    assert isinstance(m.lookup("M.E"), SymbolEnumType)
+    assert isinstance(m.lookup("M.E"), Symbol.EnumType)
 
 
 def test_type_map_is_populated(m):
@@ -112,7 +102,7 @@ def test_type_map_is_populated(m):
     assert all(isinstance(v, Type) for v in tm.values())
     # The array's resolved type is registered under its def node id.
     arr_node = m.lookup("M.Arr").node_id
-    assert isinstance(tm[arr_node], ArrayType)
+    assert isinstance(tm[arr_node], Type.Array)
 
 
 def test_symbol_value_equality(m):

@@ -11,10 +11,12 @@ diagnostic off by one.
 """
 
 import enum
+import typing
 
 import pytest
 
 import fpp as f
+import fpp.ast as fa
 
 # `string` (unsized) and `serialized_size` need the framework definitions, so the
 # fixtures that use a bare string carry them.
@@ -143,23 +145,23 @@ def analyzed(src: str) -> f.Model:
 def test_lookup_all_returns_every_symbol_of_a_name():
     m = analyzed(COLLISION_SRC)
     syms = m.lookup_all("Fw.Time")
-    assert [type(s).__name__ for s in syms] == ["SymbolAbsType", "SymbolPort"]
+    assert [type(s).__qualname__ for s in syms] == ["Symbol.AbsType", "Symbol.Port"]
 
 
 def test_lookup_returns_the_first_declared_not_an_arbitrary_one():
     m = analyzed(COLLISION_SRC)
     # `type Time` is declared first, so it wins — deterministically, where the
     # winner used to be whichever the symbol map happened to reach last.
-    assert type(m.lookup("Fw.Time")).__name__ == "SymbolAbsType"
+    assert type(m.lookup("Fw.Time")).__qualname__ == "Symbol.AbsType"
     assert m.lookup("Fw.Time").node_id == min(s.node_id for s in m.lookup_all("Fw.Time"))
 
 
 def test_lookup_kind_selects_the_name_group():
     m = analyzed(COLLISION_SRC)
-    abs_type = m.lookup("Fw.Time", kind=f.SymbolAbsType)
-    port = m.lookup("Fw.Time", kind=f.SymbolPort)
-    assert type(abs_type).__name__ == "SymbolAbsType"
-    assert type(port).__name__ == "SymbolPort"
+    abs_type = m.lookup("Fw.Time", kind=f.Symbol.AbsType)
+    port = m.lookup("Fw.Time", kind=f.Symbol.Port)
+    assert type(abs_type).__qualname__ == "Symbol.AbsType"
+    assert type(port).__qualname__ == "Symbol.Port"
     # The failure this prevents: reaching for the type and getting the port,
     # whose definition has no resolved type.
     assert abs_type.definition.resolved_type is not None
@@ -168,9 +170,9 @@ def test_lookup_kind_selects_the_name_group():
 
 def test_lookup_kind_filters_lookup_all_too():
     m = analyzed(COLLISION_SRC)
-    assert len(m.lookup_all("Fw.Time", kind=f.SymbolPort)) == 1
-    assert m.lookup_all("Fw.Time", kind=f.SymbolComponent) == []
-    assert m.lookup("Fw.Time", kind=f.SymbolComponent) is None
+    assert len(m.lookup_all("Fw.Time", kind=f.Symbol.Port)) == 1
+    assert m.lookup_all("Fw.Time", kind=f.Symbol.Component) == []
+    assert m.lookup("Fw.Time", kind=f.Symbol.Component) is None
 
 
 def test_lookup_of_an_unknown_name_is_none():
@@ -184,7 +186,7 @@ def test_lookup_kind_must_be_a_symbol_class():
     with pytest.raises(TypeError):
         m.lookup("Fw.Time", kind=int)
     with pytest.raises(TypeError):
-        m.lookup("Fw.Time", kind="SymbolPort")
+        m.lookup("Fw.Time", kind="Symbol.Port")
 
 
 def test_a_reopened_module_yields_one_symbol_not_several():
@@ -192,95 +194,147 @@ def test_a_reopened_module_yields_one_symbol_not_several():
     assert len(m.lookup_all("M")) == 1
 
 
-# --- every union subclass is named for its union ---------------------------
+# --- every union variant is a nested class on its base ---------------------
 
 
-# The unions whose subclasses read `<Union><Variant>` instead of the usual
-# `<Variant><Union>`: the two symbol unions, spelled the way the compiler spells
-# them (`Symbol::Port` -> `SymbolPort`).
-PREFIXED_UNIONS = {"Symbol", "StateMachineSymbol"}
-
-# Bare names that a union variant used to claim, before every subclass was named
-# for its union. Removed, not aliased: a name that says nothing about which union
-# it belongs to (`fpp.Array` beside `fpp.ArrayType`, `fpp.Float` beside
-# `fpp.FloatValue`) is the confusion the rule exists to end, so keeping it would
-# defeat the change.
-REMOVED_BARE_NAMES = [
-    "Action",
-    "Array",
-    "Async",
-    "AsyncInput",
-    "Constant",
-    "EnumConstant",
-    "External",
-    "Float",
-    "Guard",
-    "Guarded",
-    "GuardedInput",
-    "Initial",
-    "InitialTransition",
-    "Internal",
-    "Literal",
-    "Module",
-    "NonParam",
-    "Output",
-    "Port",
-    "PrimitiveInt",
-    "Rational",
-    "Serial",
-    "Signal",
-    "StateEntry",
-    "StateExit",
-    "StateTransition",
-    "Struct",
-    "Sync",
-    "SyncInput",
-    "System",
+# Names a union variant would claim at module level if it were not nested, paired
+# with the module that would have held it. Bare variant names are not unique —
+# `Choice` belongs to four unions, `Integer` to three — so a module namespace is no
+# place for them; `Type.Alias` is both unambiguous and the spelling `fpp_analysis`
+# itself uses.
+UNNESTED_VARIANT_NAMES = [
+    # semantic unions
+    (f, "AliasType"),
+    (f, "AnonArrayType"),
+    (f, "AsyncInputGeneralKind"),
+    (f, "AsyncNonParamKind"),
+    (f, "ChoiceTransitionGraphArc"),
+    (f, "GeneralPortInstance"),
+    (f, "IntegerValue"),
+    (f, "NonParamCommand"),
+    (f, "PrimitiveIntType"),
+    (f, "StateMachineSymbolAction"),
+    (f, "SymbolAbsType"),
+    (f, "SymbolPort"),
+    (f, "TopologyInterfaceInstance"),
+    # AST kind enums, which nest the same way
+    (fa, "ExprBinop"),
+    (fa, "ExprLiteralInt"),
+    (fa, "TransitionOrDoDo"),
+    (fa, "TypeNameBool"),
+    (fa, "TypeNameQualIdent"),
 ]
 
 
-@pytest.mark.parametrize("name", REMOVED_BARE_NAMES)
-def test_the_bare_variant_names_are_gone(name):
-    assert not hasattr(f, name)
-    assert name not in f.__all__
+@pytest.mark.parametrize("module, name", UNNESTED_VARIANT_NAMES)
+def test_variant_classes_are_not_module_level(module, name):
+    assert not hasattr(module, name)
+    assert name not in module.__all__
 
 
-def _union_subclasses(base: type) -> set[str]:
+def test_no_base_suffixed_class_is_exported():
+    # The base takes the union's plain name, so there is no `<Union>Base` left to
+    # leak the old two-name-per-union shape.
+    assert [n for n in f.__all__ + fa.__all__ if n.endswith("Base")] == []
+
+
+@pytest.mark.parametrize("module", [f, fa])
+def test_every_exported_name_appears_once(module):
+    # `PyModule::add` appends to `__all__` as well as setting the attribute, so a
+    # name registered twice lands in it twice.
+    duplicated = {n for n in module.__all__ if module.__all__.count(n) > 1}
+    assert duplicated == set()
+
+
+@pytest.mark.parametrize(
+    "name", ["Connection", "PortInstanceIdentifier", "TlmChannelIdentifier"]
+)
+def test_a_name_the_two_layers_share_means_the_layer_it_is_read_from(name):
+    # Three grammar productions carry the name of a semantic entity. One namespace
+    # each is what lets both keep it: `fpp.Connection` is the analyzed connection,
+    # `fpp.ast.Connection` the syntax it was analyzed from.
+    entity = getattr(f, name)
+    node = getattr(fa, name)
+    assert not issubclass(entity, fa.AstNode)
+    assert issubclass(node, fa.AstNode)
+    assert hasattr(f.AstVisitor, f"visit_{name}")
+
+
+def _union_bases(module=f) -> dict[str, type]:
+    """Every union base in `module`, found by the `Variant` alias only a union carries.
+
+    Derived rather than hand-listed, so a union added upstream is covered the day
+    it appears.
+    """
     return {
-        name
-        for name in dir(f)
-        if isinstance(getattr(f, name), type)
-        and issubclass(getattr(f, name), base)
-        and getattr(f, name) is not base
+        name: obj
+        for name in dir(module)
+        if isinstance(obj := getattr(module, name), type) and "Variant" in vars(obj)
     }
 
 
-def test_every_symbol_subclass_carries_the_symbol_prefix():
-    # `Symbol` is the union alias and `SymbolBase` the base class; the rest are
-    # the fifteen concrete subclasses.
-    subclasses = _union_subclasses(f.SymbolBase)
-    assert len(subclasses) == 15
-    assert all(name.startswith("Symbol") for name in subclasses), sorted(subclasses)
+def test_the_unions_are_discoverable():
+    # The three central semantic hierarchies, plus the three AST kind enums, which
+    # nest by the same mechanism and gained a base class in the process — before it,
+    # `ExprKind` was not a Python object at all.
+    assert {"Symbol", "Type", "Value", "Command", "NonParamKind"} <= set(_union_bases())
+    assert set(_union_bases(fa)) == {"ExprKind", "TypeNameKind", "TransitionOrDo"}
+    assert len(_union_bases()) == 16, sorted(_union_bases())
 
 
-def test_every_union_subclass_is_named_for_its_union():
-    # Each union contributes a `<Union>Base` class, so the bases enumerate the
-    # unions without a hand-maintained list — a union added upstream is covered
-    # the day it appears.
-    bases = {
-        name[: -len("Base")]: getattr(f, name)
-        for name in dir(f)
-        if name.endswith("Base") and isinstance(getattr(f, name), type)
+def test_a_kind_enum_is_answerable_with_isinstance():
+    # The payoff of giving the kind enums a base: `ExprBinop` and `ExprLiteralInt`
+    # used to be unrelated classes, so there was no way to ask whether a value was
+    # some kind of expression kind at all.
+    m = analyzed("module M { constant a = 1 + 2 }")
+    (const,) = m.ast[0].members[0].members
+    kind = const.value.kind
+    assert isinstance(kind, fa.ExprKind)
+    assert isinstance(kind, fa.ExprKind.Binop)
+    assert isinstance(kind, fa.ExprKind.Variant)
+    assert not isinstance(kind, fa.TypeNameKind)
+
+
+@pytest.mark.parametrize(
+    "module_name, union",
+    [("fpp", u) for u in sorted(_union_bases())]
+    + [("fpp.ast", u) for u in sorted(_union_bases(fa))],
+)
+def test_every_variant_is_nested_on_its_base(module_name, union):
+    module = f if module_name == "fpp" else fa
+    base = getattr(module, union)
+    variants = typing.get_args(base.Variant)
+    assert variants, union
+
+    for variant in variants:
+        # `Type` itself is a member of `Type.Variant`: an unknown type whose def
+        # node is absent from the walk surfaces as the bare base.
+        if variant is base:
+            continue
+        assert issubclass(variant, base), (union, variant)
+        # Reachable as an attribute of the base, under its bare name...
+        assert getattr(base, variant.__name__) is variant
+        # ...and saying so itself, which is what tracebacks and `repr(cls)` read.
+        assert variant.__qualname__ == f"{union}.{variant.__name__}"
+        assert variant.__module__ == module_name
+
+
+def test_symbol_has_its_fifteen_variants():
+    variants = typing.get_args(f.Symbol.Variant)
+    assert len(variants) == 15
+    assert f.Symbol not in variants, "Symbol has no instantiable base"
+
+
+def test_only_the_type_union_admits_its_bare_base():
+    # `Type` is the one union whose base is a real instance, so it is the one whose
+    # closed union includes it — a `match` over `Type.Variant` needs a `case
+    # Type():` arm, and no other union does.
+    including_base = {
+        union
+        for union, base in _union_bases().items()
+        if base in typing.get_args(base.Variant)
     }
-    assert "Symbol" in bases and "Type" in bases and "Value" in bases
-    for union, base in bases.items():
-        subclasses = _union_subclasses(base)
-        assert subclasses, union
-        for name in subclasses:
-            if union in PREFIXED_UNIONS:
-                assert name.startswith(union), (union, name)
-            else:
-                assert name.endswith(union), (union, name)
+    assert including_base == {"Type"}
 
 
 # --- a symbol's `.node` is an id, so it is spelled `node_id` ---------------
@@ -299,22 +353,22 @@ def test_the_int_valued_node_attribute_is_gone():
     # `.node` in the API returns an object is the trap the rename removes.
     m = analyzed("module M { constant a = 1 }")
     assert not hasattr(m.lookup("M.a"), "node")
-    assert not hasattr(f.SymbolBase, "node")
+    assert not hasattr(f.Symbol, "node")
 
 
 # --- enums expose their member name ---------------------------------------
 
 
 def test_enum_members_expose_name_and_value():
-    assert f.IntegerKind.U32.name == "U32"
-    assert f.IntegerKind.U32.value == "U32"
+    assert fa.IntegerKind.U32.name == "U32"
+    assert fa.IntegerKind.U32.value == "U32"
     assert f.Direction.Output.name == "Output"
-    assert f.EventSeverity.ActivityHigh.name == "ActivityHigh"
+    assert fa.EventSeverity.ActivityHigh.name == "ActivityHigh"
 
 
 def test_enum_member_name_matches_its_repr():
     # The member name used to be recoverable only by parsing this.
-    for member in (f.IntegerKind.I8, f.FloatKind.F64, f.ComponentKind.Passive):
+    for member in (fa.IntegerKind.I8, fa.FloatKind.F64, fa.ComponentKind.Passive):
         cls, _, name = repr(member).partition(".")
         assert name == member.name
         assert cls == type(member).__name__
@@ -323,16 +377,16 @@ def test_enum_member_name_matches_its_repr():
 def test_enums_are_not_enum_enum_subclasses():
     # Documented, and now what the stub says too — so a type checker rejects the
     # `enum.Enum` class surface instead of letting it fail at runtime.
-    assert not isinstance(f.IntegerKind.U32, enum.Enum)
-    assert not issubclass(f.IntegerKind, enum.Enum)
+    assert not isinstance(fa.IntegerKind.U32, enum.Enum)
+    assert not issubclass(fa.IntegerKind, enum.Enum)
     with pytest.raises(TypeError):
-        list(f.IntegerKind)
+        list(fa.IntegerKind)
 
 
 def test_an_enum_valued_field_reads_back_as_a_member():
     m = analyzed("module M { array A = [4] U32 }")
     elt = m.analysis.type_map[m.lookup("M.A").node_id].anon_array.elt_type
-    assert elt.value is f.IntegerKind.U32
+    assert elt.value is fa.IntegerKind.U32
     assert elt.value.name == "U32"
 
 
@@ -410,7 +464,7 @@ def test_string_size_is_recorded_in_every_context_that_accepts_one():
             self.sizes = []
 
         def visit_TypeName(self, node):
-            if type(node.kind).__name__ == "TypeNameString":
+            if type(node.kind).__qualname__ == "TypeNameKind.String":
                 self.sizes.append(node.resolved_type.value)
             super().visit_TypeName(node)
 
@@ -557,7 +611,7 @@ def test_generic_visit_still_takes_ast_nodes_only():
     v = OnlyNodes()
     v.visit(m)
     assert v.seen
-    assert all(isinstance(n, f.AstNode) for n in v.seen)
+    assert all(isinstance(n, fa.AstNode) for n in v.seen)
 
 
 # --- Topology.node -------------------------------------------------------
@@ -581,7 +635,7 @@ module M {
 """
     )
     (symbol, topology) = next(iter(m.analysis.topology_map.items()))
-    assert isinstance(topology.node, f.DefTopology)
+    assert isinstance(topology.node, fa.DefTopology)
     assert topology.node.name == "T"
     # A recorded walk node, not one built fresh: identity with the symbol's.
     assert topology.node is symbol.definition
@@ -820,16 +874,16 @@ def test_repr_names_the_concrete_class_and_identifies_the_value():
 
     # A type: the class, then the compiler's rendering of the value.
     array = a.type_map[m.lookup("M.A").node_id]
-    assert repr(array) == "<ArrayType A>"
-    assert repr(array.anon_array.elt_type) == "<PrimitiveIntType U32>"
+    assert repr(array) == "<Type.Array A>"
+    assert repr(array.anon_array.elt_type) == "<Type.PrimitiveInt U32>"
 
     # A value: likewise, so a folded constant reads as what it folded to.
     folded = m.lookup("M.c").definition.value.resolved_value
-    assert repr(folded) == "<IntegerValue 42>"
+    assert repr(folded) == "<Value.Integer 42>"
 
     # A symbol has no rendering of its own: its qualified name identifies it, and
     # the class says which kind of definition it points at.
-    assert repr(m.lookup("M.A")) == "<SymbolArrayType 'M.A'>"
+    assert repr(m.lookup("M.A")) == "<Symbol.ArrayType 'M.A'>"
 
     # An entity names itself the way the model names it: a component through its
     # symbol, a sub-element through its own member name.
@@ -837,4 +891,4 @@ def test_repr_names_the_concrete_class_and_identifies_the_value():
     component = order.analysis.component_map[order.lookup("M.Many")]
     assert repr(component) == "<Component 'M.Many'>"
     first_by_opcode = next(iter(component.command_map.values()))
-    assert repr(first_by_opcode) == "<NonParamCommand 'C0'>"
+    assert repr(first_by_opcode) == "<Command.NonParam 'C0'>"

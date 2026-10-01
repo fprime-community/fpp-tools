@@ -78,7 +78,7 @@ impl From<ParseError> for Diagnostic {
             } => {
                 let diag = Diagnostic::new(span, Level::Error, "include cycle detected");
                 include_cycle.into_iter().fold(diag, |diag, pos| {
-                    diag.note(format! {"included from {}", pos})
+                    diag.note(format!("included from {}", pos))
                 })
             }
             ParseError::Syntax { last, msg } => Diagnostic::new(last, Level::Error, msg),

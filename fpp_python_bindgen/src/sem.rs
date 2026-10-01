@@ -498,7 +498,7 @@ const RESERVED_TYPE_NAMES: &[&str] = &[
     "Arc", "Box", "Rc", "Node", "Cell", "RefCell", "Ref", "Cow", "Weak",
 ];
 
-/// Unions whose subclasses read `<Union><Variant>` instead of the default
+/// Unions whose subclass IDENTS read `<Union><Variant>` instead of the default
 /// `<Variant><Union>`.
 const PREFIXED_UNION_NATIVES: &[&str] = &[
     "fpp_analysis::semantics::Symbol",
@@ -1615,13 +1615,17 @@ fn build_leaf_enum(ctx: &Ctx, id: Id) -> LeafEnumDef {
 // Name resolution (Python-name disambiguation)
 // ---------------------------------------------------------------------------
 
-/// Python names for every emitted class, keyed by rustdoc `Id` for primaries and
-/// by `(union_id, native_variant)` for subclasses.
+/// Names for every emitted class, keyed by rustdoc `Id` for primaries and by
+/// `(union_id, native_variant)` for subclasses.
+///
+/// A primary's name is both its Rust ident and its Python name. A subclass's is only
+/// its RUST ident: in Python a variant is a nested class on its union's base, named
+/// for the native variant (`Type.Alias`), which the macro derives on its own.
 pub struct Names {
-    /// Primary py name per `Id` (union / entity / leaf_enum). For unions the
-    /// special `Type`/`Value`/`Symbol` are kept verbatim.
+    /// Primary name per `Id` (union / entity / leaf_enum). For unions the special
+    /// `Type`/`Value`/`Symbol` are kept verbatim.
     primary: BTreeMap<u32, String>,
-    /// Subclass py name per `(union_id, native_variant)`.
+    /// Subclass Rust ident per `(union_id, native_variant)`.
     subclass: BTreeMap<(u32, String), String>,
 }
 
@@ -1631,16 +1635,6 @@ impl Names {
     }
     fn entity(&self, id: Id) -> &str {
         self.primary.get(&id.0).map(String::as_str).unwrap_or("?")
-    }
-    /// Every emitted Python class name (primaries + subclasses) — the RESOLVED,
-    /// post-disambiguation names the driver intersects with the AST node set to
-    /// derive the entity-shadowed nodes.
-    pub fn all_python_names(&self) -> BTreeSet<String> {
-        self.primary
-            .values()
-            .chain(self.subclass.values())
-            .cloned()
-            .collect()
     }
 }
 
@@ -1676,12 +1670,12 @@ pub fn resolve_names(ctx: &Ctx, r: &Reflected) -> Names {
         primary.insert(id.0, name);
     }
 
-    // 2) Subclass names: every one carries its union's name ([`qualify`]), so a
+    // 2) Subclass IDENTS: every one carries its union's name ([`qualify`]), so a
     //    variant can neither collide with a sibling nor claim a bare name that
     //    something else in the module wants. There is no census and no
-    //    collision-driven fallback: the name a variant gets is a pure function of
-    //    (union python name, variant name), which is what makes it predictable from
-    //    the `fpp_analysis` spelling alone rather than only from the stub.
+    //    collision-driven fallback: the ident a variant gets is a pure function of
+    //    (union name, variant name), which is what makes it predictable from the
+    //    `fpp_analysis` spelling alone rather than only from the generated source.
     let mut subclass: BTreeMap<(u32, String), String> = BTreeMap::new();
     for u in &r.unions {
         let union_py = primary.get(&u.id.0).cloned().unwrap_or_default();
@@ -1698,18 +1692,20 @@ pub fn resolve_names(ctx: &Ctx, r: &Reflected) -> Names {
     Names { primary, subclass }
 }
 
-/// The Python name of one union subclass: `<Variant><Union>`, or `<Union><Variant>`
+/// The Rust ident of one union subclass: `<Variant><Union>`, or `<Union><Variant>`
 /// for a union in [`PREFIXED_UNION_NATIVES`].
 ///
-/// The suffix form is not a disambiguation of last resort — it IS the name. It
-/// falls out of the convention `fpp_analysis` gives the payload structs
-/// themselves, so for every variant that has a named payload the two agree
-/// exactly: `Type::Array(Arc<ArrayType>)` → `ArrayType`, `Type::Abs(Arc<AbsType>)`
-/// → `AbsType`, `Value::Float(FloatValue)` → `FloatValue`. The variants with no
-/// payload struct to borrow a name from (`Type::Boolean`, `Value::Integer`, every
-/// `astdef` symbol variant) then get the name that struct WOULD have had —
-/// `BooleanType`, `IntegerValue` — rather than a bare `Boolean`/`Integer` that says
-/// nothing about which of the three unions it belongs to.
+/// The generated wrappers all live in one flat module, so a variant's ident has to
+/// carry its union: 15 bare variant names belong to more than one union (`Choice` to
+/// four of them) and 10 more are already taken by a primary. Python does not have
+/// that problem — there a variant is a nested class on its union's base — so this
+/// spelling never reaches the Python surface.
+///
+/// The suffix form falls out of the convention `fpp_analysis` gives the payload
+/// structs themselves, so for every variant that has a named payload the two agree
+/// exactly: `Type::Array(Arc<ArrayType>)` → `ArrayType`, `Type::Abs(Arc<AbsType>)` →
+/// `AbsType`, `Value::Float(FloatValue)` → `FloatValue`. That agreement is load
+/// bearing: the `payload` declarations are keyed on the subclass ident.
 ///
 /// The stutter guard matters in both directions, and each case is one upstream
 /// rename away: a `Type::AbsType` variant (what it was called before the
@@ -1729,7 +1725,7 @@ fn qualify(union_py: &str, variant: &str, prefixed: bool) -> String {
     }
 }
 
-/// Fail the generator when two emitted classes would share a Python name.
+/// Fail the generator when two emitted classes would share a Rust ident.
 fn assert_names_unique(
     primary: &BTreeMap<u32, String>,
     subclass: &BTreeMap<(u32, String), String>,
@@ -2670,7 +2666,7 @@ pub fn write_out(path: &std::path::Path, text: &str) {
 }
 
 // ---------------------------------------------------------------------------
-// Reflection context construction + the shadow-normalize pass
+// Reflection context construction
 // ---------------------------------------------------------------------------
 
 /// Build the reflection context over a parsed rustdoc [`Crate`] + the shared AST
@@ -2696,131 +2692,4 @@ pub fn prepare<'a>(krate: &'a Crate, ast: AstClass) -> Ctx<'a> {
     assert_fpp_core_types(&ctx);
     assert_def_module_stub(&ctx);
     ctx
-}
-
-/// Phase E: rewrite `astdef(x)` → `skip` for every shadowed AST node `x` — its
-/// Python name is owned by a semantic class, so the node has no stub and is
-/// opaque as a child. Walks the reflected fields + variant payloads. A method is
-/// dropped whole (rather than degraded to `skip`, which only a field can be) when
-/// a shadowed node appears in either of its two remaining positions: an
-/// `astnode(x)` *parameter*, or — since Rule R2 now admits a *borrowed* `astdef`
-/// return — an `astdef(x)` *return*. Either would name the unstubbed wrapper class
-/// in the `.pyi`. Returns one log line per rewrite.
-pub fn apply_shadow(r: &mut Reflected, names: &Names, shadowed: &BTreeSet<String>) -> Vec<String> {
-    let mut log = Vec::new();
-    for (fname, sh) in &mut r.analysis_fields {
-        shadow_shape(sh, shadowed, &format!("Analysis.{fname}"), &mut log);
-    }
-    drop_shadowed_methods(&mut r.analysis_methods, "Analysis", shadowed, &mut log);
-    for u in &mut r.unions {
-        for v in &mut u.variants {
-            let label = v.native.clone();
-            match &mut v.payload {
-                VariantPayload::Value(sh) | VariantPayload::Newtype(sh) => {
-                    shadow_shape(sh, shadowed, &label, &mut log);
-                }
-                VariantPayload::StructVariant(fs) => {
-                    for (n, sh) in fs.iter_mut() {
-                        shadow_shape(sh, shadowed, &format!("{label}.{n}"), &mut log);
-                    }
-                }
-                _ => {}
-            }
-        }
-        let owner = names.union(u.id).to_string();
-        drop_shadowed_methods(&mut u.methods, &owner, shadowed, &mut log);
-    }
-    for p in &mut r.payloads {
-        for (fname, sh) in &mut p.fields {
-            shadow_shape(sh, shadowed, fname, &mut log);
-        }
-        drop_shadowed_methods(&mut p.methods, "payload", shadowed, &mut log);
-    }
-    for e in &mut r.entities {
-        for (fname, sh) in &mut e.fields {
-            shadow_shape(sh, shadowed, fname, &mut log);
-        }
-        let owner = names.entity(e.id).to_string();
-        drop_shadowed_methods(&mut e.methods, &owner, shadowed, &mut log);
-    }
-    log
-}
-
-/// Drop every method naming a shadowed AST node `x` in a parameter (`astnode(x)`)
-/// or in its return (`astdef(x)`). The wrapper class exists at runtime but carries
-/// no stub, so naming it in either position would emit a `.pyi` referencing an
-/// undeclared class. Neither position can degrade to `skip` the way a field does,
-/// so the whole method goes.
-fn drop_shadowed_methods(
-    methods: &mut Vec<MethodDef>,
-    owner: &str,
-    shadowed: &BTreeSet<String>,
-    log: &mut Vec<String>,
-) {
-    let mut dropped: Vec<(String, String, &'static str)> = Vec::new();
-    methods.retain(|m| {
-        let hit = m
-            .params
-            .iter()
-            .find_map(|(_, spec)| shadowed_astnode(&spec.arg, shadowed))
-            .map(|name| (name, "astnode param"))
-            .or_else(|| shadowed_astdef(&m.ret, shadowed).map(|name| (name, "astdef return")));
-        match hit {
-            Some((name, position)) => {
-                dropped.push((m.name.clone(), name, position));
-                false
-            }
-            None => true,
-        }
-    });
-    for (m, name, position) in dropped {
-        log.push(format!(
-            "  shadow {owner}.{m}(): {position} ({name}) -> method dropped (name owned by a \
-             sem class, so the node wrapper has no stub)"
-        ));
-    }
-}
-
-/// The first shadowed AST-node name referenced anywhere inside an argkind.
-fn shadowed_astnode(a: &Arg, shadowed: &BTreeSet<String>) -> Option<String> {
-    match a {
-        Arg::AstNode(name) if shadowed.contains(name) => Some(name.clone()),
-        Arg::Arc(i) | Arg::Opt(i) | Arg::List(i) => shadowed_astnode(i, shadowed),
-        _ => None,
-    }
-}
-
-/// The first shadowed AST-node name referenced anywhere inside a return shape.
-fn shadowed_astdef(s: &Shape, shadowed: &BTreeSet<String>) -> Option<String> {
-    match s {
-        Shape::AstDef(name) if shadowed.contains(name) => Some(name.clone()),
-        Shape::Opt(i) | Shape::List(i) => shadowed_astdef(i, shadowed),
-        Shape::Map(k, v) => shadowed_astdef(k, shadowed).or_else(|| shadowed_astdef(v, shadowed)),
-        Shape::Tuple(v) => v.iter().find_map(|e| shadowed_astdef(e, shadowed)),
-        _ => None,
-    }
-}
-
-fn shadow_shape(s: &mut Shape, shadowed: &BTreeSet<String>, label: &str, log: &mut Vec<String>) {
-    match s {
-        Shape::AstDef(name) if shadowed.contains(name) => {
-            log.push(format!(
-                "  shadow {label}: astdef({name}) -> skip (name owned by a sem class)"
-            ));
-            *s = Shape::Skip(format!(
-                "{name}: shadowed AST node (name owned by a sem class)"
-            ));
-        }
-        Shape::Opt(i) | Shape::List(i) => shadow_shape(i, shadowed, label, log),
-        Shape::Map(k, v) => {
-            shadow_shape(k, shadowed, label, log);
-            shadow_shape(v, shadowed, label, log);
-        }
-        Shape::Tuple(v) => {
-            for e in v {
-                shadow_shape(e, shadowed, label, log);
-            }
-        }
-        _ => {}
-    }
 }
