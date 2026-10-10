@@ -45,18 +45,25 @@ impl File {
     }
 }
 
-/// Collapse `.` and `..` components in a path, without touching the file system
-fn normalize(path: &Path) -> PathBuf {
+/// Collapse `.` and `..` components in a path, without touching the file system,
+/// as `java.nio.file.Path.normalize` does: a `..` cancels the name before it, a
+/// `..` at the root is the root, and a `..` that has no name before it in a
+/// relative path stays
+pub(crate) fn normalize(path: &Path) -> PathBuf {
     use std::path::Component;
     let mut out = PathBuf::new();
     for component in path.components() {
         match component {
             Component::CurDir => {}
-            Component::ParentDir => {
-                if !out.pop() {
+            Component::ParentDir => match out.components().next_back() {
+                Some(Component::Normal(_)) => {
+                    out.pop();
+                }
+                Some(Component::RootDir | Component::Prefix(_)) => {}
+                Some(Component::ParentDir | Component::CurDir) | None => {
                     out.push(Component::ParentDir);
                 }
-            }
+            },
             other => out.push(other),
         }
     }
