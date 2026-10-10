@@ -16,6 +16,8 @@ pub struct SpanData {
     pub start: BytePos,
     pub length: BytePos,
     pub include_span: Option<Box<SpanData>>,
+    /// Span of the template expansion specifier that copied this span here
+    pub expand_span: Option<Box<SpanData>>,
 }
 
 impl SpanData {
@@ -136,8 +138,25 @@ impl SourceFileData {
             }
         }
 
+        // Collect all the template expansion locations
+        fn collect_expand_locs(
+            loc: &Option<Box<SpanData>>,
+            out: &mut Vec<DiagnosticDataIncludeLocation>,
+        ) {
+            match loc {
+                None => {}
+                Some(loc) => {
+                    out.push(loc.file.upgrade().unwrap().include_loc(loc));
+                    collect_expand_locs(&loc.expand_span, out)
+                }
+            }
+        }
+
         let mut include_spans = vec![];
         collect_include_locs(&span.include_span, &mut include_spans);
+
+        let mut expand_spans = vec![];
+        collect_expand_locs(&span.expand_span, &mut expand_spans);
 
         DiagnosticDataSnippet {
             start: span.start - first,
@@ -146,6 +165,7 @@ impl SourceFileData {
             uri: self.uri.clone(),
             file_content: self.content[full_range.start().into()..full_range.end().into()].into(),
             include_spans,
+            expand_spans,
         }
     }
 }
@@ -179,6 +199,8 @@ pub struct DiagnosticDataSnippet {
     pub uri: String,
     pub file_content: String,
     pub include_spans: Vec<DiagnosticDataIncludeLocation>,
+    /// The chain of template expansion specifiers that copied this span here
+    pub expand_spans: Vec<DiagnosticDataIncludeLocation>,
 }
 
 #[derive(Debug)]
@@ -281,15 +303,18 @@ impl<E: DiagnosticEmitter> CompilerContext<E> {
         start: BytePos,
         length: BytePos,
         include_span: Option<Span>,
+        expand_span: Option<Span>,
     ) -> Span {
         let file = self.files.get(file.handle);
         let include_span = include_span.map(|s| Box::new(self.span_get(&s).clone()));
+        let expand_span = expand_span.map(|s| Box::new(self.span_get(&s).clone()));
         let handle = self.spans.push_with(|handle| SpanData {
             handle,
             file: Arc::downgrade(file),
             start,
             length,
             include_span,
+            expand_span,
         });
 
         self.gc.as_mut().map(|g| g.spans.insert(handle));

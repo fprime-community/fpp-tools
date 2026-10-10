@@ -468,10 +468,17 @@ impl GlobalState {
                     }
 
                     let start = std::time::Instant::now();
-                    let _ = fpp_analysis::check_semantics(
-                        &mut analysis,
-                        self.cache.values().map(|v| &v.ast).collect(),
-                    );
+
+                    // Template expansion rewrites the tree, so it runs on a copy:
+                    // the cached ASTs are shared with the request handlers, which
+                    // walk them by source position. An expansion copy carries the
+                    // span of the template body it came from, so leaving it out of
+                    // the cache keeps position lookups unambiguous.
+                    let mut asts: Vec<fpp_ast::TransUnit> =
+                        self.cache.values().map(|v| v.ast.clone()).collect();
+                    if fpp_analysis::resolve_templates(&mut analysis, &mut asts).is_continue() {
+                        let _ = fpp_analysis::check_semantics(&mut analysis, asts.iter().collect());
+                    }
                     tracing::info!(
                         "analyzed {} Translation Units in {:.2?}",
                         self.cache.len(),

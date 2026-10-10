@@ -1,0 +1,72 @@
+ --> [ local path prefix ]/template-error.fpp:2:10
+  |
+2 | expand T(1)
+  |          ^ syntax error: template argument expected
+  |
+  = note: expected one of constant, type, instance
+  = note: got literal integer
+
+ --> [ local path prefix ]/template-error.fpp:3:10
+  |
+3 | expand T(U32)
+  |          ^^^ syntax error: template argument expected
+  |
+  = note: expected one of constant, type, instance
+  = note: got u32
+
+ --> [ local path prefix ]/template-error.fpp:4:22
+  |
+4 | expand T(constant 1, 2)
+  |                      ^ syntax error: template argument expected
+  |
+  = note: expected one of constant, type, instance
+  = note: got literal integer
+
+ --> [ local path prefix ]/template-error.fpp:7:18
+  |
+7 | expand T(constant)
+  |                  ^ syntax error: expression expected
+  |
+  = note: expected one of [, {, (, identifier, true, false, sizeof, literal float, literal integer, literal string
+  = note: got )
+
+  --> [ local path prefix ]/template-error.fpp:10:1
+   |
+10 | expand
+   | ^^^^^^ syntax error: unexpected token
+   |
+   = note: expected identifier
+   = note: got end of line
+
+  --> [ local path prefix ]/template-error.fpp:13:20
+   |
+13 | module template T1(c: U32) {}
+   |                    ^ syntax error: template parameter expected
+   |
+   = note: expected one of constant, type, instance
+   = note: got identifier
+
+  --> [ local path prefix ]/template-error.fpp:16:29
+   |
+16 | module template T2(constant c) {}
+   |                             ^ syntax error: unexpected token
+   |
+   = note: expected :
+   = note: got )
+
+  --> [ local path prefix ]/template-error.fpp:19:29
+   |
+19 | module template T3(instance i) {}
+   |                             ^ syntax error: unexpected token
+   |
+   = note: expected :
+   = note: got )
+
+  --> [ local path prefix ]/template-error.fpp:22:25
+   |
+22 | module template T4(type Ty: U32) {}
+   |                         ^^ syntax error: unexpected token
+   |
+   = note: expected ,
+   = note: got :
+

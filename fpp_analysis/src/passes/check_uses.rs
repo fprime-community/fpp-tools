@@ -1,9 +1,11 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::basic_use_analyzer::{BasicUseAnalyzer, UseAnalysisPass};
+use crate::analyzers::basic_use_analyzer::{BasicUseAnalyzer, UseAnalysisPass, visit_template_arg};
 use crate::errors::{SemanticError, SemanticResult};
-use crate::semantics::{NameGroup, QualifiedName, Symbol, SymbolInterface};
-use fpp_ast::{AstNode, Expr, ExprKind, Ident, Node, QualIdent, Visitable, Visitor};
+use crate::semantics::{NameGroup, QualifiedName, ScopeOwner, Symbol, SymbolInterface};
+use fpp_ast::{
+    AstNode, Expr, ExprKind, Ident, Node, QualIdent, SpecTemplateExpand, Visitable, Visitor,
+};
 use fpp_core::Spanned;
 use std::ops::{ControlFlow, Deref};
 
@@ -18,36 +20,49 @@ impl<'ast> Default for CheckUses<'ast> {
     }
 }
 
-impl<'ast> CheckUses<'ast> {
-    pub fn new() -> CheckUses<'ast> {
-        Self {
-            super_: BasicUseAnalyzer::new(),
+/// Resolve `qualifier` `.` `name` in name group `ng`, recording the use
+fn resolve_qualified(
+    a: &mut Analysis,
+    ng: NameGroup,
+    qualifier: &QualIdent,
+    name: &Ident,
+) -> SemanticResult<Symbol> {
+    let qual_sym = resolve_qual_ident(a, ng, qualifier)?;
+    let scope = {
+        match a.lookup_scope(&qual_sym) {
+            None => {
+                return Err(SemanticError::InvalidSymbol {
+                    symbol_name: qual_sym.name().data.clone(),
+                    msg: "not a qualifier".to_string(),
+                    loc: qualifier.span(),
+                    def_loc: qual_sym.node().span(),
+                });
+            }
+            Some(scope) => scope,
+        }
+    };
+
+    match scope.get(ng, &name.data) {
+        None => Err(SemanticError::UndefinedSymbol {
+            ng: ng.to_string(),
+            name: name.data.clone(),
+            loc: name.span(),
+        }),
+        Some(sym) => {
+            a.use_def_map.insert(name.id(), sym.clone());
+            Ok(sym)
         }
     }
+}
 
-    fn visit_qualified(
-        &self,
-        a: &mut Analysis,
-        ng: NameGroup,
-        qualifier: &QualIdent,
-        name: &Ident,
-    ) -> SemanticResult<Symbol> {
-        let qual_sym = self.visit_qual_ident_impl(a, ng, qualifier)?;
-        let scope = {
-            match a.symbol_scope_map.get(&qual_sym) {
-                None => {
-                    return Err(SemanticError::InvalidSymbol {
-                        symbol_name: qual_sym.name().data.clone(),
-                        msg: "not a qualifier".to_string(),
-                        loc: qualifier.span(),
-                        def_loc: qual_sym.node().span(),
-                    });
-                }
-                Some(scope) => scope,
-            }
-        };
-
-        match scope.get(ng, &name.data) {
+/// Resolve a qualified identifier node in name group `ng`, recording the use
+pub(crate) fn resolve_qual_ident(
+    a: &mut Analysis,
+    ng: NameGroup,
+    node: &QualIdent,
+) -> SemanticResult<Symbol> {
+    match &node {
+        QualIdent::Unqualified(name) => match a.symbol_get(ng, &name.data) {
             None => Err(SemanticError::UndefinedSymbol {
                 ng: ng.to_string(),
                 name: name.data.clone(),
@@ -55,46 +70,47 @@ impl<'ast> CheckUses<'ast> {
             }),
             Some(sym) => {
                 a.use_def_map.insert(name.id(), sym.clone());
+                a.use_def_map.insert(node.id(), sym.clone());
                 Ok(sym)
             }
+        },
+        QualIdent::Qualified(qualified) => {
+            resolve_qualified(a, ng, qualified.qualifier.deref(), &qualified.name)
+        }
+    }
+}
+
+/// Resolve a qualified identifier node in name group `ng`, recording the use and
+/// emitting any error
+pub(crate) fn check_qual_ident(a: &mut Analysis, ng: NameGroup, node: &QualIdent) {
+    match resolve_qual_ident(a, ng, node) {
+        Ok(sym) => {
+            a.use_def_map.insert(node.id(), sym);
+        }
+        Err(err) => {
+            err.emit();
+        }
+    }
+}
+
+impl<'ast> CheckUses<'ast> {
+    pub fn new() -> CheckUses<'ast> {
+        Self {
+            super_: BasicUseAnalyzer::new(),
         }
     }
 
-    /// Visit a qualified identifier node and check a use
     fn visit_qual_ident_impl(
         &self,
         a: &mut Analysis,
         ng: NameGroup,
         node: &QualIdent,
     ) -> SemanticResult<Symbol> {
-        match &node {
-            QualIdent::Unqualified(name) => match a.symbol_get(ng, &name.data) {
-                None => Err(SemanticError::UndefinedSymbol {
-                    ng: ng.to_string(),
-                    name: name.data.clone(),
-                    loc: name.span(),
-                }),
-                Some(sym) => {
-                    a.use_def_map.insert(name.id(), sym.clone());
-                    a.use_def_map.insert(node.id(), sym.clone());
-                    Ok(sym)
-                }
-            },
-            QualIdent::Qualified(qualified) => {
-                self.visit_qualified(a, ng, qualified.qualifier.deref(), &qualified.name)
-            }
-        }
+        resolve_qual_ident(a, ng, node)
     }
 
     fn visit_qual_ident(&self, a: &mut Analysis, ng: NameGroup, node: &QualIdent) {
-        match self.visit_qual_ident_impl(a, ng, node) {
-            Ok(sym) => {
-                a.use_def_map.insert(node.id(), sym);
-            }
-            Err(err) => {
-                err.emit();
-            }
-        }
+        check_qual_ident(a, ng, node)
     }
 
     // Check that an implied use (a) is not a member of a def and (b) does not
@@ -106,6 +122,21 @@ impl<'ast> CheckUses<'ast> {
         iu_name: &QualifiedName,
         sym: &Symbol,
     ) {
+        // A bound template parameter is not a global definition, so it cannot
+        // satisfy an implied use
+        if sym.is_template_arg() {
+            SemanticError::InvalidSymbol {
+                symbol_name: sym.name().data.clone(),
+                msg: format!(
+                    "invalid use of symbol {}: a template parameter may not satisfy the implied use of {}",
+                    sym.name().data, iu_name
+                ),
+                loc,
+                def_loc: sym.node().span(),
+            }
+            .emit();
+            return;
+        }
         let sym_qualified_name = a.get_qualified_name(sym);
         let iu_name = iu_name.to_string();
         // Check that the name of the def matches the name of the use
@@ -135,6 +166,49 @@ impl<'ast> Visitor<'ast> for CheckUses<'ast> {
     // Walk all nodes deeply and collect up scope where relevant
     fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
         self.super_.visit(self, a, node)
+    }
+
+    /// Resolve the names inside an expanded template.
+    ///
+    /// A name in the body of a template resolves at the point of the template
+    /// definition, not at the point of expansion. So the scope stack used here is
+    /// built from scratch: the stack at the point of the definition, with the
+    /// bound parameters and the definitions of the expansion pushed on top.
+    fn visit_spec_template_expand(
+        &self,
+        a: &mut Analysis,
+        node: &'ast SpecTemplateExpand,
+    ) -> ControlFlow<Self::Break> {
+        let Some(members) = &node.members else {
+            // This specifier was not expanded: CheckTemplateUses has already
+            // reported why
+            return ControlFlow::Continue(());
+        };
+        if !a.template_expansion_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
+        let Ok(Some(tmpl)) = a.get_template_symbol(node.template.id()) else {
+            return ControlFlow::Continue(());
+        };
+
+        let mut nested_scope = a.nested_scope_at(&tmpl);
+        nested_scope.push(ScopeOwner::TemplateParams(node.node_id));
+        nested_scope.push(ScopeOwner::TemplateExpansion(node.node_id));
+
+        let saved_scope = std::mem::replace(&mut a.nested_scope, nested_scope);
+        let saved_expansion = a.template_expansion.replace(node.node_id);
+        let res = members.visit(a, self);
+        a.nested_scope = saved_scope;
+        a.template_expansion = saved_expansion;
+        res?;
+
+        // Analyze the argument list, which is written at the expansion site and
+        // so resolves in the enclosing scope
+        let params = a.expansion_at(node.node_id).params.clone();
+        for param in &params {
+            self.template_param(a, param)?;
+        }
+        ControlFlow::Continue(())
     }
 }
 
@@ -179,12 +253,12 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
                     None => None,
                     // Left side is a constant, we are selecting a member of this constant
                     // we are not creating another use.
-                    Some(Symbol::Constant(_)) => None,
+                    Some(Symbol::Constant(_) | Symbol::TemplateConstantArg { .. }) => None,
 
                     // The left side is some symbol other than a constant (a qualifier),
                     // look up this symbol and add it to the use-def entries
                     Some(qual) => {
-                        let scope = a.symbol_scope_map.get(qual).unwrap();
+                        let scope = a.lookup_scope(qual).expect("qualifier has a scope");
                         match scope.get(NameGroup::Value, &id.data) {
                             None => {
                                 SemanticError::UndefinedSymbol {
@@ -337,5 +411,28 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
         let _ = name;
         self.visit_qual_ident(a, NameGroup::StateMachine, node);
         ControlFlow::Continue(())
+    }
+
+    fn template_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        let _ = name;
+        self.visit_qual_ident(a, NameGroup::Template, node);
+        ControlFlow::Continue(())
+    }
+
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+
+    fn template_interface_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
     }
 }

@@ -1,6 +1,7 @@
 mod annotated;
 mod enum_map;
 mod node;
+mod replicate;
 mod util;
 mod visitable;
 
@@ -160,6 +161,20 @@ decl_derive!(
     [DirectRefWalkable, attributes(visitable)] =>
     /// Same as [DirectWalkable] except it only generates
     visitable::walkable_direct_ref_derive
+);
+
+decl_derive!(
+    [Replicate] =>
+    /// Derives `Replicate` for the annotated `struct` or `enum` (`union` is not supported).
+    ///
+    /// Every field is replicated in definition order, using the `Replicate`
+    /// implementation for its type. Unlike the walkable derives, no field is
+    /// skipped: a `#[visitable(ignore)]` field can still carry a node identity.
+    ///
+    /// The `node_id` field injected by `#[ast]` is replicated like any other, so
+    /// a type deriving `Replicate` gets a fresh identity for itself and for
+    /// every node beneath it.
+    replicate::replicate_derive
 );
 
 /// Count the number of variants in an enum and emit a `SIZE` constant in the impl

@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/template-error-locate-name.fpp:2:8
+  |
+2 | locate template at "c.fpp"
+  |        ^^^^^^^^ syntax error: unexpected token
+  |
+  = note: expected identifier
+  = note: got at
+

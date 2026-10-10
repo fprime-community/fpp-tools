@@ -107,7 +107,15 @@ impl<'ast> UsedSymbols<'ast> {
             Symbol::StateMachine(node) => node.visit(a, self),
             Symbol::StructType(node) => node.visit(a, self),
             Symbol::System(node) => node.visit(a, self),
+            Symbol::Template(node) => node.visit(a, self),
             Symbol::Topology(node) => node.visit(a, self),
+            // A bound template parameter is not a definition of its own: the
+            // symbols it uses are the ones in the argument bound to it
+            Symbol::TemplateConstantArg { value, .. } => value.visit(a, self),
+            Symbol::TemplateTypeArg { value, .. } => value.visit(a, self),
+            Symbol::TemplateInterfaceArg { value, .. } => {
+                self.interface_instance_use(a, &value, value.as_ref().into())
+            }
         }
     }
 }
@@ -175,6 +183,15 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for UsedSymbols<'ast> {
     }
 
     fn interface_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
+    fn template_use(
         &self,
         a: &mut Analysis,
         node: &QualIdent,

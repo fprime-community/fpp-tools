@@ -123,3 +123,17 @@ fpp-format --entry topology connections.fppi
 
 If you omit `--entry`, the `module` rule is used, which is correct for normal
 `.fpp` files and for `.fppi` fragments containing module-level members.
+
+## Module templates
+
+`module template` definitions and `expand` specifiers are formatted like any other
+definition and specifier: a template parameter list breaks and indents like a formal
+parameter list, its trailing annotations align in a column, and a template argument
+list behaves like any other parenthesized list.
+
+There is no equivalent of the Scala tool's `fpp-format -t`, which expands module
+templates before printing. That flag prints an expansion specifier together with its
+expanded body, `expand Q(args) { members }`, and that is not valid FPP surface
+syntax — an `expand` specifier never carries a body. This formatter's contract is
+that its output reparses and that reformatting it changes nothing, so an expansion
+specifier is printed as written and expanding it is left to the analyzer.

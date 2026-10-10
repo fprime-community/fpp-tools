@@ -1,6 +1,6 @@
 use crate::analysis::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
-use crate::semantics::{NameGroup, Scope, Symbol, SymbolInterface};
+use crate::semantics::{NameGroup, Scope, ScopeOwner, Symbol, SymbolInterface};
 use fpp_ast::*;
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
@@ -107,7 +107,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         .unwrap_or_else(|err| err.emit());
 
         a.symbol_scope_map.insert(symbol.clone(), Scope::new());
-        a.nested_scope.push(symbol.clone());
+        a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
 
         let save_paren = a.parent_symbol.clone();
         a.parent_symbol = Some(symbol);
@@ -142,7 +142,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         .unwrap_or_else(|err| err.emit());
 
         a.symbol_scope_map.insert(symbol.clone(), Scope::new());
-        a.nested_scope.push(symbol.clone());
+        a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
 
         let save_paren = a.parent_symbol.clone();
         a.parent_symbol = Some(symbol);
@@ -225,7 +225,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
 
         self.update_parent_symbol_map(a, sym.clone());
 
-        a.nested_scope.push(sym.clone());
+        a.nested_scope.push(ScopeOwner::Symbol(sym.clone()));
         let save_paren = a.parent_symbol.clone();
         a.parent_symbol = Some(sym);
         let res = def.walk(a, self);
@@ -234,6 +234,32 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         a.nested_scope.pop();
 
         res
+    }
+
+    /// A module template definition introduces a name in the template name
+    /// group. Its body is not entered here: the definitions in the body come
+    /// into being only where the template is expanded.
+    fn visit_def_module_template(
+        &self,
+        a: &mut Analysis,
+        def: &'ast DefModuleTemplate,
+    ) -> ControlFlow<Self::Break> {
+        let symbol = Symbol::Template(Arc::new(def.clone()));
+        a.symbol_map.insert(def.node_id, symbol.clone());
+        self.enter_symbol(a, symbol, NameGroup::Template)
+            .unwrap_or_else(|err| err.emit());
+        ControlFlow::Continue(())
+    }
+
+    /// A template expansion specifier enters no symbols. The symbols of an
+    /// expansion are entered by [`crate::passes::EnterTemplateSymbols`], after
+    /// the template body has been copied to the point of the specifier.
+    fn visit_spec_template_expand(
+        &self,
+        _a: &mut Analysis,
+        _def: &'ast SpecTemplateExpand,
+    ) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
     }
 
     fn visit_def_state_machine(
@@ -256,7 +282,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         // A state machine opens a scope for its nested definitions
         // (types, constants, etc.).
         a.symbol_scope_map.insert(symbol.clone(), Scope::new());
-        a.nested_scope.push(symbol.clone());
+        a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
 
         let save_parent = a.parent_symbol.clone();
         a.parent_symbol = Some(symbol);

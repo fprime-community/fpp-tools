@@ -217,6 +217,290 @@ fn completion_suppressed_inside_comment() {
     );
 }
 
+/// Index a single-file project and open the file in the VFS, so completion can
+/// read the document text.
+fn state_with_open_document(dir: &Path, text: &str) -> (GlobalState, String) {
+    std::fs::write(dir.join("Top.fpp"), text).unwrap();
+    std::fs::write(dir.join(".fpp-lsp"), "scanWorkspace: true\n").unwrap();
+
+    let mut state = index_workspace(dir);
+    let uri = crate::uri::from_file_path(dir.join("Top.fpp")).unwrap();
+    state.vfs.did_open(lsp_types::DidOpenTextDocumentParams {
+        text_document: lsp_types::TextDocumentItem {
+            uri: Uri::from_str(&uri).unwrap(),
+            language_id: "fpp".into(),
+            version: 1,
+            text: text.to_string(),
+        },
+    });
+    (state, uri)
+}
+
+/// The completion item labels offered at a zero-based `line`/`character`.
+fn completion_labels_at(state: &GlobalState, uri: &str, line: u32, character: u32) -> Vec<String> {
+    completion_items(
+        crate::handlers::handle_completion(state, completion_params_at(uri, line, character))
+            .expect("completion should not error"),
+    )
+    .into_iter()
+    .map(|i| i.label)
+    .collect()
+}
+
+/// An expansion specifier names a template, so completion there must offer the
+/// template name group — both for a bare name and after a qualifier's dot.
+/// Nothing else lives in that name group, so no other definition may leak in.
+#[test]
+fn completion_after_expand_offers_templates() {
+    let dir = fixture_dir("ws_expand_completion");
+    // Line 4 is `expand `, line 5 is `expand M.`.
+    let text = "\
+module M {
+  module template Tmpl() { }
+  constant NotATemplate = 1
+}
+expand
+expand M.
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let bare = completion_labels_at(&state, &uri, 4, 7);
+    assert!(
+        bare.contains(&"M".to_string()),
+        "`expand ` should offer the enclosing module as a qualifier, got {bare:?}"
+    );
+    assert!(
+        !bare.contains(&"NotATemplate".to_string()),
+        "`expand ` must not offer non-templates, got {bare:?}"
+    );
+
+    let qualified = completion_labels_at(&state, &uri, 5, 9);
+    assert_eq!(
+        qualified,
+        vec!["Tmpl".to_string()],
+        "`expand M.` should offer only module `M`'s templates"
+    );
+}
+
+/// An `instance` template argument is a bare qualified identifier, so completion
+/// there must offer interface instances. The other two argument kinds are an
+/// expression and a type name, which the generic expression/type paths handle.
+#[test]
+fn completion_in_instance_template_argument_offers_instances() {
+    let dir = fixture_dir("ws_template_arg_completion");
+    // Line 7 leaves the `instance` argument's name empty.
+    let text = "\
+interface Iface { }
+passive component Comp { }
+instance comp: Comp base id 1
+module template Tmpl(instance myInst: Iface) {
+  topology Top {
+    instance myInst
+  }
+}
+expand Tmpl(instance )
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let labels = completion_labels_at(&state, &uri, 7, 21);
+    assert!(
+        labels.contains(&"comp".to_string()),
+        "an `instance` argument should offer component instances, got {labels:?}"
+    );
+    assert!(
+        !labels.contains(&"Tmpl".to_string()),
+        "an `instance` argument must not offer templates, got {labels:?}"
+    );
+}
+
+/// A template parameter is in scope only inside the body of the template that
+/// declares it, and only in the name group its kind belongs to. It has no symbol
+/// in any enclosing scope, so completion must offer it from the declaration.
+#[test]
+fn completion_inside_template_body_offers_parameters() {
+    let dir = fixture_dir("ws_template_param_completion");
+    // Line 6 completes a type name, line 7 a constant expression.
+    let text = "\
+port P
+interface Iface {
+  output port pOut: P
+}
+module template Tmpl(constant Size: U32, type Elem, instance myInst: Iface) {
+  array A = [3] U32
+  array B = [3]
+  constant C =
+}
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let type_position = completion_labels_at(&state, &uri, 6, 16);
+    assert!(
+        type_position.contains(&"Elem".to_string()),
+        "a type position in a template body should offer the type parameter, got {type_position:?}"
+    );
+    assert!(
+        !type_position.contains(&"Size".to_string()),
+        "a type position must not offer the constant parameter, got {type_position:?}"
+    );
+
+    let value_position = completion_labels_at(&state, &uri, 7, 15);
+    assert!(
+        value_position.contains(&"Size".to_string()),
+        "a constant position in a template body should offer the constant parameter, got {value_position:?}"
+    );
+    assert!(
+        !value_position.contains(&"Elem".to_string()),
+        "a constant position must not offer the type parameter, got {value_position:?}"
+    );
+}
+
+/// A parameter is not in scope in its own declaration, so the parameter list
+/// offers no parameters.
+#[test]
+fn completion_in_template_parameter_list_offers_no_parameters() {
+    let dir = fixture_dir("ws_template_param_list_completion");
+    // Line 1 leaves the second parameter's type name empty.
+    let text = "\
+module template Tmpl(type Elem, constant Size: ) {
+  array A = [3] U32
+}
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let labels = completion_labels_at(&state, &uri, 0, 47);
+    assert!(
+        !labels.contains(&"Elem".to_string()),
+        "a parameter's own declaration must not offer the parameters, got {labels:?}"
+    );
+    assert!(
+        labels.contains(&"U32".to_string()),
+        "fixture precondition: a type position offers the primitive types, got {labels:?}"
+    );
+}
+
+/// Inside a template body an instance parameter is a connection endpoint, but it
+/// has no symbol in any enclosing scope. Only the port interface declared in the
+/// parameter is visible there, so its ports are what completion offers.
+#[test]
+fn completion_after_instance_parameter_dot_offers_interface_ports() {
+    let dir = fixture_dir("ws_template_instance_param_completion");
+    // Line 9 is the connection whose `from` endpoint is the parameter.
+    let text = "\
+port P
+interface Iface {
+  output port ifaceOut: P
+}
+passive component Comp {
+  sync input port compIn: P
+}
+instance comp: Comp base id 1
+module template Tmpl(instance myInst: Iface) {
+  topology Top {
+    instance myInst
+    instance comp
+    connections C {
+      myInst. -> comp.compIn
+    }
+  }
+}
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let labels = completion_labels_at(&state, &uri, 13, 13);
+    assert_eq!(
+        labels,
+        vec!["ifaceOut".to_string()],
+        "the parameter's declared interface ports should be offered"
+    );
+}
+
+/// A template body is analyzed once per expansion, so the same line of the body
+/// carries one diagnostic per expansion. Each must point at the expansion
+/// specifier that produced it, or the editor shows indistinguishable duplicates.
+#[test]
+fn diagnostics_in_a_template_body_point_at_the_expansion() {
+    let dir = fixture_dir("ws_template_diagnostics");
+    let text = "\
+module template Tmpl() {
+  constant C = Undefined
+}
+module A {
+  expand Tmpl()
+}
+module B {
+  expand Tmpl()
+}
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let diagnostics = state.diagnostics.get(&uri);
+    let in_body: Vec<&lsp_types::Diagnostic> = diagnostics
+        .iter()
+        .filter(|d| d.range.start.line == 1)
+        .collect();
+    assert_eq!(
+        in_body.len(),
+        2,
+        "expected one diagnostic per expansion, got {diagnostics:?}"
+    );
+
+    // Each diagnostic names its own `expand` specifier, so the two are distinct.
+    let mut expansion_lines: Vec<u32> = in_body
+        .iter()
+        .map(|d| {
+            let related = d
+                .related_information
+                .as_ref()
+                .expect("related information present");
+            let expansion = related
+                .iter()
+                .find(|r| r.message == "expanded at")
+                .unwrap_or_else(|| panic!("no expansion location in {related:?}"));
+            expansion.location.range.start.line
+        })
+        .collect();
+    expansion_lines.sort_unstable();
+    assert_eq!(expansion_lines, vec![4, 7]);
+}
+
+/// A module template body is a module member list, so it may hold `include`
+/// specifiers. The document-link visitor must descend into it, or the include in
+/// a template body is not a clickable link.
+#[test]
+fn document_links_reach_includes_in_a_template_body() {
+    let dir = fixture_dir("ws_template_document_links");
+    std::fs::write(dir.join("Defs.fppi"), "constant A = 1\n").unwrap();
+    let text = "\
+module template Tmpl() {
+  include \"Defs.fppi\"
+}
+module M {
+  include \"Defs.fppi\"
+}
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let links = crate::handlers::handle_document_link_request(
+        &state,
+        lsp_types::DocumentLinkParams {
+            text_document: lsp_types::TextDocumentIdentifier {
+                uri: Uri::from_str(&uri).unwrap(),
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        },
+    )
+    .expect("document links should not error")
+    .unwrap_or_default();
+
+    let lines: Vec<u32> = links.iter().map(|l| l.range.start.line).collect();
+    assert_eq!(
+        lines,
+        vec![1, 4],
+        "expected a link for the include in the template body and in the module"
+    );
+}
+
 #[test]
 fn locs_mode_resolves_uses_through_symlinked_root() {
     let real = fixture_dir("ws_locs_real");

@@ -99,6 +99,33 @@ fn span_data_to_range(span: &fpp_core::SpanData) -> Range {
     )
 }
 
+/// The chain of template expansion specifiers that copied `span` here, as
+/// related information.
+///
+/// A template body is analyzed once per expansion, so one line of a template body
+/// can carry one diagnostic per expansion of that template. Those diagnostics have
+/// the same range and, when the arguments differ only in what they name, the same
+/// message: without the expansion point they cannot be told apart in the editor.
+fn expansion_related_information(
+    span: &fpp_core::SpanData,
+) -> impl Iterator<Item = DiagnosticRelatedInformation> {
+    let mut current = span.expand_span.clone();
+    std::iter::from_fn(move || {
+        let expand = current.take()?;
+        let file = expand.file.upgrade().unwrap();
+        current = expand.expand_span.clone();
+        Some(DiagnosticRelatedInformation {
+            location: Location::new(
+                Uri::from_str(&file.uri).unwrap(),
+                span_data_to_range(&expand),
+            ),
+            // The location carries the file and position that the command line
+            // renderer prints after this phrase.
+            message: "expanded at".to_string(),
+        })
+    })
+}
+
 fn diagnostic_level_to_severity(level: fpp_core::Level) -> DiagnosticSeverity {
     match level {
         fpp_core::Level::Error => DiagnosticSeverity::ERROR,
@@ -116,6 +143,7 @@ impl DiagnosticEmitter for LspDiagnosticsEmitter {
         let range = span_data_to_range(&diagnostic.span);
 
         let uri_c = uri.clone();
+        let expansions = expansion_related_information(&diagnostic.span);
         let related_information = Some(
             diagnostic
                 .children
@@ -134,6 +162,7 @@ impl DiagnosticEmitter for LspDiagnosticsEmitter {
                         message: sub.message,
                     }
                 })
+                .chain(expansions)
                 .collect(),
         );
 

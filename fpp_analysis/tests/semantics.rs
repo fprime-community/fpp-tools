@@ -8,7 +8,7 @@
 use fpp_analysis::semantics::{
     Command, ComponentInstance, NonParamKind, ParamKind, Symbol, SymbolInterface, Type, Value,
 };
-use fpp_analysis::{Analysis, add_state_enums, check_semantics};
+use fpp_analysis::{Analysis, add_state_enums, check_semantics, resolve_templates};
 use fpp_ast::{QueueFull, TlmChannelLimitKind, TlmChannelUpdate};
 use fpp_core::{SourceFile, Spanned};
 use std::sync::Arc;
@@ -23,6 +23,7 @@ fn with_analysis(src: &str, f: impl FnOnce(&Analysis)) {
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = Analysis::new();
         add_state_enums(&mut ast);
+        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
         let _ = check_semantics(&mut a, vec![&ast]);
         f(&a);
     });
@@ -620,9 +621,9 @@ passive component C {{
             matches!(default.anon_struct.members.get("y"), Some(Value::PrimitiveInteger(v)) if v.value == 0)
         );
 
-        // Converting a partial struct value to the struct type fills the
-        // missing members from the struct type's own default, not from the
-        // member type's default.
+        // Converting a partial struct value to the struct type fills the missing
+        // members from the member type's default, not from the struct type's own
+        // default. So `x` is 0 here, even though the struct type defaults it to 5.
         let param = the_component(a)
             .param_map
             .get(&0x10)
@@ -631,7 +632,7 @@ passive component C {{
             Value::Struct(v) => &v.anon_struct.members,
             other => panic!("expected a struct value, got {other:?}"),
         };
-        assert!(matches!(members.get("x"), Some(Value::PrimitiveInteger(v)) if v.value == 5));
+        assert!(matches!(members.get("x"), Some(Value::PrimitiveInteger(v)) if v.value == 0));
         assert!(matches!(members.get("y"), Some(Value::PrimitiveInteger(v)) if v.value == 1));
     });
 }

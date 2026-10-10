@@ -1,5 +1,8 @@
 use crate::Diagnosed;
-use fpp_ast::{MoveWalkable, MutVisitor, Node, TransUnit, Visitor};
+use fpp_ast::{
+    DefModuleTemplate, ModuleMember, MoveWalkable, MutVisitor, Node, QualIdent, Replicator,
+    TransUnit, Visitor,
+};
 use fpp_core::{SourceFile, Spanned};
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
@@ -63,10 +66,120 @@ pub fn parse(inputs: Vec<Input>) -> Vec<TransUnit> {
         .collect()
 }
 
-/// Run the expansion passes
-pub fn expand(units: &mut [TransUnit]) {
+/// Synthesize the implicit `enum State` of each state machine that has a body, so
+/// that the enum `fpp-to-cpp` generates for it is part of the model.
+///
+/// An external (bodyless) state machine declares no states, so it gets none.
+///
+/// Reaches a state machine written in a `module template` body, and not the members
+/// an expansion specifier has materialized, so it belongs before
+/// [`expand_templates`]: run in that order every copy of a template carries the enums
+/// the body's state machines were given.
+pub fn add_state_enums(units: &mut [TransUnit]) {
     for unit in units {
         fpp_parser::add_state_enums(unit);
+    }
+}
+
+/// Replace each template expansion specifier with the members of the template it
+/// names, so that the definitions an expansion contributes are part of the model.
+///
+/// The template name is resolved syntactically, by the scoping rules for a
+/// qualified identifier: the innermost enclosing module outward. `fpp-check`
+/// resolves it through the symbol table instead, but this tool sees one module of
+/// a larger build, so a name that does not resolve here simply contributes
+/// nothing — the same answer this tool gives for any definition it cannot see.
+pub fn expand_templates(units: &mut [TransUnit]) {
+    let templates = collect_templates(units);
+    for unit in units {
+        let mut scope: Vec<String> = Vec::new();
+        for member in &mut unit.0 {
+            expand_member(&templates, &mut scope, member);
+        }
+    }
+}
+
+/// The module templates of the model, by qualified name
+fn collect_templates(units: &[TransUnit]) -> Vec<(Vec<String>, DefModuleTemplate)> {
+    fn walk(
+        out: &mut Vec<(Vec<String>, DefModuleTemplate)>,
+        scope: &mut Vec<String>,
+        members: &[ModuleMember],
+    ) {
+        for member in members {
+            match member {
+                ModuleMember::DefModule(def) => {
+                    scope.push(def.name.data.clone());
+                    walk(out, scope, &def.members);
+                    scope.pop();
+                }
+                ModuleMember::DefModuleTemplate(def) => {
+                    let mut name = scope.clone();
+                    name.push(def.name.data.clone());
+                    out.push((name, def.clone()));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let mut out = Vec::new();
+    for unit in units {
+        walk(&mut out, &mut Vec::new(), &unit.0);
+    }
+    out
+}
+
+/// Look up a template by the name a specifier writes, trying the innermost
+/// enclosing scope first
+fn look_up<'t>(
+    templates: &'t [(Vec<String>, DefModuleTemplate)],
+    scope: &[String],
+    name: &QualIdent,
+) -> Option<&'t DefModuleTemplate> {
+    let mut parts: Vec<&str> = Vec::new();
+    name.write_parts(&mut parts);
+    for prefix_len in (0..=scope.len()).rev() {
+        let candidate: Vec<&str> = scope[..prefix_len]
+            .iter()
+            .map(String::as_str)
+            .chain(parts.iter().copied())
+            .collect();
+        if let Some((_, def)) = templates.iter().find(|(qualified, _)| {
+            qualified
+                .iter()
+                .map(String::as_str)
+                .eq(candidate.iter().copied())
+        }) {
+            return Some(def);
+        }
+    }
+    None
+}
+
+fn expand_member(
+    templates: &[(Vec<String>, DefModuleTemplate)],
+    scope: &mut Vec<String>,
+    member: &mut ModuleMember,
+) {
+    match member {
+        ModuleMember::DefModule(def) => {
+            scope.push(def.name.data.clone());
+            for member in &mut def.members {
+                expand_member(templates, scope, member);
+            }
+            scope.pop();
+        }
+        ModuleMember::SpecTemplateExpand(spec) => {
+            let Some(def) = look_up(templates, scope, &spec.template) else {
+                return;
+            };
+            let replicator = Replicator::new(spec.span());
+            let mut members = def.members.clone();
+            replicator.apply(&mut members);
+            spec.members = Some(members);
+        }
+        _ => {}
     }
 }
 

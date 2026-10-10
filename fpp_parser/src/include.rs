@@ -262,6 +262,21 @@ impl<Reader: FileReader> MutVisitor for ResolveIncludes<Reader> {
         ControlFlow::Continue(())
     }
 
+    /// All include specifiers are resolved, even ones that occur inside or
+    /// transitively inside a template definition.
+    fn visit_def_module_template(
+        &self,
+        a: &mut Self::State,
+        node: &mut DefModuleTemplate,
+    ) -> ControlFlow<Self::Break> {
+        let old_members = std::mem::take(&mut node.members);
+        for member in old_members.into_iter() {
+            self.module_member(a, member, &mut node.members)
+        }
+
+        ControlFlow::Continue(())
+    }
+
     fn visit_def_topology(
         &self,
         a: &mut Self::State,

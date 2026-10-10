@@ -1,8 +1,9 @@
 use crate::Analysis;
+use crate::analyzers::analyzer::visit_expansion;
 use crate::errors::SemanticError;
 use crate::passes::check_spec_locs::resolve_spec_path;
 use crate::semantics::QualifiedName;
-use fpp_ast::{DefModule, SpecLoc, Visitor, Walkable};
+use fpp_ast::{DefModule, DefModuleTemplate, SpecLoc, SpecTemplateExpand, Visitor, Walkable};
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -24,6 +25,24 @@ impl<'ast> Visitor<'ast> for BuildSpecLocMap {
         let result = node.walk(a, self);
         a.scope_name_list.remove(0);
         result
+    }
+
+    /// A location specifier in the body of a template is analyzed at the point of
+    /// the definition of the template, whether or not the template is expanded.
+    fn visit_def_module_template(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefModuleTemplate,
+    ) -> ControlFlow<Self::Break> {
+        node.members.walk(a, self)
+    }
+
+    fn visit_spec_template_expand(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecTemplateExpand,
+    ) -> ControlFlow<Self::Break> {
+        visit_expansion(self, a, node)
     }
 
     fn visit_spec_loc(&self, a: &mut Self::State, node: &'ast SpecLoc) -> ControlFlow<Self::Break> {

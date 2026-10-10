@@ -1,0 +1,14 @@
+  --> [ local path prefix ]/port_numbering/template_two_expansions_duplicate_output_connection.fpp:32:7
+   |
+32 |       i.pOut[0] -> hub.hIn
+   |       ^^^^^^ duplicate connection at output port 0
+   |
+   = note: expanded at [ local path prefix ]/port_numbering/template_two_expansions_duplicate_output_connection.fpp:44:3
+   |
+  ::: [ local path prefix ]/port_numbering/template_two_expansions_duplicate_output_connection.fpp:32:7
+   |
+32 |       i.pOut[0] -> hub.hIn
+   |       ------ previous occurrence is here
+   |
+   = note: expanded at [ local path prefix ]/port_numbering/template_two_expansions_duplicate_output_connection.fpp:40:3
+

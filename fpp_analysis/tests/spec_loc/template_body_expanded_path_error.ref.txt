@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/spec_loc/template_body_expanded_path_error.fpp:2:24
+  |
+2 |   locate constant c at "incorrect.fpp"
+  |                        ^^^^^^^^^^^^^^^ incorrect location path [ local path prefix ]/spec_loc/incorrect.fpp
+  |
+ ::: [ local path prefix ]/spec_loc/template_body_expanded_path_error.fpp:6:1
+  |
+6 | expand T
+  | -------- actual location is here
+

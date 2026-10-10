@@ -40,7 +40,9 @@ impl<Reader: FileReader + Clone> ComputeDependencies<Reader> {
         let units: Vec<&TransUnit> = tul.iter().map(|tu| &**tu).collect();
         BuildSpecLocMap.visit_trans_units(a, units.iter().cloned())?;
         ConstructImpliedUseMap.visit_trans_units(a, units.iter().cloned())?;
-        AddDependencies::new(self.reader.clone()).visit_trans_units(a, units.iter().cloned())?;
+        let expanded_template_names = CollectTemplateExpansions::names_in(units.iter().cloned());
+        AddDependencies::new(self.reader.clone(), expanded_template_names)
+            .visit_trans_units(a, units.iter().cloned())?;
         let included_file_set = a.included_file_set.clone();
         a.dependency_file_set
             .retain(|f| !included_file_set.contains(f));
@@ -82,6 +84,18 @@ mod tests {
     }
 
     impl FileReader for MapReader {
+        /// Resolve relative to the directory of the including file. The default
+        /// implementation canonicalizes that file, which the map's files do not
+        /// have on disk.
+        fn resolve(&self, current: SourceFile, include: &str) -> Result<String, Error> {
+            let uri = current.uri();
+            let path = match std::path::Path::new(&uri).parent() {
+                Some(dir) => dir.join(include),
+                None => std::path::PathBuf::from(include),
+            };
+            Ok(path.to_string_lossy().into_owned())
+        }
+
         fn read(&self, path: &str) -> Result<String, Error> {
             let path = File::get_path(path).to_string_lossy().into_owned();
             match self.files.get(&path) {
@@ -138,6 +152,284 @@ mod tests {
             // The crawl returns to level 0.
             assert_eq!(a.level, 0);
         });
+    }
+
+    /// Runs `ComputeDependencies` over `inputs` and returns the sorted dependency
+    /// file set.
+    fn dependencies_of(reader: &MapReader, inputs: &[(&str, &str)]) -> Vec<String> {
+        let mut diagnostics = vec![];
+        let mut ctx =
+            fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
+        fpp_core::run(&mut ctx, || {
+            let mut asts: Vec<fpp_ast::TransUnit> = inputs
+                .iter()
+                .map(|(path, src)| {
+                    let source = SourceFile::new(path, src.to_string());
+                    fpp_parser::parse(source, |p| p.trans_unit(), None)
+                })
+                .collect();
+            let mut a = Analysis::new();
+            for (path, _) in inputs {
+                a.input_file_set.insert(file(path));
+            }
+            let mut refs: Vec<&mut fpp_ast::TransUnit> = asts.iter_mut().collect();
+            let _ = ComputeDependencies::new(reader.clone()).tu_list(&mut a, &mut refs);
+            let mut deps: Vec<String> = a
+                .dependency_file_set
+                .iter()
+                .map(|f| f.to_string())
+                .collect();
+            deps.sort();
+            deps
+        })
+    }
+
+    /// The parameter list of a template, its expansion, and the arguments of the
+    /// expansion are all sources of dependencies.
+    #[test]
+    fn template_parameters_and_arguments_are_dependencies() {
+        let reader = MapReader::new(&[
+            (
+                "iface.fpp",
+                "port P
+interface ParamIface { sync input port pIn: P }
+",
+            ),
+            (
+                "body.fpp",
+                "constant bodyConst = 7
+",
+            ),
+            (
+                "argtype.fpp",
+                "type ArgType = U32
+",
+            ),
+            (
+                "arginst.fpp",
+                "locate interface ParamIface at \"iface.fpp\"\npassive component ArgComp { import ParamIface }\ninstance argInst: ArgComp base id 0x200\n",
+            ),
+        ]);
+        let src = "\
+locate interface ParamIface at \"iface.fpp\"
+locate constant bodyConst at \"body.fpp\"
+locate type ArgType at \"argtype.fpp\"
+locate instance argInst at \"arginst.fpp\"
+
+module template T(instance i: ParamIface, type ty) {
+  constant cOut = bodyConst
+  struct S { x: ty }
+  topology Top {
+    instance i
+  }
+}
+
+module M {
+  expand T(instance argInst, type ArgType)
+}
+";
+        let deps = dependencies_of(&reader, &[("top.fpp", src)]);
+        assert_eq!(
+            deps,
+            vec![
+                file("arginst.fpp").to_string(),
+                file("argtype.fpp").to_string(),
+                file("body.fpp").to_string(),
+                file("iface.fpp").to_string(),
+            ]
+        );
+    }
+
+    /// An expansion depends on the file that defines the template it names.
+    #[test]
+    fn a_template_expansion_depends_on_the_template_definition() {
+        let reader = MapReader::new(&[(
+            "def.fpp",
+            "module template T(constant p: U32) {
+  constant cOut = p + 1
+}
+",
+        )]);
+        let src = "locate template T at \"def.fpp\"
+
+module M {
+  expand T(constant 10)
+}
+";
+        let deps = dependencies_of(&reader, &[("top.fpp", src)]);
+        assert_eq!(deps, vec![file("def.fpp").to_string()]);
+    }
+
+    /// The body of a template that is never expanded contributes no dependencies.
+    #[test]
+    fn an_unexpanded_template_body_contributes_no_dependencies() {
+        let reader = MapReader::new(&[(
+            "dep.fpp",
+            "constant cycleConst = 1
+",
+        )]);
+        let src = "\
+locate constant cycleConst at \"dep.fpp\"
+
+module template CycleT(constant p: U32) {
+  constant cOut = p + cycleConst
+}
+";
+        let deps = dependencies_of(&reader, &[("top.fpp", src)]);
+        assert!(deps.is_empty(), "unexpected dependencies: {deps:?}");
+    }
+
+    /// The body of a template contributes dependencies when the template is
+    /// expanded, even when the expansion is in another input file.
+    #[test]
+    fn a_template_body_contributes_dependencies_when_expanded_elsewhere() {
+        let reader = MapReader::new(&[(
+            "dep.fpp",
+            "constant splitConst = 5
+",
+        )]);
+        let def = "\
+locate constant splitConst at \"dep.fpp\"
+
+module template BodyLocSplitT(constant p: U32) {
+  constant cOut = p + splitConst
+}
+";
+        let use_ = "module M {
+  expand BodyLocSplitT(constant 1)
+}
+";
+        let deps = dependencies_of(&reader, &[("def.fpp", def), ("use.fpp", use_)]);
+        assert_eq!(deps, vec![file("dep.fpp").to_string()]);
+    }
+
+    /// Below the input files the crawl cannot see the expansions, so it visits
+    /// every template body. A body whose use leads back to an input file does not
+    /// restart the crawl there.
+    #[test]
+    fn a_template_body_is_visited_below_the_input_files() {
+        let reader = MapReader::new(&[
+            (
+                "def.fpp",
+                "locate constant cycleConst at \"top.fpp\"
+locate constant deepConst at \"deep.fpp\"
+
+module template CycleT(constant p: U32) {
+  constant cOut = p + cycleConst + deepConst
+}
+",
+            ),
+            (
+                "deep.fpp",
+                "constant deepConst = 2
+",
+            ),
+        ]);
+        let src = "\
+locate template CycleT at \"def.fpp\"
+
+constant cycleConst = 1
+
+module M {
+  expand CycleT(constant 2)
+}
+";
+        let deps = dependencies_of(&reader, &[("top.fpp", src)]);
+        assert_eq!(
+            deps,
+            vec![file("deep.fpp").to_string(), file("def.fpp").to_string()]
+        );
+    }
+
+    /// An include specifier inside a template body is resolved like any other, so
+    /// the crawl reports the included file.
+    #[test]
+    fn an_include_in_a_template_body_is_resolved() {
+        let reader = MapReader::new(&[(
+            "inc.fppi",
+            "constant includedConst = 3
+",
+        )]);
+        let mut diagnostics = vec![];
+        let mut ctx =
+            fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
+        fpp_core::run(&mut ctx, || {
+            let src = "\
+module template IncT(constant p: U32) {
+  include \"inc.fppi\"
+  constant cOut = p + includedConst
+}
+
+module M {
+  expand IncT(constant 1)
+}
+";
+            let source = SourceFile::new("top.fpp", src.to_string());
+            let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
+            let mut a = Analysis::new();
+            a.input_file_set.insert(file("top.fpp"));
+            let _ = ComputeDependencies::new(reader.clone()).tu_list(&mut a, &mut [&mut ast]);
+
+            let included: Vec<String> = a.included_file_set.iter().map(|f| f.to_string()).collect();
+            assert_eq!(included, vec![file("inc.fppi").to_string()]);
+            // The included constant is defined where it is used, so it locates
+            // nothing and contributes no dependency of its own.
+            assert!(a.dependency_file_set.is_empty());
+        });
+    }
+
+    /// A deployment topology in an unexpanded template body does not pull in the
+    /// dictionary dependencies.
+    #[test]
+    fn an_unexpanded_template_body_adds_no_dictionary_dependencies() {
+        let reader = MapReader::new(&[
+            (
+                "dict_c.fpp",
+                "dictionary constant c = 1
+",
+            ),
+            (
+                "dict_t.fpp",
+                "dictionary type T1 = U32
+",
+            ),
+        ]);
+        let src = "\
+locate dictionary constant c at \"dict_c.fpp\"
+locate dictionary type T1 at \"dict_t.fpp\"
+
+module template DictT(constant p: U32) {
+  deployment topology DictTop { }
+}
+";
+        let deps = dependencies_of(&reader, &[("top.fpp", src)]);
+        assert!(deps.is_empty(), "unexpected dependencies: {deps:?}");
+    }
+
+    /// A string type used as a template type argument implies a use of the
+    /// framework definitions that back it.
+    #[test]
+    fn a_string_type_argument_implies_the_framework_dependencies() {
+        let reader = MapReader::new(&[(
+            "dep.fpp",
+            "type FwSizeStoreType = U32
+constant FW_FIXED_LENGTH_STRING_SIZE = 256
+",
+        )]);
+        let src = "\
+locate type FwSizeStoreType at \"dep.fpp\"
+locate constant FW_FIXED_LENGTH_STRING_SIZE at \"dep.fpp\"
+
+module template StringArgT(type U) {
+  struct StringArgS { s: U }
+}
+
+module M {
+  expand StringArgT(type string)
+}
+";
+        let deps = dependencies_of(&reader, &[("top.fpp", src)]);
+        assert_eq!(deps, vec![file("dep.fpp").to_string()]);
     }
 
     /// A location specifier naming a file that cannot be opened is recorded as

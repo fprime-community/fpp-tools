@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/template/arity_omitted_args.fpp:5:1
+  |
+5 |   expand T
+  |   ^^^^^^^^ expected 1 template argument, got 0
+  |
+ ::: [ local path prefix ]/template/arity_omitted_args.fpp:1:1
+  |
+1 | / module template T(constant p: U32) {
+2 | |     constant c = p
+3 | | }
+  | |_- template defined here
+

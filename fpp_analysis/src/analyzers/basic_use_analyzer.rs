@@ -1,7 +1,7 @@
 use crate::analyzers::NestedScopeState;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
-use crate::semantics::QualifiedName;
+use crate::semantics::{QualifiedName, Symbol};
 use fpp_ast::*;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
@@ -136,6 +136,97 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         let _ = node;
         let _ = name;
         ControlFlow::Continue(())
+    }
+
+    /// A use of a module template definition
+    fn template_use(
+        &self,
+        a: &mut Self::State,
+        node: &QualIdent,
+        name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        let _ = a;
+        let _ = node;
+        let _ = name;
+        ControlFlow::Continue(())
+    }
+
+    /// A use of a bound constant template parameter.
+    ///
+    /// A pass that analyzes the bound argument calls [`visit_template_arg`],
+    /// which is the shared behavior these hooks build on.
+    fn template_constant_arg(&self, a: &mut Self::State, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let _ = a;
+        let _ = arg;
+        ControlFlow::Continue(())
+    }
+
+    /// A use of a bound type template parameter
+    fn template_type_arg(&self, a: &mut Self::State, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let _ = a;
+        let _ = arg;
+        ControlFlow::Continue(())
+    }
+
+    /// A use of a bound port interface instance template parameter
+    fn template_interface_arg(
+        &self,
+        a: &mut Self::State,
+        arg: &Symbol,
+    ) -> ControlFlow<Self::Break> {
+        let _ = a;
+        let _ = arg;
+        ControlFlow::Continue(())
+    }
+
+    /// A bound template parameter of an expansion
+    fn template_param(&self, a: &mut Self::State, arg: &Symbol) -> ControlFlow<Self::Break> {
+        match arg {
+            Symbol::TemplateConstantArg { .. } => self.template_constant_arg(a, arg),
+            Symbol::TemplateTypeArg { .. } => self.template_type_arg(a, arg),
+            Symbol::TemplateInterfaceArg { .. } => self.template_interface_arg(a, arg),
+            _ => ControlFlow::Continue(()),
+        }
+    }
+
+    /// A template argument of an expansion that has not been resolved
+    fn template_arg_node(
+        &self,
+        a: &mut Self::State,
+        node: &'ast TemplateArg,
+    ) -> ControlFlow<Self::Break> {
+        match &node.kind {
+            TemplateArgKind::Constant(e) => e.visit(a, self),
+            TemplateArgKind::Type(tn) => tn.visit(a, self),
+            // An unresolved interface argument names no definition yet
+            TemplateArgKind::Interface(_) => ControlFlow::Continue(()),
+        }
+    }
+}
+
+/// The uses in the argument bound to a template parameter: a constant argument
+/// is an expression, a type argument is a type name, and a port interface
+/// instance argument is a use of a port interface instance.
+///
+/// This is the analysis a use pass performs on a bound parameter before doing
+/// its own work with it, so it plays the role of the base-class behavior the
+/// [`UseAnalysisPass`] template-argument hooks extend.
+pub fn visit_template_arg<'ast, S, V>(
+    visitor: &V,
+    a: &mut S,
+    arg: &'ast Symbol,
+) -> ControlFlow<V::Break>
+where
+    S: NestedScopeState,
+    V: UseAnalysisPass<'ast, S>,
+{
+    match arg {
+        Symbol::TemplateConstantArg { value, .. } => value.visit(a, visitor),
+        Symbol::TemplateTypeArg { value, .. } => value.visit(a, visitor),
+        Symbol::TemplateInterfaceArg { value, .. } => {
+            visitor.interface_instance_use(a, value, value.as_ref().into())
+        }
+        _ => ControlFlow::Continue(()),
     }
 }
 
@@ -284,6 +375,41 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
             },
             Node::SpecInstance(si) => {
                 visitor.interface_instance_use(a, &si.instance, (&si.instance).into())
+            }
+            Node::DefModuleTemplate(d) => {
+                // The body of a template is analyzed where the template is
+                // expanded, not here. The parameter list is analyzed here,
+                // because it does not depend on the body.
+                for param in &d.params {
+                    match param {
+                        TemplateParam::Constant(p) => p.type_name.visit(a, visitor)?,
+                        TemplateParam::Interface(p) => {
+                            visitor.interface_use(a, &p.interface, (&p.interface).into())?
+                        }
+                        TemplateParam::Type(_) => {}
+                    }
+                }
+                ControlFlow::Continue(())
+            }
+            Node::SpecTemplateExpand(s) => {
+                visitor.template_use(a, &s.template, (&s.template).into())?;
+
+                // Analyze the parameters bound by this expansion. Before the
+                // expansion exists, all we have are the argument nodes.
+                match a.template_expansion_params(s.node_id) {
+                    Some(params) => {
+                        for param in &params {
+                            visitor.template_param(a, param)?;
+                        }
+                    }
+                    None => {
+                        for arg in &s.args {
+                            visitor.template_arg_node(a, arg)?;
+                        }
+                    }
+                }
+
+                self.super_.visit(visitor, a, node)
             }
             Node::SpecStateMachineInstance(si) => {
                 visitor.state_machine_use(a, &si.state_machine, (&si.state_machine).into())?;

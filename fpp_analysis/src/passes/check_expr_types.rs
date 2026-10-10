@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::basic_use_analyzer::UseAnalysisPass;
+use crate::analyzers::basic_use_analyzer::{UseAnalysisPass, visit_template_arg};
 use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::SemanticError;
 use crate::semantics::{
@@ -700,6 +700,13 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
             // Enum symbol: if this is in scope, then we are in
             // the enum definition, so it already has a type
             Symbol::EnumConstant(_) => {}
+            // Bound constant parameter: compute the type of the argument bound
+            // to it
+            Symbol::TemplateConstantArg { value, .. } => {
+                if !a.type_map.contains_key(&value.node_id) {
+                    self.template_constant_arg(a, &symbol)?;
+                }
+            }
             // Invalid use of a symbol in an expression
             _ => {
                 SemanticError::InvalidSymbol {
@@ -720,5 +727,43 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
             }
         }
         ControlFlow::Continue(())
+    }
+
+    /// The type of a bound constant parameter is the type declared in the
+    /// parameter, so the argument must be convertible to it.
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let Symbol::TemplateConstantArg { param_def, value } = arg else {
+            return ControlFlow::Continue(());
+        };
+        let param_def = param_def.clone();
+        let value = value.clone();
+
+        // Compute the type of the argument
+        visit_template_arg(self, a, arg)?;
+
+        let Some(param_ty) = a.type_map.get(&param_def.type_name.node_id).cloned() else {
+            return ControlFlow::Continue(());
+        };
+        if let Some(value_ty) = a.type_map.get(&value.node_id).cloned()
+            && let Err(err) = Type::convert(&value_ty, &param_ty)
+        {
+            SemanticError::TypeConversion {
+                loc: value.span(),
+                msg: format!("template argument cannot be converted to {}", param_ty),
+                err: Box::new(err),
+            }
+            .emit();
+            return ControlFlow::Break(());
+        }
+        a.type_map.insert(value.node_id, param_ty);
+        ControlFlow::Continue(())
+    }
+
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+
+    fn template_interface_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
     }
 }

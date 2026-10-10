@@ -98,6 +98,13 @@ impl<'ast> Visitor<'ast> for Selector<'_> {
             }
         }
 
+        // The body of a module template is not part of the model: its definitions
+        // come into being where the template is expanded, and `expand.templates`
+        // decides whether that expansion carries its own copy of them.
+        if let Node::DefModuleTemplate(_) = node {
+            return ControlFlow::Continue(());
+        }
+
         a.stack.push(node);
         let flow = node.walk(a, self);
         a.stack.pop();

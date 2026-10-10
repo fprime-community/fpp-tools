@@ -50,7 +50,7 @@ impl<'py> FromPyObject<'_, 'py> for SymbolKind {
 
 impl pyo3_stub_gen::PyStubType for SymbolKind {
     fn type_output() -> pyo3_stub_gen::TypeInfo {
-        // `Symbol` is the injected union alias over the fifteen symbol classes; the
+        // `Symbol` is the injected union alias over every symbol class; the
         // parameter is the class itself, not an instance.
         let mut info = pyo3_stub_gen::TypeInfo::unqualified("Symbol");
         info.name = format!("type[{}]", info.name);
@@ -115,8 +115,8 @@ impl Model {
     /// declaration order — at most one when `first_only`.
     ///
     /// The filter is an `isinstance` check on the *built* wrapper, so it needs no
-    /// knowledge of the fifteen symbol classes and stays correct if any of them is
-    /// renamed. Building a candidate is cheap (the wrapper stores a cloned handle),
+    /// knowledge of the individual symbol classes and stays correct if any of them
+    /// is renamed. Building a candidate is cheap (the wrapper stores a cloned handle),
     /// and `first_only` stops after the first match, so the common single-symbol
     /// lookup builds exactly one.
     fn matching(
@@ -187,8 +187,11 @@ impl Model {
 impl Model {
     /// The transformed AST: one `TransUnit` per input, in the order given.
     ///
-    /// "Transformed" is the parsed units after include resolution and the
-    /// state-enum transform — what the analysis was actually computed from.
+    /// "Transformed" is the parsed units after include resolution, the state-enum
+    /// transform, and template expansion — what the analysis was actually computed
+    /// from. So an `expand` specifier here carries the expanded template body in
+    /// its `members`, and the definitions in that body are the ones the analysis
+    /// resolved.
     #[getter]
     fn ast(slf: PyRef<'_, Self>) -> PyResult<Vec<Py<TransUnit>>> {
         let py = slf.py();

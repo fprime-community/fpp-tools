@@ -48,6 +48,7 @@ __all__ = [
     "DefGuard",
     "DefInterface",
     "DefModule",
+    "DefModuleTemplate",
     "DefPort",
     "DefPortPortInstanceType",
     "DefSignal",
@@ -104,6 +105,7 @@ __all__ = [
     "GeneralKindBase",
     "GeneralPortInstance",
     "GeneralPortInstanceKind",
+    "GlobalScopeOwner",
     "GuardedInputGeneralKind",
     "GuardedNonParamKind",
     "GuardedTransition",
@@ -129,6 +131,7 @@ __all__ = [
     "LiteralFormatPart",
     "Loc",
     "Model",
+    "NestedScope",
     "NodeVisitor",
     "NonParamCommand",
     "NonParamKind",
@@ -157,6 +160,8 @@ __all__ = [
     "Record",
     "RecordEntry",
     "Scope",
+    "ScopeOwner",
+    "ScopeOwnerBase",
     "SerialPortInstanceType",
     "Span",
     "SpecCommand",
@@ -181,6 +186,7 @@ __all__ = [
     "SpecStateExit",
     "SpecStateMachineInstance",
     "SpecStateTransition",
+    "SpecTemplateExpand",
     "SpecTlmChannel",
     "SpecTlmPacket",
     "SpecTlmPacketSet",
@@ -227,13 +233,29 @@ __all__ = [
     "SymbolInterface",
     "SymbolModule",
     "SymbolPort",
+    "SymbolScopeOwner",
     "SymbolStateMachine",
     "SymbolStructType",
     "SymbolSystem",
+    "SymbolTemplate",
+    "SymbolTemplateConstantArg",
+    "SymbolTemplateInterfaceArg",
+    "SymbolTemplateTypeArg",
     "SymbolTopology",
     "SyncInputGeneralKind",
     "SyncNonParamKind",
     "SyntaxTree",
+    "TemplateArg",
+    "TemplateArgConstant",
+    "TemplateArgInterface",
+    "TemplateArgInterfaceInstance",
+    "TemplateArgType",
+    "TemplateExpansion",
+    "TemplateExpansionScopeOwner",
+    "TemplateParamConstant",
+    "TemplateParamInterface",
+    "TemplateParamType",
+    "TemplateParamsScopeOwner",
     "Throttle",
     "TimeInterval",
     "TlmChannel",
@@ -277,14 +299,15 @@ Command: typing.TypeAlias = NonParamCommand | ParamCommand
 FormatPart: typing.TypeAlias = LiteralFormatPart | FormatReplacementFormatPart
 FormatReplacementKind: typing.TypeAlias = DefaultFormatReplacementKind | IntegerFormatReplacementKind | RationalFormatReplacementKind
 GeneralKind: typing.TypeAlias = AsyncInputGeneralKind | GuardedInputGeneralKind | OutputGeneralKind | SyncInputGeneralKind
-InterfaceInstance: typing.TypeAlias = ComponentInterfaceInstance | TopologyInterfaceInstance
+InterfaceInstance: typing.TypeAlias = ComponentInterfaceInstance | TopologyInterfaceInstance | TemplateArgInterfaceInstance
 NonParamKind: typing.TypeAlias = AsyncNonParamKind | GuardedNonParamKind | SyncNonParamKind
 PortInstance: typing.TypeAlias = GeneralPortInstance | SpecialPortInstance | InternalPortInstance | TopologyPortInstance
 PortInstanceType: typing.TypeAlias = DefPortPortInstanceType | SerialPortInstanceType
+ScopeOwner: typing.TypeAlias = GlobalScopeOwner | SymbolScopeOwner | TemplateParamsScopeOwner | TemplateExpansionScopeOwner
 StateMachineSymbol: typing.TypeAlias = StateMachineSymbolAction | StateMachineSymbolGuard | StateMachineSymbolChoice | StateMachineSymbolSignal | StateMachineSymbolState
 StateMachineTypedElement: typing.TypeAlias = StateEntryStateMachineTypedElement | StateExitStateMachineTypedElement | InitialTransitionStateMachineTypedElement | StateTransitionStateMachineTypedElement | ChoiceStateMachineTypedElement
 StateOrChoice: typing.TypeAlias = StateStateOrChoice | ChoiceStateOrChoice
-Symbol: typing.TypeAlias = SymbolAbsType | SymbolAliasType | SymbolArrayType | SymbolComponent | SymbolComponentInstance | SymbolConstant | SymbolEnumType | SymbolEnumConstant | SymbolInterface | SymbolModule | SymbolPort | SymbolStateMachine | SymbolStructType | SymbolSystem | SymbolTopology
+Symbol: typing.TypeAlias = SymbolAbsType | SymbolAliasType | SymbolArrayType | SymbolComponent | SymbolComponentInstance | SymbolConstant | SymbolEnumType | SymbolEnumConstant | SymbolInterface | SymbolModule | SymbolPort | SymbolStateMachine | SymbolStructType | SymbolSystem | SymbolTemplate | SymbolTopology | SymbolTemplateConstantArg | SymbolTemplateTypeArg | SymbolTemplateInterfaceArg
 Transition: typing.TypeAlias = ExternalTransition | InternalTransition
 TransitionGraphArc: typing.TypeAlias = InitialTransitionGraphArc | StateTransitionGraphArc | ChoiceTransitionGraphArc
 Type: typing.TypeAlias = PrimitiveIntType | FloatType | StringType | BooleanType | IntegerType | AbsType | AliasType | ArrayType | AnonArrayType | EnumType | StructType | AnonStructType | TypeBase
@@ -349,11 +372,14 @@ class Analysis:
     @property
     def implied_use_map(self) -> builtins.dict[builtins.int, ImpliedUseSet]: ...
     @property
+    def template_expansion_map(self) -> builtins.dict[builtins.int, TemplateExpansion]: ...
+    @property
     def dictionary_symbol_set(self) -> builtins.list[Symbol]: ...
     @property
     def system_map(self) -> builtins.dict[Symbol, FppSystem]: ...
     def check_displayable_params(self, params: typing.Sequence[FormalParam], msg: builtins.str) -> None: ...
     def check_displayable_type(self, node: AstNode, loc: Span, msg: builtins.str) -> None: ...
+    def expansion_at(self, node: AstNode) -> TemplateExpansion: ...
     def get_array_size(self, node: AstNode, loc: Span) -> builtins.int: ...
     def get_array_size_opt(self, expr: typing.Optional[Expr]) -> builtins.int: ...
     def get_big_int_value(self, node: AstNode) -> typing.Optional[builtins.int]: ...
@@ -375,10 +401,18 @@ class Analysis:
     def get_nonnegative_int_value(self, node: AstNode, loc: Span) -> builtins.int: ...
     def get_qualified_name(self, symbol: Symbol) -> builtins.str: ...
     def get_reason_for_non_displayable_type_at(self, node: AstNode) -> builtins.list[tuple[Span, builtins.str]]: ...
-    def get_scope(self, symbol: typing.Optional[Symbol]) -> Scope: ...
+    def get_represented_component_instance(self, id: AstNode) -> typing.Optional[ComponentInterfaceInstance]: ...
+    def get_represented_symbol(self, id: AstNode) -> typing.Optional[Symbol]: ...
+    def get_represented_topology_symbol(self, symbol: Symbol) -> typing.Optional[Symbol]: ...
+    def get_scope(self, owner: ScopeOwner) -> Scope: ...
+    def get_symbol_scope(self, symbol: typing.Optional[Symbol]) -> Scope: ...
+    def get_template_symbol(self, id: AstNode) -> typing.Optional[Symbol]: ...
     def get_topology(self, id: AstNode) -> typing.Optional[Topology]: ...
     def get_topology_symbol(self, id: AstNode) -> typing.Optional[Symbol]: ...
     def implied_uses(self, node: AstNode) -> typing.Optional[ImpliedUseSet]: ...
+    def lookup_scope(self, symbol: Symbol) -> typing.Optional[Scope]: ...
+    def nested_scope_at(self, symbol: Symbol) -> NestedScope: ...
+    def template_expansion_params(self, node: AstNode) -> typing.Optional[builtins.list[Symbol]]: ...
 
 @typing.final
 class AnonArrayType(TypeBase):
@@ -815,7 +849,17 @@ class DefModule(AstNode):
     @property
     def name(self) -> builtins.str: ...
     @property
-    def members(self) -> builtins.list[DefAbsType | DefAliasType | DefArray | DefComponent | DefComponentInstance | DefConstant | DefEnum | DefInterface | DefModule | DefPort | DefStateMachine | DefStruct | DefSystem | DefTopology | SpecInclude | SpecLoc]: ...
+    def members(self) -> builtins.list[DefAbsType | DefAliasType | DefArray | DefComponent | DefComponentInstance | DefConstant | DefEnum | DefInterface | DefModule | DefModuleTemplate | DefPort | DefStateMachine | DefStruct | DefSystem | DefTopology | SpecInclude | SpecLoc | SpecTemplateExpand]: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class DefModuleTemplate(AstNode):
+    @property
+    def name(self) -> builtins.str: ...
+    @property
+    def params(self) -> builtins.list[TemplateParamConstant | TemplateParamInterface | TemplateParamType]: ...
+    @property
+    def members(self) -> builtins.list[DefAbsType | DefAliasType | DefArray | DefComponent | DefComponentInstance | DefConstant | DefEnum | DefInterface | DefModule | DefModuleTemplate | DefPort | DefStateMachine | DefStruct | DefSystem | DefTopology | SpecInclude | SpecLoc | SpecTemplateExpand]: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -941,6 +985,15 @@ class Diagnostic:
         empty when the file was compiled directly.
         """
     @property
+    def expansions(self) -> builtins.list[Loc]:
+        r"""
+        The `expand` chain that copied `location`'s source here, nearest first;
+        empty when the source is not inside a template expansion.
+        
+        `location` stays in the template body it was written in, so this is how a
+        consumer tells which expansion of that template the diagnostic is about.
+        """
+    @property
     def source(self) -> typing.Optional[builtins.str]:
         r"""
         The source line(s) this diagnostic points at, as they appear in the file.
@@ -1054,6 +1107,15 @@ class DiagnosticMessage:
         r"""
         The `include` chain that spliced `location`'s file in, nearest first;
         empty when the file was compiled directly.
+        """
+    @property
+    def expansions(self) -> builtins.list[Loc]:
+        r"""
+        The `expand` chain that copied `location`'s source here, nearest first;
+        empty when the source is not inside a template expansion.
+        
+        `location` stays in the template body it was written in, so this is how a
+        consumer tells which expansion of that template the message is about.
         """
     @property
     def source(self) -> typing.Optional[builtins.str]:
@@ -1342,6 +1404,10 @@ class GeneralPortInstance(PortInstanceBase):
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
+class GlobalScopeOwner(ScopeOwnerBase):
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
 class GuardedInputGeneralKind(GeneralKindBase):
     def __repr__(self) -> builtins.str: ...
 
@@ -1529,8 +1595,11 @@ class Model:
         r"""
         The transformed AST: one `TransUnit` per input, in the order given.
         
-        "Transformed" is the parsed units after include resolution and the
-        state-enum transform — what the analysis was actually computed from.
+        "Transformed" is the parsed units after include resolution, the state-enum
+        transform, and template expansion — what the analysis was actually computed
+        from. So an `expand` specifier here carries the expanded template body in
+        its `members`, and the definitions in that body are the ones the analysis
+        resolved.
         """
     @property
     def diagnostics(self) -> builtins.list[Diagnostic]:
@@ -1596,6 +1665,10 @@ class Model:
         """
     def __repr__(self) -> builtins.str: ...
 
+@typing.final
+class NestedScope:
+    def __repr__(self) -> builtins.str: ...
+
 class NodeVisitor:
     r"""
     Base class for read-only AST traversals.
@@ -1651,6 +1724,7 @@ class NodeVisitor:
     def visit_DefGuard(self, node: DefGuard) -> typing.Any: ...
     def visit_DefInterface(self, node: DefInterface) -> typing.Any: ...
     def visit_DefModule(self, node: DefModule) -> typing.Any: ...
+    def visit_DefModuleTemplate(self, node: DefModuleTemplate) -> typing.Any: ...
     def visit_DefPort(self, node: DefPort) -> typing.Any: ...
     def visit_DefSignal(self, node: DefSignal) -> typing.Any: ...
     def visit_DefState(self, node: DefState) -> typing.Any: ...
@@ -1688,12 +1762,17 @@ class NodeVisitor:
     def visit_SpecStateExit(self, node: SpecStateExit) -> typing.Any: ...
     def visit_SpecStateMachineInstance(self, node: SpecStateMachineInstance) -> typing.Any: ...
     def visit_SpecStateTransition(self, node: SpecStateTransition) -> typing.Any: ...
+    def visit_SpecTemplateExpand(self, node: SpecTemplateExpand) -> typing.Any: ...
     def visit_SpecTlmChannel(self, node: SpecTlmChannel) -> typing.Any: ...
     def visit_SpecTlmPacket(self, node: SpecTlmPacket) -> typing.Any: ...
     def visit_SpecTlmPacketSet(self, node: SpecTlmPacketSet) -> typing.Any: ...
     def visit_SpecTopPort(self, node: SpecTopPort) -> typing.Any: ...
     def visit_StructExprMember(self, node: StructExprMember) -> typing.Any: ...
     def visit_StructTypeMember(self, node: StructTypeMember) -> typing.Any: ...
+    def visit_TemplateArg(self, node: TemplateArg) -> typing.Any: ...
+    def visit_TemplateParamConstant(self, node: TemplateParamConstant) -> typing.Any: ...
+    def visit_TemplateParamInterface(self, node: TemplateParamInterface) -> typing.Any: ...
+    def visit_TemplateParamType(self, node: TemplateParamType) -> typing.Any: ...
     def visit_TlmChannelIdentifier(self, node: AstNode) -> typing.Any: ...
     def visit_TlmChannelLimit(self, node: TlmChannelLimit) -> typing.Any: ...
     def visit_TransitionExpr(self, node: TransitionExpr) -> typing.Any: ...
@@ -1933,6 +2012,9 @@ class RecordEntry:
 
 @typing.final
 class Scope:
+    def __repr__(self) -> builtins.str: ...
+
+class ScopeOwnerBase:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -2200,6 +2282,16 @@ class SpecStateTransition(AstNode):
     def guard(self) -> typing.Optional[Ident]: ...
     @property
     def transition_or_do(self) -> TransitionOrDoTransition | TransitionOrDoDo: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SpecTemplateExpand(AstNode):
+    @property
+    def template(self) -> Ident | Qualified: ...
+    @property
+    def args(self) -> builtins.list[TemplateArg]: ...
+    @property
+    def members(self) -> typing.Optional[builtins.list[DefAbsType | DefAliasType | DefArray | DefComponent | DefComponentInstance | DefConstant | DefEnum | DefInterface | DefModule | DefModuleTemplate | DefPort | DefStateMachine | DefStruct | DefSystem | DefTopology | SpecInclude | SpecLoc | SpecTemplateExpand]]: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -2542,6 +2634,10 @@ class SymbolBase:
     @property
     def is_dictionary_def(self) -> builtins.bool: ...
     @property
+    def is_interface_instance(self) -> builtins.bool: ...
+    @property
+    def is_template_arg(self) -> builtins.bool: ...
+    @property
     def node_id(self) -> builtins.int: ...
     @property
     def parent(self) -> typing.Optional[Symbol]: ...
@@ -2602,6 +2698,12 @@ class SymbolPort(SymbolBase):
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
+class SymbolScopeOwner(ScopeOwnerBase):
+    @property
+    def value(self) -> Symbol: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
 class SymbolStateMachine(SymbolBase):
     @property
     def definition(self) -> DefStateMachine: ...
@@ -2617,6 +2719,34 @@ class SymbolStructType(SymbolBase):
 class SymbolSystem(SymbolBase):
     @property
     def definition(self) -> DefSystem: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolTemplate(SymbolBase):
+    @property
+    def definition(self) -> DefModuleTemplate: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolTemplateConstantArg(SymbolBase):
+    @property
+    def param_def(self) -> TemplateParamConstant: ...
+    @property
+    def value(self) -> Expr: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolTemplateInterfaceArg(SymbolBase):
+    @property
+    def param_def(self) -> TemplateParamInterface: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class SymbolTemplateTypeArg(SymbolBase):
+    @property
+    def param_def(self) -> TemplateParamType: ...
+    @property
+    def value(self) -> TypeName: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -2657,6 +2787,87 @@ class SyntaxTree:
     @property
     def error_count(self) -> builtins.int: ...
     def __len__(self) -> builtins.int: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class TemplateArg(AstNode):
+    @property
+    def kind(self) -> TemplateArgConstant | TemplateArgType | TemplateArgInterface: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class TemplateArgConstant:
+    @property
+    def value(self) -> Expr: ...
+
+@typing.final
+class TemplateArgInterface:
+    @property
+    def value(self) -> Ident | Qualified: ...
+
+@typing.final
+class TemplateArgInterfaceInstance(InterfaceInstanceBase):
+    @property
+    def param_def(self) -> TemplateParamInterface: ...
+    @property
+    def declared_interface(self) -> Interface: ...
+    @property
+    def instance(self) -> InterfaceInstance: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class TemplateArgType:
+    @property
+    def value(self) -> TypeName: ...
+
+@typing.final
+class TemplateExpansion:
+    @property
+    def def_node(self) -> DefModuleTemplate: ...
+    @property
+    def expansion(self) -> SpecTemplateExpand: ...
+    @property
+    def params(self) -> builtins.list[Symbol]: ...
+    @property
+    def param_scope(self) -> Scope: ...
+    @property
+    def scope(self) -> Scope: ...
+    @property
+    def local_scope_map(self) -> builtins.dict[Symbol, Scope]: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class TemplateExpansionScopeOwner(ScopeOwnerBase):
+    @property
+    def value(self) -> builtins.int: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class TemplateParamConstant(AstNode):
+    @property
+    def name(self) -> builtins.str: ...
+    @property
+    def type_name(self) -> TypeName: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class TemplateParamInterface(AstNode):
+    @property
+    def name(self) -> builtins.str: ...
+    @property
+    def interface(self) -> Ident | Qualified: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class TemplateParamType(AstNode):
+    @property
+    def name(self) -> builtins.str: ...
+    def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class TemplateParamsScopeOwner(ScopeOwnerBase):
+    @property
+    def value(self) -> builtins.int: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -2769,6 +2980,8 @@ class Topology:
     @property
     def direct_topologies(self) -> builtins.dict[Symbol, Span]: ...
     @property
+    def direct_template_args(self) -> builtins.dict[Symbol, Span]: ...
+    @property
     def transitive_import_set(self) -> builtins.list[Symbol]: ...
     @property
     def instance_map(self) -> builtins.dict[InterfaceInstance, Span]: ...
@@ -2800,6 +3013,8 @@ class Topology:
     def unconnected_port_set(self) -> builtins.list[PortInstanceIdentifier]: ...
     @property
     def component_instance_map(self) -> builtins.dict[ComponentInterfaceInstance, Span]: ...
+    @property
+    def imported_topology_symbols(self) -> builtins.list[Symbol]: ...
     @property
     def name(self) -> builtins.str: ...
     @property
@@ -3403,6 +3618,7 @@ class SpecLocKind:
     Constant: typing.ClassVar[SpecLocKind]
     Port: typing.ClassVar[SpecLocKind]
     StateMachine: typing.ClassVar[SpecLocKind]
+    Template: typing.ClassVar[SpecLocKind]
     System: typing.ClassVar[SpecLocKind]
     Type: typing.ClassVar[SpecLocKind]
     Interface: typing.ClassVar[SpecLocKind]
@@ -3518,7 +3734,9 @@ def analyze(paths: typing.Optional[builtins.str | builtins.list[builtins.str]] =
     about are `[u for u in model.ast if u.is_source]`.
     `imports` alone is not enough to compile: it raises `ValueError`.
     
-    `model.ast` is the *transformed* AST after running analysis transformations
+    `model.ast` is the *transformed* AST after running analysis transformations —
+    so each `SpecTemplateExpand` in it carries the expanded template body in its
+    `members`.
     
     Raises `OSError` if a path cannot be read, `ValueError` if no source is given.
     """
@@ -3534,7 +3752,8 @@ def parse(paths: typing.Optional[builtins.str | builtins.list[builtins.str]] = N
     
     This is the fast front end: the nodes it yields carry locations, annotations,
     and children, but no resolved symbols, types, or values. Use `analyze` for
-    those.
+    those. A `SpecTemplateExpand` is likewise left unexpanded — its `members` is
+    `None` — because naming the template it expands is already a symbol lookup.
     
     There is no `imports=` here, unlike `analyze`: nothing at this depth reads
     another translation unit, so every unit `parse` returns is a source.

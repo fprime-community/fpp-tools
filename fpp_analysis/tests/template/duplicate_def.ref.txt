@@ -1,13 +1,12 @@
- --> [ local path prefix ]/template/duplicate_def.fpp:1:8
-  |
-1 | module template T(constant p: U32) {
-  |        ^^^^^^^^ syntax error: unexpected token
-  |
-  = note: expected {
-  = note: got identifier
-
- --> [ local path prefix ]/template/duplicate_def.fpp:3:22
+ --> [ local path prefix ]/template/duplicate_def.fpp:3:14
   |
 3 |     constant cOut2 = p + 2
-  |                      ^ cannot find constant `p` in scope
+  |              ^^^^^ redefinition of symbol cOut2
+  |
+  = note: expanded at [ local path prefix ]/template/duplicate_def.fpp:6:1
+  |
+ ::: [ local path prefix ]/template/duplicate_def.fpp:8:1
+  |
+8 | constant cOut2 = cOut1 + 2
+  | -------------------------- previous definition is here
 

@@ -1,0 +1,15 @@
+  --> [ local path prefix ]/template/interfaces_arg_bad_signature.fpp:23:23
+   |
+23 |     expand T(instance c)
+   |                       ^ port interface not implemented
+   |
+  ::: [ local path prefix ]/template/interfaces_arg_bad_signature.fpp:10:5
+   |
+10 |     output port pIn: P
+   |     ------------------ port instance does not match definition in interface
+   |
+  ::: [ local path prefix ]/template/interfaces_arg_bad_signature.fpp:4:5
+   |
+ 4 |     sync input port pIn: P
+   |     ---------------------- interface definition is here
+

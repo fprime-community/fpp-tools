@@ -10,7 +10,7 @@
 //! `str(diagnostic)` is the same text the `fpp` console prints.
 
 use crate::ir_core::{Loc, Span};
-use fpp_core::{DiagnosticDataSnippet, Level};
+use fpp_core::{DiagnosticDataIncludeLocation, DiagnosticDataSnippet, Level};
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 
@@ -212,20 +212,30 @@ fn loc_of_snippet(snippet: &DiagnosticDataSnippet) -> Loc {
     }
 }
 
-/// The chain of `include` specifiers that spliced an excerpt's source in, nearest
-/// first. Each is a point, so its end equals its start.
-fn includes_of_snippet(snippet: &DiagnosticDataSnippet) -> Vec<Loc> {
-    snippet
-        .include_spans
+/// One of the specifier chains an excerpt carries — the `include`s that spliced
+/// its source in, or the `expand`s that copied it here — nearest first. Each
+/// specifier is a point, so its end equals its start.
+fn locs_of_chain(chain: &[DiagnosticDataIncludeLocation]) -> Vec<Loc> {
+    chain
         .iter()
-        .map(|include| Loc {
-            uri: include.uri.clone(),
-            line: include.line,
-            column: include.column,
-            end_line: include.line,
-            end_column: include.column,
+        .map(|specifier| Loc {
+            uri: specifier.uri.clone(),
+            line: specifier.line,
+            column: specifier.column,
+            end_line: specifier.line,
+            end_column: specifier.column,
         })
         .collect()
+}
+
+/// The `include` chain of `snippet`, or nothing when it has no excerpt.
+fn includes_of(snippet: Option<&DiagnosticDataSnippet>) -> Vec<Loc> {
+    snippet.map_or_else(Vec::new, |s| locs_of_chain(&s.include_spans))
+}
+
+/// The `expand` chain of `snippet`, or nothing when it has no excerpt.
+fn expansions_of(snippet: Option<&DiagnosticDataSnippet>) -> Vec<Loc> {
+    snippet.map_or_else(Vec::new, |s| locs_of_chain(&s.expand_spans))
 }
 
 /// The excerpt a `Span` argument points at, or `None` for `span=None`.
@@ -284,10 +294,17 @@ impl DiagnosticMessage {
     /// empty when the file was compiled directly.
     #[getter]
     fn includes(&self) -> Vec<Loc> {
-        self.data
-            .snippet
-            .as_ref()
-            .map_or_else(Vec::new, includes_of_snippet)
+        includes_of(self.data.snippet.as_ref())
+    }
+
+    /// The `expand` chain that copied `location`'s source here, nearest first;
+    /// empty when the source is not inside a template expansion.
+    ///
+    /// `location` stays in the template body it was written in, so this is how a
+    /// consumer tells which expansion of that template the message is about.
+    #[getter]
+    fn expansions(&self) -> Vec<Loc> {
+        expansions_of(self.data.snippet.as_ref())
     }
 
     /// The source line(s) this message points at, as they appear in the file.
@@ -398,10 +415,17 @@ impl Diagnostic {
     /// empty when the file was compiled directly.
     #[getter]
     fn includes(&self) -> Vec<Loc> {
-        self.data
-            .snippet
-            .as_ref()
-            .map_or_else(Vec::new, includes_of_snippet)
+        includes_of(self.data.snippet.as_ref())
+    }
+
+    /// The `expand` chain that copied `location`'s source here, nearest first;
+    /// empty when the source is not inside a template expansion.
+    ///
+    /// `location` stays in the template body it was written in, so this is how a
+    /// consumer tells which expansion of that template the diagnostic is about.
+    #[getter]
+    fn expansions(&self) -> Vec<Loc> {
+        expansions_of(self.data.snippet.as_ref())
     }
 
     /// The source line(s) this diagnostic points at, as they appear in the file.

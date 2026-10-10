@@ -5,7 +5,10 @@ use fpp_analysis::semantics::{
     Component, Direction, NameGroup, PortInstance, PortInstanceType, PortInterface, Scope, Symbol,
     SymbolInterface, Type,
 };
-use fpp_ast::{AstNode, FormalParam, FormalParamKind, MoveWalkable, Name, Node, Visitor};
+use fpp_ast::{
+    AstNode, FormalParam, FormalParamKind, MoveWalkable, Name, Node, TemplateParam,
+    TemplateParamInterface, Visitor,
+};
 use fpp_core::{BytePos, CompilerContext, LineCol, SourceFile};
 use fpp_lsp_parser::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken, TextSize};
 use lsp_types::{
@@ -65,6 +68,7 @@ impl<'ast> Visitor<'ast> for FindPositionVisitor<'ast> {
                 Node::DefAction(_) => node.walk(a, self),
                 Node::DefComponent(_) => node.walk(a, self),
                 Node::DefModule(_) => node.walk(a, self),
+                Node::DefModuleTemplate(_) => node.walk(a, self),
                 Node::DefState(_) => node.walk(a, self),
                 Node::DefStateMachine(_) => node.walk(a, self),
                 Node::DefTopology(_) => node.walk(a, self),
@@ -173,6 +177,14 @@ pub fn node_to_location(state: &GlobalState, node: fpp_core::Node) -> Location {
     }
 }
 
+/// The display names of the three template parameter kinds. A parameter is
+/// described to the editor both as a declaration (in the body of the template
+/// that declares it) and as a bound argument symbol (in an expansion), so both
+/// paths name it the same way.
+const CONSTANT_TEMPLATE_PARAM: &str = "Constant Template Parameter";
+const TYPE_TEMPLATE_PARAM: &str = "Type Template Parameter";
+const INSTANCE_TEMPLATE_PARAM: &str = "Instance Template Parameter";
+
 fn symbol_kind_name(symbol: &Symbol) -> &'static str {
     match symbol {
         Symbol::AbsType(_) => "Abstract Type",
@@ -189,8 +201,26 @@ fn symbol_kind_name(symbol: &Symbol) -> &'static str {
         Symbol::StateMachine(_) => "State Machine",
         Symbol::StructType(_) => "Struct",
         Symbol::System(_) => "System",
+        Symbol::Template(_) => "Module Template",
         Symbol::Topology(_) => "Topology",
+        Symbol::TemplateConstantArg { .. } => CONSTANT_TEMPLATE_PARAM,
+        Symbol::TemplateTypeArg { .. } => TYPE_TEMPLATE_PARAM,
+        Symbol::TemplateInterfaceArg { .. } => INSTANCE_TEMPLATE_PARAM,
     }
+}
+
+/// Whether a template parameter's name is visible in name group `ng` inside the
+/// body of the template that declares it.
+fn template_param_in_name_group(param: &TemplateParam, ng: NameGroup) -> bool {
+    matches!(
+        (param, ng),
+        (TemplateParam::Constant(_), NameGroup::Value)
+            | (TemplateParam::Type(_), NameGroup::Type)
+            | (
+                TemplateParam::Interface(_),
+                NameGroup::PortInterfaceInstance
+            )
+    )
 }
 
 pub fn hover_for_symbol(state: &GlobalState, hover_node: Node, symbol: &Symbol) -> Hover {
@@ -251,9 +281,11 @@ pub fn hover_for_node(state: &GlobalState, hover_node: &Name, def_node: Node) ->
         Node::DefEnumConstant(_) => "Enum Constant",
         Node::DefInterface(_) => "Interface",
         Node::DefModule(_) => "Module",
+        Node::DefModuleTemplate(_) => "Module Template",
         Node::DefPort(_) => "Port",
         Node::DefStateMachine(_) => "State Machine",
         Node::DefStruct(_) => "Struct",
+        Node::DefSystem(_) => "System",
         Node::DefTopology(_) => "Topology",
         Node::DefChoice(_) => "Choice",
         Node::DefGuard(_) => "Guard",
@@ -274,6 +306,12 @@ pub fn hover_for_node(state: &GlobalState, hover_node: &Name, def_node: Node) ->
         Node::SpecTlmPacketSet(_) => "Telemetry Packet Set",
         Node::SpecTopPort(_) => "Topology Port",
         Node::FormalParam(_) => "Formal Parameter",
+        // A template parameter binds a name only where the template is expanded,
+        // so it is not in the symbol map: the qualified name below falls back to
+        // the unqualified one.
+        Node::TemplateParamConstant(_) => CONSTANT_TEMPLATE_PARAM,
+        Node::TemplateParamType(_) => TYPE_TEMPLATE_PARAM,
+        Node::TemplateParamInterface(_) => INSTANCE_TEMPLATE_PARAM,
         _ => return None,
     };
 
@@ -371,7 +409,11 @@ pub fn symbol_to_completion_item(state: &GlobalState, symbol: &Symbol) -> Comple
         Symbol::StateMachine(_) => CompletionItemKind::CLASS,
         Symbol::StructType(_) => CompletionItemKind::STRUCT,
         Symbol::System(_) => CompletionItemKind::CLASS,
+        Symbol::Template(_) => CompletionItemKind::CLASS,
         Symbol::Topology(_) => CompletionItemKind::CLASS,
+        Symbol::TemplateConstantArg { .. } => CompletionItemKind::CONSTANT,
+        Symbol::TemplateTypeArg { .. } => CompletionItemKind::CLASS,
+        Symbol::TemplateInterfaceArg { .. } => CompletionItemKind::VARIABLE,
     };
 
     let detail = match symbol {
@@ -394,11 +436,17 @@ pub fn symbol_to_completion_item(state: &GlobalState, symbol: &Symbol) -> Comple
 
             Some(format!("({})", arg_fmt.join(", ")))
         }
-        Symbol::EnumConstant(_) | Symbol::Constant(_) => state
+        Symbol::EnumConstant(_) | Symbol::Constant(_) | Symbol::TemplateConstantArg { .. } => state
             .analysis
             .value_map
             .get(&symbol.node())
             .map(|value| format!(" = {value}")),
+        Symbol::TemplateTypeArg { .. } => state
+            .analysis
+            .type_map
+            .get(&symbol.node())
+            .map(Type::underlying_type)
+            .map(|ty| format!(" = {ty}")),
 
         // TODO(tumbar) Add some nice details about components and component instances
         Symbol::ComponentInstance(_) => None,
@@ -407,7 +455,9 @@ pub fn symbol_to_completion_item(state: &GlobalState, symbol: &Symbol) -> Comple
         Symbol::Module(_) => None,
         Symbol::StateMachine(_) => None,
         Symbol::System(_) => None,
+        Symbol::Template(_) => None,
         Symbol::Topology(_) => None,
+        Symbol::TemplateInterfaceArg { .. } => None,
     };
 
     CompletionItem {
@@ -426,6 +476,93 @@ pub fn symbol_to_completion_item(state: &GlobalState, symbol: &Symbol) -> Comple
         }),
         ..Default::default()
     }
+}
+
+/// Build a completion item for a template parameter *declaration*.
+///
+/// A declared parameter is not a [`Symbol`]: a parameter names something only
+/// once an expansion binds an argument to it, and one template may be expanded
+/// many times. So the item is described from the declaration alone — its kind,
+/// and the type or port interface it declares.
+fn template_param_to_completion_item(state: &GlobalState, param: &TemplateParam) -> CompletionItem {
+    let (kind, kind_name, detail) = match param {
+        TemplateParam::Constant(p) => (
+            CompletionItemKind::CONSTANT,
+            CONSTANT_TEMPLATE_PARAM,
+            state
+                .analysis
+                .type_map
+                .get(&p.type_name.node_id)
+                .map(|ty| format!(": {ty}")),
+        ),
+        TemplateParam::Type(_) => (CompletionItemKind::CLASS, TYPE_TEMPLATE_PARAM, None),
+        TemplateParam::Interface(p) => (
+            CompletionItemKind::VARIABLE,
+            INSTANCE_TEMPLATE_PARAM,
+            Some(format!(": {}", p.interface)),
+        ),
+    };
+
+    let documentation = match state.context.node_try_get(&param.id()) {
+        Some(node) if !node.pre_annotation.is_empty() => {
+            Some(Documentation::MarkupContent(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: node.pre_annotation.join(" "),
+            }))
+        }
+        _ => None,
+    };
+
+    CompletionItem {
+        label: param.name().data.clone(),
+        kind: Some(kind),
+        label_details: Some(CompletionItemLabelDetails {
+            detail,
+            description: None,
+        }),
+        detail: Some(kind_name.to_string()),
+        documentation,
+        ..Default::default()
+    }
+}
+
+/// Whether a lossless-parse element sits inside a template parameter list.
+///
+/// A template parameter is in scope in the body of the template that declares
+/// it, and not in the parameter list itself: a parameter list is analyzed where
+/// the template is defined, with no parameter in scope.
+pub(crate) fn in_template_param_list(element: &SyntaxElement) -> bool {
+    element
+        .ancestors()
+        .any(|n| n.kind() == SyntaxKind::TEMPLATE_PARAM_LIST)
+}
+
+/// Completion items for the template parameters visible at `offset` in name
+/// group `ng`.
+///
+/// A template parameter is in scope lexically, in the body of the template that
+/// declares it, and nowhere else: it has no entry in any of the enclosing scopes
+/// because it binds a name only where the template is expanded.
+fn completion_items_for_template_params(
+    state: &GlobalState,
+    document: &Uri,
+    offset: BytePos,
+    ng: NameGroup,
+) -> Vec<CompletionItem> {
+    let Some(nodes) = nodes_at_offset(state, document, offset) else {
+        return vec![];
+    };
+
+    nodes
+        .iter()
+        .filter_map(|node| match node {
+            Node::DefModuleTemplate(def) => Some(*def),
+            _ => None,
+        })
+        .flat_map(|def| def.params.iter())
+        .filter(|param| template_param_in_name_group(param, ng))
+        .map(|param| template_param_to_completion_item(state, param))
+        .collect()
 }
 
 pub(crate) struct GetScopeVisitor<'a> {
@@ -513,11 +650,19 @@ pub fn scope_at_offset<'a>(
     })
 }
 
+/// The names visible at `cursor_pos` in name group `ng`, innermost scope first.
+///
+/// `in_template_param_list` reports whether the cursor is inside a template's
+/// parameter list, which the callers know from the lossless parse (see
+/// [`in_template_param_list`]) and the semantic AST cannot tell: a parameter
+/// list that fails to parse leaves no node behind. It suppresses the template
+/// parameters, which are in scope only in the template's body.
 pub fn completion_items_in_name_group(
     state: &GlobalState,
     cursor_pos: TextSize,
     ng: NameGroup,
     uri: &Uri,
+    in_template_param_list: bool,
 ) -> Option<Vec<CompletionItem>> {
     // If this is first token which means we need to list the first level of all valid
     // symbols. Query the analysis to extract the current scope of the cursor.
@@ -578,8 +723,17 @@ pub fn completion_items_in_name_group(
         .0;
 
     // The closest symbols should appear first
-    // Flip the completion items and flatten everything
-    Some(items.into_iter().rev().flatten().collect())
+    // Flip the completion items and flatten everything.
+    // A template parameter is nearer than any of those scopes: it is declared by
+    // the template whose body encloses the cursor, and shadows everything
+    // outside it.
+    let mut out = if in_template_param_list {
+        vec![]
+    } else {
+        completion_items_for_template_params(state, uri, cursor_pos.into(), ng)
+    };
+    out.extend(items.into_iter().rev().flatten());
+    Some(out)
 }
 
 /// Complete member selection on a value expression such as `a.b.c.`.
@@ -658,9 +812,12 @@ pub fn completion_items_for_postfix_expr(
 /// Resolve an interface-instance symbol to its port interface.
 ///
 /// An interface instance is either a component instance (whose ports come from
-/// its component's port interface) or an imported (sub)topology (whose ports
-/// come from the topology's own port interface). This is the generic lookup
-/// shared by connection endpoints and topology port aliases.
+/// its component's port interface), an imported (sub)topology (whose ports come
+/// from the topology's own port interface), or a bound port interface instance
+/// template parameter (whose ports are those of the port interface declared in
+/// the parameter — inside an expansion that is the only interface visible). This
+/// is the generic lookup shared by connection endpoints and topology port
+/// aliases.
 fn port_interface_for_instance_symbol<'a>(
     state: &'a GlobalState,
     symbol: &Symbol,
@@ -675,8 +832,47 @@ fn port_interface_for_instance_symbol<'a>(
             Some(&component.port_interface)
         }
         Symbol::Topology(_) => Some(&state.analysis.topology_map.get(symbol)?.port_interface),
+        Symbol::TemplateInterfaceArg { param_def, .. } => {
+            interface_declared_by_param(state, param_def)
+        }
         _ => None,
     }
+}
+
+/// The port interface an instance template parameter declares.
+///
+/// The parameter list of a template is analyzed where the template is defined,
+/// so the interface use is in the use-def map even though the parameter itself
+/// binds no symbol until an expansion.
+fn interface_declared_by_param<'a>(
+    state: &'a GlobalState,
+    param: &TemplateParamInterface,
+) -> Option<&'a PortInterface> {
+    let symbol = state.analysis.use_def_map.get(&param.interface.id())?;
+    Some(&state.analysis.interface_map.get(symbol)?.port_interface)
+}
+
+/// The port interface declared by the instance template parameter named `name`,
+/// among those in scope at `offset`.
+///
+/// Inside the body of a template, an instance parameter is the receiver of a
+/// port-instance identifier (`i.someOut`) even though it has no symbol in any
+/// enclosing scope, so the ports it offers are resolved from the declaration.
+fn template_param_port_interface<'a>(
+    state: &'a GlobalState,
+    document: &Uri,
+    offset: BytePos,
+    name: &str,
+) -> Option<&'a PortInterface> {
+    let nodes = nodes_at_offset(state, document, offset)?;
+    let param = nodes.iter().find_map(|node| match node {
+        Node::DefModuleTemplate(def) => def.params.iter().find_map(|param| match param {
+            TemplateParam::Interface(param) if param.name.data == name => Some(param),
+            _ => None,
+        }),
+        _ => None,
+    })?;
+    interface_declared_by_param(state, param)
 }
 
 /// Format the signature of the port definition backing a port instance, as a
@@ -1341,12 +1537,15 @@ pub fn completion_items_for_port_instance(
     uri: &Uri,
 ) -> Option<Vec<CompletionItem>> {
     if !after_dot {
-        // First segment: complete the available interface-instance names.
+        // First segment: complete the available interface-instance names. A
+        // port-instance identifier never appears in a template parameter list, so
+        // the parameters of an enclosing template are in scope here.
         return completion_items_in_name_group(
             state,
             cursor_pos,
             NameGroup::PortInterfaceInstance,
             uri,
+            false,
         );
     }
 
@@ -1357,6 +1556,21 @@ pub fn completion_items_for_port_instance(
         .iter()
         .map(|t| t.text().to_string())
         .collect();
+
+    // A one-segment receiver may be an instance template parameter of the
+    // template whose body encloses the cursor. Such a parameter is not in any of
+    // the scopes the chain walks, so resolve it from its declaration first.
+    if let [name] = segments.as_slice()
+        && let Some(port_interface) =
+            template_param_port_interface(state, uri, cursor_pos.into(), name)
+    {
+        return Some(completion_items_for_ports(
+            state,
+            port_interface,
+            direction_filter,
+            false,
+        ));
+    }
 
     let symbol = resolve_symbol_in_scope_chain(
         state,
@@ -1406,7 +1620,8 @@ pub fn completion_items_for_qual_ident(
         .unwrap_or(vec![]);
 
     if tokens.is_empty() {
-        completion_items_in_name_group(state, cursor_pos, ng, uri)
+        let in_param_list = in_template_param_list(&qual_ident);
+        completion_items_in_name_group(state, cursor_pos, ng, uri, in_param_list)
     } else {
         // Get the final token before the cursor to look it up in the AST
         let last_token_pos = tokens.last().unwrap().text_range().start().into();

@@ -1,8 +1,0 @@
- --> [ local path prefix ]/template/interfaces_basic.fpp:5:8
-  |
-5 | module template T(interface i: I) {
-  |        ^^^^^^^^ syntax error: unexpected token
-  |
-  = note: expected {
-  = note: got identifier
-

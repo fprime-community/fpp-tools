@@ -431,6 +431,21 @@
                 "description": "A choice definition or use"
             },
             {
+                "id": "template",
+                "superType": "class",
+                "description": "A module template definition or use"
+            },
+            {
+                "id": "instanceTemplateArg",
+                "superType": "variable",
+                "description": "A instance template parameter definition or use"
+            },
+            {
+                "id": "typeTemplateArg",
+                "superType": "typeParameter",
+                "description": "A type template parameter definition or use"
+            },
+            {
                 "id": "annotation",
                 "superType": "comment",
                 "description": "A documentation annotation"
@@ -535,6 +550,12 @@
                     ],
                     "choice": [
                         "entity.name.variable"
+                    ],
+                    "template": [
+                        "entity.name.type.class"
+                    ],
+                    "templateParameter": [
+                        "entity.name.type.parameter"
                     ],
                     "annotation": [
                         "comment.block.documentation"

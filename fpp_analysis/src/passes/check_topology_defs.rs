@@ -26,11 +26,13 @@ impl CheckTopologyDefs {
             return;
         }
 
-        // Resolve directly imported topologies first.
+        // Resolve imported topologies first. A topology may be imported through
+        // a bound port interface instance template parameter, so follow those to
+        // the topology they name.
         let deps: Vec<Symbol> = a
             .partial_topology_map
             .get(symbol)
-            .map(|t| t.direct_topologies.keys().cloned().collect())
+            .map(|t| t.get_imported_topology_symbols(a))
             .unwrap_or_default();
         for dep in &deps {
             self.resolve(a, dep);

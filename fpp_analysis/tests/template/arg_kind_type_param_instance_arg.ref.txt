@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/template/arg_kind_type_param_instance_arg.fpp:13:10
+   |
+13 | expand T(instance c)
+   |          ^^^^^^^^^^ invalid argument for template parameter Ty: expected a type argument, got a instance argument
+   |
+  ::: [ local path prefix ]/template/arg_kind_type_param_instance_arg.fpp:9:19
+   |
+ 9 | module template T(type Ty) {
+   |                   ------- template parameter is defined here
+

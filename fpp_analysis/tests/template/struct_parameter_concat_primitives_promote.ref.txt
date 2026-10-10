@@ -1,8 +1,0 @@
- --> [ local path prefix ]/template/struct_parameter_concat_primitives_promote.fpp:9:8
-  |
-9 | module template M(constant b: B) {
-  |        ^^^^^^^^ syntax error: unexpected token
-  |
-  = note: expected {
-  = note: got identifier
-

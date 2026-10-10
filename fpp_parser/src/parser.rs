@@ -389,7 +389,12 @@ impl<'a> Parser<'a> {
                 Ok(ModuleMember::DefComponent(self.def_component()?))
             }
             Keyword(Interface) => Ok(ModuleMember::DefInterface(self.def_interface()?)),
-            Keyword(Module) => Ok(ModuleMember::DefModule(self.def_module()?)),
+            Keyword(Module) => match self.peek(1) {
+                Keyword(Template) => {
+                    Ok(ModuleMember::DefModuleTemplate(self.def_module_template()?))
+                }
+                _ => Ok(ModuleMember::DefModule(self.def_module()?)),
+            },
             Keyword(Port) => Ok(ModuleMember::DefPort(self.def_port()?)),
             Keyword(State) => Ok(ModuleMember::DefStateMachine(self.def_state_machine()?)),
             Keyword(System) => Ok(ModuleMember::DefSystem(self.def_system()?)),
@@ -398,6 +403,9 @@ impl<'a> Parser<'a> {
             }
             Keyword(Include) => Ok(ModuleMember::SpecInclude(self.spec_include()?)),
             Keyword(Locate) => Ok(ModuleMember::SpecLoc(self.spec_loc()?)),
+            Keyword(Expand) => Ok(ModuleMember::SpecTemplateExpand(
+                self.spec_template_expand()?,
+            )),
             _ => Err(self.cursor.err_expected_one_of(
                 "module member expected",
                 vec![
@@ -419,9 +427,138 @@ impl<'a> Parser<'a> {
                     Keyword(Topology),
                     Keyword(Include),
                     Keyword(Locate),
+                    Keyword(Expand),
                 ],
             )),
         }
+    }
+
+    fn def_module_template(&mut self) -> ParseResult<DefModuleTemplate> {
+        let first = self.consume_keyword(Module)?;
+        self.consume_keyword(Template)?;
+        let name = self.name()?;
+        let params = self.template_param_list()?;
+        self.consume(LeftCurly)?;
+        let members = self.module_members();
+        self.consume(RightCurly)?;
+
+        Ok(DefModuleTemplate {
+            node_id: self.node(first.span()),
+            name,
+            params,
+            members,
+        })
+    }
+
+    fn template_param_list(&mut self) -> ParseResult<TemplateParamList> {
+        match self.peek(0) {
+            LeftParen => {
+                self.next();
+                let params =
+                    self.annotated_element_sequence(&Parser::template_param, Comma, RightParen);
+
+                self.consume(RightParen)?;
+                Ok(params)
+            }
+            _ => Ok(vec![]),
+        }
+    }
+
+    fn template_param(&mut self) -> ParseResult<TemplateParam> {
+        let first_span = self.current_span()?;
+
+        match self.peek(0) {
+            Keyword(Constant) => {
+                self.next();
+                let name = self.name()?;
+                self.consume(Colon)?;
+                let type_name = self.type_name()?;
+                Ok(TemplateParam::Constant(TemplateParamConstant {
+                    node_id: self.node(first_span),
+                    name,
+                    type_name,
+                }))
+            }
+            Keyword(Type) => {
+                self.next();
+                let name = self.name()?;
+                Ok(TemplateParam::Type(TemplateParamType {
+                    node_id: self.node(first_span),
+                    name,
+                }))
+            }
+            Keyword(Instance) => {
+                self.next();
+                let name = self.name()?;
+                self.consume(Colon)?;
+                let interface = self.qual_ident()?;
+                Ok(TemplateParam::Interface(TemplateParamInterface {
+                    node_id: self.node(first_span),
+                    name,
+                    interface,
+                }))
+            }
+            _ => Err(self.cursor.err_expected_one_of(
+                "template parameter expected",
+                vec![Keyword(Constant), Keyword(Type), Keyword(Instance)],
+            )),
+        }
+    }
+
+    fn spec_template_expand(&mut self) -> ParseResult<SpecTemplateExpand> {
+        let first = self.consume_keyword(Expand)?;
+        let template = self.qual_ident()?;
+        let args = self.template_arg_list()?;
+
+        Ok(SpecTemplateExpand {
+            node_id: self.node(first.span()),
+            template,
+            args,
+            members: None,
+        })
+    }
+
+    fn template_arg_list(&mut self) -> ParseResult<TemplateArgList> {
+        match self.peek(0) {
+            LeftParen => {
+                self.next();
+                let args = self.element_sequence(&Parser::template_arg, Comma, RightParen);
+
+                self.consume(RightParen)?;
+                Ok(args)
+            }
+            _ => Ok(vec![]),
+        }
+    }
+
+    fn template_arg(&mut self) -> ParseResult<TemplateArg> {
+        let first_span = self.current_span()?;
+
+        let kind = match self.peek(0) {
+            Keyword(Constant) => {
+                self.next();
+                TemplateArgKind::Constant(self.expr()?)
+            }
+            Keyword(Type) => {
+                self.next();
+                TemplateArgKind::Type(self.type_name()?)
+            }
+            Keyword(Instance) => {
+                self.next();
+                TemplateArgKind::Interface(self.qual_ident()?)
+            }
+            _ => {
+                return Err(self.cursor.err_expected_one_of(
+                    "template argument expected",
+                    vec![Keyword(Constant), Keyword(Type), Keyword(Instance)],
+                ));
+            }
+        };
+
+        Ok(TemplateArg {
+            node_id: self.node(first_span),
+            kind,
+        })
     }
 
     fn def_port(&mut self) -> ParseResult<DefPort> {
@@ -478,6 +615,10 @@ impl<'a> Parser<'a> {
                 self.consume_keyword(Machine)?;
                 SpecLocKind::StateMachine
             }
+            Keyword(Template) => {
+                self.next();
+                SpecLocKind::Template
+            }
             Keyword(System) => {
                 self.next();
                 SpecLocKind::System
@@ -499,6 +640,7 @@ impl<'a> Parser<'a> {
                         Keyword(Instance),
                         Keyword(Port),
                         Keyword(State),
+                        Keyword(Template),
                         Keyword(System),
                         Keyword(Type),
                         Keyword(Interface),

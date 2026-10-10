@@ -1,6 +1,6 @@
 //! Integration tests: parse FPP source, run analysis, lower to IR + sprotty.
 
-use fpp_analysis::{Analysis, add_state_enums, check_semantics};
+use fpp_analysis::{Analysis, add_state_enums, check_semantics, resolve_templates};
 use fpp_core::SourceFile;
 use fpp_diagram::ir::{DiagramKind, Direction, PortKind};
 
@@ -14,6 +14,7 @@ fn with_analysis<R>(src: &str, f: impl FnOnce(&Analysis) -> R) -> R {
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         add_state_enums(&mut ast);
         let mut a = Analysis::new();
+        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
         let _ = check_semantics(&mut a, vec![&ast]);
         f(&a)
     })
@@ -250,5 +251,63 @@ fn missing_element_is_an_error() {
     with_analysis(MODEL, |a| {
         let err = fpp_diagram::lower(a, DiagramKind::Topology, "DoesNotExist").unwrap_err();
         assert!(matches!(err, fpp_diagram::LowerError::NotFound { .. }));
+    });
+}
+
+/// A topology defined by a module template, whose producer is a bound port
+/// interface instance template parameter. Both the instance node and the
+/// connection to it must come out under the *bound* instance's name, not the
+/// parameter's: a bound parameter is not a node of its own.
+const TEMPLATE_MODEL: &str = r#"
+port P
+
+passive component Producer {
+    output port pOut: P
+}
+
+passive component Consumer {
+    sync input port cIn: P
+}
+
+instance prod: Producer base id 0x100
+instance cons: Consumer base id 0x200
+
+interface I {
+    output port pOut: P
+}
+
+module template T(instance i: I) {
+    topology Sys {
+        instance i
+        instance cons
+
+        connections C {
+            i.pOut -> cons.cIn
+        }
+    }
+}
+
+expand T(instance prod)
+"#;
+
+#[test]
+fn lowers_topology_from_template_expansion() {
+    with_analysis(TEMPLATE_MODEL, |a| {
+        let diagram =
+            fpp_diagram::lower(a, DiagramKind::Topology, "Sys").expect("topology Sys should lower");
+
+        let mut node_ids: Vec<&str> = diagram.nodes.iter().map(|n| n.id.as_str()).collect();
+        node_ids.sort_unstable();
+        assert_eq!(node_ids, vec!["cons", "prod"]);
+
+        // The bound parameter's node carries the component it was given, with
+        // that component's full port set — not just the interface's ports.
+        let prod = diagram.nodes.iter().find(|n| n.id == "prod").unwrap();
+        assert_eq!(prod.class_name.as_deref(), Some("Producer"));
+
+        assert_eq!(diagram.edges.len(), 1, "edges: {:?}", diagram.edges);
+        let edge = &diagram.edges[0];
+        assert_eq!(edge.from_port, "prod.pOut.0");
+        assert_eq!(edge.to_port, "cons.cIn.0");
     });
 }

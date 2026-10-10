@@ -1,18 +1,22 @@
 pub mod component;
 pub mod node;
+pub mod replicate;
 mod serde_annotate;
 pub mod state_machine;
+pub mod template;
 pub mod topology;
 pub mod visit;
 
 use std::fmt::Debug;
 
 use fpp_core::Annotated;
-use fpp_macros::{AstAnnotated, DirectWalkable, VisitorWalkable, ast};
+use fpp_macros::{AstAnnotated, DirectWalkable, Replicate, VisitorWalkable, ast};
 
 pub use component::*;
 pub use node::*;
+pub use replicate::*;
 pub use state_machine::*;
+pub use template::*;
 pub use topology::*;
 pub use visit::*;
 
@@ -21,7 +25,7 @@ pub trait AstNode: fpp_core::Spanned + Sized {
 }
 
 /// Translation unit
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct TransUnit(pub Vec<ModuleMember>);
 
 pub enum QualIdentKind {
@@ -36,7 +40,7 @@ pub enum QualIdentKind {
 }
 
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct LitString {
     #[visitable(ignore)]
     pub data: String,
@@ -47,7 +51,7 @@ pub struct LitString {
 
 /// Definition name
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct Name {
     #[visitable(ignore)]
     pub data: String,
@@ -55,7 +59,7 @@ pub struct Name {
 
 /// Identifier
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct Ident {
     #[visitable(ignore)]
     pub data: String,
@@ -81,7 +85,7 @@ pub enum IntegerKind {
     I64,
 }
 
-#[derive(Debug, Clone, DirectWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum TypeNameKind {
     #[visitable(ignore)]
     Bool,
@@ -95,14 +99,14 @@ pub enum TypeNameKind {
 
 /// Type name
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct TypeName {
     pub kind: TypeNameKind,
 }
 
 /// A qualified identifier
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct Qualified {
     pub qualifier: Box<QualIdent>,
     pub name: Ident,
@@ -110,7 +114,7 @@ pub struct Qualified {
 
 /// A possibly-qualified identifier
 #[ast]
-#[derive(Clone, VisitorWalkable)]
+#[derive(Clone, Replicate, VisitorWalkable)]
 pub enum QualIdent {
     /// An unqualified identifier
     Unqualified(Ident),
@@ -147,13 +151,13 @@ impl serde::Serialize for QualIdent {
 
 /// Struct member
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct StructExprMember {
     pub name: Name,
     pub value: Expr,
 }
 
-#[derive(Debug, Clone, DirectWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum ExprKind {
     Array(Vec<Expr>),
     ArraySubscript {
@@ -192,7 +196,7 @@ pub enum ExprKind {
 
 /// Expression
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct Expr {
     pub kind: ExprKind,
 }
@@ -206,7 +210,7 @@ pub enum FormalParamKind {
 
 /// Formal parameter
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct FormalParam {
     #[visitable(ignore)]
     pub kind: FormalParamKind,
@@ -236,14 +240,14 @@ pub enum Unop {
 
 /// Abstract type definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefAbsType {
     pub name: Name,
 }
 
 /// Aliased type definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefAliasType {
     pub name: Name,
     pub type_name: TypeName,
@@ -253,7 +257,7 @@ pub struct DefAliasType {
 
 /// Array definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefArray {
     pub name: Name,
     pub size: Expr,
@@ -286,7 +290,7 @@ impl std::fmt::Display for ComponentKind {
 
 /// Component definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefComponent {
     #[visitable(ignore)]
     pub kind: ComponentKind,
@@ -296,7 +300,7 @@ pub struct DefComponent {
 
 /// Component instance definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefComponentInstance {
     pub name: Name,
     pub component: QualIdent,
@@ -314,7 +318,7 @@ pub struct DefComponentInstance {
 
 /// Init specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecInit {
     pub phase: Expr,
     #[visitable(ignore)]
@@ -323,7 +327,7 @@ pub struct SpecInit {
 
 /// Constant definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefConstant {
     pub name: Name,
     pub value: Expr,
@@ -333,7 +337,7 @@ pub struct DefConstant {
 
 /// Enum definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefEnum {
     pub name: Name,
     pub type_name: Option<TypeName>,
@@ -345,7 +349,7 @@ pub struct DefEnum {
 
 /// Enum constant definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefEnumConstant {
     pub name: Name,
     pub value: Option<Expr>,
@@ -353,7 +357,7 @@ pub struct DefEnumConstant {
 
 /// Module definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefModule {
     pub name: Name,
     pub members: Vec<ModuleMember>,
@@ -361,7 +365,7 @@ pub struct DefModule {
 
 /// Module member
 #[ast]
-#[derive(AstAnnotated, Clone, DirectWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum ModuleMember {
     DefAbsType(DefAbsType),
     DefAliasType(DefAliasType),
@@ -372,6 +376,7 @@ pub enum ModuleMember {
     DefEnum(DefEnum),
     DefInterface(DefInterface),
     DefModule(DefModule),
+    DefModuleTemplate(DefModuleTemplate),
     DefPort(DefPort),
     DefStateMachine(DefStateMachine),
     DefStruct(DefStruct),
@@ -379,6 +384,7 @@ pub enum ModuleMember {
     DefTopology(DefTopology),
     SpecInclude(SpecInclude),
     SpecLoc(SpecLoc),
+    SpecTemplateExpand(SpecTemplateExpand),
 }
 
 /// Location specifier kind
@@ -389,6 +395,7 @@ pub enum SpecLocKind {
     Constant,
     Port,
     StateMachine,
+    Template,
     System,
     Type,
     Interface,
@@ -396,7 +403,7 @@ pub enum SpecLocKind {
 
 /// Location specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecLoc {
     #[visitable(ignore)]
     pub kind: SpecLocKind,
@@ -409,7 +416,7 @@ pub struct SpecLoc {
 
 /// General port instance
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecGeneralPortInstance {
     #[visitable(ignore)]
     pub kind: GeneralPortInstanceKind,
@@ -423,7 +430,7 @@ pub struct SpecGeneralPortInstance {
 
 /// Special port instance
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecSpecialPortInstance {
     #[visitable(ignore)]
     pub input_kind: Option<InputPortKind>,
@@ -437,7 +444,7 @@ pub struct SpecSpecialPortInstance {
 
 /// Port instance specifier
 #[ast]
-#[derive(AstAnnotated, Clone, DirectWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum SpecPortInstance {
     General(SpecGeneralPortInstance),
     Special(SpecSpecialPortInstance),
@@ -445,7 +452,7 @@ pub enum SpecPortInstance {
 
 /// Interface member
 #[ast]
-#[derive(AstAnnotated, Clone, DirectWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum InterfaceMember {
     SpecPortInstance(SpecPortInstance),
     SpecInterfaceImport(SpecInterfaceImport),
@@ -453,7 +460,7 @@ pub enum InterfaceMember {
 
 /// Interface definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefInterface {
     pub name: Name,
     pub members: Vec<InterfaceMember>,
@@ -461,7 +468,7 @@ pub struct DefInterface {
 
 /// Struct type member
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct StructTypeMember {
     pub name: Name,
     pub size: Option<Expr>,
@@ -472,7 +479,7 @@ pub struct StructTypeMember {
 
 /// Struct definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefStruct {
     pub name: Name,
     pub members: Vec<StructTypeMember>,
@@ -483,7 +490,7 @@ pub struct DefStruct {
 
 /// Port definition
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DefPort {
     pub name: Name,
     pub params: FormalParamList,
@@ -492,7 +499,7 @@ pub struct DefPort {
 
 /// Include specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecInclude {
     #[visitable(ignore)]
     pub file: LitString,
@@ -500,7 +507,7 @@ pub struct SpecInclude {
 
 /// Import specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecInterfaceImport {
     pub interface: QualIdent,
 }

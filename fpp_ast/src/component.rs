@@ -2,7 +2,7 @@ use crate::*;
 
 /// Component member
 #[ast]
-#[derive(AstAnnotated, Clone, DirectWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum ComponentMember {
     DefAbsType(DefAbsType),
     DefAliasType(DefAliasType),
@@ -43,14 +43,14 @@ pub enum QueueFull {
 
 /// Queue full behavior specifier
 #[ast]
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, serde::Serialize)]
 pub struct QueueFullSpecifier {
     pub kind: QueueFull,
 }
 
 /// Command specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecCommand {
     #[visitable(ignore)]
     pub kind: InputPortKind,
@@ -64,7 +64,7 @@ pub struct SpecCommand {
 
 /// Container specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecContainer {
     pub name: Name,
     pub id: Option<Expr>,
@@ -84,7 +84,7 @@ pub enum EventSeverity {
 }
 
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct EventThrottle {
     pub count: Expr,
     pub every: Option<Expr>,
@@ -92,7 +92,7 @@ pub struct EventThrottle {
 
 /// Event specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecEvent {
     pub name: Name,
     pub params: FormalParamList,
@@ -106,7 +106,7 @@ pub struct SpecEvent {
 
 /// Internal port specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecInternalPort {
     pub name: Name,
     pub params: FormalParamList,
@@ -117,7 +117,7 @@ pub struct SpecInternalPort {
 
 /// Parameter specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecParam {
     pub name: Name,
     pub type_name: TypeName,
@@ -177,7 +177,7 @@ impl std::fmt::Display for SpecialPortInstanceKind {
 
 /// Port matching specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecPortMatching {
     pub port1: Ident,
     pub port2: Ident,
@@ -185,7 +185,7 @@ pub struct SpecPortMatching {
 
 /// Record specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecRecord {
     pub name: Name,
     pub record_type: TypeName,
@@ -196,7 +196,7 @@ pub struct SpecRecord {
 
 /// State machine instance spec
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecStateMachineInstance {
     pub name: Name,
     pub state_machine: QualIdent,
@@ -222,7 +222,7 @@ pub enum TlmChannelLimitKind {
 
 /// Telemetry limit
 #[ast]
-#[derive(Debug, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct TlmChannelLimit {
     #[visitable(ignore)]
     pub kind: TlmChannelLimitKind,
@@ -231,7 +231,7 @@ pub struct TlmChannelLimit {
 
 /// Telemetry channel specifier
 #[ast]
-#[derive(AstAnnotated, Clone, VisitorWalkable, serde::Serialize)]
+#[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecTlmChannel {
     pub name: Name,
     pub type_name: TypeName,

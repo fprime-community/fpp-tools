@@ -1,0 +1,8 @@
+  --> [ local path prefix ]/template/constant_param_array_promote_bad_subscript.fpp:11:21
+   |
+11 |   constant e = c[0][3]
+   |                     ^ index value is not in the range [0, 2]
+   |
+   = note: expanded at [ local path prefix ]/template/constant_param_array_promote_bad_subscript.fpp:15:1
+   = note: expression evaluated to `3`
+

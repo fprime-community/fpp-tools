@@ -64,3 +64,28 @@ fn duplicate_instance_name() {
 fn matched_through_alias() {
     run_test("port_numbering/matched_through_alias")
 }
+
+#[test]
+fn template_implicit_duplicate_at_matched_port() {
+    run_test("port_numbering/template_implicit_duplicate_at_matched_port")
+}
+
+#[test]
+fn template_ok() {
+    run_test("port_numbering/template_ok")
+}
+
+#[test]
+fn template_too_many_output_ports() {
+    run_test("port_numbering/template_too_many_output_ports")
+}
+
+#[test]
+fn template_two_expansions_too_many_output_ports() {
+    run_test("port_numbering/template_two_expansions_too_many_output_ports")
+}
+
+#[test]
+fn template_two_expansions_duplicate_output_connection() {
+    run_test("port_numbering/template_two_expansions_duplicate_output_connection")
+}

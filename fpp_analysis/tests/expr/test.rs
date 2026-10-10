@@ -101,6 +101,16 @@ fn sizeof_ok() {
 }
 
 #[test]
+fn sizeof_alias_struct_ok() {
+    run_test("expr/sizeof_alias_struct_ok")
+}
+
+#[test]
+fn sizeof_alias_alias_struct_ok() {
+    run_test("expr/sizeof_alias_alias_struct_ok")
+}
+
+#[test]
 fn sizeof_error() {
     run_test("expr/sizeof_error")
 }

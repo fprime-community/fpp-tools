@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/template/param_conflict_same_name_group.fpp:5:31
+  |
+5 | expand T(constant 1, constant 2)
+  |                               ^ redefinition of symbol x
+  |
+ ::: [ local path prefix ]/template/param_conflict_same_name_group.fpp:5:19
+  |
+5 | expand T(constant 1, constant 2)
+  |                   - previous definition is here
+

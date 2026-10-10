@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::basic_use_analyzer::UseAnalysisPass;
+use crate::analyzers::basic_use_analyzer::{UseAnalysisPass, visit_template_arg};
 use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::SemanticError;
 use crate::semantics::{QualifiedName, Symbol, SymbolInterface, UseDefMatching};
@@ -36,6 +36,9 @@ impl<'ast> CheckUseDefCycles<'ast> {
             Symbol::Interface(node) => node.visit(a, self),
             Symbol::StructType(node) => node.visit(a, self),
             Symbol::Topology(node) => node.visit(a, self),
+            arg @ (Symbol::TemplateConstantArg { .. }
+            | Symbol::TemplateTypeArg { .. }
+            | Symbol::TemplateInterfaceArg { .. }) => self.template_param(a, &arg),
             _ => ControlFlow::Continue(()),
         }
     }
@@ -68,6 +71,32 @@ impl<'ast> CheckUseDefCycles<'ast> {
         let result = self.visit_def_pre(a, symbol);
         a.use_def_matching_list.truncate(len);
         result
+    }
+
+    /// The use-def graph node for a symbol whose definition is not an AST
+    /// subtree of its own, so `visit` supplies the descent
+    fn visit_def_post_with(
+        &self,
+        a: &mut Analysis,
+        symbol: Symbol,
+        visit: impl FnOnce(&Self, &mut Analysis) -> ControlFlow<()>,
+    ) -> ControlFlow<()> {
+        if a.use_def_symbol_set.contains(&symbol) {
+            SemanticError::UseDefCycle {
+                loc: symbol.node().span(),
+                cycle: a.use_def_matching_list.iter().map(|m| m.into()).collect(),
+            }
+            .emit();
+            ControlFlow::Break(())
+        } else if !a.visited_symbol_set.contains(&symbol) {
+            a.use_def_symbol_set.insert(symbol.clone());
+            visit(self, a)?;
+            a.use_def_symbol_set.remove(&symbol);
+            a.visited_symbol_set.insert(symbol);
+            ControlFlow::Continue(())
+        } else {
+            ControlFlow::Continue(())
+        }
     }
 
     fn visit_def_post<T: Walkable<'ast, Self>>(
@@ -233,5 +262,20 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUseDefCycles<'ast> {
         name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.visit_use(a, node.id(), name)
+    }
+
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let arg = arg.clone();
+        self.visit_def_post_with(a, arg.clone(), |s, a| visit_template_arg(s, a, &arg))
+    }
+
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let arg = arg.clone();
+        self.visit_def_post_with(a, arg.clone(), |s, a| visit_template_arg(s, a, &arg))
+    }
+
+    fn template_interface_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let arg = arg.clone();
+        self.visit_def_post_with(a, arg.clone(), |s, a| visit_template_arg(s, a, &arg))
     }
 }

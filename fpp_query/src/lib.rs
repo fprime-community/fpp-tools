@@ -48,15 +48,34 @@ pub enum Output {
     Report(String),
 }
 
+/// Which of the model's expansions to run before the groups are matched.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Expansions {
+    /// Replace each `expand` specifier with the members of the module template it
+    /// names.
+    pub templates: bool,
+    /// Synthesize the implicit `enum State` of each state machine that has a body.
+    pub state_enums: bool,
+}
+
+impl Expansions {
+    /// The model exactly as parsed.
+    pub const NONE: Expansions = Expansions {
+        templates: false,
+        state_enums: false,
+    };
+}
+
 /// The groups to match, and which model to match them against.
 ///
 /// `expand` travels with the groups because it decides what they *mean*: rules
 /// written for the expanded model ask a `DefEnum` group to pick up each state
-/// machine's implicit `State` enum, and the same rules read against the raw model
-/// would silently miss those files.
+/// machine's implicit `State` enum and a `DefComponent` group to reach the
+/// components a template expansion contributes, and the same rules read against the
+/// raw model would silently miss those files.
 pub struct RuleSet {
     pub groups: Vec<Group>,
-    pub expand: bool,
+    pub expand: Expansions,
 }
 
 /// Everything that happens inside the one `fpp_core::run` scope.
@@ -72,17 +91,17 @@ pub fn run(
         Some(input) => rules::load(input)?,
         None => RuleSet {
             groups: Vec::new(),
-            expand: false,
+            expand: Expansions::NONE,
         },
     };
 
     let mut units = model::parse(inputs);
     model::check_unresolved_includes(&units)?;
-    // After the include check, so a state machine is expanded only once its whole
-    // body is visible. Before `--json` and `--fields`, which promise to report the
-    // model a query will actually see.
-    if rule_set.expand {
-        model::expand(&mut units);
+    if rule_set.expand.state_enums {
+        model::add_state_enums(&mut units);
+    }
+    if rule_set.expand.templates {
+        model::expand_templates(&mut units);
     }
 
     if args.json {

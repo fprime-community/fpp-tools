@@ -726,6 +726,7 @@ impl Component {
             max_in_map(&self.container_map),
             max_in_map(&self.event_map),
             max_in_map(&self.param_map),
+            max_in_map(&self.record_map),
             max_in_map(&self.tlm_channel_map),
         ]
         .into_iter()
@@ -1118,7 +1119,7 @@ impl Component {
 mod tests {
     use super::Component;
     use crate::semantics::{PortInstance, Symbol, SymbolInterface, state_machine};
-    use crate::{Analysis, add_state_enums, check_semantics};
+    use crate::{Analysis, add_state_enums, check_semantics, resolve_templates};
     use fpp_ast::SpecialPortInstanceKind;
     use fpp_core::SourceFile;
 
@@ -1179,6 +1180,7 @@ module M {
             let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
             let mut a = Analysis::new();
             add_state_enums(&mut ast);
+            let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
             let _ = check_semantics(&mut a, vec![&ast]);
             let component = a
                 .component_map

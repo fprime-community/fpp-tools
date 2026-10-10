@@ -34,3 +34,38 @@ fn repeated_name() {
 fn p2_not_valid() {
     run_test("port_matching/p2_not_valid")
 }
+
+#[test]
+fn missing_connection() {
+    run_test("port_matching/missing_connection")
+}
+
+#[test]
+fn template_matched_remote_arg() {
+    run_test("port_matching/template_matched_remote_arg")
+}
+
+#[test]
+fn template_mismatched_port_numbers() {
+    run_test("port_matching/template_mismatched_port_numbers")
+}
+
+#[test]
+fn template_missing_connection() {
+    run_test("port_matching/template_missing_connection")
+}
+
+#[test]
+fn template_ok() {
+    run_test("port_matching/template_ok")
+}
+
+#[test]
+fn template_unmatched() {
+    run_test("port_matching/template_unmatched")
+}
+
+#[test]
+fn template_unmatched_remote_arg() {
+    run_test("port_matching/template_unmatched_remote_arg")
+}

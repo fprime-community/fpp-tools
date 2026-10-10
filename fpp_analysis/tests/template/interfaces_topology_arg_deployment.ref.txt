@@ -1,0 +1,13 @@
+ --> [ local path prefix ]/template/interfaces_topology_arg_deployment.fpp:9:5
+  |
+9 |       instance i
+  |       ^^^^^^^^^^ invalid use of symbol i: use of deployment topology is not allowed here
+  |
+  = note: expanded at [ local path prefix ]/template/interfaces_topology_arg_deployment.fpp:13:1
+  |
+ ::: [ local path prefix ]/template/interfaces_topology_arg_deployment.fpp:4:1
+  |
+4 | / deployment topology Dep {
+5 | | }
+  | |_- i defined here
+

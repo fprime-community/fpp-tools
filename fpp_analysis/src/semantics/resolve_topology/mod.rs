@@ -49,7 +49,7 @@ pub(crate) fn for_each_port(a: &Analysis, t: &Topology) -> Vec<PortInstanceIdent
 
 /// Resolve this topology definition.
 pub fn resolve(a: &Analysis, t: &mut Topology) -> SemanticResult {
-    resolve_topology_instances::resolve(a, t);
+    resolve_topology_instances::resolve(a, t)?;
     resolve_topology_port_interface::resolve(a, t)?;
     resolve_partially_numbered::resolve(a, t)?;
     resolve_port_numbers::resolve(a, t)?;

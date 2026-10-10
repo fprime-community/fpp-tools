@@ -132,3 +132,16 @@ fn channel_instance_not_component_instance() {
         "tlm_packets/channel_instance_not_component_instance",
     )
 }
+
+#[test]
+fn template_ok() {
+    run_test_with(&["tlm_packets/instances"], "tlm_packets/template_ok")
+}
+
+#[test]
+fn template_channel_neither_used_nor_omitted() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/template_channel_neither_used_nor_omitted",
+    )
+}

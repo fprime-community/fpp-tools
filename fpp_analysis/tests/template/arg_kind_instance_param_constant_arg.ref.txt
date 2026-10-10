@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/template/arg_kind_instance_param_constant_arg.fpp:13:10
+   |
+13 | expand T(constant 0)
+   |          ^^^^^^^^^^ invalid argument for template parameter i: expected a instance argument, got a constant argument
+   |
+  ::: [ local path prefix ]/template/arg_kind_instance_param_constant_arg.fpp:7:19
+   |
+ 7 | module template T(instance i: I) {
+   |                   ------------- template parameter is defined here
+

@@ -1,32 +1,7 @@
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance.fpp:33:8
-   |
-33 | module template T(interface i: A_I, constant idx: U32) {
-   |        ^^^^^^^^ syntax error: unexpected token
-   |
-   = note: expected {
-   = note: got identifier
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance.fpp:36:18
-   |
-36 |         instance b
-   |                  ^ syntax error: unexpected token
-   |
-   = note: expected :
-   = note: got end of line
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance.fpp:38:9
-   |
-38 |         connections C {
-   |         ^^^^^^^^^^^ syntax error: module member expected
-   |
-   = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate
-   = note: got connections
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance.fpp:42:13
+  --> [ local path prefix ]/template/interfaces_invalid_port_instance.fpp:42:30
    |
 42 |             b.aOut[idx] -> i.aIn2[idx]
-   |             ^ syntax error: module member expected
+   |                              ^^^^ aIn2 is not a port instance of interface A_I
    |
-   = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate
-   = note: got identifier
+   = note: expanded at [ local path prefix ]/template/interfaces_invalid_port_instance.fpp:49:5
 

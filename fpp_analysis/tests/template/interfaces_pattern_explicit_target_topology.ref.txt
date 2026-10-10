@@ -1,0 +1,11 @@
+  --> [ local path prefix ]/template/interfaces_pattern_explicit_target_topology.fpp:29:19
+   |
+29 |   expand T(instance Sub)
+   |                     ^^^ invalid use of symbol Sub: not a component instance symbol
+   |
+  ::: [ local path prefix ]/template/interfaces_pattern_explicit_target_topology.fpp:16:1
+   |
+16 | / topology Sub {
+17 | | }
+   | |_- Sub defined here
+

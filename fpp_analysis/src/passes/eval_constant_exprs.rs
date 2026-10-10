@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::basic_use_analyzer::UseAnalysisPass;
+use crate::analyzers::basic_use_analyzer::{UseAnalysisPass, visit_template_arg};
 use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::SemanticError;
 use crate::passes::FinalizeTypeDefs;
@@ -50,6 +50,15 @@ impl<'ast> EvalConstantExprs<'ast> {
                 def.clone().visit(a, self)?;
                 sym
             }
+            // Bound constant parameter: evaluate the bound argument to ensure
+            // that it has a value
+            Some(sym @ Symbol::TemplateConstantArg { value, .. }) => {
+                let sym = sym.clone();
+                if !a.value_map.contains_key(&value.node_id) {
+                    self.template_constant_arg(a, &sym)?;
+                }
+                sym
+            }
             _ => return ControlFlow::Continue(()),
         };
 
@@ -85,6 +94,7 @@ impl<'ast> EvalConstantExprs<'ast> {
             Type::Alias(alias) => {
                 let def = alias.node.clone();
                 self.visit_def_alias_type(a, &def)?;
+                self.finalize_if_needed(a, &alias.alias_type)?;
                 finalize_defs.visit_def_alias_type(a, &def)?;
             }
             Type::Array(array) => {
@@ -228,7 +238,11 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     None => return ControlFlow::Continue(()),
                     Some(ty) => match ty.deref() {
                         Type::AnonArray(arr) => arr.elt_type.clone(),
-                        _ => panic!("type of array expression should be AnonArray"),
+                        // A named array type here means the array expression is
+                        // the argument bound to a constant template parameter,
+                        // whose type is the one declared in the parameter
+                        Type::Array(arr) => arr.anon_array.elt_type.clone(),
+                        _ => panic!("type of array expression should be AnonArray or Array"),
                     },
                 };
 
@@ -250,7 +264,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     .insert(node.node_id, Value::AnonArray(AnonArrayValue::new(out)));
             }
             ExprKind::ArraySubscript { e1, e2 } => {
-                let elements = match a.value_map.get(&e1.node_id) {
+                let anon_array = match a.value_map.get(&e1.node_id) {
                     Some(Value::AnonArray(anon_array))
                     | Some(Value::Array(ArrayValue { anon_array, .. })) => anon_array,
                     _ => return ControlFlow::Continue(()),
@@ -263,16 +277,19 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     _ => return ControlFlow::Continue(()),
                 };
 
-                // Check if the index is in bounds
+                // Check if the index is in bounds. If the size of the array is
+                // not yet known, then only the lower bound can be checked here;
+                // `FinalizeConstantExprs` checks the upper bound once it is.
                 if index < 0 {
                     SemanticError::InvalidIntValue {
                         loc: e2.span(),
                         v: Some(index),
-                        msg: "index value may not be negative".to_string(),
+                        msg: "value may not be negative".to_string(),
                     }
                     .emit();
                     return ControlFlow::Break(());
-                } else if index >= elements.elements.len() as i128 {
+                } else if anon_array.scalar.is_none() && index >= anon_array.elements.len() as i128
+                {
                     // Compare in i128: narrowing the index to usize first would
                     // accept any index congruent to an in-bounds one modulo the
                     // pointer width.
@@ -281,13 +298,16 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                         v: Some(index),
                         msg: format!(
                             "index value is not in the range [0, {}]",
-                            elements.elements.len().saturating_sub(1)
+                            anon_array.elements.len().saturating_sub(1)
                         ),
                     }
                     .emit();
                     return ControlFlow::Break(());
                 } else {
-                    let element = elements.get(index as usize).expect("in bounds").clone();
+                    let element = match &anon_array.scalar {
+                        Some(scalar) => scalar.deref().clone(),
+                        None => anon_array.get(index as usize).expect("in bounds").clone(),
+                    };
                     a.value_map.insert(node.node_id, element);
                 }
             }
@@ -563,5 +583,56 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for EvalConstantExprs<'ast> {
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.eval_constant_use(a, node.node_id)
+    }
+
+    /// The value of a bound constant parameter is the value of the argument
+    /// bound to it, converted to the type declared in the parameter.
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let Symbol::TemplateConstantArg { param_def, value } = arg else {
+            return ControlFlow::Continue(());
+        };
+        let param_def = param_def.clone();
+        let value = value.clone();
+        let loc = value.span();
+
+        // Compute the value of the argument
+        visit_template_arg(self, a, arg)?;
+
+        // The type of the parameter may name an array or struct whose size or
+        // default value is not known until it is finalized
+        if let Some(ty) = a.type_map.get(&param_def.type_name.node_id).cloned() {
+            self.finalize_if_needed(a, &ty)?;
+        }
+
+        // Read the type back through its definition: the type-name use node
+        // still holds the type as it was before finalization
+        let Some(ty) = a.get_finalized_type(param_def.type_name.node_id) else {
+            return ControlFlow::Continue(());
+        };
+        let Some(v) = a.value_map.get(&value.node_id).cloned() else {
+            return ControlFlow::Continue(());
+        };
+        match v.convert(&ty) {
+            Some(new_value) => {
+                a.assign_type(value.node_id, ty);
+                a.assign_value(value.node_id, new_value);
+                ControlFlow::Continue(())
+            }
+            None => {
+                SemanticError::InvalidType {
+                    loc,
+                    msg: format!("cannot convert value {} to type {}", v, ty),
+                    notes: vec![],
+                }
+                .emit();
+                // The bound parameter has no usable value, so every use of it
+                // would report a further error
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
     }
 }

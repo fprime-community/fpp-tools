@@ -39,12 +39,14 @@ fpp_python_macros::fpp_sem_bindings! {
             state_machine_map: map(union(Symbol), entity(StateMachine)),
             dictionary_map: map(union(Symbol), entity(Dictionary)),
             implied_use_map: map(node, entity(ImpliedUseSet)),
+            template_expansion_map: map(node, entity(TemplateExpansion)),
             dictionary_symbol_set: list(union(Symbol)),
             system_map: map(union(Symbol), entity(FppSystem)),
         }
         methods {
             check_displayable_params(params: ref list(astnode(FormalParam)), msg: str) throws(SemanticError) -> unit,
             check_displayable_type(node: node, loc: span, msg: str) throws(SemanticError) -> unit,
+            expansion_at(node: node) -> ref entity(TemplateExpansion),
             get_array_size(node: node, loc: span) throws(SemanticError) -> i128,
             get_array_size_opt(expr: ref opt(astnode(Expr))) throws(SemanticError) -> i128,
             get_big_int_value(node: node) -> opt(i128),
@@ -66,10 +68,18 @@ fpp_python_macros::fpp_sem_bindings! {
             get_nonnegative_int_value(node: node, loc: span) throws(SemanticError) -> i128,
             get_qualified_name(symbol: ref union(Symbol)) -> str,
             get_reason_for_non_displayable_type_at(node: node) -> list(tuple(span, str)),
-            get_scope(symbol: ref opt(union(Symbol))) -> ref entity(Scope),
+            get_represented_component_instance(id: node) throws(SemanticError) -> opt(rewrap(InterfaceInstance::Component)),
+            get_represented_symbol(id: node) -> opt(union(Symbol)),
+            get_represented_topology_symbol(symbol: ref union(Symbol)) -> opt(union(Symbol)),
+            get_scope(owner: ref union(ScopeOwner)) -> ref entity(Scope),
+            get_symbol_scope(symbol: ref opt(union(Symbol))) -> ref entity(Scope),
+            get_template_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
             get_topology(id: node) throws(SemanticError) -> opt(entity(Topology)),
             get_topology_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
             implied_uses(node: node) -> opt(entity(ImpliedUseSet)),
+            lookup_scope(symbol: ref union(Symbol)) -> opt(entity(Scope)),
+            nested_scope_at(symbol: ref union(Symbol)) -> entity(NestedScope),
+            template_expansion_params(node: node) -> opt(list(union(Symbol))),
         }
     }
 
@@ -112,6 +122,7 @@ fpp_python_macros::fpp_sem_bindings! {
         variants {
             Component => ComponentInterfaceInstance : payload,
             Topology => TopologyInterfaceInstance : payload,
+            TemplateArg => TemplateArgInterfaceInstance : payload,
         }
         methods {
             as_topology(a: analysis) -> opt(entity(Topology)),
@@ -163,6 +174,15 @@ fpp_python_macros::fpp_sem_bindings! {
         }
         methods {
             port_returns_value -> opt(span),
+        }
+    }
+
+    union ScopeOwner native fpp_analysis::semantics::ScopeOwner handle clone alias "ScopeOwner" accessor native {
+        variants {
+            Global => GlobalScopeOwner : unit,
+            Symbol => SymbolScopeOwner : union(Symbol),
+            TemplateParams => TemplateParamsScopeOwner : node,
+            TemplateExpansion => TemplateExpansionScopeOwner : node,
         }
     }
 
@@ -221,10 +241,16 @@ fpp_python_macros::fpp_sem_bindings! {
             StateMachine => SymbolStateMachine : astdef(DefStateMachine),
             StructType => SymbolStructType : astdef(DefStruct),
             System => SymbolSystem : astdef(DefSystem),
+            Template => SymbolTemplate : astdef(DefModuleTemplate),
             Topology => SymbolTopology : astdef(DefTopology),
+            TemplateConstantArg => SymbolTemplateConstantArg : struct { param_def: astdef(TemplateParamConstant), value: astdef(Expr) },
+            TemplateTypeArg => SymbolTemplateTypeArg : struct { param_def: astdef(TemplateParamType), value: astdef(TypeName) },
+            TemplateInterfaceArg => SymbolTemplateInterfaceArg : struct { param_def: astdef(TemplateParamInterface), value: skip },
         }
         methods {
             is_dictionary_def -> bool,
+            is_interface_instance -> bool,
+            is_template_arg -> bool,
             node -> node,
             parent(a: analysis) -> opt(union(Symbol)),
             qualified_name(a: analysis) -> str,
@@ -528,6 +554,14 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
+    payload TemplateArgInterfaceInstance native fpp_analysis::semantics::TemplateArgInstance {
+        fields {
+            param_def: astdef(TemplateParamInterface),
+            declared_interface: entity(Interface),
+            instance: union(InterfaceInstance),
+        }
+    }
+
     payload TopologyInterfaceInstance native fpp_analysis::semantics::TopologyInstance {
         fields {
             symbol: union(Symbol),
@@ -750,6 +784,9 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
+    entity NestedScope native fpp_analysis::semantics::NestedScope {
+    }
+
     entity Param native fpp_analysis::semantics::Param repr name(get_name) {
         fields {
             node: astdef(SpecParam),
@@ -908,6 +945,17 @@ fpp_python_macros::fpp_sem_bindings! {
     entity StateMachineScope native fpp_analysis::semantics::state_machine::StateMachineScope {
     }
 
+    entity TemplateExpansion native fpp_analysis::semantics::TemplateExpansion {
+        fields {
+            def_node: astdef(DefModuleTemplate),
+            expansion: astdef(SpecTemplateExpand),
+            params: list(union(Symbol)),
+            param_scope: entity(Scope),
+            scope: entity(Scope),
+            local_scope_map: map(union(Symbol), entity(Scope)),
+        }
+    }
+
     entity Throttle native fpp_analysis::semantics::Throttle {
         fields {
             count: usize,
@@ -991,6 +1039,7 @@ fpp_python_macros::fpp_sem_bindings! {
             qualified_name: str,
             direct_component_instances: map(union(Symbol), span),
             direct_topologies: map(union(Symbol), span),
+            direct_template_args: map(union(Symbol), span),
             transitive_import_set: list(union(Symbol)),
             instance_map: map(union(InterfaceInstance), span),
             ports: list(astdef(SpecTopPort)),
@@ -1014,6 +1063,7 @@ fpp_python_macros::fpp_sem_bindings! {
             get_connections_between(from: ref entity(PortInstanceIdentifier), to: ref entity(PortInstanceIdentifier)) -> list(entity(Connection)),
             get_connections_from(from: ref entity(PortInstanceIdentifier)) -> list(entity(Connection)),
             get_connections_to(to: ref entity(PortInstanceIdentifier)) -> list(entity(Connection)),
+            get_imported_topology_symbols(a: analysis) -> list(union(Symbol)),
             get_name -> ref str,
             get_port_number(pi: ref union(PortInstance), c: ref entity(Connection)) -> opt(i128),
             get_used_port_numbers(pi: ref union(PortInstance), cs: ref list(entity(Connection))) -> list(i128),

@@ -1,0 +1,7 @@
+  --> [ local path prefix ]/template/definition_point_scoping.fpp:15:24
+   |
+15 | array Discriminator = [N.b] U32
+   |                        ^^^ array size must be greater than zero
+   |
+   = note: expression evaluated to `0`
+

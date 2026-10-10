@@ -118,6 +118,9 @@ private class FppLspServerDescriptor(project: Project) : ProjectWideLspServerDes
                         SemanticTokenTypes.State -> FppColors.STATE
                         SemanticTokenTypes.Choice -> FppColors.CHOICE
 
+                        SemanticTokenTypes.Template -> FppColors.TEMPLATE
+                        SemanticTokenTypes.TemplateParameter -> FppColors.TEMPLATE_PARAMETER
+
                         // Other
                         SemanticTokenTypes.Annotation -> FppColors.ANNOTATION
                         SemanticTokenTypes.Comment -> FppColors.COMMENT

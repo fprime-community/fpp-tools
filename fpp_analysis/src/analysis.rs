@@ -2,8 +2,8 @@ use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
     Component, ComponentInstance, Dictionary, FppSystem, FrameworkDefinitions, ImpliedUse,
     ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, NameGroup, NestedScope, QualifiedName,
-    Scope, Symbol, SymbolInterface, TlmPacketSet, Topology, Type, UseDefMatching, Value,
-    state_machine::StateMachine,
+    Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion, TlmPacketSet, Topology, Type,
+    UseDefMatching, Value, state_machine::StateMachine,
 };
 use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc};
 use fpp_core::{File, SourceFile, Span, Spanned};
@@ -107,6 +107,11 @@ pub struct Analysis {
     pub(crate) tlm_packet_set: Option<TlmPacketSet>,
     /// The mapping from nodes to implied uses
     pub implied_use_map: HashMap<fpp_core::Node, ImpliedUseSet>,
+    /// The mapping from template expansion specifier nodes to their expansions
+    pub template_expansion_map: HashMap<fpp_core::Node, TemplateExpansion>,
+    /// The node of the template expansion specifier whose expansion we are
+    /// currently analyzing inside of
+    pub(crate) template_expansion: Option<fpp_core::Node>,
     /// The set of symbols defined with a dictionary specifier
     pub dictionary_symbol_set: HashSet<Symbol>,
     /// The mapping from system symbols to systems
@@ -143,7 +148,7 @@ impl Analysis {
             scope_name_list: Vec::new(),
             dictionary_generation: false,
             include_dictionary_deps: false,
-            nested_scope: NestedScope::new(),
+            nested_scope: NestedScope::new(ScopeOwner::Global),
             global_scope: Scope::new(),
             parent_symbol: None,
             parent_symbol_map: Default::default(),
@@ -171,6 +176,8 @@ impl Analysis {
             dictionary: None,
             tlm_packet_set: None,
             implied_use_map: Default::default(),
+            template_expansion_map: Default::default(),
+            template_expansion: None,
             dictionary_symbol_set: Default::default(),
             system_map: Default::default(),
             unknown_type: None,
@@ -312,9 +319,11 @@ impl Analysis {
         id: fpp_core::Node,
     ) -> SemanticResult<Option<Symbol>> {
         match self.use_def_map.get(&id) {
-            Some(symbol @ (Symbol::ComponentInstance(_) | Symbol::Topology(_))) => {
-                Ok(Some(symbol.clone()))
-            }
+            Some(
+                symbol @ (Symbol::ComponentInstance(_)
+                | Symbol::Topology(_)
+                | Symbol::TemplateInterfaceArg { .. }),
+            ) => Ok(Some(symbol.clone())),
             Some(symbol) => Err(Analysis::invalid_symbol(
                 symbol,
                 id,
@@ -650,13 +659,39 @@ impl Analysis {
         self.symbol_map.get(&node.id()).cloned()
     }
 
-    pub fn get_scope(&self, symbol: &Option<Symbol>) -> &Scope {
-        match symbol {
-            None => &self.global_scope,
-            Some(s) => self
-                .symbol_scope_map
-                .get(s)
+    /// The scope of a definition, or the global scope
+    pub fn get_symbol_scope(&self, symbol: &Option<Symbol>) -> &Scope {
+        self.get_scope(&symbol.clone().into())
+    }
+
+    /// The scope of a symbol for resolving names in it, or `None` if the symbol
+    /// opens no scope
+    pub fn lookup_scope(&self, symbol: &Symbol) -> Option<&Scope> {
+        self.local_scope(symbol)
+            .or_else(|| self.symbol_scope_map.get(symbol))
+    }
+
+    /// The scope open at one level of the nested scope stack
+    pub fn get_scope(&self, owner: &ScopeOwner) -> &Scope {
+        match owner {
+            ScopeOwner::Global => &self.global_scope,
+            ScopeOwner::Symbol(s) => self
+                .lookup_scope(s)
                 .unwrap_or_else(|| panic!("symbol {} does not have a scope", s.name().data)),
+            ScopeOwner::TemplateParams(node) => &self.expansion_at(*node).param_scope,
+            ScopeOwner::TemplateExpansion(node) => &self.expansion_at(*node).scope,
+        }
+    }
+
+    pub fn get_scope_mut(&mut self, owner: &ScopeOwner) -> &mut Scope {
+        match owner {
+            ScopeOwner::Global => &mut self.global_scope,
+            ScopeOwner::Symbol(s) => self
+                .symbol_scope_map
+                .get_mut(s)
+                .unwrap_or_else(|| panic!("symbol {} does not have a scope", s.name().data)),
+            ScopeOwner::TemplateParams(node) => &mut self.expansion_at_mut(*node).param_scope,
+            ScopeOwner::TemplateExpansion(node) => &mut self.expansion_at_mut(*node).scope,
         }
     }
 
@@ -665,19 +700,104 @@ impl Analysis {
             .search(|s| self.get_scope(s).get(name_group, name))
     }
 
-    pub fn get_scope_mut(&mut self, symbol: &Option<Symbol>) -> &mut Scope {
-        match symbol {
-            None => &mut self.global_scope,
-            Some(s) => self
-                .symbol_scope_map
-                .get_mut(s)
-                .unwrap_or_else(|| panic!("symbol {} does not have a scope", s.name().data)),
+    pub fn symbol_put(&mut self, name_group: NameGroup, symbol: Symbol) -> SemanticResult {
+        let owner = self.nested_scope.current().clone();
+        self.get_scope_mut(&owner).put(name_group, symbol)
+    }
+
+    /// The expansion of the template expansion specifier at `node`
+    pub fn expansion_at(&self, node: fpp_core::Node) -> &TemplateExpansion {
+        self.template_expansion_map
+            .get(&node)
+            .expect("template expansion specifier has no expansion")
+    }
+
+    fn expansion_at_mut(&mut self, node: fpp_core::Node) -> &mut TemplateExpansion {
+        self.template_expansion_map
+            .get_mut(&node)
+            .expect("template expansion specifier has no expansion")
+    }
+
+    /// The scope of a module defined by the expansion we are analyzing inside of.
+    ///
+    /// A module defined by an expansion is merged with a same-named module at the
+    /// expansion site, so the scope in the symbol scope map holds both sets of
+    /// members. A use inside the expansion must see only the members that the
+    /// expansion introduced: otherwise a definition at the expansion site
+    /// captures a use of a bound parameter and the argument is discarded.
+    fn local_scope(&self, symbol: &Symbol) -> Option<&Scope> {
+        let expansion = self.expansion_at(self.template_expansion?);
+        expansion.local_scope_map.get(symbol)
+    }
+
+    /// The nested scope in effect at the point of a definition, built from the
+    /// chain of definitions enclosing it
+    pub fn nested_scope_at(&self, symbol: &Symbol) -> NestedScope {
+        let mut levels = Vec::new();
+        self.push_enclosing_scopes(symbol, &mut levels);
+        levels.insert(0, ScopeOwner::Global);
+        NestedScope::from_levels(levels)
+    }
+
+    fn push_enclosing_scopes(&self, symbol: &Symbol, out: &mut Vec<ScopeOwner>) {
+        if let Some(parent) = self.parent_symbol_map.get(symbol) {
+            self.push_enclosing_scopes(parent, out);
+        }
+        // A definition without a brace-delimited body opens no scope
+        if self.symbol_scope_map.contains_key(symbol) {
+            out.push(ScopeOwner::Symbol(symbol.clone()));
         }
     }
 
-    pub fn symbol_put(&mut self, name_group: NameGroup, symbol: Symbol) -> SemanticResult {
-        let scope = self.nested_scope.current().clone();
-        self.get_scope_mut(&scope).put(name_group, symbol)
+    /// Gets a template symbol from the use-def map
+    pub fn get_template_symbol(&self, id: fpp_core::Node) -> SemanticResult<Option<Symbol>> {
+        match self.use_def_map.get(&id) {
+            Some(symbol @ Symbol::Template(_)) => Ok(Some(symbol.clone())),
+            Some(symbol) => Err(Analysis::invalid_symbol(
+                symbol,
+                id,
+                "not a template symbol",
+            )),
+            None => Ok(None),
+        }
+    }
+
+    /// Gets the use represented by a use. A use that refers to a bound template
+    /// parameter represents the use appearing in the template argument, resolved
+    /// recursively; any other use represents itself.
+    pub(crate) fn get_represented_use(&self, id: fpp_core::Node) -> fpp_core::Node {
+        match self.use_def_map.get(&id) {
+            Some(symbol) if symbol.is_template_arg() => self.get_represented_use(symbol.node()),
+            _ => id,
+        }
+    }
+
+    /// Gets the symbol represented by a use, stripping off any bound template
+    /// parameters. Returns `None` if the represented use refers to no symbol,
+    /// for example if the template argument is a literal value or a primitive
+    /// type name.
+    pub fn get_represented_symbol(&self, id: fpp_core::Node) -> Option<&Symbol> {
+        self.use_def_map.get(&self.get_represented_use(id))
+    }
+
+    /// Gets the topology symbol represented by a symbol, if there is one.
+    /// See [`Analysis::get_represented_symbol`].
+    pub fn get_represented_topology_symbol<'a>(&'a self, symbol: &'a Symbol) -> Option<&'a Symbol> {
+        let represented = if symbol.is_template_arg() {
+            self.get_represented_symbol(symbol.node())?
+        } else {
+            symbol
+        };
+        matches!(represented, Symbol::Topology(_)).then_some(represented)
+    }
+
+    /// Gets the component instance represented by a use, stripping off any bound
+    /// template parameters
+    pub fn get_represented_component_instance(
+        &self,
+        id: fpp_core::Node,
+    ) -> SemanticResult<Option<ComponentInstance>> {
+        self.get_component_instance(self.get_represented_use(id))
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::basic_use_analyzer::UseAnalysisPass;
+use crate::analyzers::basic_use_analyzer::{UseAnalysisPass, visit_template_arg};
 use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::SemanticError;
 use crate::semantics::{
@@ -271,6 +271,13 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckTypeUses<'ast> {
             Symbol::ArrayType(def) => def.visit(a, self)?,
             Symbol::EnumType(def) => def.visit(a, self)?,
             Symbol::StructType(def) => def.visit(a, self)?,
+            // A bound type parameter names the type its argument names, so
+            // compute the type of the argument
+            Symbol::TemplateTypeArg { value, .. } => {
+                if !a.type_map.contains_key(&value.node_id) {
+                    self.template_type_arg(a, &symbol)?;
+                }
+            }
             _ => {
                 SemanticError::InvalidSymbol {
                     symbol_name: symbol.name().data.clone(),
@@ -291,5 +298,13 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckTypeUses<'ast> {
         }
 
         ControlFlow::Continue(())
+    }
+
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
     }
 }

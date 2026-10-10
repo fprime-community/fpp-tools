@@ -42,9 +42,9 @@ groups.
 
 One file-wide key sits above the first `[[group]]`:
 
-| Key      | Meaning                                            |
-| -------- | -------------------------------------------------- |
-| `expand` | Match against the expanded model. Default `false`. |
+| Key      | Meaning                                                                   |
+| -------- | ------------------------------------------------------------------------- |
+| `expand` | Which expansions to match against. Default none; the spellings are below. |
 
 **Write a query as a TOML literal string** — `where = '$.is_deployment'`, in single
 quotes. A query needs `"` for its own string literals, and a literal string carries
@@ -56,6 +56,61 @@ A misspelled key names the alternatives exactly (`unknown field \`wheer\`, expec
 one of \`node\`, \`where\`, \`name\`, \`generate\``), and every diagnostic — a bad
 kind, a bad suffix, a query that will not parse — carets the offending value at its
 real line in the file. One run reports every rule the file gets wrong.
+
+### Expansions
+
+The model a query sees is the model as parsed — `include`s resolved, nothing else
+rewritten — plus whichever of two expansions `expand` asks for:
+
+- `templates` replaces each `expand` specifier with the members of the module
+  template it names.
+- `state-enums` synthesizes the implicit `enum State` of each state machine that has
+  a body.
+
+| Value                                   | Expansions                                  |
+| --------------------------------------- | ------------------------------------------- |
+| `expand = true`                         | both                                        |
+| `expand = false`                        | neither — the model as parsed. The default. |
+| `expand = ["templates"]`                | templates only                              |
+| `expand = ["state-enums"]`              | state enums only                            |
+| `expand = ["templates", "state-enums"]` | both, in any order                          |
+| `expand = []`                           | neither                                     |
+
+The two are independent, and the order the names are written in is not the order they
+run in: asking for both gives a state machine a template expansion contributed the
+same implicit `State` a hand-written one gets, wherever in the template body it is
+written.
+
+It is file-wide because it decides what every group *means*: the same `DefEnum` group
+either picks up each state machine's `State` enum or does not, and the same
+`DefComponent` group either reaches the components a template expansion contributes
+or does not. A name that is neither of the two is an error rather than a no-op, for
+the same reason — a setting that quietly did nothing would drop files from the list.
+
+`expand = false` reads the model exactly as written: nothing has been copied under an
+`expand` specifier, which still selects as a `SpecTemplateExpand` of its own. The
+body of a `module template` is never matched either way — its definitions come into
+being where the template is expanded, so a group reaches them only through an
+expansion `templates` has materialized.
+
+## Template expansion
+
+When `expand` includes `templates`, each `expand` specifier is replaced by its own
+copy of the members of the module template it names, so the definitions an expansion
+contributes are part of the model a query sees, and the files they generate are in
+the list.
+
+Every preset turns it on: a template expansion specifier is written by hand and says
+that the members of a template appear at that point, so a file list that left them
+out would simply be wrong.
+
+The template name is resolved **syntactically**, by the scoping rules for a
+qualified identifier: innermost enclosing module outward. `fpp-check` resolves it
+through the symbol table, but this tool sees one module of a larger build, so a
+name that does not resolve here contributes nothing and is not reported — the same
+answer this tool gives for any definition it cannot see. Expansion runs after
+`include` resolution, so a template defined in an included file is visible, and
+before `--json` and `--fields`, which report the model a query will actually see.
 
 ## The command line
 
@@ -120,12 +175,13 @@ modes are expressible here, and ship as presets:
 fpp-query --rules presets/autocode.toml -d "$OUT" -- "$@"
 ```
 
-Copy the file into your project and delete the groups you do not want. Its comments
-explain each rule, and it is the tested spelling of them: `tests/filenames.rs` runs
-these presets against upstream's own suite — the models in `tests/filenames/` and the
-`.ref.txt` reference outputs are copied verbatim from the Scala compiler's
-`compiler/tools/fpp-filenames/test` — so the file you copy is the one held to
-upstream's output byte for byte, not a transcription of it.
+Copy the file into your project and delete the groups you do not want — but keep its
+`expand`, or the definitions a template expansion contributes drop out of the list.
+Its comments explain each rule, and it is the tested spelling of them:
+`tests/filenames.rs` runs these presets against upstream's own suite — the models in
+`tests/filenames/` and the `.ref.txt` reference outputs are copied verbatim from the
+Scala compiler's `compiler/tools/fpp-filenames/test` — so the file you copy is the
+one held to upstream's output byte for byte, not a transcription of it.
 
 ## The query language
 

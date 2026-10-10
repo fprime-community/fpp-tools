@@ -177,3 +177,33 @@ fn topology_ports() {
 fn topology() {
     run_test("topology")
 }
+
+#[test]
+fn template() {
+    run_test("template")
+}
+
+#[test]
+fn template_error() {
+    run_test("template-error")
+}
+
+#[test]
+fn template_error_def() {
+    run_test("template-error-def")
+}
+
+#[test]
+fn template_error_body() {
+    run_test("template-error-body")
+}
+
+#[test]
+fn template_error_locate_name() {
+    run_test("template-error-locate-name")
+}
+
+#[test]
+fn template_error_locate_file() {
+    run_test("template-error-locate-file")
+}

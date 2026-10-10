@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/template-error-body.fpp:2:17
+  |
+2 | module template T5
+  |                 ^^ syntax error: unexpected token
+  |
+  = note: expected {
+  = note: got end of line
+

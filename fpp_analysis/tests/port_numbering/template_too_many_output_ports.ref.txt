@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/port_numbering/template_too_many_output_ports.fpp:11:3
+   |
+11 |   output port pOut: [2] P
+   |   ^^^^^^^^^^^^^^^^^^^^^^^ too many ports connected here (found 3, max is 2)
+   |
+  ::: [ local path prefix ]/port_numbering/template_too_many_output_ports.fpp:23:1
+   |
+23 | instance cm: CMatch base id 0x100
+   | --------------------------------- for this component instance
+

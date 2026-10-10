@@ -555,7 +555,7 @@ struct ListCfg {
 
 fn list_cfg(kind: SyntaxKind) -> ListCfg {
     match kind {
-        FORMAL_PARAM_LIST => ListCfg {
+        FORMAL_PARAM_LIST | TEMPLATE_PARAM_LIST | TEMPLATE_ARG_LIST => ListCfg {
             open: "(",
             close: ")",
             mode: ListMode::Auto,

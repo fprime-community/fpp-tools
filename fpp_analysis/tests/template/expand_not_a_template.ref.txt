@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/template/expand_not_a_template.fpp:9:10
+  |
+9 |     expand N
+  |            ^ invalid use of symbol N: not a template symbol
+  |
+ ::: [ local path prefix ]/template/expand_not_a_template.fpp:4:1
+  |
+4 | / module N {
+5 | |   constant x = 1
+6 | | }
+  | |_- N defined here
+

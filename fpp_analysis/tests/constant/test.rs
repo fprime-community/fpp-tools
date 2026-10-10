@@ -46,6 +46,16 @@ fn array_common_type_conversion() {
 }
 
 #[test]
+fn template_scalar_array_promote_ok() {
+    run_test("constant/template_scalar_array_promote_ok")
+}
+
+#[test]
+fn template_scalar_array_promote_out_of_bounds() {
+    run_test("constant/template_scalar_array_promote_out_of_bounds")
+}
+
+#[test]
 fn dictionary_error() {
     run_test("constant/dictionary_error")
 }

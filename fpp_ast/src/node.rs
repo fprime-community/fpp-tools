@@ -51,6 +51,7 @@ node_kinds! {
     DefGuard,
     DefInterface,
     DefModule,
+    DefModuleTemplate,
     DefPort,
     DefSignal,
     DefState,
@@ -81,6 +82,7 @@ node_kinds! {
     SpecStateExit,
     SpecStateMachineInstance,
     SpecStateTransition,
+    SpecTemplateExpand,
     SpecTlmChannel,
     SpecTlmPacket,
     SpecTlmPacketSet,
@@ -94,6 +96,11 @@ node_kinds! {
     QualIdent,
     Qualified,
     StructExprMember,
+    TemplateArg,
+    TemplateParam,
+    TemplateParamConstant,
+    TemplateParamInterface,
+    TemplateParamType,
     TypeName,
     /* Inner AST nodes */
     Connection,
@@ -123,6 +130,7 @@ impl<'a> Node<'a> {
             Node::DefGuard(n) => Some(&n.name.data),
             Node::DefInterface(n) => Some(&n.name.data),
             Node::DefModule(n) => Some(&n.name.data),
+            Node::DefModuleTemplate(n) => Some(&n.name.data),
             Node::DefPort(n) => Some(&n.name.data),
             Node::DefSignal(n) => Some(&n.name.data),
             Node::DefState(n) => Some(&n.name.data),
@@ -151,6 +159,10 @@ impl<'a> Node<'a> {
             Node::FormalParam(n) => Some(&n.name.data),
             Node::StructExprMember(n) => Some(&n.name.data),
             Node::StructTypeMember(n) => Some(&n.name.data),
+            Node::TemplateParam(n) => Some(&n.name().data),
+            Node::TemplateParamConstant(n) => Some(&n.name.data),
+            Node::TemplateParamInterface(n) => Some(&n.name.data),
+            Node::TemplateParamType(n) => Some(&n.name.data),
             Node::Name(n) => Some(&n.data),
             Node::Ident(n) => Some(&n.data),
             Node::Connection(_)
@@ -172,6 +184,8 @@ impl<'a> Node<'a> {
             | Node::SpecStateEntry(_)
             | Node::SpecStateExit(_)
             | Node::SpecStateTransition(_)
+            | Node::SpecTemplateExpand(_)
+            | Node::TemplateArg(_)
             | Node::TlmChannelIdentifier(_)
             | Node::TlmChannelLimit(_)
             | Node::TransitionExpr(_)

@@ -1,8 +1,5 @@
- --> [ local path prefix ]/template/undef_constant_param_type.fpp:1:8
+ --> [ local path prefix ]/template/undef_constant_param_type.fpp:1:31
   |
 1 | module template T(constant c: S) {}
-  |        ^^^^^^^^ syntax error: unexpected token
-  |
-  = note: expected {
-  = note: got identifier
+  |                               ^ cannot find type `S` in scope
 

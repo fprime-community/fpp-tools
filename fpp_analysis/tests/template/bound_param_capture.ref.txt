@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/template/bound_param_capture.fpp:3:16
+  |
+3 |     array A = [n] U32
+  |                ^ array size must be greater than zero
+  |
+  = note: expanded at [ local path prefix ]/template/bound_param_capture.fpp:12:3
+  = note: expression evaluated to `0`
+

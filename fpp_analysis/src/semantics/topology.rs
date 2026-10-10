@@ -62,13 +62,13 @@ impl ConnectionPattern {
         a: &crate::Analysis,
         spec: &Arc<ast::SpecPatternConnectionGraph>,
     ) -> SemanticResult<Option<ConnectionPattern>> {
-        let Some(source_ci) = a.get_component_instance(spec.source.id())? else {
+        let Some(source_ci) = a.get_represented_component_instance(spec.source.id())? else {
             return Ok(None);
         };
         let source = (source_ci, spec.source.span());
         let mut targets: Vec<(ComponentInstance, Span)> = Vec::new();
         for tgt in &spec.targets {
-            let Some(ci) = a.get_component_instance(tgt.id())? else {
+            let Some(ci) = a.get_represented_component_instance(tgt.id())? else {
                 return Ok(None);
             };
             if !targets.iter().any(|(prev, _)| prev == &ci) {
@@ -94,6 +94,9 @@ pub struct Topology {
     pub direct_component_instances: HashMap<Symbol, Span>,
     /// The topologies directly imported into this topology
     pub direct_topologies: HashMap<Symbol, Span>,
+    /// The bound port interface instance template parameters directly declared
+    /// as instances of this topology
+    pub direct_template_args: HashMap<Symbol, Span>,
     /// The transitively imported topologies (by symbol).
     pub transitive_import_set: HashSet<Symbol>,
     /// The instances of this topology, resolved across imports.
@@ -133,6 +136,7 @@ impl Topology {
             qualified_name,
             direct_component_instances: HashMap::default(),
             direct_topologies: HashMap::default(),
+            direct_template_args: HashMap::default(),
             transitive_import_set: HashSet::default(),
             instance_map: BTreeMap::new(),
             ports: Vec::new(),
@@ -182,24 +186,33 @@ impl Topology {
 
     /// Add an interface instance symbol (component instance or imported
     /// topology) that must be unique within its category.
-    pub fn add_instance_symbol(&mut self, symbol: Symbol, loc: Span) -> SemanticResult {
+    pub fn add_instance_symbol(
+        &mut self,
+        a: &crate::Analysis,
+        symbol: Symbol,
+        loc: Span,
+    ) -> SemanticResult {
+        // A deployment topology may not be an instance of another topology. The
+        // symbol may be a bound template parameter, so resolve it first.
+        if let Some(top @ Symbol::Topology(def)) = a.get_represented_topology_symbol(&symbol)
+            && def.is_deployment
+        {
+            return Err(SemanticError::InvalidSymbol {
+                symbol_name: symbol.name().data.clone(),
+                msg: format!(
+                    "invalid use of symbol {}: use of deployment topology is not allowed here",
+                    symbol.name().data
+                ),
+                loc,
+                def_loc: top.node().span(),
+            });
+        }
         let map = match &symbol {
             Symbol::ComponentInstance(_) => &mut self.direct_component_instances,
-            Symbol::Topology(def) => {
-                // A deployment topology may not be imported into another topology.
-                if def.is_deployment {
-                    return Err(SemanticError::InvalidSymbol {
-                        symbol_name: symbol.name().data.clone(),
-                        msg: format!(
-                            "invalid use of symbol {}: use of deployment topology is not allowed here",
-                            symbol.name().data
-                        ),
-                        loc,
-                        def_loc: symbol.node().span(),
-                    });
-                }
-                &mut self.direct_topologies
-            }
+            Symbol::Topology(_) => &mut self.direct_topologies,
+            // A bound parameter stands for whatever instance the argument names,
+            // which is not known until the argument is resolved
+            Symbol::TemplateInterfaceArg { .. } => &mut self.direct_template_args,
             // Other symbol kinds are rejected earlier during use resolution.
             _ => return Ok(()),
         };
@@ -403,10 +416,42 @@ impl Topology {
     }
 
     /// Looks up the location where a component instance appears in this topology.
+    ///
+    /// The instance may appear directly, through an imported subtopology, or
+    /// through a bound port interface instance template parameter.
     pub fn look_up_component_instance_loc(&self, ci: &ComponentInstance) -> Option<Span> {
-        self.instance_map
-            .get(&InterfaceInstance::from_component_instance(ci.clone()))
-            .copied()
+        self.component_instance_map().get(ci).copied()
+    }
+
+    /// Look up a component instance used at a location.
+    pub fn look_up_component_instance_at(
+        &self,
+        ci: &ComponentInstance,
+        loc: Span,
+    ) -> SemanticResult {
+        match self.look_up_component_instance_loc(ci) {
+            Some(_) => Ok(()),
+            None => Err(SemanticError::InvalidInterfaceInstance {
+                loc,
+                instance_name: ci.get_unqualified_name().to_string(),
+                top_name: self.unqualified_name(),
+            }),
+        }
+    }
+
+    /// The symbols of the topologies imported into this topology.
+    ///
+    /// A topology may be imported through a bound port interface instance
+    /// template parameter, so follow each bound parameter to the definition it
+    /// represents.
+    pub fn get_imported_topology_symbols(&self, a: &crate::Analysis) -> Vec<Symbol> {
+        let mut out: Vec<Symbol> = self.direct_topologies.keys().cloned().collect();
+        out.extend(
+            self.direct_template_args
+                .keys()
+                .filter_map(|symbol| a.get_represented_topology_symbol(symbol).cloned()),
+        );
+        out
     }
 
     /// Resolve the port numbers in a connection.
@@ -468,7 +513,7 @@ pub fn pattern_kind_str(kind: &ConnectionPatternKind) -> String {
 mod tests {
     use super::Topology;
     use crate::semantics::{Connection, InterfaceInstance, PortInstanceIdentifier};
-    use crate::{Analysis, add_state_enums, check_semantics};
+    use crate::{Analysis, add_state_enums, check_semantics, resolve_templates};
     use fpp_core::SourceFile;
 
     /// A topology with one output port array feeding two input ports. The
@@ -525,6 +570,7 @@ module M {
             let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
             let mut a = Analysis::new();
             add_state_enums(&mut ast);
+            let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
             let _ = check_semantics(&mut a, vec![&ast]);
             let top = a
                 .topology_map

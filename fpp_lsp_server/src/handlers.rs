@@ -397,6 +397,7 @@ impl<'a> fpp_lsp_parser::Visitor for DocumentLinksVisitor<'a> {
         match node.kind() {
             SyntaxKind::ROOT => VisitorResult::Recurse,
             SyntaxKind::DEF_MODULE => VisitorResult::Recurse,
+            SyntaxKind::DEF_MODULE_TEMPLATE => VisitorResult::Recurse,
             SyntaxKind::MODULE_MEMBER_LIST => VisitorResult::Recurse,
             SyntaxKind::DEF_COMPONENT => VisitorResult::Recurse,
             SyntaxKind::COMPONENT_MEMBER_LIST => VisitorResult::Recurse,
@@ -644,9 +645,14 @@ pub fn handle_hover(state: &GlobalState, request: HoverParams) -> Result<Option<
     // From here on in we should only show hover information for definitions if we are hovering over
     // the definition's name
     if let Some(Node::Name(name)) = nodes.first() {
-        // We are hovering over a name
+        // We are hovering over a name. Only a definition that this name
+        // introduces may answer: an unresolved name (a use inside a template
+        // body, which resolves only where the template is expanded, or a name
+        // that does not resolve at all) would otherwise walk out to the
+        // enclosing definition and be described as that definition.
         Ok(nodes
             .iter()
+            .filter(|node| node.name() == Some(name.data.as_str()))
             .find_map(|node| hover_for_node(state, name, *node)))
     } else {
         Ok(None)
@@ -997,6 +1003,14 @@ pub fn handle_completion(
             SyntaxKind::SPEC_LOC => return Ok(None),
             SyntaxKind::SPEC_PORT_INSTANCE_GENERAL => NameGroup::Port,
             SyntaxKind::SPEC_STATE_MACHINE_INSTANCE => NameGroup::StateMachine,
+            SyntaxKind::SPEC_TEMPLATE_EXPAND => NameGroup::Template,
+            // The only template argument written as a bare qualified identifier
+            // is an interface instance; a constant argument is an expression and
+            // a type argument is a type name, both of which nest deeper.
+            SyntaxKind::TEMPLATE_ARG => NameGroup::PortInterfaceInstance,
+            // Likewise, the only qualified identifier in a template parameter is
+            // the port interface an instance parameter declares.
+            SyntaxKind::TEMPLATE_PARAM => NameGroup::PortInterface,
             SyntaxKind::TYPE_NAME => NameGroup::Type,
             _ => return Ok(None),
         };
@@ -1155,7 +1169,18 @@ pub fn handle_completion(
                                     .syntax_node()
                                     .covering_element(TextRange::new(cursor_pos, cursor_pos));
 
-                                if let Some(ng) = element.ancestors().find_map(|n| match n.kind() {
+                                // The enclosing grammar rule decides which names
+                                // may be written here. A cursor parked in the
+                                // whitespace that follows the rule's opening
+                                // keyword is covered only by that whitespace,
+                                // which is a *sibling* of the rule rather than a
+                                // descendant (nothing after the keyword parsed,
+                                // so the rule ends at it). Fall back to the rule
+                                // around the last real token to the left.
+                                let mut ancestors =
+                                    element.ancestors().chain(left_token.parent_ancestors());
+
+                                if let Some(ng) = ancestors.find_map(|n| match n.kind() {
                                     SyntaxKind::DEF_COMPONENT_INSTANCE => {
                                         Some(NameGroup::Component)
                                     }
@@ -1176,10 +1201,24 @@ pub fn handle_completion(
                                     SyntaxKind::SPEC_STATE_MACHINE_INSTANCE => {
                                         Some(NameGroup::StateMachine)
                                     }
+                                    // An argument or parameter is nested inside
+                                    // the specifier or definition it belongs to,
+                                    // so it is found first and wins.
+                                    SyntaxKind::TEMPLATE_ARG => {
+                                        Some(NameGroup::PortInterfaceInstance)
+                                    }
+                                    SyntaxKind::TEMPLATE_PARAM => Some(NameGroup::PortInterface),
+                                    SyntaxKind::SPEC_TEMPLATE_EXPAND => Some(NameGroup::Template),
                                     SyntaxKind::TYPE_NAME => Some(NameGroup::Type),
                                     _ => None,
                                 }) {
-                                    completion_items_in_name_group(state, cursor_pos, ng, &uri)
+                                    completion_items_in_name_group(
+                                        state,
+                                        cursor_pos,
+                                        ng,
+                                        &uri,
+                                        crate::util::in_template_param_list(&element),
+                                    )
                                 } else {
                                     None
                                 }
@@ -1350,7 +1389,17 @@ mod hover_tests {
     /// The `(line, character)` position (0-based) of the first occurrence of
     /// `needle` in `src`.
     fn position_of(src: &str, needle: &str) -> Position {
-        let byte = src.find(needle).expect("needle present in source");
+        position_of_nth(src, needle, 0)
+    }
+
+    /// The `(line, character)` position (0-based) of the `nth` (0-based)
+    /// occurrence of `needle` in `src`.
+    fn position_of_nth(src: &str, needle: &str, nth: usize) -> Position {
+        let byte = src
+            .match_indices(needle)
+            .nth(nth)
+            .expect("needle present in source")
+            .0;
         let prefix = &src[..byte];
         let line = prefix.matches('\n').count() as u32;
         let col = prefix.len() as u32 - prefix.rfind('\n').map_or(0, |i| i as u32 + 1);
@@ -1387,7 +1436,7 @@ mod hover_tests {
         (state, file_uri)
     }
 
-    fn hover_at(state: &GlobalState, uri: &Uri, position: Position) -> String {
+    fn hover_opt_at(state: &GlobalState, uri: &Uri, position: Position) -> Option<String> {
         let hover = handle_hover(
             state,
             HoverParams {
@@ -1398,12 +1447,15 @@ mod hover_tests {
                 work_done_progress_params: WorkDoneProgressParams::default(),
             },
         )
-        .expect("hover ok")
-        .expect("hover present");
+        .expect("hover ok")?;
         match hover.contents {
-            HoverContents::Markup(MarkupContent { value, .. }) => value,
+            HoverContents::Markup(MarkupContent { value, .. }) => Some(value),
             other => panic!("expected markup hover, got {other:?}"),
         }
+    }
+
+    fn hover_at(state: &GlobalState, uri: &Uri, position: Position) -> String {
+        hover_opt_at(state, uri, position).expect("hover present")
     }
 
     const SM_SRC: &str = "\
@@ -1444,6 +1496,91 @@ module M {
             assert!(
                 !value.contains("(State Machine)"),
                 "hover on `{needle}` should not show the parent state machine, got:\n{value}"
+            );
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    const TEMPLATE_SRC: &str = "\
+module M {
+  port P
+  interface Iface {
+    output port pOut: P
+  }
+  module template Tmpl(constant Size: U32, type Elem, instance myInst: Iface) {
+    array Arr = [Size] Elem
+    topology Top {
+      instance myInst
+    }
+  }
+  passive component Comp {
+    output port pOut: P
+  }
+  instance comp: Comp base id 1
+  expand Tmpl(constant 3, type U32, instance comp)
+}
+";
+
+    /// A module template definition and each kind of template parameter are named
+    /// by their own hover. Without an arm for them the hover would walk out to the
+    /// enclosing definition and describe that instead.
+    #[test]
+    fn hover_on_template_definition_and_parameters() {
+        let dir = temp_dir("template-defs");
+        let (state, uri) = state_for(&dir, TEMPLATE_SRC);
+
+        for (needle, expected) in [
+            ("Tmpl", "(Module Template) M.Tmpl"),
+            ("Size", "(Constant Template Parameter) Size"),
+            ("Elem", "(Type Template Parameter) Elem"),
+            ("myInst", "(Instance Template Parameter) myInst"),
+        ] {
+            let value = hover_at(&state, &uri, position_of(TEMPLATE_SRC, needle));
+            assert!(
+                value.contains(expected),
+                "hover on `{needle}` should contain `{expected}`, got:\n{value}"
+            );
+            assert!(
+                !value.contains("(Module) M"),
+                "hover on `{needle}` should not describe the enclosing module, got:\n{value}"
+            );
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The name in an expansion specifier is a use of the template, so it hovers
+    /// as the template it names.
+    #[test]
+    fn hover_on_template_expansion_names_the_template() {
+        let dir = temp_dir("template-expand");
+        let (state, uri) = state_for(&dir, TEMPLATE_SRC);
+
+        // The second `Tmpl` is the one in `expand Tmpl(...)`.
+        let value = hover_at(&state, &uri, position_of_nth(TEMPLATE_SRC, "Tmpl", 1));
+        assert!(
+            value.contains("(Module Template) M.Tmpl"),
+            "hover on the expanded template should name it, got:\n{value}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A use inside a template body resolves only where the template is expanded,
+    /// so it has no entry in the use-def map of the body as written. It must
+    /// produce no hover rather than describing whichever definition encloses it.
+    #[test]
+    fn hover_on_use_inside_template_body_is_empty() {
+        let dir = temp_dir("template-body-use");
+        let (state, uri) = state_for(&dir, TEMPLATE_SRC);
+
+        // The second `Elem` and `Size` are the uses in `array Arr = [Size] Elem`.
+        for needle in ["Size", "Elem"] {
+            let hover = hover_opt_at(&state, &uri, position_of_nth(TEMPLATE_SRC, needle, 1));
+            assert!(
+                hover.is_none(),
+                "hover on the use of `{needle}` in a template body should be empty, got:\n{hover:?}"
             );
         }
 

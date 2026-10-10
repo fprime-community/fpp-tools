@@ -5,21 +5,73 @@ use crate::passes::compute_dependencies::ComputeDependencies;
 use crate::semantics::QualifiedName;
 use fpp_ast::*;
 use fpp_core::{File, FileReader, Spanned};
+use rustc_hash::FxHashSet as HashSet;
 use std::ops::ControlFlow;
 use std::sync::Arc;
+
+/// Collect the names of the templates that a list of translation units expands.
+///
+/// The definition of a template and the expansion of that template may appear in
+/// different translation units, so the set is collected from the whole list
+/// before any dependency is added.
+pub struct CollectTemplateExpansions;
+
+impl CollectTemplateExpansions {
+    /// The names of the templates expanded in a list of translation units
+    pub fn names_in<'a>(tul: impl Iterator<Item = &'a TransUnit>) -> HashSet<String> {
+        let mut names = HashSet::default();
+        let _ = CollectTemplateExpansions.visit_trans_units(&mut names, tul);
+        names
+    }
+}
+
+impl<'ast> Visitor<'ast> for CollectTemplateExpansions {
+    type Break = ();
+    type State = HashSet<String>;
+
+    fn super_visit(&self, a: &mut Self::State, node: Node<'ast>) -> ControlFlow<Self::Break> {
+        node.walk(a, self)
+    }
+
+    fn visit_spec_template_expand(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecTemplateExpand,
+    ) -> ControlFlow<Self::Break> {
+        let name: QualifiedName = (&node.template).into();
+        a.insert(name.base().to_string());
+        ControlFlow::Continue(())
+    }
+}
 
 /// Add dependencies
 pub struct AddDependencies<'ast, Reader: FileReader + Clone> {
     super_: BasicUseAnalyzer<'ast, Analysis, Self>,
     reader: Reader,
+    /// The names of the templates that the translation units at this dependency
+    /// level expand
+    expanded_template_names: HashSet<String>,
 }
 
 impl<'ast, Reader: FileReader + Clone> AddDependencies<'ast, Reader> {
-    pub fn new(reader: Reader) -> AddDependencies<'ast, Reader> {
+    pub fn new(
+        reader: Reader,
+        expanded_template_names: HashSet<String>,
+    ) -> AddDependencies<'ast, Reader> {
         AddDependencies {
             super_: BasicUseAnalyzer::new(),
             reader,
+            expanded_template_names,
         }
+    }
+
+    /// Should we visit the body of a module template definition?
+    ///
+    /// The body of a template contributes dependencies only where the template is
+    /// expanded. At a deeper dependency level we cannot see the expansions, so
+    /// every body is visited.
+    fn visit_template_body(&self, a: &Analysis, name: &str) -> bool {
+        a.level > 1 || self.expanded_template_names.contains(name)
     }
 
     /// Descend into a container, tracking the enclosing scope names
@@ -129,6 +181,20 @@ impl<'ast, Reader: FileReader + Clone> Visitor<'ast> for AddDependencies<'ast, R
         node: &'ast DefStateMachine,
     ) -> ControlFlow<Self::Break> {
         self.scoped(a, &node.name.data, Node::DefStateMachine(node))
+    }
+
+    fn visit_def_module_template(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefModuleTemplate,
+    ) -> ControlFlow<Self::Break> {
+        // The parameter list is a source of dependencies wherever the template is
+        // defined; the body is one only where the template is expanded.
+        self.super_.visit(self, a, Node::DefModuleTemplate(node))?;
+        if self.visit_template_body(a, &node.name.data) {
+            node.members.visit(a, self)?;
+        }
+        ControlFlow::Continue(())
     }
 
     fn visit_spec_loc(&self, a: &mut Analysis, node: &'ast SpecLoc) -> ControlFlow<Self::Break> {
@@ -242,5 +308,46 @@ impl<'ast, Reader: FileReader + Clone> UseAnalysisPass<'ast, Analysis>
         name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.analyze_use(a, SpecLocKind::Type, name)
+    }
+
+    fn template_use(
+        &self,
+        a: &mut Analysis,
+        _node: &QualIdent,
+        name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.analyze_use(a, SpecLocKind::Template, name)
+    }
+
+    fn implied_type_use(
+        &self,
+        a: &mut Analysis,
+        _node: &QualIdent,
+        name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.analyze_use(a, SpecLocKind::Type, name)
+    }
+
+    fn implied_constant_use(
+        &self,
+        a: &mut Analysis,
+        _node: &Expr,
+        name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.analyze_use(a, SpecLocKind::Constant, name)
+    }
+
+    /// A template argument names a definition wherever the expansion appears,
+    /// whether or not the template can be resolved here.
+    fn template_arg_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast TemplateArg,
+    ) -> ControlFlow<Self::Break> {
+        match &node.kind {
+            TemplateArgKind::Constant(e) => e.visit(a, self),
+            TemplateArgKind::Type(tn) => tn.visit(a, self),
+            TemplateArgKind::Interface(q) => self.interface_instance_use(a, q, q.into()),
+        }
     }
 }

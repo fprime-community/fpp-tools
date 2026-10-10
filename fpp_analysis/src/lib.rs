@@ -6,10 +6,11 @@ pub use used_symbols::UsedSymbols;
 use crate::passes::{
     BuildSpecLocMap, CheckComponentDefs, CheckComponentInstanceDefs, CheckDictionaryDefs,
     CheckExprTypes, CheckFrameworkConstantValues, CheckFrameworkDefs, CheckInterfaceDefs,
-    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs, CheckTopologyDefs,
-    CheckTopologyInstances, CheckTypeUses, CheckUseDefCycles, CheckUses, ConstructDictionaryMap,
-    ConstructImpliedUseMap, EnterSymbols, EvalConstantExprs, EvalImpliedEnumConsts,
-    FinalizeTypeDefs,
+    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs,
+    CheckTemplateInterfaceArgs, CheckTemplateUses, CheckTopologyDefs, CheckTopologyInstances,
+    CheckTypeUses, CheckUseDefCycles, CheckUses, ConstructDictionaryMap, ConstructImpliedUseMap,
+    EnterSymbols, EnterTemplateSymbols, EvalConstantExprs, EvalImpliedEnumConsts,
+    FinalizeConstantExprs, FinalizeTypeDefs,
 };
 pub use analysis::*;
 use fpp_ast::{MutVisitor, Visitor};
@@ -47,8 +48,17 @@ pub mod passes {
 
     pub mod state_machine;
 
-    mod check_uses;
+    pub(crate) mod check_uses;
     pub use check_uses::*;
+
+    mod check_template_uses;
+    pub use check_template_uses::*;
+
+    mod check_template_interface_args;
+    pub use check_template_interface_args::*;
+
+    mod enter_template_symbols;
+    pub use enter_template_symbols::*;
 
     mod check_use_def_cycles;
     pub use check_use_def_cycles::*;
@@ -67,6 +77,9 @@ pub mod passes {
 
     mod finalize_type_defs;
     pub use finalize_type_defs::*;
+
+    mod finalize_constant_exprs;
+    pub use finalize_constant_exprs::*;
 
     mod check_port_defs;
     pub use check_port_defs::*;
@@ -110,8 +123,11 @@ pub mod passes {
 
 pub mod transform {
     pub use fpp_parser::add_state_enums;
+
+    mod expand_templates;
+    pub use expand_templates::*;
 }
-pub use transform::add_state_enums;
+pub use transform::{ExpandTemplates, add_state_enums};
 
 pub mod semantics {
     mod symbol;
@@ -165,6 +181,9 @@ pub mod semantics {
     mod scope;
     pub use scope::*;
 
+    mod template_expansion;
+    pub use template_expansion::*;
+
     mod name_groups;
     pub use name_groups::*;
 
@@ -215,9 +234,31 @@ pub fn resolve_includes<Reader: FileReader>(
     result
 }
 
+/// Expand template expansion specifiers and enter the symbols they produce.
+///
+/// This runs before [`check_semantics`], on the same analysis: it performs the
+/// symbol entering that the rest of the analysis relies on, and it rewrites the
+/// translation units, replacing each template expansion specifier with the
+/// expanded template.
+///
+/// A model whose templates do not expand cannot be analyzed, so a `Break` result
+/// means the caller must not go on to [`check_semantics`].
+pub fn resolve_templates(a: &mut Analysis, ast: &mut [fpp_ast::TransUnit]) -> ControlFlow<()> {
+    EnterSymbols.visit_trans_units(a, ast.iter())?;
+    CheckTemplateUses::new().visit_trans_units(a, ast.iter())?;
+    if let Err(err) = ExpandTemplates::transform(a, ast) {
+        err.emit();
+        return ControlFlow::Break(());
+    }
+    EnterTemplateSymbols.visit_trans_units(a, ast.iter())?;
+    ControlFlow::Continue(())
+}
+
 /// Check the semantics of a list of translation units.
+///
+/// [`resolve_templates`] must have run on the same analysis first: it enters the
+/// symbols of the model.
 pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> ControlFlow<()> {
-    EnterSymbols.visit_trans_units(a, ast.iter().cloned())?;
     ConstructImpliedUseMap.visit_trans_units(a, ast.iter().cloned())?;
     CheckUses::new().visit_trans_units(a, ast.iter().cloned())?;
     CheckUseDefCycles::new().visit_trans_units(a, ast.iter().cloned())?;
@@ -227,6 +268,7 @@ pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> Contr
     EvalImpliedEnumConsts::new().visit_trans_units(a, ast.iter().cloned())?;
     EvalConstantExprs::new().visit_trans_units(a, ast.iter().cloned())?;
     FinalizeTypeDefs::new().visit_trans_units(a, ast.iter().cloned())?;
+    FinalizeConstantExprs::new().visit_trans_units(a, ast.iter().cloned())?;
     CheckFrameworkConstantValues.check(a);
     CheckPortDefs.visit_trans_units(a, ast.iter().cloned())?;
     CheckInterfaceDefs.visit_trans_units(a, ast.iter().cloned())?;
@@ -236,6 +278,7 @@ pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> Contr
     CheckStateMachineDefs.visit_trans_units(a, ast.iter().cloned())?;
     CheckTopologyInstances.visit_trans_units(a, ast.iter().cloned())?;
     CheckTopologyDefs.resolve_all(a);
+    CheckTemplateInterfaceArgs.check(a);
     BuildSpecLocMap.visit_trans_units(a, ast.iter().cloned())?;
     CheckSpecLocs.visit_trans_units(a, ast.iter().cloned())?;
     CheckDictionaryDefs.visit_trans_units(a, ast.iter().cloned())?;

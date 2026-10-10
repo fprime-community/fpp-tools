@@ -1,8 +1,0 @@
- --> [ local path prefix ]/template/basic_constant.fpp:1:8
-  |
-1 | module template T(constant p: U32) {
-  |        ^^^^^^^^ syntax error: unexpected token
-  |
-  = note: expected {
-  = note: got identifier
-

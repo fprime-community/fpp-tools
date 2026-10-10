@@ -22,7 +22,8 @@ fn diagnostic_snippet_to_annotation<'a>(
 }
 
 /// The annotated source excerpt for one span of a diagnostic, followed by a note
-/// per `include` that spliced its source in.
+/// per `include` that spliced its source in and per template expansion that
+/// copied it here.
 fn snippet_elements<'a>(
     message: String,
     kind: AnnotationKind,
@@ -40,6 +41,14 @@ fn snippet_elements<'a>(
                 include_loc.uri,
                 include_loc.line + 1,
                 include_loc.column + 1
+            )))
+        }))
+        .chain(snippet.expand_spans.iter().map(|expand_loc| {
+            Element::Message(annotate_snippets::Level::NOTE.message(format!(
+                "expanded at {}:{}:{}",
+                expand_loc.uri,
+                expand_loc.line + 1,
+                expand_loc.column + 1
             )))
         }))
         .collect()

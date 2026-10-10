@@ -1,0 +1,20 @@
+ --> [ local path prefix ]/spec_loc/template_body_inconsistent_path_error.fpp:5:22
+  |
+5 | locate constant a at "template_body_inconsistent_path_error.fpp"
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ inconsistent location path [ local path prefix ]/spec_loc/template_body_inconsistent_path_error.fpp
+  |
+ ::: [ local path prefix ]/spec_loc/template_body_inconsistent_path_error.fpp:2:24
+  |
+2 |   locate constant a at "incorrect.fpp"
+  |                        --------------- previous path [ local path prefix ]/spec_loc/incorrect.fpp is here
+
+ --> [ local path prefix ]/spec_loc/template_body_inconsistent_path_error.fpp:2:24
+  |
+2 |   locate constant a at "incorrect.fpp"
+  |                        ^^^^^^^^^^^^^^^ incorrect location path [ local path prefix ]/spec_loc/incorrect.fpp
+  |
+ ::: [ local path prefix ]/spec_loc/template_body_inconsistent_path_error.fpp:7:1
+  |
+7 | constant a = 0
+  | -------------- actual location is here
+

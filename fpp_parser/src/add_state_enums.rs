@@ -26,6 +26,11 @@ fn trans_module_member(member: &mut ModuleMember) {
                 trans_module_member(m);
             }
         }
+        ModuleMember::DefModuleTemplate(def) => {
+            for m in &mut def.members {
+                trans_module_member(m);
+            }
+        }
         ModuleMember::DefComponent(def) => {
             for m in &mut def.members {
                 trans_component_member(m);

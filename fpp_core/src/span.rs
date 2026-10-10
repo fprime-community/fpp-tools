@@ -39,7 +39,22 @@ impl Span {
         length: BytePos,
         include_span: Option<Span>,
     ) -> Span {
-        with(|w| w.span_add(file, start, length, include_span))
+        with(|w| w.span_add(file, start, length, include_span, None))
+    }
+
+    /// Creates a span that is a copy of the source text at `self`, made at the
+    /// point of the template expansion specifier spanning `expand_span`.
+    pub fn expanded_at(&self, expand_span: Span) -> Span {
+        let start = self.start();
+        with(|w| {
+            w.span_add(
+                w.span_file(self),
+                start.pos(),
+                self.len() as BytePos,
+                w.span_include_span(self),
+                Some(expand_span),
+            )
+        })
     }
 
     /// Gets the start position of the span
@@ -68,6 +83,11 @@ impl Span {
     /// Span of the include specifier that brought this span in
     pub fn including_span(&self) -> Option<Span> {
         with(|w| w.span_include_span(self))
+    }
+
+    /// Span of the template expansion specifier that copied this span here
+    pub fn expanding_span(&self) -> Option<Span> {
+        with(|w| w.span_expand_span(self))
     }
 
     diagnostic_method!(error, Level::Error);

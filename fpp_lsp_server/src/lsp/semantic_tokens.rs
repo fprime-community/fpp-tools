@@ -22,7 +22,9 @@ pub enum SemanticTokenKind {
     System,
     Component,
     Interface,
+    Template,
     ComponentInstance,
+    InstanceTemplateArg,
     Constant,
     EnumConstant,
     StructMember,
@@ -35,6 +37,7 @@ pub enum SemanticTokenKind {
     EnumType,
     StructType,
     PrimitiveType,
+    TypeTemplateArg,
     FormalParameter,
     Command,
     Event,
@@ -63,13 +66,15 @@ pub enum SemanticTokenKind {
 }
 
 impl SemanticTokenKind {
-    pub const TOKEN_TYPES: [SemanticTokenType; 38] = [
+    pub const TOKEN_TYPES: [SemanticTokenType; 41] = [
         SemanticTokenType::new("module"),
         SemanticTokenType::new("topology"),
         SemanticTokenType::new("system"),
         SemanticTokenType::new("component"),
         SemanticTokenType::new("interface"),
+        SemanticTokenType::new("template"),
         SemanticTokenType::new("componentInstance"),
+        SemanticTokenType::new("instanceTemplateArg"),
         SemanticTokenType::new("constant"),
         SemanticTokenType::new("enumConstant"),
         SemanticTokenType::new("structMember"),
@@ -82,6 +87,7 @@ impl SemanticTokenKind {
         SemanticTokenType::new("enumType"),
         SemanticTokenType::new("structType"),
         SemanticTokenType::new("primitiveType"),
+        SemanticTokenType::new("typeTemplateArg"),
         SemanticTokenType::new("formalParameter"),
         SemanticTokenType::new("command"),
         SemanticTokenType::new("event"),
@@ -271,6 +277,7 @@ impl fpp_lsp_parser::Visitor for SemanticTokenVisitor {
                         SyntaxKind::DEF_ENUM => SemanticTokenKind::EnumType,
                         SyntaxKind::DEF_STRUCT => SemanticTokenKind::StructType,
                         SyntaxKind::FORMAL_PARAM => SemanticTokenKind::FormalParameter,
+                        SyntaxKind::EXPR_STRUCT_MEMBER => SemanticTokenKind::StructMember,
                         SyntaxKind::DEF_COMPONENT => SemanticTokenKind::Component,
                         SyntaxKind::DEF_COMPONENT_INSTANCE => SemanticTokenKind::ComponentInstance,
                         SyntaxKind::DEF_ENUM_CONSTANT => SemanticTokenKind::EnumConstant,
@@ -298,6 +305,28 @@ impl fpp_lsp_parser::Visitor for SemanticTokenVisitor {
                         SyntaxKind::DEF_STATE => SemanticTokenKind::State,
                         SyntaxKind::DEF_CHOICE => SemanticTokenKind::Choice,
                         SyntaxKind::DEF_STATE_MACHINE => SemanticTokenKind::StateMachine,
+                        SyntaxKind::DEF_MODULE_TEMPLATE => SemanticTokenKind::Template,
+                        SyntaxKind::TEMPLATE_PARAM => {
+                            match node.first_child_or_token_by_kind(&|k| {
+                                matches!(
+                                    k,
+                                    SyntaxKind::CONSTANT_KW
+                                        | SyntaxKind::TYPE_KW
+                                        | SyntaxKind::INSTANCE_KW
+                                )
+                            }) {
+                                Some(v) => match v.kind() {
+                                    SyntaxKind::CONSTANT_KW => SemanticTokenKind::Constant,
+                                    SyntaxKind::TYPE_KW => SemanticTokenKind::TypeTemplateArg,
+                                    SyntaxKind::INSTANCE_KW => {
+                                        SemanticTokenKind::InstanceTemplateArg
+                                    }
+                                    _ => unreachable!(),
+                                },
+                                // Fall back to constant
+                                None => SemanticTokenKind::Constant,
+                            }
+                        }
                         SyntaxKind::TLM_PACKET_SET => SemanticTokenKind::TelemetryPacketSet,
                         SyntaxKind::SPEC_TLM_PACKET => SemanticTokenKind::TelemetryPacket,
                         SyntaxKind::SPEC_STATE_MACHINE_INSTANCE => {
@@ -394,7 +423,11 @@ impl<'ast> SemanticUses<'ast> {
                 Symbol::StateMachine(_) => SemanticTokenKind::StateMachine,
                 Symbol::StructType(_) => SemanticTokenKind::StructType,
                 Symbol::System(_) => SemanticTokenKind::System,
+                Symbol::Template(_) => SemanticTokenKind::Template,
                 Symbol::Topology(_) => SemanticTokenKind::Topology,
+                Symbol::TemplateConstantArg { .. } => SemanticTokenKind::Constant,
+                Symbol::TemplateTypeArg { .. } => SemanticTokenKind::TypeTemplateArg,
+                Symbol::TemplateInterfaceArg { .. } => SemanticTokenKind::InstanceTemplateArg,
             };
 
             self.mark_node(a, node, semantic_kind);

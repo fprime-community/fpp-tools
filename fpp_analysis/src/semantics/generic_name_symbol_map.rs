@@ -27,7 +27,7 @@ impl<S: SymbolInterface> GenericNameSymbolMap<S> {
             }
             Some(prev) => Err(SemanticError::RedefinedSymbol {
                 name: name.to_string(),
-                loc: symbol.name().span(),
+                loc: symbol.redefined_loc(),
                 prev_loc: prev.node().span(),
             }),
         }

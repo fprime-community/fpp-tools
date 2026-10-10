@@ -11,7 +11,10 @@ pub trait Annotated {
     fn post_annotation(&self) -> Vec<String>;
 }
 
-#[derive(Eq, Hash, PartialEq, Copy, Clone)]
+/// Nodes are ordered by allocation order, which is deterministic for a given
+/// model. The order carries no meaning of its own; it is a stable tiebreak for
+/// comparisons that would otherwise be ambiguous.
+#[derive(Eq, Hash, PartialEq, Ord, PartialOrd, Copy, Clone)]
 pub struct Node {
     pub(crate) handle: usize,
 }

@@ -35,21 +35,19 @@ fn check_port_instances(t: &Topology) -> SemanticResult {
 }
 
 /// Check the instances of a pattern
+///
+/// A pattern names component instances, which may be in the topology directly,
+/// through an imported subtopology, or through a bound port interface instance
+/// template parameter.
 fn check_pattern_instances(t: &Topology, pattern: &ConnectionPattern) -> SemanticResult {
     // Check the source
     {
         let (instance, loc) = &pattern.source;
-        t.look_up_instance_at(
-            &InterfaceInstance::from_component_instance(instance.clone()),
-            *loc,
-        )?;
+        t.look_up_component_instance_at(instance, *loc)?;
     }
     // Check the targets
     for (instance, loc) in &pattern.targets {
-        t.look_up_instance_at(
-            &InterfaceInstance::from_component_instance(instance.clone()),
-            *loc,
-        )?;
+        t.look_up_component_instance_at(instance, *loc)?;
     }
     Ok(())
 }
@@ -57,13 +55,13 @@ fn check_pattern_instances(t: &Topology, pattern: &ConnectionPattern) -> Semanti
 /// Compute the transitively imported topologies
 fn compute_transitive_imports(a: &Analysis, t: &mut Topology) {
     let mut tis: HashSet<Symbol> = HashSet::default();
-    for ts in t.direct_topologies.keys() {
-        if let Some(dep) = a.topology_map.get(ts) {
+    for ts in t.get_imported_topology_symbols(a) {
+        if let Some(dep) = a.topology_map.get(&ts) {
             for s in &dep.transitive_import_set {
                 tis.insert(s.clone());
             }
         }
-        tis.insert(ts.clone());
+        tis.insert(ts);
     }
     t.transitive_import_set = tis;
 }
@@ -88,10 +86,18 @@ fn resolve_patterns(a: &Analysis, t: &mut Topology) -> SemanticResult {
 
 /// Resolve the imported connections of t
 fn resolve_imported_connections(a: &Analysis, t: &mut Topology) {
-    // Check whether an instance exists
+    // Check whether an instance exists. A connection imported from a
+    // subtopology names the component instance directly, so an instance that is
+    // in this topology only through a bound template parameter still counts.
     let endpoint_exists = |t: &Topology, endpoint: &crate::semantics::Endpoint| -> bool {
-        t.instance_map
-            .contains_key(&endpoint.port.interface_instance)
+        let instance = &endpoint.port.interface_instance;
+        if t.instance_map.contains_key(instance) {
+            return true;
+        }
+        match instance.get_component_instance_opt() {
+            Some(ci) => t.look_up_component_instance_loc(ci).is_some(),
+            None => false,
+        }
     };
     // Import connections from transitively imported topologies
     let syms: Vec<Symbol> = t.transitive_import_set.iter().cloned().collect();
@@ -141,7 +147,7 @@ fn resolve_interfaces_to_component_instances(a: &Analysis, t: &mut Topology) {
 
 /// Resolve the instances of t
 fn resolve_instances(a: &Analysis, t: &mut Topology) {
-    let syms: Vec<Symbol> = t.direct_topologies.keys().cloned().collect();
+    let syms: Vec<Symbol> = t.get_imported_topology_symbols(a);
     for from_symbol in syms {
         if let Some(dep) = a.topology_map.get(&from_symbol) {
             let entries: Vec<(InterfaceInstance, Span)> = dep

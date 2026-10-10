@@ -33,7 +33,11 @@ impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Analyzer<'ast, V> for UseAnalyzer
                     ExprKind::Dot { e, .. } => {
                         match a.use_def_map.get(&expr.id()) {
                             // expr is a use, so it must be a constant use
-                            Some(Symbol::Constant(_) | Symbol::EnumConstant(_)) => {
+                            Some(
+                                Symbol::Constant(_)
+                                | Symbol::EnumConstant(_)
+                                | Symbol::TemplateConstantArg { .. },
+                            ) => {
                                 let use_name = self
                                     .super_
                                     .expr_to_qualified_name(expr)

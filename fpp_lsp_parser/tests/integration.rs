@@ -181,3 +181,8 @@ fn topology() {
 fn guarded_command_nested_array() {
     run_test("guarded-command-nested-array")
 }
+
+#[test]
+fn template() {
+    run_test_from_fpp_parser("template")
+}

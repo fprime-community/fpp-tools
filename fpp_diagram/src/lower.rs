@@ -256,6 +256,13 @@ fn topology_edges(a: &Analysis, topology: &Topology, only_group: Option<&str>) -
 
 /// Build a single edge from a resolved connection, resolving both endpoints
 /// through any topology-port aliases down to the underlying component ports.
+///
+/// [`Endpoint::get_underlying_endpoint`] also follows a bound port interface
+/// instance template parameter to the instance it stands for, so an endpoint of
+/// an expanded template arrives here already named after that instance — which
+/// is the name [`instance_nodes`] builds its node under.
+///
+/// [`Endpoint::get_underlying_endpoint`]: fpp_analysis::semantics::Endpoint::get_underlying_endpoint
 fn connection_edge(
     a: &Analysis,
     topology: &Topology,

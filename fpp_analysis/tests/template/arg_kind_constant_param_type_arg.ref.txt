@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/template/arg_kind_constant_param_type_arg.fpp:5:10
+  |
+5 | expand T(type U32)
+  |          ^^^^^^^^ invalid argument for template parameter p: expected a constant argument, got a type argument
+  |
+ ::: [ local path prefix ]/template/arg_kind_constant_param_type_arg.fpp:1:19
+  |
+1 | module template T(constant p: U32) {
+  |                   --------------- template parameter is defined here
+

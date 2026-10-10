@@ -1,53 +1,7 @@
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:33:8
-   |
-33 | module template T(interface i1: A_I1, interface i2: A_I2, constant idx: U32) {
-   |        ^^^^^^^^ syntax error: unexpected token
-   |
-   = note: expected {
-   = note: got identifier
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:35:18
-   |
-35 |     constant b = a + 1
-   |                  ^ cannot find constant `a` in scope
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:39:18
-   |
-39 |         instance i1
-   |                  ^^ cannot find component instance or topology `i1` in scope
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:42:18
-   |
-42 |         instance i2
-   |                  ^^ cannot find component instance or topology `i2` in scope
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:48:13
-   |
-48 |             i1.bOut[idx] -> b.bIn[idx]
-   |             ^^ cannot find component instance or topology `i1` in scope
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:48:21
-   |
-48 |             i1.bOut[idx] -> b.bIn[idx]
-   |                     ^^^ cannot find constant `idx` in scope
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:48:35
-   |
-48 |             i1.bOut[idx] -> b.bIn[idx]
-   |                                   ^^^ cannot find constant `idx` in scope
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:51:20
+  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:51:31
    |
 51 |             b.aOut[idx] -> i1.aIn2[idx]
-   |                    ^^^ cannot find constant `idx` in scope
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:51:28
+   |                               ^^^^ aIn2 is not a port instance of interface A_I1
    |
-51 |             b.aOut[idx] -> i1.aIn2[idx]
-   |                            ^^ cannot find component instance or topology `i1` in scope
-
-  --> [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:51:36
-   |
-51 |             b.aOut[idx] -> i1.aIn2[idx]
-   |                                    ^^^ cannot find constant `idx` in scope
+   = note: expanded at [ local path prefix ]/template/interfaces_invalid_port_instance_name_aliased.fpp:58:5
 

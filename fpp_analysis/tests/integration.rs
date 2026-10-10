@@ -1,4 +1,6 @@
-use fpp_analysis::{Analysis, add_state_enums, check_semantics, resolve_includes};
+use fpp_analysis::{
+    Analysis, add_state_enums, check_semantics, resolve_includes, resolve_templates,
+};
 use fpp_core::{FileReader, SourceFile};
 use fpp_fs::FsReader;
 use pretty_assertions::assert_eq;
@@ -57,7 +59,9 @@ pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
             let _ = resolve_includes(&mut a, FsReader {}, ast);
             add_state_enums(ast);
         }
-        let _ = check_semantics(&mut a, asts.iter().collect());
+        if resolve_templates(&mut a, &mut asts).is_continue() {
+            let _ = check_semantics(&mut a, asts.iter().collect());
+        }
     });
 
     let output = String::from_utf8(diagnostics_str)
@@ -229,7 +233,6 @@ mod top_ports {
     mod test;
 }
 
-#[cfg(feature = "disabled-tests")]
 mod template {
     mod test;
 }

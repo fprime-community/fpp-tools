@@ -177,3 +177,33 @@ fn topology_ok() {
 fn topology_path_error() {
     run_test("spec_loc/topology_path_error")
 }
+
+#[test]
+fn template_ok() {
+    run_test("spec_loc/template_ok")
+}
+
+#[test]
+fn template_path_error() {
+    run_test("spec_loc/template_path_error")
+}
+
+#[test]
+fn template_body_ok() {
+    run_test("spec_loc/template_body_ok")
+}
+
+#[test]
+fn template_body_path_error() {
+    run_test("spec_loc/template_body_path_error")
+}
+
+#[test]
+fn template_body_inconsistent_path_error() {
+    run_test("spec_loc/template_body_inconsistent_path_error")
+}
+
+#[test]
+fn template_body_expanded_path_error() {
+    run_test("spec_loc/template_body_expanded_path_error")
+}

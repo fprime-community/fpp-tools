@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/port_numbering/template_two_expansions_too_many_output_ports.fpp:17:3
+   |
+17 |   output port hOut: P
+   |   ^^^^^^^^^^^^^^^^^^^ too many ports connected here (found 2, max is 1)
+   |
+  ::: [ local path prefix ]/port_numbering/template_two_expansions_too_many_output_ports.fpp:22:1
+   |
+22 | instance hub: Hub base id 0x300
+   | ------------------------------- for this component instance
+

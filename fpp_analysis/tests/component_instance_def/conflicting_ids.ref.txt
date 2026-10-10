@@ -1,7 +1,7 @@
   --> [ local path prefix ]/component_instance_def/conflicting_ids.fpp:12:1
    |
 12 | instance c1: C base id 0x100
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ base id 256 of instance c1 is in the id range [256, 256] of instance c2
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ base ID 256 for instance c1 lies inside the ID range [256, 256] for instance c2
    |
   ::: [ local path prefix ]/component_instance_def/conflicting_ids.fpp:13:1
    |

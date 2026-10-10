@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/template/type_arg_string.fpp:8:15
+  |
+8 | expand T(type string size 256)
+  |               ^^^^^^^^^^^^^^^ cannot find type `FwSizeStoreType` in scope
+

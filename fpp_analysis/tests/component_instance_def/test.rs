@@ -76,6 +76,11 @@ fn conflicting_ids() {
 }
 
 #[test]
+fn conflicting_ids_record() {
+    run_test("component_instance_def/conflicting_ids_record")
+}
+
+#[test]
 fn queued_stack_size() {
     run_test("component_instance_def/queued_stack_size")
 }

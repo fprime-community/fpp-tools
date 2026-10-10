@@ -197,7 +197,7 @@ const EXPR_STRUCT_RECOVER: TokenSet = TokenSet::new(&[EOL, COMMA, RIGHT_CURLY, I
 
 fn expr_struct_member(p: &mut Parser) {
     let m = p.start();
-    if !p.expect(IDENT) {
+    if !name(p) {
         m.abandon(p);
         p.err_recover("struct member expected", EXPR_STRUCT_RECOVER);
         return;

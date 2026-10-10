@@ -1,6 +1,6 @@
 //! Integration tests for state machine diagram lowering.
 
-use fpp_analysis::{Analysis, add_state_enums, check_semantics};
+use fpp_analysis::{Analysis, add_state_enums, check_semantics, resolve_templates};
 use fpp_core::SourceFile;
 use fpp_diagram::TransitionActionMode;
 use fpp_diagram::ir::{ChoiceBranch, DiagramKind, SmNode, SmNodeKind};
@@ -13,6 +13,7 @@ fn with_analysis<R>(src: &str, f: impl FnOnce(&Analysis) -> R) -> R {
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         add_state_enums(&mut ast);
         let mut a = Analysis::new();
+        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
         let _ = check_semantics(&mut a, vec![&ast]);
         f(&a)
     })

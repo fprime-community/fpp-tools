@@ -6,6 +6,14 @@
 # `fpp_query/tests/filenames.rs` runs this file against the Scala compiler's own
 # `fpp-filenames` test suite, so it is the tested spelling of these rules, not a
 # transcription of them.
+
+# Templates only. An `expand` specifier is written by hand and says that the members
+# of a template appear at that point, so the files those members generate belong in
+# the list. The state enum is left to the second `DefStateMachine` group below, which
+# names its files directly rather than asking for the model to be rewritten; that is
+# the whole difference between this file and `autocode-expanded.toml`.
+expand = ["templates"]
+
 [[group]]
 node = "DefConstant"
 name = '"FppConstants"'
@@ -46,7 +54,7 @@ where = '$.members != null'
 generate = ["StateMachineAc.hpp", "StateMachineAc.cpp"]
 
 # ...and it gets a second pair from the `enum State` upstream synthesizes for it.
-# This file reads the model as parsed, which does not contain that enum, so the
+# This file does not run that synthesis, so the model holds no such enum and the
 # stem is asked for directly. See `autocode-expanded.toml` for the other spelling.
 [[group]]
 node = "DefStateMachine"

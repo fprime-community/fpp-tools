@@ -891,7 +891,8 @@ ROOT@0..6806
                     EXPR_STRUCT_MEMBER_LIST@2786..2798
                       LEFT_CURLY@2786..2787 "{"
                       EXPR_STRUCT_MEMBER@2787..2797
-                        IDENT@2787..2794 "seconds"
+                        NAME@2787..2794
+                          IDENT@2787..2794 "seconds"
                         EQUALS@2794..2795 "="
                         EXPR@2795..2797
                           EXPR_LITERAL@2795..2797
@@ -2202,7 +2203,8 @@ ROOT@0..6806
               LEFT_CURLY@6752..6753 "{"
               WHITESPACE@6753..6754 " "
               EXPR_STRUCT_MEMBER@6754..6759
-                IDENT@6754..6755 "a"
+                NAME@6754..6755
+                  IDENT@6754..6755 "a"
                 WHITESPACE@6755..6756 " "
                 EQUALS@6756..6757 "="
                 WHITESPACE@6757..6758 " "
@@ -2212,7 +2214,8 @@ ROOT@0..6806
               COMMA@6759..6760 ","
               WHITESPACE@6760..6761 " "
               EXPR_STRUCT_MEMBER@6761..6766
-                IDENT@6761..6762 "b"
+                NAME@6761..6762
+                  IDENT@6761..6762 "b"
                 WHITESPACE@6762..6763 " "
                 EQUALS@6763..6764 "="
                 WHITESPACE@6764..6765 " "
@@ -2222,7 +2225,8 @@ ROOT@0..6806
               COMMA@6766..6767 ","
               WHITESPACE@6767..6768 " "
               EXPR_STRUCT_MEMBER@6768..6773
-                IDENT@6768..6769 "c"
+                NAME@6768..6769
+                  IDENT@6768..6769 "c"
                 WHITESPACE@6769..6770 " "
                 EQUALS@6770..6771 "="
                 WHITESPACE@6771..6772 " "

@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/port_matching/missing_connection.fpp:27:5
+   |
+27 |     cm.pOut -> c2.pIn
+   |     ^^^^^^^ no match for this connection
+   |
+  ::: [ local path prefix ]/port_matching/missing_connection.fpp:7:3
+   |
+ 7 |   match pIn with pOut
+   |   ------------------- port matching is specified here
+

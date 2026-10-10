@@ -1,0 +1,26 @@
+  --> [ local path prefix ]/port_numbering/template_implicit_duplicate_at_matched_port.fpp:39:9
+   |
+39 |         c2.pOut -> i.pIn
+   |         ^^^^^^^ implicit duplicate connection at matched port pIn[0]
+   |
+   = note: expanded at [ local path prefix ]/port_numbering/template_implicit_duplicate_at_matched_port.fpp:48:3
+   |
+  ::: [ local path prefix ]/port_numbering/template_implicit_duplicate_at_matched_port.fpp:38:9
+   |
+38 |         i.pOut[0] -> c2.pIn
+   |         ------ connection is implied here
+   |
+   = note: expanded at [ local path prefix ]/port_numbering/template_implicit_duplicate_at_matched_port.fpp:48:3
+   |
+  ::: [ local path prefix ]/port_numbering/template_implicit_duplicate_at_matched_port.fpp:15:5
+   |
+15 |     match pOut with pIn
+   |     ------------------- because of matching specified here
+   |
+  ::: [ local path prefix ]/port_numbering/template_implicit_duplicate_at_matched_port.fpp:40:19
+   |
+40 |         unmatched c2.pOut -> i.pIn[0]
+   |                   ------- conflicting connection is here
+   |
+   = note: expanded at [ local path prefix ]/port_numbering/template_implicit_duplicate_at_matched_port.fpp:48:3
+

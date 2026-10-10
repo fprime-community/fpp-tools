@@ -41,6 +41,7 @@ pub(super) fn module_member(p: &mut Parser) {
         INSTANCE_KW => def_component_instance(p),
         PASSIVE_KW | ACTIVE_KW | QUEUED_KW => component::def_component(p),
         INTERFACE_KW => def_interface(p),
+        MODULE_KW if p.nth_at(1, TEMPLATE_KW) => def_module_template(p),
         MODULE_KW => def_module(p),
         PORT_KW => def_port(p),
         STATE_KW => state_machine::def_state_machine(p),
@@ -48,6 +49,7 @@ pub(super) fn module_member(p: &mut Parser) {
         TOPOLOGY_KW | DEPLOYMENT_KW => topology::def_topology(p),
         INCLUDE_KW => spec_include(p),
         LOCATE_KW => spec_loc(p),
+        EXPAND_KW => spec_template_expand(p),
 
         _ => {
             p.err_and_bump("module member expected");
@@ -55,12 +57,139 @@ pub(super) fn module_member(p: &mut Parser) {
     }
 }
 
+fn def_module_template(p: &mut Parser) {
+    assert!(p.at(MODULE_KW));
+    let m = p.start();
+    p.bump(MODULE_KW);
+    p.bump(TEMPLATE_KW);
+    if !name(p) {
+        m.abandon(p);
+        return;
+    }
+
+    template_param_list(p);
+
+    if p.at(LEFT_CURLY) {
+        member_list(
+            p,
+            LEFT_CURLY,
+            RIGHT_CURLY,
+            module_member,
+            SEMI,
+            MODULE_MEMBER_LIST,
+            "expected module member",
+        )
+    } else {
+        p.error("expected '{'")
+    }
+
+    m.complete(p, DEF_MODULE_TEMPLATE);
+}
+
+fn template_param_list(p: &mut Parser) {
+    if p.at(LEFT_PAREN) {
+        member_list(
+            p,
+            LEFT_PAREN,
+            RIGHT_PAREN,
+            template_param,
+            COMMA,
+            TEMPLATE_PARAM_LIST,
+            "expected template parameter",
+        );
+    }
+}
+
+fn template_param(p: &mut Parser) {
+    let m = p.start();
+    match p.current() {
+        CONSTANT_KW => {
+            p.bump(CONSTANT_KW);
+            name(p);
+            if p.eat(COLON) {
+                types::type_name(p);
+            } else {
+                p.error("expected `:`");
+            }
+        }
+        TYPE_KW => {
+            p.bump(TYPE_KW);
+            name(p);
+        }
+        INSTANCE_KW => {
+            p.bump(INSTANCE_KW);
+            name(p);
+            if p.eat(COLON) {
+                qual_ident(p);
+            } else {
+                p.error("expected `:`");
+            }
+        }
+        _ => {
+            m.abandon(p);
+            p.err_and_bump("expected template parameter");
+            return;
+        }
+    }
+
+    m.complete(p, TEMPLATE_PARAM);
+}
+
+fn spec_template_expand(p: &mut Parser) {
+    assert!(p.at(EXPAND_KW));
+    let m = p.start();
+    p.bump(EXPAND_KW);
+    qual_ident(p);
+    template_arg_list(p);
+    m.complete(p, SPEC_TEMPLATE_EXPAND);
+}
+
+fn template_arg_list(p: &mut Parser) {
+    if p.at(LEFT_PAREN) {
+        member_list(
+            p,
+            LEFT_PAREN,
+            RIGHT_PAREN,
+            template_arg,
+            COMMA,
+            TEMPLATE_ARG_LIST,
+            "expected template argument",
+        );
+    }
+}
+
+fn template_arg(p: &mut Parser) {
+    let m = p.start();
+    match p.current() {
+        CONSTANT_KW => {
+            p.bump(CONSTANT_KW);
+            expr::expr(p);
+        }
+        TYPE_KW => {
+            p.bump(TYPE_KW);
+            types::type_name(p);
+        }
+        INSTANCE_KW => {
+            p.bump(INSTANCE_KW);
+            qual_ident(p);
+        }
+        _ => {
+            m.abandon(p);
+            p.err_and_bump("expected template argument");
+            return;
+        }
+    }
+
+    m.complete(p, TEMPLATE_ARG);
+}
+
 fn spec_loc(p: &mut Parser) {
     assert!(p.at(LOCATE_KW));
     let m = p.start();
     p.bump(LOCATE_KW);
     match p.current() {
-        COMPONENT_KW | CONSTANT_KW | INSTANCE_KW | PORT_KW | TYPE_KW | INTERFACE_KW | SYSTEM_KW => {
+        COMPONENT_KW | CONSTANT_KW | INSTANCE_KW | PORT_KW | TEMPLATE_KW | TYPE_KW
+        | INTERFACE_KW | SYSTEM_KW => {
             p.bump_any();
         }
         STATE_KW => {

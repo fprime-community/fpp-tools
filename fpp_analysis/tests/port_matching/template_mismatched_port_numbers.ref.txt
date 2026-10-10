@@ -1,0 +1,19 @@
+  --> [ local path prefix ]/port_matching/template_mismatched_port_numbers.fpp:35:18
+   |
+35 |       c2.pOut -> i.pIn[1]
+   |                  ^^^^^ mismatched port numbers (1 vs. 0)
+   |
+   = note: expanded at [ local path prefix ]/port_matching/template_mismatched_port_numbers.fpp:42:1
+   |
+  ::: [ local path prefix ]/port_matching/template_mismatched_port_numbers.fpp:34:7
+   |
+34 |       i.pOut[0] -> c2.pIn
+   |       ------ conflicting port number is here
+   |
+   = note: expanded at [ local path prefix ]/port_matching/template_mismatched_port_numbers.fpp:42:1
+   |
+  ::: [ local path prefix ]/port_matching/template_mismatched_port_numbers.fpp:12:3
+   |
+12 |   match pIn with pOut
+   |   ------------------- port matching is specified here
+

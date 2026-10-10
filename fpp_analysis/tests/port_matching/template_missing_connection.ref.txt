@@ -1,0 +1,12 @@
+  --> [ local path prefix ]/port_matching/template_missing_connection.fpp:34:7
+   |
+34 |       i.pOut -> c2.pIn
+   |       ^^^^^^ no match for this connection
+   |
+   = note: expanded at [ local path prefix ]/port_matching/template_missing_connection.fpp:41:1
+   |
+  ::: [ local path prefix ]/port_matching/template_missing_connection.fpp:12:3
+   |
+12 |   match pIn with pOut
+   |   ------------------- port matching is specified here
+

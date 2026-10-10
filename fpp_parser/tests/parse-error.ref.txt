@@ -3,7 +3,7 @@
 5 | + c
   | ^ syntax error: module member expected
   |
-  = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate
+  = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate, expand
   = note: got +
 
  --> [ local path prefix ]/parse-error.fpp:7:1
@@ -11,7 +11,7 @@
 7 | + c
   | ^ syntax error: module member expected
   |
-  = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate
+  = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate, expand
   = note: got +
 
   --> [ local path prefix ]/parse-error.fpp:14:11

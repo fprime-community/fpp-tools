@@ -1,15 +1,18 @@
 # `autocode.toml`, written against the *expanded* model.
 #
-# The only difference is the state enum. `autocode.toml` hand-encodes the
-# `enum State` that `fpp-to-cpp` synthesizes for each internal state machine, as a
-# second `DefStateMachine` group with `name = '$@stem + "_State"'`. Setting
-# `expand = true` runs that synthesis for real, so the plain `DefEnum` group below
-# picks the enum up like any other, and the special-case group is not needed.
+# `expand = true` is every expansion. Templates are one of them, and `autocode.toml`
+# expands those too, so the only difference between the two files is the state enum.
+# `autocode.toml` hand-encodes the `enum State` that `fpp-to-cpp` synthesizes for each
+# internal state machine, as a second `DefStateMachine` group with
+# `name = '$@stem + "_State"'`. Here that synthesis runs for real, so the plain
+# `DefEnum` group below picks the enum up like any other, and the special-case group
+# is not needed.
 #
 # Both files produce byte-identical output; `tests/filenames.rs` holds each of them
 # to the same upstream `fpp-filenames` references. Prefer this one when you want the
-# model a query sees to match what `fpp-to-cpp` compiles, and `autocode.toml` when
-# you want the tool to touch nothing the parser did not produce.
+# model a query sees to match what `fpp-to-cpp` compiles, and `autocode.toml` when you
+# want that enum's filenames to come from a rule rather than from a rewrite of the
+# model.
 expand = true
 
 [[group]]

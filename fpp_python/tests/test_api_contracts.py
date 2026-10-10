@@ -257,9 +257,9 @@ def _union_subclasses(base: type) -> set[str]:
 
 def test_every_symbol_subclass_carries_the_symbol_prefix():
     # `Symbol` is the union alias and `SymbolBase` the base class; the rest are
-    # the fifteen concrete subclasses.
+    # the nineteen concrete subclasses.
     subclasses = _union_subclasses(f.SymbolBase)
-    assert len(subclasses) == 15
+    assert len(subclasses) == 19
     assert all(name.startswith("Symbol") for name in subclasses), sorted(subclasses)
 
 
@@ -619,13 +619,17 @@ def test_diagnostic_exposes_its_source_excerpt_and_children():
     )
     (redefinition, *_) = [d for d in bad.diagnostics if d.children]
     assert redefinition.source == "  constant a = 2\n"
+    # Neither chain that can put an excerpt somewhere other than where it was
+    # written applies to source compiled directly and outside any expansion.
     assert redefinition.includes == []
+    assert redefinition.expansions == []
     (child, *_) = redefinition.children
     # A child points at the first definition, with its own excerpt, and renders
     # under the primary annotation.
     assert child.kind in (f.DiagnosticMessageKind.Annotation, f.DiagnosticMessageKind.Note)
     assert child.location.line == 1
     assert child.source == "  constant a = 1\n"
+    assert child.includes == child.expansions == []
     assert child.message in str(redefinition)
 
 

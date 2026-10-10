@@ -166,29 +166,36 @@ impl Value {
             Value::AnonArray(anon_array) | Value::Array(ArrayValue { anon_array, .. }) => {
                 let anon_array_ty = ty.as_anon_array()?;
 
-                if let Some(n) = anon_array_ty.size
-                    && n != anon_array.elements.len()
-                {
-                    return None;
-                }
+                let converted = match &anon_array.scalar {
+                    // This value is a scalar promoted to an array of unknown
+                    // size. Fill in the elements, if the size is now known.
+                    Some(scalar) => promote_to_anon_array(
+                        scalar.convert(&anon_array_ty.elt_type)?,
+                        anon_array_ty.size,
+                    ),
+                    None => {
+                        if let Some(n) = anon_array_ty.size
+                            && n != anon_array.elements.len()
+                        {
+                            return None;
+                        }
 
-                // The conversion is over the elements, so the result has no
-                // scalar
-                let elements =
-                    anon_array.try_map_elements(|e| e.convert(&anon_array_ty.elt_type))?;
+                        // The conversion is over the elements, so the result has
+                        // no scalar
+                        AnonArrayValue {
+                            elements: anon_array
+                                .try_map_elements(|e| e.convert(&anon_array_ty.elt_type))?,
+                            scalar: None,
+                        }
+                    }
+                };
 
                 match ty.deref() {
                     Type::Array(array_ty) => Some(Value::Array(ArrayValue {
-                        anon_array: AnonArrayValue {
-                            elements,
-                            scalar: None,
-                        },
+                        anon_array: converted,
                         ty: array_ty.clone(),
                     })),
-                    Type::AnonArray(_) => Some(Value::AnonArray(AnonArrayValue {
-                        elements,
-                        scalar: None,
-                    })),
+                    Type::AnonArray(_) => Some(Value::AnonArray(converted)),
                     _ => None,
                 }
             }
@@ -198,29 +205,13 @@ impl Value {
 
                 let to_ty = ty.as_anon_struct()?;
 
-                // The values to use for members that this value does not
-                // provide. Converting to a named struct takes them from the
-                // target type's own default value; converting to an anonymous
-                // struct takes them from the source struct's type.
-                let member_defaults: Option<&AnonStructValue> = match (ty.deref(), self) {
-                    (Type::Struct(struct_ty), _) => {
-                        struct_ty.default.as_ref().map(|d| &d.anon_struct)
-                    }
-                    (Type::AnonStruct(_), Value::Struct(StructValue { ty: from_ty, .. })) => {
-                        from_ty.default.as_ref().map(|d| &d.anon_struct)
-                    }
-                    _ => None,
-                };
-
                 for (name, member_ty) in &to_ty.members {
                     let member_value = match anon_struct.members.get(name) {
+                        // If this value has the member, then convert its value to
+                        // the member type. Otherwise use the default value at the
+                        // member type.
                         Some(member_value) => member_value.convert(member_ty)?,
-                        // The member is absent: take the struct type's default
-                        // for it, or failing that the member type's default.
-                        None => match member_defaults.and_then(|d| d.members.get(name)) {
-                            Some(default) => default.clone(),
-                            None => member_ty.default_value()?,
-                        },
+                        None => member_ty.default_value()?,
                     };
 
                     members.insert(name.clone(), member_value);

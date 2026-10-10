@@ -4,19 +4,20 @@ use crate::model::Input;
 use crate::naming;
 use crate::query::{self, Query};
 use crate::select::Group;
-use crate::{Diagnosed, RuleSet};
+use crate::{Diagnosed, Expansions, RuleSet};
 use fpp_core::{BytePos, SourceFile, Span};
 use serde::Deserialize;
+use std::fmt;
 use std::ops::Range;
 use toml::Spanned;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RulesFile {
-    /// Match against the expanded model. File-wide, because it decides what every
+    /// Which expansions to match against. File-wide, because it decides what every
     /// group in the file means.
     #[serde(default)]
-    expand: bool,
+    expand: Option<Spanned<ExpandValue>>,
     #[serde(default)]
     group: Vec<Spanned<GroupTable>>,
 }
@@ -32,11 +33,102 @@ struct GroupTable {
     generate: Vec<Spanned<String>>,
 }
 
+/// What one name in an `expand` list does to the set being read.
+type TurnOn = fn(&mut Expansions);
+
+/// Every name an `expand` list accepts, and the expansion it turns on. The one
+/// place the names are written, so the diagnostic that lists them cannot drift from
+/// the set that is accepted.
+const EXPANSIONS: &[(&str, TurnOn)] = &[
+    ("templates", |e| e.templates = true),
+    ("state-enums", |e| e.state_enums = true),
+];
+
+/// The set `expand = true` asks for: every entry of [`EXPANSIONS`], folded.
+///
+/// Read off the table rather than written out, so a name added there is part of
+/// `expand = true` by construction. A file that asked for everything and got the set
+/// as someone last spelled it would leave the new expansion off and the files it
+/// contributes out of the list, which is the one failure this setting exists to
+/// prevent.
+fn all_expansions() -> Expansions {
+    let mut all = Expansions::NONE;
+    for (_, turn_on) in EXPANSIONS {
+        turn_on(&mut all);
+    }
+    all
+}
+
+/// The `expand` value as written, before any name is checked.
+///
+/// Deserialization accepts every shape it can name, including the ones that are
+/// errors, so that each one is reported through [`span_of`] with a caret in the
+/// rules file and a list can report all of its bad names at once — a serde error
+/// stops at the first.
+///
+/// Hence a hand-written visitor rather than `#[serde(untagged)]`: an untagged enum
+/// buffers the value through serde's private `Content` type, which does not carry
+/// the hook [`toml::Spanned`] reads, so the span this file needs would be gone —
+/// including the one each list element keeps for its own caret.
+enum ExpandValue {
+    /// `expand = true`, `expand = false`: every expansion, or none.
+    Every(bool),
+    /// `expand = ["templates"]`: the names as written, unchecked, each with the span
+    /// of the element that wrote it.
+    Named(Vec<Spanned<String>>),
+    /// `expand = "templates"`: rejected, because the surface has two shapes and one
+    /// spelling per meaning keeps the rules grammar small. The name is not kept, since
+    /// the complaint is about the shape of the value rather than about the name in it.
+    Bare,
+}
+
+impl<'de> Deserialize<'de> for ExpandValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<ExpandValue, D::Error> {
+        struct ExpandVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ExpandVisitor {
+            type Value = ExpandValue;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a bool or a list of expansion names")
+            }
+
+            fn visit_bool<E: serde::de::Error>(self, value: bool) -> Result<ExpandValue, E> {
+                Ok(ExpandValue::Every(value))
+            }
+
+            fn visit_str<E: serde::de::Error>(self, _: &str) -> Result<ExpandValue, E> {
+                Ok(ExpandValue::Bare)
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<ExpandValue, A::Error> {
+                let mut names = Vec::new();
+                // A non-string element is serde's own error: it is one mistake, and
+                // reporting it needs nothing this file knows.
+                //
+                // TOML honours `Spanned` at an element of a sequence, so each name
+                // arrives with the range of the element that wrote it, which is what a
+                // caret under one bad name among several is drawn from.
+                while let Some(name) = seq.next_element::<Spanned<String>>()? {
+                    names.push(name);
+                }
+                Ok(ExpandValue::Named(names))
+            }
+        }
+
+        deserializer.deserialize_any(ExpandVisitor)
+    }
+}
+
 /// Read the groups out of `input`.
 ///
 /// Must be called inside a `fpp_core::run` scope. Every problem is reported as a
-/// diagnostic before returning `Err(Diagnosed)`, and as many groups as possible are
-/// checked first, so one run reports every bad rule rather than the first.
+/// diagnostic before returning `Err(Diagnosed)`, and the file-wide setting and as
+/// many groups as possible are checked first, so one run reports every bad rule
+/// rather than the first.
 pub fn load(input: &Input) -> Result<RuleSet, Diagnosed> {
     let source = &input.content;
     let file = SourceFile::new(&input.uri, source.clone());
@@ -45,22 +137,40 @@ pub fn load(input: &Input) -> Result<RuleSet, Diagnosed> {
         Ok(parsed) => parsed,
         Err(error) => {
             let range = error.span().unwrap_or(0..source.len());
+            let message = error.message();
+            // Two errors carry the span of an `expand` key and neither is worded as a
+            // fact about the rules surface: one is serde's, about a struct field, and
+            // the other is TOML's, about a document. The message tells them apart.
+            let key = source.get(range.clone()) == Some("expand");
             let span = span_of(file, source, &range);
-            // TOML binds a bare key to the table above it, so `expand` written
-            // after the first `[[group]]` is a group key -- and `deny_unknown_fields`
-            // would report a correctly-spelled setting as a misspelling. The key
-            // under the error's own span identifies that case without reading
-            // serde's message.
-            if source.get(range) == Some("expand") {
+            if key && message.starts_with("unknown field") {
+                // TOML binds a bare key to the table above it, so `expand` written
+                // after the first `[[group]]` is a group key -- and
+                // `deny_unknown_fields` would report a correctly-spelled setting as a
+                // misspelling.
                 span.error("`expand` is a file-wide setting, not a group setting")
                     .note("move it above the first `[[group]]`, where TOML will read it as one")
                     .emit();
+            } else if key && message == "duplicate key" {
+                // Two expansions read like two settings, so the key gets written once
+                // per expansion. TOML takes the second as a redefinition of the first
+                // rather than an addition to it, and the names belong in one list.
+                span.error("`expand` is written more than once")
+                    .note(format!(
+                        "one `expand` names every expansion it asks for: `{}`",
+                        every_expansion_list()
+                    ))
+                    .emit();
             } else {
-                span.error(error.message().to_string()).emit();
+                span.error(message.to_string()).emit();
             }
             return Err(Diagnosed);
         }
     };
+
+    // The file-wide setting is read before anything can bail out, so a file that gets
+    // it wrong and defines no group reports both rather than only the second.
+    let expand = expansions(file, source, parsed.expand.as_ref());
 
     if parsed.group.is_empty() {
         span_of(file, source, &(0..0))
@@ -71,7 +181,7 @@ pub fn load(input: &Input) -> Result<RuleSet, Diagnosed> {
     }
 
     let mut groups = Vec::with_capacity(parsed.group.len());
-    let mut bad = false;
+    let mut bad = expand.is_err();
     for table in &parsed.group {
         match group(file, source, table) {
             Ok(group) => groups.push(group),
@@ -83,8 +193,91 @@ pub fn load(input: &Input) -> Result<RuleSet, Diagnosed> {
     }
     Ok(RuleSet {
         groups,
-        expand: parsed.expand,
+        expand: expand?,
     })
+}
+
+/// The expansions the file asks for, `Expansions::NONE` when it says nothing.
+///
+/// Every bad name in a list is reported, not just the first, so fixing the list
+/// takes one round trip however many names it misspells.
+fn expansions(
+    file: SourceFile,
+    source: &str,
+    value: Option<&Spanned<ExpandValue>>,
+) -> Result<Expansions, Diagnosed> {
+    let Some(value) = value else {
+        return Ok(Expansions::NONE);
+    };
+    let whole = value.span();
+
+    match value.get_ref() {
+        ExpandValue::Every(true) => Ok(all_expansions()),
+        ExpandValue::Every(false) => Ok(Expansions::NONE),
+        ExpandValue::Bare => {
+            // The note spells the list out of the accepted names rather than out of
+            // what was written: the value is a name this file has not checked, and a
+            // suggestion built from it would be worth following only if it happened to
+            // be spelled right.
+            span_of(file, source, &whole)
+                .error("`expand` is a list of expansions, not one name")
+                .note(format!("write it as a list: `{}`", every_expansion_list()))
+                .note("`expand = true` is all of them, `expand = false` none")
+                .emit();
+            Err(Diagnosed)
+        }
+        ExpandValue::Named(names) => {
+            let mut expansions = Expansions::NONE;
+            let mut bad = false;
+            for name in names {
+                if let Some((_, turn_on)) = EXPANSIONS
+                    .iter()
+                    .find(|(known, _)| *known == name.get_ref().as_str())
+                {
+                    turn_on(&mut expansions);
+                    continue;
+                }
+                // Every element keeps its own span, so the caret lands on the name that
+                // is wrong however the rest of the list is spelled -- including when it
+                // reads as part of a name the list spelled right.
+                //
+                // An empty element has no name to quote and nothing between its quotes
+                // to point at, so it is reported as the element it is, quotes included.
+                let report = if name.get_ref().is_empty() {
+                    span_of(file, source, &name.span()).error("this expansion name is empty")
+                } else {
+                    value_span(file, source, name)
+                        .error(format!("`{}` is not an expansion", name.get_ref()))
+                };
+                report
+                    .note(format!("the expansions are {}", expansion_names()))
+                    .note("`expand = true` is all of them, `expand = false` none")
+                    .emit();
+                bad = true;
+            }
+            if bad { Err(Diagnosed) } else { Ok(expansions) }
+        }
+    }
+}
+
+/// The accepted names, as a diagnostic reads them.
+fn expansion_names() -> String {
+    EXPANSIONS
+        .iter()
+        .map(|(name, _)| format!("`{name}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Every accepted name as one `expand` setting, for a note that shows the shape a
+/// list is written in along with the names that go in it.
+fn every_expansion_list() -> String {
+    let names = EXPANSIONS
+        .iter()
+        .map(|(name, _)| format!("\"{name}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("expand = [{names}]")
 }
 
 fn group(file: SourceFile, source: &str, table: &Spanned<GroupTable>) -> Result<Group, Diagnosed> {

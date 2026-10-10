@@ -1,3 +1,4 @@
+use fpp_ast::AstNode;
 use fpp_core::{Node, Span, Spanned};
 use std::sync::Arc;
 
@@ -12,6 +13,11 @@ pub trait SymbolInterface: Clone {
     /// Gets the location of the symbol
     fn get_loc(&self) -> Span {
         self.node().span()
+    }
+    /// Gets the location to report when this symbol conflicts with one that is
+    /// already in scope
+    fn redefined_loc(&self) -> Span {
+        self.name().span()
     }
 }
 
@@ -47,7 +53,24 @@ pub enum Symbol {
     StateMachine(Arc<fpp_ast::DefStateMachine>),
     StructType(Arc<fpp_ast::DefStruct>),
     System(Arc<fpp_ast::DefSystem>),
+    Template(Arc<fpp_ast::DefModuleTemplate>),
     Topology(Arc<fpp_ast::DefTopology>),
+    /// A constant template parameter bound to a constant template argument
+    TemplateConstantArg {
+        param_def: Arc<fpp_ast::TemplateParamConstant>,
+        value: Arc<fpp_ast::Expr>,
+    },
+    /// A type template parameter bound to a type template argument
+    TemplateTypeArg {
+        param_def: Arc<fpp_ast::TemplateParamType>,
+        value: Arc<fpp_ast::TypeName>,
+    },
+    /// A port interface instance template parameter bound to a port interface
+    /// instance template argument
+    TemplateInterfaceArg {
+        param_def: Arc<fpp_ast::TemplateParamInterface>,
+        value: Arc<fpp_ast::QualIdent>,
+    },
 }
 
 impl Symbol {
@@ -77,6 +100,27 @@ impl Symbol {
             _ => false,
         }
     }
+
+    /// Whether this symbol is a bound template parameter. A bound template
+    /// parameter is not a global definition, so it has no qualified name.
+    pub fn is_template_arg(&self) -> bool {
+        matches!(
+            self,
+            Symbol::TemplateConstantArg { .. }
+                | Symbol::TemplateTypeArg { .. }
+                | Symbol::TemplateInterfaceArg { .. }
+        )
+    }
+
+    /// Whether this symbol may be a port interface instance
+    pub fn is_interface_instance(&self) -> bool {
+        matches!(
+            self,
+            Symbol::ComponentInstance(_)
+                | Symbol::Topology(_)
+                | Symbol::TemplateInterfaceArg { .. }
+        )
+    }
 }
 
 impl SymbolInterface for Symbol {
@@ -95,8 +139,15 @@ impl SymbolInterface for Symbol {
             Symbol::StateMachine(node) => node.node_id,
             Symbol::StructType(node) => node.node_id,
             Symbol::System(node) => node.node_id,
+            Symbol::Template(node) => node.node_id,
             Symbol::Topology(node) => node.node_id,
             Symbol::Port(node) => node.node_id,
+            // A bound template parameter is identified by the argument bound to
+            // it, so that two expansions of the same template with different
+            // arguments give distinct symbols
+            Symbol::TemplateConstantArg { value, .. } => value.node_id,
+            Symbol::TemplateTypeArg { value, .. } => value.node_id,
+            Symbol::TemplateInterfaceArg { value, .. } => value.id(),
         }
     }
 
@@ -115,8 +166,24 @@ impl SymbolInterface for Symbol {
             Symbol::StateMachine(def) => &def.name,
             Symbol::StructType(def) => &def.name,
             Symbol::System(def) => &def.name,
+            Symbol::Template(def) => &def.name,
             Symbol::Topology(def) => &def.name,
             Symbol::Port(def) => &def.name,
+            Symbol::TemplateConstantArg { param_def, .. } => &param_def.name,
+            Symbol::TemplateTypeArg { param_def, .. } => &param_def.name,
+            Symbol::TemplateInterfaceArg { param_def, .. } => &param_def.name,
+        }
+    }
+
+    fn redefined_loc(&self) -> Span {
+        if self.is_template_arg() {
+            // The name of a bound parameter is in the template definition, which
+            // may be expanded many times. It is this expansion's arguments that
+            // put two parameters of the same name in scope together, so report
+            // the conflict there.
+            self.get_loc()
+        } else {
+            self.name().span()
         }
     }
 }

@@ -104,7 +104,7 @@
             "patterns": [
                 {
                     "name": "storage.type.class.fpp",
-                    "match": "\\b(?<![$])(action|always|array|assert|at|base|block|bool|change|choice|command|component|connections|constant|container|cpu|default|do|drop|else|enter|entry|enum|event|exit|format|get|group|guard|health|hook|id|if|import|include|initial|input|instance|interface|internal|locate|machine|match|module|omit|on|opcode|orange|output|packet|packets|param|phase|port|priority|private|product|queue|record|recv|red|ref|reg|request|resp|save|send|serial|set|severity|signal|size|sizeof|stack|state|string|struct|telemetry|text|throttle|time|topology|type|unmatched|update|with|yellow)\\b"
+                    "match": "\\b(?<![$])(action|always|array|assert|at|base|block|bool|change|choice|command|component|connections|constant|container|cpu|default|do|drop|else|enter|entry|enum|event|exit|expand|format|get|group|guard|health|hook|id|if|import|include|initial|input|instance|interface|internal|locate|machine|match|module|omit|on|opcode|orange|output|packet|packets|param|phase|port|priority|private|product|queue|record|recv|red|ref|reg|request|resp|save|send|serial|set|severity|signal|size|sizeof|stack|state|string|struct|telemetry|template|text|throttle|time|topology|type|unmatched|update|with|yellow)\\b"
                 }
             ]
         },

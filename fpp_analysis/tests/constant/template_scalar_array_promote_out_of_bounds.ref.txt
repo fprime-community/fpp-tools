@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/constant/template_scalar_array_promote_out_of_bounds.fpp:6:28
+  |
+6 |   constant x = outer[0][0][2]
+  |                            ^ index value is not in the range [0, 1]
+  |
+  = note: expanded at [ local path prefix ]/constant/template_scalar_array_promote_out_of_bounds.fpp:10:3
+  = note: expression evaluated to `2`
+

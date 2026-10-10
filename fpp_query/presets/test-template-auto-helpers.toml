@@ -1,5 +1,8 @@
 # Upstream `fpp-filenames -u -t -a`: the unit-test template without the helpers,
 # which `-a` moves into the autocode set.
+# Module templates are expanded, so a component an expansion contributes gets
+# these files too.
+expand = ["templates"]
 
 [[group]]
 node = "DefComponent"

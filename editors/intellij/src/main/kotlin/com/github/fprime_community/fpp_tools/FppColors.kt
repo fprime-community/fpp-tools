@@ -48,6 +48,9 @@ enum class FppColors(humanName: Supplier<@AttributeDescriptor String>, default: 
     STATE(FppBundle.messagePointer("settings.fpp.color.state"), Default.GLOBAL_VARIABLE),
     CHOICE(FppBundle.messagePointer("settings.fpp.color.choice"), Default.GLOBAL_VARIABLE),
 
+    TEMPLATE(FppBundle.messagePointer("settings.fpp.color.template"), Default.CLASS_NAME),
+    TEMPLATE_PARAMETER(FppBundle.messagePointer("settings.fpp.color.template.parameter"), Default.INSTANCE_FIELD),
+
     // Other
     ANNOTATION(FppBundle.messagePointer("settings.fpp.color.annotation"), Default.DOC_COMMENT),
     COMMENT(FppBundle.messagePointer("settings.fpp.color.comment"), Default.LINE_COMMENT),

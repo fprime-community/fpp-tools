@@ -205,3 +205,43 @@ fn ok_test_template_auto_helpers() {
         "ok_test_template_auto_helpers",
     );
 }
+
+// `template.fpp` uses a module template; `template_hand.fpp` writes the expansion
+// out by hand. The two models must yield the same file names, so both are held to
+// the same reference: if the names an expansion contributes were dropped, updating
+// the reference could not hide it.
+
+#[test]
+fn template() {
+    run_test(Mode::Autocode, "template", "template");
+}
+
+#[test]
+fn template_hand() {
+    run_test(Mode::Autocode, "template_hand", "template");
+}
+
+#[test]
+fn template_expanded() {
+    run_test(Mode::AutocodeExpanded, "template", "template");
+}
+
+#[test]
+fn template_template() {
+    run_test(Mode::Template, "template", "template_template");
+}
+
+#[test]
+fn template_hand_template() {
+    run_test(Mode::Template, "template_hand", "template_template");
+}
+
+#[test]
+fn template_test() {
+    run_test(Mode::Test, "template", "template_test");
+}
+
+#[test]
+fn template_hand_test() {
+    run_test(Mode::Test, "template_hand", "template_test");
+}

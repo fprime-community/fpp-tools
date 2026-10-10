@@ -501,6 +501,36 @@ pub enum SemanticError {
         site_kind: String,
         site_show: String,
     },
+    /// Wrong number of template arguments
+    WrongNumberOfTemplateArguments {
+        expand_loc: Span,
+        def_loc: Span,
+        expand_length: usize,
+        def_length: usize,
+    },
+    /// Template argument of the wrong kind
+    InvalidTemplateArg {
+        param_name: String,
+        arg_loc: Span,
+        param_loc: Span,
+        msg: String,
+    },
+    /// Template parameter conflicts with a definition in the template body
+    TemplateParameterConflict {
+        param_name: String,
+        param_loc: Span,
+        def_loc: Span,
+    },
+    /// Nested template definition
+    NestedTemplateDefinition {
+        nested_loc: Span,
+        parent_loc: Span,
+    },
+    /// Template expansion specifier nested inside a template
+    TemplateExpansionInTemplate {
+        expand_loc: Span,
+        template_loc: Span,
+    },
 }
 
 /// The result of a compilation step
@@ -860,7 +890,7 @@ impl From<SemanticError> for Diagnostic {
                 loc1,
                 Level::Error,
                 format!(
-                    "base id {} of instance {} is in the id range [{}, {}] of instance {}",
+                    "base ID {} for instance {} lies inside the ID range [{}, {}] for instance {}",
                     base_id1, name1, base_id2, max_id2, name2
                 ),
             )
@@ -1175,6 +1205,69 @@ impl From<SemanticError> for Diagnostic {
             } => Diagnostic::new(loc, Level::Error, format!("type mismatch at {}", te_kind))
                 .note(format!("type of {} is {}", te_kind, te_show))
                 .note(format!("type of {} is {}", site_kind, site_show)),
+            SemanticError::WrongNumberOfTemplateArguments {
+                expand_loc,
+                def_loc,
+                expand_length,
+                def_length,
+            } => {
+                let arguments = if def_length == 1 {
+                    "argument"
+                } else {
+                    "arguments"
+                };
+                Diagnostic::new(
+                    expand_loc,
+                    Level::Error,
+                    format!(
+                        "expected {} template {}, got {}",
+                        def_length, arguments, expand_length
+                    ),
+                )
+                .span_note(def_loc, "template defined here")
+            }
+            SemanticError::InvalidTemplateArg {
+                param_name,
+                arg_loc,
+                param_loc,
+                msg,
+            } => Diagnostic::new(
+                arg_loc,
+                Level::Error,
+                format!("invalid argument for template parameter {}: {}", param_name, msg),
+            )
+            .span_note(param_loc, "template parameter is defined here"),
+            SemanticError::TemplateParameterConflict {
+                param_name,
+                param_loc,
+                def_loc,
+            } => Diagnostic::new(
+                param_loc,
+                Level::Error,
+                format!(
+                    "template parameter {} conflicts with a definition in the template body",
+                    param_name
+                ),
+            )
+            .span_note(def_loc, "conflicting definition is here"),
+            SemanticError::NestedTemplateDefinition {
+                nested_loc,
+                parent_loc,
+            } => Diagnostic::new(
+                nested_loc,
+                Level::Error,
+                "module template definitions cannot be nested",
+            )
+            .span_note(parent_loc, "parent template defined here"),
+            SemanticError::TemplateExpansionInTemplate {
+                expand_loc,
+                template_loc,
+            } => Diagnostic::new(
+                expand_loc,
+                Level::Error,
+                "template expansion specifiers cannot appear inside a module template",
+            )
+            .span_note(template_loc, "enclosing template defined here"),
         }
     }
 }

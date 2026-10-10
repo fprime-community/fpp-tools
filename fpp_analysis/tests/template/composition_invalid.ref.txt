@@ -1,8 +1,14 @@
- --> [ local path prefix ]/template/composition_invalid.fpp:1:8
-  |
-1 | module template T1(
-  |        ^^^^^^^^ syntax error: unexpected token
-  |
-  = note: expected {
-  = note: got identifier
+  --> [ local path prefix ]/template/composition_invalid.fpp:10:5
+   |
+10 |       expand T1(constant p)
+   |       ^^^^^^^^^^^^^^^^^^^^^ template expansion specifiers cannot appear inside a module template
+   |
+  ::: [ local path prefix ]/template/composition_invalid.fpp:7:1
+   |
+ 7 | / module template T2(
+ 8 | |     constant p: U32
+ 9 | | ) {
+10 | |     expand T1(constant p)
+11 | | }
+   | |_- enclosing template defined here
 

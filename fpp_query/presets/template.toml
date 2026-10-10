@@ -1,4 +1,7 @@
 # Upstream `fpp-filenames -t`: the implementation template for a component.
+# Module templates are expanded, so a component an expansion contributes gets
+# these files too.
+expand = ["templates"]
 
 [[group]]
 node = "DefComponent"

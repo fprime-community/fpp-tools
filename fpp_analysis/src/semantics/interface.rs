@@ -1005,7 +1005,7 @@ pub fn resolve_interface(
 mod tests {
     use super::{Direction, PortInstance, PortInterface};
     use crate::semantics::{Component, SymbolInterface, Topology};
-    use crate::{Analysis, add_state_enums, check_semantics};
+    use crate::{Analysis, add_state_enums, check_semantics, resolve_templates};
     use fpp_ast::SpecialPortInstanceKind;
     use fpp_core::{SourceFile, Spanned};
 
@@ -1075,6 +1075,7 @@ module M {
             let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
             let mut a = Analysis::new();
             add_state_enums(&mut ast);
+            let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
             let _ = check_semantics(&mut a, vec![&ast]);
             let component = a
                 .component_map
@@ -1247,6 +1248,7 @@ interface I {
             let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
             let mut a = Analysis::new();
             add_state_enums(&mut ast);
+            let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
             let _ = check_semantics(&mut a, vec![&ast]);
             let interface = a
                 .interface_map

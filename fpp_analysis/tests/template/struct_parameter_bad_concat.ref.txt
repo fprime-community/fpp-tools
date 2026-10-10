@@ -1,8 +1,7 @@
- --> [ local path prefix ]/template/struct_parameter_bad_concat.fpp:6:8
+ --> [ local path prefix ]/template/struct_parameter_bad_concat.fpp:7:18
   |
-6 | module template M(constant s: S) {
-  |        ^^^^^^^^ syntax error: unexpected token
+7 |   constant c = [ s.a, s.b ]
+  |                  ^^^ cannot compute common type of A and B
   |
-  = note: expected {
-  = note: got identifier
+  = note: expanded at [ local path prefix ]/template/struct_parameter_bad_concat.fpp:10:1
 

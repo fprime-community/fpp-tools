@@ -154,6 +154,20 @@ pub(crate) fn ast_node_enum(input: &ItemEnum) -> TokenStream {
                 }
             }
         }
+
+        impl #impl_generics ::core::cmp::PartialEq for #enum_ident #ty_generics #where_clause {
+            fn eq(&self, other: &Self) -> bool {
+                crate::AstNode::id(self) == crate::AstNode::id(other)
+            }
+        }
+
+        impl #impl_generics ::core::cmp::Eq for #enum_ident #ty_generics #where_clause {}
+
+        impl #impl_generics ::core::hash::Hash for #enum_ident #ty_generics #where_clause {
+            fn hash<H: ::std::hash::Hasher>(&self, state: &mut H) {
+                crate::AstNode::id(self).hash(state)
+            }
+        }
     };
 
     output.into()

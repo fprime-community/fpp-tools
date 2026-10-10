@@ -75,10 +75,11 @@ impl<'ctx, E: DiagnosticEmitter> CompilerInterface for Container<'ctx, E> {
         start: BytePos,
         length: BytePos,
         include_span: Option<Span>,
+        expand_span: Option<Span>,
     ) -> Span {
         self.ctx
             .borrow_mut()
-            .span_add(file, start, length, include_span)
+            .span_add(file, start, length, include_span, expand_span)
     }
 
     fn span_start(&self, s: &Span) -> Position {
@@ -113,6 +114,13 @@ impl<'ctx, E: DiagnosticEmitter> CompilerInterface for Container<'ctx, E> {
         let ctx = self.ctx.borrow();
         Some(Span {
             handle: ctx.span_get(s).include_span.clone()?.handle,
+        })
+    }
+
+    fn span_expand_span(&self, s: &Span) -> Option<Span> {
+        let ctx = self.ctx.borrow();
+        Some(Span {
+            handle: ctx.span_get(s).expand_span.clone()?.handle,
         })
     }
 
@@ -204,6 +212,7 @@ impl<E: DiagnosticEmitter> CompilerInterface for RefContainer<'_, E> {
         _start: BytePos,
         _length: BytePos,
         _include_span: Option<Span>,
+        _expand_span: Option<Span>,
     ) -> Span {
         panic!("cannot add a span under a read-only compiler context")
     }
@@ -239,6 +248,13 @@ impl<E: DiagnosticEmitter> CompilerInterface for RefContainer<'_, E> {
         let ctx = self.ctx.borrow();
         Some(Span {
             handle: ctx.span_get(s).include_span.clone()?.handle,
+        })
+    }
+
+    fn span_expand_span(&self, s: &Span) -> Option<Span> {
+        let ctx = self.ctx.borrow();
+        Some(Span {
+            handle: ctx.span_get(s).expand_span.clone()?.handle,
         })
     }
 
@@ -282,12 +298,14 @@ pub(crate) trait CompilerInterface {
         start: BytePos,
         length: BytePos,
         include_span: Option<Span>,
+        expand_span: Option<Span>,
     ) -> Span;
     fn span_start(&self, s: &Span) -> Position;
     fn span_end(&self, s: &Span) -> Position;
     fn span_len(&self, s: &Span) -> usize;
     fn span_file(&self, s: &Span) -> SourceFile;
     fn span_include_span(&self, s: &Span) -> Option<Span>;
+    fn span_expand_span(&self, s: &Span) -> Option<Span>;
 
     /// Diagnostic related functions
     fn diagnostic_emit(&self, diag: Diagnostic);
