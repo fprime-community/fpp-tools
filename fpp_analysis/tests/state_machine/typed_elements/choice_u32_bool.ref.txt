@@ -3,13 +3,13 @@
  8 |     choice C { if g enter T else enter T }
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ type mismatch at choice
    |
-  ::: [ local path prefix ]/state_machine/typed_elements/choice_u32_bool.fpp:9:5
-   |
- 9 |     on s1 enter C
-   |     ------------- type of transition is U32
-   |
   ::: [ local path prefix ]/state_machine/typed_elements/choice_u32_bool.fpp:10:5
    |
 10 |     on s2 enter C
    |     ------------- type of transition is boolean
+   |
+  ::: [ local path prefix ]/state_machine/typed_elements/choice_u32_bool.fpp:9:5
+   |
+ 9 |     on s1 enter C
+   |     ------------- type of transition is U32
 

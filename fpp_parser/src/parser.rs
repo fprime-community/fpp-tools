@@ -956,18 +956,26 @@ impl<'a> Parser<'a> {
     fn tlm_packet_member(&mut self) -> ParseResult<TlmPacketMember> {
         match self.peek(0) {
             Keyword(Include) => Ok(TlmPacketMember::SpecInclude(self.spec_include()?)),
-            Identifier => Ok(TlmPacketMember::TlmChannelIdentifier(
+            Identifier | Dot => Ok(TlmPacketMember::TlmChannelIdentifier(
                 self.tlm_channel_identifier()?,
             )),
             _ => Err(self.cursor.err_expected_one_of(
                 "telemetry packet member expected",
-                vec![Keyword(Include), Identifier],
+                vec![Keyword(Include), Identifier, Dot],
             )),
         }
     }
 
     fn tlm_channel_identifier(&mut self) -> ParseResult<TlmChannelIdentifier> {
-        let (component_instance, channel_name, first_span) = self.interface_instance_member()?;
+        let dot = self.opt_dot();
+        let id = self.ident()?;
+        self.consume(Dot)?;
+        let mut qid = self.qual_ident_node_list()?;
+        let channel_name = qid.pop().unwrap();
+        let mut component_instance = vec![id];
+        component_instance.extend(qid);
+        let first_span = dot.unwrap_or(component_instance[0].span());
+        let component_instance = QualIdent::from_node_list(component_instance, dot.is_some());
 
         Ok(TlmChannelIdentifier {
             node_id: self.node(first_span),
@@ -977,7 +985,15 @@ impl<'a> Parser<'a> {
     }
 
     fn port_instance_identifier(&mut self) -> ParseResult<PortInstanceIdentifier> {
-        let (interface_instance, port_name, first_span) = self.interface_instance_member()?;
+        let dot = self.opt_dot();
+        let id = self.ident()?;
+        self.consume(Dot)?;
+        let mut qid = self.qual_ident_node_list()?;
+        let port_name = qid.pop().unwrap();
+        let mut component_instance = vec![id];
+        component_instance.extend(qid);
+        let first_span = dot.unwrap_or(component_instance[0].span());
+        let interface_instance = QualIdent::from_node_list(component_instance, dot.is_some());
 
         Ok(PortInstanceIdentifier {
             node_id: self.node(first_span),
@@ -986,31 +1002,12 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn interface_instance_member(&mut self) -> ParseResult<(QualIdent, Ident, fpp_core::Span)> {
-        let first = self.ident()?;
-        let first_span = first.span();
-
-        let mut identifiers = vec![];
-        self.consume(Dot)?;
-        identifiers.push(self.ident()?);
-        while self.peek(0) == Dot {
-            self.next();
-            identifiers.push(self.ident()?);
+    /// An optional `.`, returning its span if it is there
+    fn opt_dot(&mut self) -> Option<fpp_core::Span> {
+        match self.peek(0) {
+            Dot => self.next().map(|dot| dot.span()),
+            _ => None,
         }
-
-        let member = identifiers.pop().unwrap();
-        let instance = identifiers
-            .into_iter()
-            .fold(QualIdent::Unqualified(first), |q, ident| {
-                let q_span = q.span();
-                QualIdent::Qualified(Qualified {
-                    node_id: self.node(q_span),
-                    qualifier: Box::new(q),
-                    name: ident,
-                })
-            });
-
-        Ok((instance, member, first_span))
     }
 
     fn spec_top_port(&mut self) -> ParseResult<SpecTopPort> {
@@ -1032,16 +1029,9 @@ impl<'a> Parser<'a> {
         self.consume(Colon)?;
         let component = self.qual_ident()?;
 
-        let base_id = {
-            match self.peek(0) {
-                Keyword(Base) => {
-                    self.next();
-                    self.consume_keyword(Id)?;
-                    Some(self.expr()?)
-                }
-                _ => None,
-            }
-        };
+        self.consume_keyword(Base)?;
+        self.consume_keyword(Id)?;
+        let base_id = self.expr()?;
 
         let impl_type = {
             match self.peek(0) {
@@ -2458,8 +2448,13 @@ impl<'a> Parser<'a> {
     }
 
     fn qual_ident(&mut self) -> ParseResult<QualIdent> {
-        let first = self.ident()?;
-        let mut out = vec![];
+        let dot = self.opt_dot();
+        let qid = self.qual_ident_node_list()?;
+        Ok(QualIdent::from_node_list(qid, dot.is_some()))
+    }
+
+    fn qual_ident_node_list(&mut self) -> ParseResult<QualIdentNodeList> {
+        let mut out = vec![self.ident()?];
         while self.peek(0) == Dot {
             let dot_token = self.next().unwrap();
             if self.peek(0) == Identifier {
@@ -2475,16 +2470,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(out
-            .into_iter()
-            .fold(QualIdent::Unqualified(first), |q, ident| {
-                let q_span = q.span();
-                QualIdent::Qualified(Qualified {
-                    node_id: self.node(q_span),
-                    qualifier: Box::new(q),
-                    name: ident,
-                })
-            }))
+        Ok(out)
     }
 
     fn type_name(&mut self) -> ParseResult<TypeName> {
@@ -2545,7 +2531,7 @@ impl<'a> Parser<'a> {
                 };
                 Ok(TypeNameKind::String(size))
             }
-            Identifier => Ok(TypeNameKind::QualIdent(self.qual_ident()?)),
+            Identifier | Dot => Ok(TypeNameKind::QualIdent(self.qual_ident()?)),
             _ => Err(self.cursor.err_expected_one_of(
                 "type name expected",
                 vec![
@@ -2562,6 +2548,7 @@ impl<'a> Parser<'a> {
                     Keyword(F64),
                     Keyword(String_),
                     Identifier,
+                    Dot,
                 ],
             )),
         }?;
@@ -2747,7 +2734,21 @@ impl<'a> Parser<'a> {
                 let first = self.next().unwrap();
                 Ok(Expr {
                     node_id: self.node(first.span()),
-                    kind: ExprKind::Ident(first.text().to_string()),
+                    kind: ExprKind::Ident {
+                        value: first.text().to_string(),
+                        is_absolute: false,
+                    },
+                })
+            }
+            Dot => {
+                let first = self.next().unwrap();
+                let id = self.consume(Identifier)?;
+                Ok(Expr {
+                    node_id: self.node(first.span()),
+                    kind: ExprKind::Ident {
+                        value: id.text().to_string(),
+                        is_absolute: true,
+                    },
                 })
             }
             LiteralInt => {
@@ -2791,6 +2792,7 @@ impl<'a> Parser<'a> {
                     LeftCurly,
                     LeftParen,
                     Identifier,
+                    Dot,
                     Keyword(True),
                     Keyword(False),
                     Keyword(Sizeof),
@@ -2933,3 +2935,6 @@ impl<'a> Parser<'a> {
         self.consume(Keyword(kind))
     }
 }
+
+#[cfg(test)]
+mod parser_spec;

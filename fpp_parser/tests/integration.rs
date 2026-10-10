@@ -183,6 +183,12 @@ fn template() {
     run_test("template")
 }
 
+// Rust-only: the template forms that `template` leaves out
+#[test]
+fn template_forms() {
+    run_test("template-forms")
+}
+
 #[test]
 fn template_error() {
     run_test("template-error")

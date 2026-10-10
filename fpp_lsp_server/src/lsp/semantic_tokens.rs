@@ -446,7 +446,7 @@ impl<'ast> Visitor<'ast> for SemanticUses<'ast> {
 
     fn visit_expr(&self, a: &mut Self::State, node: &'ast Expr) -> ControlFlow<Self::Break> {
         match &node.kind {
-            ExprKind::Ident(_) => {
+            ExprKind::Ident { .. } => {
                 self.mark_use(a, node.node_id, node.node_id);
                 ControlFlow::Continue(())
             }

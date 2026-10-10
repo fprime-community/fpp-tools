@@ -1,7 +1,7 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::basic_use_analyzer::{BasicUseAnalyzer, UseAnalysisPass};
-use crate::semantics::Symbol;
+use crate::semantics::{QualifiedName, Symbol};
 use fpp_ast::{AstNode, ExprKind, Node, Visitable};
 use std::ops::ControlFlow;
 
@@ -38,10 +38,10 @@ impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Analyzer<'ast, V> for UseAnalyzer
                                 | Symbol::EnumConstant(_)
                                 | Symbol::TemplateConstantArg { .. },
                             ) => {
-                                let use_name = self
-                                    .super_
-                                    .expr_to_qualified_name(expr)
-                                    .expect("expected a qualified name");
+                                let use_name = QualifiedName::from(
+                                    expr.get_ident_list_opt()
+                                        .expect("expected a qualified identifier"),
+                                );
                                 visitor.constant_use(a, expr, use_name)
                             }
                             Some(Symbol::Module(_) | Symbol::Component(_)) | None => {

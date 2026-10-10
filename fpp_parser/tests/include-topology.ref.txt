@@ -11,8 +11,15 @@ TransUnit(
             },
             members: [
                 SpecInstance {
-                    instance: Ident {
-                        data: "x",
+                    instance: Unqualified {
+                        name: Ident {
+                            data: "x",
+                            node_id: Span {
+                                start: [ local path prefix ]/instance.fppi:2:10,
+                                end: [ local path prefix ]/instance.fppi:2:11,
+                            },
+                        },
+                        is_absolute: false,
                         node_id: Span {
                             start: [ local path prefix ]/instance.fppi:2:10,
                             end: [ local path prefix ]/instance.fppi:2:11,

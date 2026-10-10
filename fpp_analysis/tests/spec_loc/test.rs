@@ -18,6 +18,18 @@ fn nested_path_error() {
     run_test("spec_loc/nested_path_error")
 }
 
+// Rust-only: a location specifier for a name of four or more parts is keyed
+// under that name, with its qualifier in source order
+#[test]
+fn four_part_name_ok() {
+    run_test("spec_loc/four_part_name_ok")
+}
+
+#[test]
+fn four_part_name_path_error() {
+    run_test("spec_loc/four_part_name_path_error")
+}
+
 #[test]
 fn abs_type_path_error() {
     run_test("spec_loc/abs_type_path_error")

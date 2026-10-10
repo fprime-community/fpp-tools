@@ -79,33 +79,7 @@ impl From<VecDeque<String>> for QualifiedName {
 /// Create a qualified name from a qualified identifier
 impl From<&fpp_ast::QualIdent> for QualifiedName {
     fn from(value: &fpp_ast::QualIdent) -> Self {
-        fn to_qualifier(value: &fpp_ast::QualIdent, mut q: VecDeque<String>) -> VecDeque<String> {
-            match value {
-                fpp_ast::QualIdent::Unqualified(ident) => {
-                    q.push_front(ident.data.clone());
-                    q
-                }
-                fpp_ast::QualIdent::Qualified(fpp_ast::Qualified {
-                    qualifier, name, ..
-                }) => {
-                    q.push_back(name.data.clone());
-                    to_qualifier(qualifier, q)
-                }
-            }
-        }
-
-        match value {
-            fpp_ast::QualIdent::Qualified(fpp_ast::Qualified {
-                qualifier, name, ..
-            }) => Self {
-                qualifier: to_qualifier(qualifier, VecDeque::new()),
-                base: name.data.clone(),
-            },
-            fpp_ast::QualIdent::Unqualified(name) => Self {
-                qualifier: VecDeque::new(),
-                base: name.data.clone(),
-            },
-        }
+        value.to_ident_list().into()
     }
 }
 

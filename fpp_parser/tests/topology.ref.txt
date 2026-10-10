@@ -81,8 +81,15 @@ TransUnit(
                     members: [
                         SpecInstance {
                             instance: Qualified {
-                                qualifier: Ident {
-                                    data: "CdhCore",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "CdhCore",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:19:12,
+                                            end: [ local path prefix ]/topology.fpp:19:19,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:19:12,
                                         end: [ local path prefix ]/topology.fpp:19:19,
@@ -107,8 +114,15 @@ TransUnit(
                         },
                         SpecInstance {
                             instance: Qualified {
-                                qualifier: Ident {
-                                    data: "ComCcsds",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "ComCcsds",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:20:12,
+                                            end: [ local path prefix ]/topology.fpp:20:20,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:20:12,
                                         end: [ local path prefix ]/topology.fpp:20:20,
@@ -133,8 +147,15 @@ TransUnit(
                         },
                         SpecInstance {
                             instance: Qualified {
-                                qualifier: Ident {
-                                    data: "FileHandling",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "FileHandling",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:21:12,
+                                            end: [ local path prefix ]/topology.fpp:21:24,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:21:12,
                                         end: [ local path prefix ]/topology.fpp:21:24,
@@ -159,8 +180,15 @@ TransUnit(
                         },
                         SpecInstance {
                             instance: Qualified {
-                                qualifier: Ident {
-                                    data: "DataProducts",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "DataProducts",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:22:12,
+                                            end: [ local path prefix ]/topology.fpp:22:24,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:22:12,
                                         end: [ local path prefix ]/topology.fpp:22:24,
@@ -184,8 +212,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "SG1",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "SG1",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:28:14,
+                                        end: [ local path prefix ]/topology.fpp:28:17,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:28:14,
                                     end: [ local path prefix ]/topology.fpp:28:17,
@@ -197,8 +232,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "SG2",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "SG2",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:29:14,
+                                        end: [ local path prefix ]/topology.fpp:29:17,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:29:14,
                                     end: [ local path prefix ]/topology.fpp:29:17,
@@ -210,8 +252,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "SG3",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "SG3",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:30:14,
+                                        end: [ local path prefix ]/topology.fpp:30:17,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:30:14,
                                     end: [ local path prefix ]/topology.fpp:30:17,
@@ -223,8 +272,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "SG4",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "SG4",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:31:14,
+                                        end: [ local path prefix ]/topology.fpp:31:17,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:31:14,
                                     end: [ local path prefix ]/topology.fpp:31:17,
@@ -236,8 +292,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "SG5",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "SG5",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:32:14,
+                                        end: [ local path prefix ]/topology.fpp:32:17,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:32:14,
                                     end: [ local path prefix ]/topology.fpp:32:17,
@@ -249,8 +312,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "blockDrv",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "blockDrv",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:33:14,
+                                        end: [ local path prefix ]/topology.fpp:33:22,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:33:14,
                                     end: [ local path prefix ]/topology.fpp:33:22,
@@ -262,8 +332,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "posixTime",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "posixTime",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:34:14,
+                                        end: [ local path prefix ]/topology.fpp:34:23,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:34:14,
                                     end: [ local path prefix ]/topology.fpp:34:23,
@@ -275,8 +352,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "pingRcvr",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "pingRcvr",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:35:14,
+                                        end: [ local path prefix ]/topology.fpp:35:22,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:35:14,
                                     end: [ local path prefix ]/topology.fpp:35:22,
@@ -288,8 +372,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "rateGroup1Comp",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "rateGroup1Comp",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:36:14,
+                                        end: [ local path prefix ]/topology.fpp:36:28,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:36:14,
                                     end: [ local path prefix ]/topology.fpp:36:28,
@@ -301,8 +392,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "rateGroup2Comp",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "rateGroup2Comp",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:37:14,
+                                        end: [ local path prefix ]/topology.fpp:37:28,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:37:14,
                                     end: [ local path prefix ]/topology.fpp:37:28,
@@ -314,8 +412,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "rateGroup3Comp",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "rateGroup3Comp",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:38:14,
+                                        end: [ local path prefix ]/topology.fpp:38:28,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:38:14,
                                     end: [ local path prefix ]/topology.fpp:38:28,
@@ -327,8 +432,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "rateGroupDriverComp",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "rateGroupDriverComp",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:39:14,
+                                        end: [ local path prefix ]/topology.fpp:39:33,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:39:14,
                                     end: [ local path prefix ]/topology.fpp:39:33,
@@ -340,8 +452,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "recvBuffComp",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "recvBuffComp",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:40:14,
+                                        end: [ local path prefix ]/topology.fpp:40:26,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:40:14,
                                     end: [ local path prefix ]/topology.fpp:40:26,
@@ -353,8 +472,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "sendBuffComp",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "sendBuffComp",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:41:14,
+                                        end: [ local path prefix ]/topology.fpp:41:26,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:41:14,
                                     end: [ local path prefix ]/topology.fpp:41:26,
@@ -366,8 +492,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "typeDemo",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "typeDemo",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:42:14,
+                                        end: [ local path prefix ]/topology.fpp:42:22,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:42:14,
                                     end: [ local path prefix ]/topology.fpp:42:22,
@@ -379,8 +512,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "systemResources",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "systemResources",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:43:14,
+                                        end: [ local path prefix ]/topology.fpp:43:29,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:43:14,
                                     end: [ local path prefix ]/topology.fpp:43:29,
@@ -392,8 +532,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "dpDemo",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "dpDemo",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:44:14,
+                                        end: [ local path prefix ]/topology.fpp:44:20,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:44:14,
                                     end: [ local path prefix ]/topology.fpp:44:20,
@@ -405,8 +552,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "linuxTimer",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "linuxTimer",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:45:14,
+                                        end: [ local path prefix ]/topology.fpp:45:24,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:45:14,
                                     end: [ local path prefix ]/topology.fpp:45:24,
@@ -418,8 +572,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "comDriver",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "comDriver",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:46:14,
+                                        end: [ local path prefix ]/topology.fpp:46:23,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:46:14,
                                     end: [ local path prefix ]/topology.fpp:46:23,
@@ -431,8 +592,15 @@ TransUnit(
                             },
                         },
                         SpecInstance {
-                            instance: Ident {
-                                data: "cmdSeq",
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "cmdSeq",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:47:14,
+                                        end: [ local path prefix ]/topology.fpp:47:20,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:47:14,
                                     end: [ local path prefix ]/topology.fpp:47:20,
@@ -446,8 +614,15 @@ TransUnit(
                         SpecPatternConnectionGraph {
                             kind: Command,
                             source: Qualified {
-                                qualifier: Ident {
-                                    data: "CdhCore",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "CdhCore",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:53:34,
+                                            end: [ local path prefix ]/topology.fpp:53:41,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:53:34,
                                         end: [ local path prefix ]/topology.fpp:53:41,
@@ -474,8 +649,15 @@ TransUnit(
                         SpecPatternConnectionGraph {
                             kind: Event,
                             source: Qualified {
-                                qualifier: Ident {
-                                    data: "CdhCore",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "CdhCore",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:55:32,
+                                            end: [ local path prefix ]/topology.fpp:55:39,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:55:32,
                                         end: [ local path prefix ]/topology.fpp:55:39,
@@ -502,8 +684,15 @@ TransUnit(
                         SpecPatternConnectionGraph {
                             kind: Telemetry,
                             source: Qualified {
-                                qualifier: Ident {
-                                    data: "CdhCore",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "CdhCore",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:57:36,
+                                            end: [ local path prefix ]/topology.fpp:57:43,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:57:36,
                                         end: [ local path prefix ]/topology.fpp:57:43,
@@ -530,8 +719,15 @@ TransUnit(
                         SpecPatternConnectionGraph {
                             kind: TextEvent,
                             source: Qualified {
-                                qualifier: Ident {
-                                    data: "CdhCore",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "CdhCore",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:59:37,
+                                            end: [ local path prefix ]/topology.fpp:59:44,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:59:37,
                                         end: [ local path prefix ]/topology.fpp:59:44,
@@ -558,8 +754,15 @@ TransUnit(
                         SpecPatternConnectionGraph {
                             kind: Health,
                             source: Qualified {
-                                qualifier: Ident {
-                                    data: "CdhCore",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "CdhCore",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:61:33,
+                                            end: [ local path prefix ]/topology.fpp:61:40,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:61:33,
                                         end: [ local path prefix ]/topology.fpp:61:40,
@@ -586,8 +789,15 @@ TransUnit(
                         SpecPatternConnectionGraph {
                             kind: Param,
                             source: Qualified {
-                                qualifier: Ident {
-                                    data: "FileHandling",
+                                qualifier: Unqualified {
+                                    name: Ident {
+                                        data: "FileHandling",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/topology.fpp:63:32,
+                                            end: [ local path prefix ]/topology.fpp:63:44,
+                                        },
+                                    },
+                                    is_absolute: false,
                                     node_id: Span {
                                         start: [ local path prefix ]/topology.fpp:63:32,
                                         end: [ local path prefix ]/topology.fpp:63:44,
@@ -613,8 +823,15 @@ TransUnit(
                         },
                         SpecPatternConnectionGraph {
                             kind: Time,
-                            source: Ident {
-                                data: "posixTime",
+                            source: Unqualified {
+                                name: Ident {
+                                    data: "posixTime",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/topology.fpp:65:31,
+                                        end: [ local path prefix ]/topology.fpp:65:40,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/topology.fpp:65:31,
                                     end: [ local path prefix ]/topology.fpp:65:40,
@@ -638,8 +855,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "linuxTimer",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "linuxTimer",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:80:7,
+                                                    end: [ local path prefix ]/topology.fpp:80:17,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:80:7,
                                                 end: [ local path prefix ]/topology.fpp:80:17,
@@ -659,8 +883,15 @@ TransUnit(
                                     },
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroupDriverComp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroupDriverComp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:80:30,
+                                                    end: [ local path prefix ]/topology.fpp:80:49,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:80:30,
                                                 end: [ local path prefix ]/topology.fpp:80:49,
@@ -687,8 +918,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroupDriverComp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroupDriverComp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:83:7,
+                                                    end: [ local path prefix ]/topology.fpp:83:26,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:83:7,
                                                 end: [ local path prefix ]/topology.fpp:83:26,
@@ -710,9 +948,10 @@ TransUnit(
                                         Expr {
                                             kind: Dot {
                                                 e: Expr {
-                                                    kind: Ident(
-                                                        "Ports_RateGroups",
-                                                    ),
+                                                    kind: Ident {
+                                                        value: "Ports_RateGroups",
+                                                        is_absolute: false,
+                                                    },
                                                     node_id: Span {
                                                         start: [ local path prefix ]/topology.fpp:83:36,
                                                         end: [ local path prefix ]/topology.fpp:83:52,
@@ -733,8 +972,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup1Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup1Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:83:68,
+                                                    end: [ local path prefix ]/topology.fpp:83:82,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:83:68,
                                                 end: [ local path prefix ]/topology.fpp:83:82,
@@ -761,8 +1007,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup1Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup1Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:84:7,
+                                                    end: [ local path prefix ]/topology.fpp:84:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:84:7,
                                                 end: [ local path prefix ]/topology.fpp:84:21,
@@ -792,8 +1045,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "SG1",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "SG1",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:84:47,
+                                                    end: [ local path prefix ]/topology.fpp:84:50,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:84:47,
                                                 end: [ local path prefix ]/topology.fpp:84:50,
@@ -820,8 +1080,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup1Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup1Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:85:7,
+                                                    end: [ local path prefix ]/topology.fpp:85:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:85:7,
                                                 end: [ local path prefix ]/topology.fpp:85:21,
@@ -851,8 +1118,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "SG2",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "SG2",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:85:47,
+                                                    end: [ local path prefix ]/topology.fpp:85:50,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:85:47,
                                                 end: [ local path prefix ]/topology.fpp:85:50,
@@ -879,8 +1153,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup1Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup1Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:86:7,
+                                                    end: [ local path prefix ]/topology.fpp:86:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:86:7,
                                                 end: [ local path prefix ]/topology.fpp:86:21,
@@ -911,8 +1192,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:86:47,
+                                                        end: [ local path prefix ]/topology.fpp:86:54,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:86:47,
                                                     end: [ local path prefix ]/topology.fpp:86:54,
@@ -927,7 +1215,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:86:47,
-                                                end: [ local path prefix ]/topology.fpp:86:66,
+                                                end: [ local path prefix ]/topology.fpp:86:62,
                                             },
                                         },
                                         port_name: Ident {
@@ -951,8 +1239,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup1Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup1Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:87:7,
+                                                    end: [ local path prefix ]/topology.fpp:87:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:87:7,
                                                 end: [ local path prefix ]/topology.fpp:87:21,
@@ -983,8 +1278,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "FileHandling",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "FileHandling",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:87:47,
+                                                        end: [ local path prefix ]/topology.fpp:87:59,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:87:47,
                                                     end: [ local path prefix ]/topology.fpp:87:59,
@@ -999,7 +1301,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:87:47,
-                                                end: [ local path prefix ]/topology.fpp:87:76,
+                                                end: [ local path prefix ]/topology.fpp:87:72,
                                             },
                                         },
                                         port_name: Ident {
@@ -1023,8 +1325,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup1Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup1Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:88:7,
+                                                    end: [ local path prefix ]/topology.fpp:88:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:88:7,
                                                 end: [ local path prefix ]/topology.fpp:88:21,
@@ -1054,8 +1363,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "systemResources",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "systemResources",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:88:47,
+                                                    end: [ local path prefix ]/topology.fpp:88:62,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:88:47,
                                                 end: [ local path prefix ]/topology.fpp:88:62,
@@ -1082,8 +1398,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup1Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup1Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:89:7,
+                                                    end: [ local path prefix ]/topology.fpp:89:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:89:7,
                                                 end: [ local path prefix ]/topology.fpp:89:21,
@@ -1114,8 +1437,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:89:47,
+                                                        end: [ local path prefix ]/topology.fpp:89:55,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:89:47,
                                                     end: [ local path prefix ]/topology.fpp:89:55,
@@ -1130,7 +1460,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:89:47,
-                                                end: [ local path prefix ]/topology.fpp:89:68,
+                                                end: [ local path prefix ]/topology.fpp:89:64,
                                             },
                                         },
                                         port_name: Ident {
@@ -1154,8 +1484,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup1Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup1Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:90:7,
+                                                    end: [ local path prefix ]/topology.fpp:90:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:90:7,
                                                 end: [ local path prefix ]/topology.fpp:90:21,
@@ -1186,8 +1523,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:90:47,
+                                                        end: [ local path prefix ]/topology.fpp:90:54,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:90:47,
                                                     end: [ local path prefix ]/topology.fpp:90:54,
@@ -1202,7 +1546,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:90:47,
-                                                end: [ local path prefix ]/topology.fpp:90:66,
+                                                end: [ local path prefix ]/topology.fpp:90:62,
                                             },
                                         },
                                         port_name: Ident {
@@ -1226,8 +1570,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup1Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup1Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:91:7,
+                                                    end: [ local path prefix ]/topology.fpp:91:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:91:7,
                                                 end: [ local path prefix ]/topology.fpp:91:21,
@@ -1258,8 +1609,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:91:47,
+                                                        end: [ local path prefix ]/topology.fpp:91:55,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:91:47,
                                                     end: [ local path prefix ]/topology.fpp:91:55,
@@ -1274,7 +1632,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:91:47,
-                                                end: [ local path prefix ]/topology.fpp:91:74,
+                                                end: [ local path prefix ]/topology.fpp:91:66,
                                             },
                                         },
                                         port_name: Ident {
@@ -1298,8 +1656,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroupDriverComp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroupDriverComp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:94:7,
+                                                    end: [ local path prefix ]/topology.fpp:94:26,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:94:7,
                                                 end: [ local path prefix ]/topology.fpp:94:26,
@@ -1321,9 +1686,10 @@ TransUnit(
                                         Expr {
                                             kind: Dot {
                                                 e: Expr {
-                                                    kind: Ident(
-                                                        "Ports_RateGroups",
-                                                    ),
+                                                    kind: Ident {
+                                                        value: "Ports_RateGroups",
+                                                        is_absolute: false,
+                                                    },
                                                     node_id: Span {
                                                         start: [ local path prefix ]/topology.fpp:94:36,
                                                         end: [ local path prefix ]/topology.fpp:94:52,
@@ -1344,8 +1710,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup2Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup2Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:94:68,
+                                                    end: [ local path prefix ]/topology.fpp:94:82,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:94:68,
                                                 end: [ local path prefix ]/topology.fpp:94:82,
@@ -1372,8 +1745,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup2Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup2Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:96:7,
+                                                    end: [ local path prefix ]/topology.fpp:96:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:96:7,
                                                 end: [ local path prefix ]/topology.fpp:96:21,
@@ -1403,8 +1783,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "sendBuffComp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "sendBuffComp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:96:47,
+                                                    end: [ local path prefix ]/topology.fpp:96:59,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:96:47,
                                                 end: [ local path prefix ]/topology.fpp:96:59,
@@ -1431,8 +1818,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup2Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup2Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:97:7,
+                                                    end: [ local path prefix ]/topology.fpp:97:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:97:7,
                                                 end: [ local path prefix ]/topology.fpp:97:21,
@@ -1462,8 +1856,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "SG3",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "SG3",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:97:47,
+                                                    end: [ local path prefix ]/topology.fpp:97:50,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:97:47,
                                                 end: [ local path prefix ]/topology.fpp:97:50,
@@ -1490,8 +1891,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup2Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup2Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:98:7,
+                                                    end: [ local path prefix ]/topology.fpp:98:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:98:7,
                                                 end: [ local path prefix ]/topology.fpp:98:21,
@@ -1521,8 +1929,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "SG4",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "SG4",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:98:47,
+                                                    end: [ local path prefix ]/topology.fpp:98:50,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:98:47,
                                                 end: [ local path prefix ]/topology.fpp:98:50,
@@ -1549,8 +1964,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup2Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup2Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:99:7,
+                                                    end: [ local path prefix ]/topology.fpp:99:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:99:7,
                                                 end: [ local path prefix ]/topology.fpp:99:21,
@@ -1580,8 +2002,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "dpDemo",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "dpDemo",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:99:47,
+                                                    end: [ local path prefix ]/topology.fpp:99:53,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:99:47,
                                                 end: [ local path prefix ]/topology.fpp:99:53,
@@ -1608,8 +2037,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup2Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup2Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:101:7,
+                                                    end: [ local path prefix ]/topology.fpp:101:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:101:7,
                                                 end: [ local path prefix ]/topology.fpp:101:21,
@@ -1640,8 +2076,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "FileHandling",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "FileHandling",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:101:47,
+                                                        end: [ local path prefix ]/topology.fpp:101:59,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:101:47,
                                                     end: [ local path prefix ]/topology.fpp:101:59,
@@ -1656,7 +2099,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:101:47,
-                                                end: [ local path prefix ]/topology.fpp:101:79,
+                                                end: [ local path prefix ]/topology.fpp:101:71,
                                             },
                                         },
                                         port_name: Ident {
@@ -1680,8 +2123,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroupDriverComp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroupDriverComp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:104:7,
+                                                    end: [ local path prefix ]/topology.fpp:104:26,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:104:7,
                                                 end: [ local path prefix ]/topology.fpp:104:26,
@@ -1703,9 +2153,10 @@ TransUnit(
                                         Expr {
                                             kind: Dot {
                                                 e: Expr {
-                                                    kind: Ident(
-                                                        "Ports_RateGroups",
-                                                    ),
+                                                    kind: Ident {
+                                                        value: "Ports_RateGroups",
+                                                        is_absolute: false,
+                                                    },
                                                     node_id: Span {
                                                         start: [ local path prefix ]/topology.fpp:104:36,
                                                         end: [ local path prefix ]/topology.fpp:104:52,
@@ -1726,8 +2177,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup3Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup3Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:104:68,
+                                                    end: [ local path prefix ]/topology.fpp:104:82,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:104:68,
                                                 end: [ local path prefix ]/topology.fpp:104:82,
@@ -1754,8 +2212,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup3Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup3Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:105:7,
+                                                    end: [ local path prefix ]/topology.fpp:105:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:105:7,
                                                 end: [ local path prefix ]/topology.fpp:105:21,
@@ -1786,8 +2251,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:105:47,
+                                                        end: [ local path prefix ]/topology.fpp:105:54,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:105:47,
                                                     end: [ local path prefix ]/topology.fpp:105:54,
@@ -1802,7 +2274,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:105:47,
-                                                end: [ local path prefix ]/topology.fpp:105:66,
+                                                end: [ local path prefix ]/topology.fpp:105:62,
                                             },
                                         },
                                         port_name: Ident {
@@ -1826,8 +2298,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup3Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup3Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:106:7,
+                                                    end: [ local path prefix ]/topology.fpp:106:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:106:7,
                                                 end: [ local path prefix ]/topology.fpp:106:21,
@@ -1857,8 +2336,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "SG5",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "SG5",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:106:47,
+                                                    end: [ local path prefix ]/topology.fpp:106:50,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:106:47,
                                                 end: [ local path prefix ]/topology.fpp:106:50,
@@ -1885,8 +2371,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup3Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup3Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:107:7,
+                                                    end: [ local path prefix ]/topology.fpp:107:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:107:7,
                                                 end: [ local path prefix ]/topology.fpp:107:21,
@@ -1916,8 +2409,15 @@ TransUnit(
                                         },
                                     ),
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "blockDrv",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "blockDrv",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:107:47,
+                                                    end: [ local path prefix ]/topology.fpp:107:55,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:107:47,
                                                 end: [ local path prefix ]/topology.fpp:107:55,
@@ -1944,8 +2444,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup3Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup3Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:108:7,
+                                                    end: [ local path prefix ]/topology.fpp:108:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:108:7,
                                                 end: [ local path prefix ]/topology.fpp:108:21,
@@ -1976,8 +2483,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:108:47,
+                                                        end: [ local path prefix ]/topology.fpp:108:55,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:108:47,
                                                     end: [ local path prefix ]/topology.fpp:108:55,
@@ -1992,7 +2506,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:108:47,
-                                                end: [ local path prefix ]/topology.fpp:108:82,
+                                                end: [ local path prefix ]/topology.fpp:108:74,
                                             },
                                         },
                                         port_name: Ident {
@@ -2016,8 +2530,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup3Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup3Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:109:7,
+                                                    end: [ local path prefix ]/topology.fpp:109:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:109:7,
                                                 end: [ local path prefix ]/topology.fpp:109:21,
@@ -2048,8 +2569,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:109:47,
+                                                        end: [ local path prefix ]/topology.fpp:109:59,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:109:47,
                                                     end: [ local path prefix ]/topology.fpp:109:59,
@@ -2064,7 +2592,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:109:47,
-                                                end: [ local path prefix ]/topology.fpp:109:83,
+                                                end: [ local path prefix ]/topology.fpp:109:75,
                                             },
                                         },
                                         port_name: Ident {
@@ -2088,8 +2616,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup3Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup3Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:110:7,
+                                                    end: [ local path prefix ]/topology.fpp:110:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:110:7,
                                                 end: [ local path prefix ]/topology.fpp:110:21,
@@ -2120,8 +2655,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:110:47,
+                                                        end: [ local path prefix ]/topology.fpp:110:59,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:110:47,
                                                     end: [ local path prefix ]/topology.fpp:110:59,
@@ -2136,7 +2678,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:110:47,
-                                                end: [ local path prefix ]/topology.fpp:110:76,
+                                                end: [ local path prefix ]/topology.fpp:110:68,
                                             },
                                         },
                                         port_name: Ident {
@@ -2160,8 +2702,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "rateGroup3Comp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "rateGroup3Comp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:111:7,
+                                                    end: [ local path prefix ]/topology.fpp:111:21,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:111:7,
                                                 end: [ local path prefix ]/topology.fpp:111:21,
@@ -2192,8 +2741,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:111:47,
+                                                        end: [ local path prefix ]/topology.fpp:111:59,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:111:47,
                                                     end: [ local path prefix ]/topology.fpp:111:59,
@@ -2208,7 +2764,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:111:47,
-                                                end: [ local path prefix ]/topology.fpp:111:73,
+                                                end: [ local path prefix ]/topology.fpp:111:65,
                                             },
                                         },
                                         port_name: Ident {
@@ -2247,8 +2803,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "comDriver",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "comDriver",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:116:7,
+                                                    end: [ local path prefix ]/topology.fpp:116:16,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:116:7,
                                                 end: [ local path prefix ]/topology.fpp:116:16,
@@ -2269,8 +2832,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:116:34,
+                                                        end: [ local path prefix ]/topology.fpp:116:42,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:116:34,
                                                     end: [ local path prefix ]/topology.fpp:116:42,
@@ -2285,7 +2855,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:116:34,
-                                                end: [ local path prefix ]/topology.fpp:116:77,
+                                                end: [ local path prefix ]/topology.fpp:116:61,
                                             },
                                         },
                                         port_name: Ident {
@@ -2309,8 +2879,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "comDriver",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "comDriver",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:117:7,
+                                                    end: [ local path prefix ]/topology.fpp:117:16,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:117:7,
                                                 end: [ local path prefix ]/topology.fpp:117:16,
@@ -2331,8 +2908,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:117:34,
+                                                        end: [ local path prefix ]/topology.fpp:117:42,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:117:34,
                                                     end: [ local path prefix ]/topology.fpp:117:42,
@@ -2347,7 +2931,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:117:34,
-                                                end: [ local path prefix ]/topology.fpp:117:74,
+                                                end: [ local path prefix ]/topology.fpp:117:61,
                                             },
                                         },
                                         port_name: Ident {
@@ -2371,8 +2955,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "comDriver",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "comDriver",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:120:7,
+                                                    end: [ local path prefix ]/topology.fpp:120:16,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:120:7,
                                                 end: [ local path prefix ]/topology.fpp:120:16,
@@ -2393,8 +2984,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:120:46,
+                                                        end: [ local path prefix ]/topology.fpp:120:54,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:120:46,
                                                     end: [ local path prefix ]/topology.fpp:120:54,
@@ -2409,7 +3007,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:120:46,
-                                                end: [ local path prefix ]/topology.fpp:120:75,
+                                                end: [ local path prefix ]/topology.fpp:120:62,
                                             },
                                         },
                                         port_name: Ident {
@@ -2434,8 +3032,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:121:7,
+                                                        end: [ local path prefix ]/topology.fpp:121:15,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:121:7,
                                                     end: [ local path prefix ]/topology.fpp:121:15,
@@ -2450,7 +3055,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:121:7,
-                                                end: [ local path prefix ]/topology.fpp:121:43,
+                                                end: [ local path prefix ]/topology.fpp:121:23,
                                             },
                                         },
                                         port_name: Ident {
@@ -2467,8 +3072,15 @@ TransUnit(
                                     },
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "comDriver",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "comDriver",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:121:47,
+                                                    end: [ local path prefix ]/topology.fpp:121:56,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:121:47,
                                                 end: [ local path prefix ]/topology.fpp:121:56,
@@ -2496,8 +3108,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:124:7,
+                                                        end: [ local path prefix ]/topology.fpp:124:15,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:124:7,
                                                     end: [ local path prefix ]/topology.fpp:124:15,
@@ -2512,7 +3131,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:124:7,
-                                                end: [ local path prefix ]/topology.fpp:124:34,
+                                                end: [ local path prefix ]/topology.fpp:124:23,
                                             },
                                         },
                                         port_name: Ident {
@@ -2529,8 +3148,15 @@ TransUnit(
                                     },
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "comDriver",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "comDriver",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:124:43,
+                                                    end: [ local path prefix ]/topology.fpp:124:52,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:124:43,
                                                 end: [ local path prefix ]/topology.fpp:124:52,
@@ -2557,8 +3183,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "comDriver",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "comDriver",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:125:7,
+                                                    end: [ local path prefix ]/topology.fpp:125:16,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:125:7,
                                                 end: [ local path prefix ]/topology.fpp:125:16,
@@ -2579,8 +3212,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:125:34,
+                                                        end: [ local path prefix ]/topology.fpp:125:42,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:125:34,
                                                     end: [ local path prefix ]/topology.fpp:125:42,
@@ -2595,7 +3235,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:125:34,
-                                                end: [ local path prefix ]/topology.fpp:125:63,
+                                                end: [ local path prefix ]/topology.fpp:125:50,
                                             },
                                         },
                                         port_name: Ident {
@@ -2634,8 +3274,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "sendBuffComp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "sendBuffComp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:129:7,
+                                                    end: [ local path prefix ]/topology.fpp:129:19,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:129:7,
                                                 end: [ local path prefix ]/topology.fpp:129:19,
@@ -2655,8 +3302,15 @@ TransUnit(
                                     },
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "blockDrv",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "blockDrv",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:129:28,
+                                                    end: [ local path prefix ]/topology.fpp:129:36,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:129:28,
                                                 end: [ local path prefix ]/topology.fpp:129:36,
@@ -2683,8 +3337,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "blockDrv",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "blockDrv",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:130:7,
+                                                    end: [ local path prefix ]/topology.fpp:130:15,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:130:7,
                                                 end: [ local path prefix ]/topology.fpp:130:15,
@@ -2704,8 +3365,15 @@ TransUnit(
                                     },
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "recvBuffComp",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "recvBuffComp",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:130:29,
+                                                    end: [ local path prefix ]/topology.fpp:130:41,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:130:29,
                                                 end: [ local path prefix ]/topology.fpp:130:41,
@@ -2732,8 +3400,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "SG1",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "SG1",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:134:7,
+                                                    end: [ local path prefix ]/topology.fpp:134:10,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:134:7,
                                                 end: [ local path prefix ]/topology.fpp:134:10,
@@ -2754,8 +3429,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:134:28,
+                                                        end: [ local path prefix ]/topology.fpp:134:40,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:134:28,
                                                     end: [ local path prefix ]/topology.fpp:134:40,
@@ -2770,7 +3452,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:134:28,
-                                                end: [ local path prefix ]/topology.fpp:134:59,
+                                                end: [ local path prefix ]/topology.fpp:134:46,
                                             },
                                         },
                                         port_name: Ident {
@@ -2794,8 +3476,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "SG1",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "SG1",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:136:7,
+                                                    end: [ local path prefix ]/topology.fpp:136:10,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:136:7,
                                                 end: [ local path prefix ]/topology.fpp:136:10,
@@ -2816,8 +3505,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:136:32,
+                                                        end: [ local path prefix ]/topology.fpp:136:44,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:136:32,
                                                     end: [ local path prefix ]/topology.fpp:136:44,
@@ -2832,7 +3528,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:136:32,
-                                                end: [ local path prefix ]/topology.fpp:136:67,
+                                                end: [ local path prefix ]/topology.fpp:136:50,
                                             },
                                         },
                                         port_name: Ident {
@@ -2857,8 +3553,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:137:7,
+                                                        end: [ local path prefix ]/topology.fpp:137:19,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:137:7,
                                                     end: [ local path prefix ]/topology.fpp:137:19,
@@ -2873,7 +3576,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:137:7,
-                                                end: [ local path prefix ]/topology.fpp:137:44,
+                                                end: [ local path prefix ]/topology.fpp:137:25,
                                             },
                                         },
                                         port_name: Ident {
@@ -2890,8 +3593,15 @@ TransUnit(
                                     },
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "SG1",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "SG1",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:137:48,
+                                                    end: [ local path prefix ]/topology.fpp:137:51,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:137:48,
                                                 end: [ local path prefix ]/topology.fpp:137:51,
@@ -2918,8 +3628,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "SG1",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "SG1",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:139:7,
+                                                    end: [ local path prefix ]/topology.fpp:139:10,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:139:7,
                                                 end: [ local path prefix ]/topology.fpp:139:10,
@@ -2940,8 +3657,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:139:29,
+                                                        end: [ local path prefix ]/topology.fpp:139:41,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:139:29,
                                                     end: [ local path prefix ]/topology.fpp:139:41,
@@ -2956,7 +3680,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:139:29,
-                                                end: [ local path prefix ]/topology.fpp:139:61,
+                                                end: [ local path prefix ]/topology.fpp:139:47,
                                             },
                                         },
                                         port_name: Ident {
@@ -2980,8 +3704,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "dpDemo",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "dpDemo",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:141:7,
+                                                    end: [ local path prefix ]/topology.fpp:141:13,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:141:7,
                                                 end: [ local path prefix ]/topology.fpp:141:13,
@@ -3002,8 +3733,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:141:31,
+                                                        end: [ local path prefix ]/topology.fpp:141:43,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:141:31,
                                                     end: [ local path prefix ]/topology.fpp:141:43,
@@ -3018,7 +3756,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:141:31,
-                                                end: [ local path prefix ]/topology.fpp:141:62,
+                                                end: [ local path prefix ]/topology.fpp:141:49,
                                             },
                                         },
                                         port_name: Ident {
@@ -3042,8 +3780,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "dpDemo",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "dpDemo",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:143:7,
+                                                    end: [ local path prefix ]/topology.fpp:143:13,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:143:7,
                                                 end: [ local path prefix ]/topology.fpp:143:13,
@@ -3064,8 +3809,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:143:32,
+                                                        end: [ local path prefix ]/topology.fpp:143:44,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:143:32,
                                                     end: [ local path prefix ]/topology.fpp:143:44,
@@ -3080,7 +3832,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:143:32,
-                                                end: [ local path prefix ]/topology.fpp:143:64,
+                                                end: [ local path prefix ]/topology.fpp:143:50,
                                             },
                                         },
                                         port_name: Ident {
@@ -3104,8 +3856,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "dpDemo",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "dpDemo",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:145:7,
+                                                    end: [ local path prefix ]/topology.fpp:145:13,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:145:7,
                                                 end: [ local path prefix ]/topology.fpp:145:13,
@@ -3126,8 +3885,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:145:35,
+                                                        end: [ local path prefix ]/topology.fpp:145:47,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:145:35,
                                                     end: [ local path prefix ]/topology.fpp:145:47,
@@ -3142,7 +3908,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:145:35,
-                                                end: [ local path prefix ]/topology.fpp:145:70,
+                                                end: [ local path prefix ]/topology.fpp:145:53,
                                             },
                                         },
                                         port_name: Ident {
@@ -3167,8 +3933,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:146:7,
+                                                        end: [ local path prefix ]/topology.fpp:146:19,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:146:7,
                                                     end: [ local path prefix ]/topology.fpp:146:19,
@@ -3183,7 +3956,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:146:7,
-                                                end: [ local path prefix ]/topology.fpp:146:44,
+                                                end: [ local path prefix ]/topology.fpp:146:25,
                                             },
                                         },
                                         port_name: Ident {
@@ -3200,8 +3973,15 @@ TransUnit(
                                     },
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "dpDemo",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "dpDemo",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:146:48,
+                                                    end: [ local path prefix ]/topology.fpp:146:54,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:146:48,
                                                 end: [ local path prefix ]/topology.fpp:146:54,
@@ -3244,8 +4024,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:151:7,
+                                                        end: [ local path prefix ]/topology.fpp:151:14,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:151:7,
                                                     end: [ local path prefix ]/topology.fpp:151:14,
@@ -3260,7 +4047,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:151:7,
-                                                end: [ local path prefix ]/topology.fpp:151:29,
+                                                end: [ local path prefix ]/topology.fpp:151:21,
                                             },
                                         },
                                         port_name: Ident {
@@ -3278,8 +4065,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:151:40,
+                                                        end: [ local path prefix ]/topology.fpp:151:48,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:151:40,
                                                     end: [ local path prefix ]/topology.fpp:151:48,
@@ -3294,7 +4088,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:151:40,
-                                                end: [ local path prefix ]/topology.fpp:151:74,
+                                                end: [ local path prefix ]/topology.fpp:151:57,
                                             },
                                         },
                                         port_name: Ident {
@@ -3315,9 +4109,10 @@ TransUnit(
                                                 e: Expr {
                                                     kind: Dot {
                                                         e: Expr {
-                                                            kind: Ident(
-                                                                "ComCcsds",
-                                                            ),
+                                                            kind: Ident {
+                                                                value: "ComCcsds",
+                                                                is_absolute: false,
+                                                            },
                                                             node_id: Span {
                                                                 start: [ local path prefix ]/topology.fpp:151:75,
                                                                 end: [ local path prefix ]/topology.fpp:151:83,
@@ -3359,8 +4154,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:152:7,
+                                                        end: [ local path prefix ]/topology.fpp:152:14,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:152:7,
                                                     end: [ local path prefix ]/topology.fpp:152:14,
@@ -3375,7 +4177,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:152:7,
-                                                end: [ local path prefix ]/topology.fpp:152:30,
+                                                end: [ local path prefix ]/topology.fpp:152:22,
                                             },
                                         },
                                         port_name: Ident {
@@ -3393,8 +4195,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:152:45,
+                                                        end: [ local path prefix ]/topology.fpp:152:53,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:152:45,
                                                     end: [ local path prefix ]/topology.fpp:152:53,
@@ -3409,7 +4218,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:152:45,
-                                                end: [ local path prefix ]/topology.fpp:152:79,
+                                                end: [ local path prefix ]/topology.fpp:152:62,
                                             },
                                         },
                                         port_name: Ident {
@@ -3430,9 +4239,10 @@ TransUnit(
                                                 e: Expr {
                                                     kind: Dot {
                                                         e: Expr {
-                                                            kind: Ident(
-                                                                "ComCcsds",
-                                                            ),
+                                                            kind: Ident {
+                                                                value: "ComCcsds",
+                                                                is_absolute: false,
+                                                            },
                                                             node_id: Span {
                                                                 start: [ local path prefix ]/topology.fpp:152:80,
                                                                 end: [ local path prefix ]/topology.fpp:152:88,
@@ -3474,8 +4284,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:155:7,
+                                                        end: [ local path prefix ]/topology.fpp:155:15,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:155:7,
                                                     end: [ local path prefix ]/topology.fpp:155:15,
@@ -3490,7 +4307,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:155:7,
-                                                end: [ local path prefix ]/topology.fpp:155:39,
+                                                end: [ local path prefix ]/topology.fpp:155:28,
                                             },
                                         },
                                         port_name: Ident {
@@ -3508,8 +4325,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:155:44,
+                                                        end: [ local path prefix ]/topology.fpp:155:51,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:155:44,
                                                     end: [ local path prefix ]/topology.fpp:155:51,
@@ -3524,7 +4348,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:155:44,
-                                                end: [ local path prefix ]/topology.fpp:155:70,
+                                                end: [ local path prefix ]/topology.fpp:155:59,
                                             },
                                         },
                                         port_name: Ident {
@@ -3549,8 +4373,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:156:7,
+                                                        end: [ local path prefix ]/topology.fpp:156:14,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:156:7,
                                                     end: [ local path prefix ]/topology.fpp:156:14,
@@ -3565,7 +4396,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:156:7,
-                                                end: [ local path prefix ]/topology.fpp:156:35,
+                                                end: [ local path prefix ]/topology.fpp:156:22,
                                             },
                                         },
                                         port_name: Ident {
@@ -3583,8 +4414,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:156:43,
+                                                        end: [ local path prefix ]/topology.fpp:156:51,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:156:43,
                                                     end: [ local path prefix ]/topology.fpp:156:51,
@@ -3599,7 +4437,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:156:43,
-                                                end: [ local path prefix ]/topology.fpp:156:78,
+                                                end: [ local path prefix ]/topology.fpp:156:64,
                                             },
                                         },
                                         port_name: Ident {
@@ -3623,8 +4461,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "cmdSeq",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "cmdSeq",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:157:7,
+                                                    end: [ local path prefix ]/topology.fpp:157:13,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:157:7,
                                                 end: [ local path prefix ]/topology.fpp:157:13,
@@ -3645,8 +4490,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:157:24,
+                                                        end: [ local path prefix ]/topology.fpp:157:31,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:157:24,
                                                     end: [ local path prefix ]/topology.fpp:157:31,
@@ -3661,7 +4513,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:157:24,
-                                                end: [ local path prefix ]/topology.fpp:157:50,
+                                                end: [ local path prefix ]/topology.fpp:157:39,
                                             },
                                         },
                                         port_name: Ident {
@@ -3686,8 +4538,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:158:7,
+                                                        end: [ local path prefix ]/topology.fpp:158:14,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:158:7,
                                                     end: [ local path prefix ]/topology.fpp:158:14,
@@ -3702,7 +4561,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:158:7,
-                                                end: [ local path prefix ]/topology.fpp:158:35,
+                                                end: [ local path prefix ]/topology.fpp:158:22,
                                             },
                                         },
                                         port_name: Ident {
@@ -3719,8 +4578,15 @@ TransUnit(
                                     },
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "cmdSeq",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "cmdSeq",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:158:39,
+                                                    end: [ local path prefix ]/topology.fpp:158:45,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:158:39,
                                                 end: [ local path prefix ]/topology.fpp:158:45,
@@ -3747,8 +4613,15 @@ TransUnit(
                                 Connection {
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
-                                        interface_instance: Ident {
-                                            data: "cmdSeq",
+                                        interface_instance: Unqualified {
+                                            name: Ident {
+                                                data: "cmdSeq",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/topology.fpp:159:7,
+                                                    end: [ local path prefix ]/topology.fpp:159:13,
+                                                },
+                                            },
+                                            is_absolute: false,
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:159:7,
                                                 end: [ local path prefix ]/topology.fpp:159:13,
@@ -3769,8 +4642,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "CdhCore",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "CdhCore",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:159:28,
+                                                        end: [ local path prefix ]/topology.fpp:159:35,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:159:28,
                                                     end: [ local path prefix ]/topology.fpp:159:35,
@@ -3785,7 +4665,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:159:28,
-                                                end: [ local path prefix ]/topology.fpp:159:50,
+                                                end: [ local path prefix ]/topology.fpp:159:43,
                                             },
                                         },
                                         port_name: Ident {
@@ -3825,8 +4705,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "FileHandling",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "FileHandling",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:164:7,
+                                                        end: [ local path prefix ]/topology.fpp:164:19,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:164:7,
                                                     end: [ local path prefix ]/topology.fpp:164:19,
@@ -3841,7 +4728,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:164:7,
-                                                end: [ local path prefix ]/topology.fpp:164:46,
+                                                end: [ local path prefix ]/topology.fpp:164:32,
                                             },
                                         },
                                         port_name: Ident {
@@ -3859,8 +4746,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:164:50,
+                                                        end: [ local path prefix ]/topology.fpp:164:58,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:164:50,
                                                     end: [ local path prefix ]/topology.fpp:164:58,
@@ -3875,7 +4769,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:164:50,
-                                                end: [ local path prefix ]/topology.fpp:164:81,
+                                                end: [ local path prefix ]/topology.fpp:164:67,
                                             },
                                         },
                                         port_name: Ident {
@@ -3896,9 +4790,10 @@ TransUnit(
                                                 e: Expr {
                                                     kind: Dot {
                                                         e: Expr {
-                                                            kind: Ident(
-                                                                "ComCcsds",
-                                                            ),
+                                                            kind: Ident {
+                                                                value: "ComCcsds",
+                                                                is_absolute: false,
+                                                            },
                                                             node_id: Span {
                                                                 start: [ local path prefix ]/topology.fpp:164:82,
                                                                 end: [ local path prefix ]/topology.fpp:164:90,
@@ -3940,8 +4835,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:165:7,
+                                                        end: [ local path prefix ]/topology.fpp:165:15,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:165:7,
                                                     end: [ local path prefix ]/topology.fpp:165:15,
@@ -3956,7 +4858,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:165:7,
-                                                end: [ local path prefix ]/topology.fpp:165:40,
+                                                end: [ local path prefix ]/topology.fpp:165:24,
                                             },
                                         },
                                         port_name: Ident {
@@ -3977,9 +4879,10 @@ TransUnit(
                                                 e: Expr {
                                                     kind: Dot {
                                                         e: Expr {
-                                                            kind: Ident(
-                                                                "ComCcsds",
-                                                            ),
+                                                            kind: Ident {
+                                                                value: "ComCcsds",
+                                                                is_absolute: false,
+                                                            },
                                                             node_id: Span {
                                                                 start: [ local path prefix ]/topology.fpp:165:41,
                                                                 end: [ local path prefix ]/topology.fpp:165:49,
@@ -4014,8 +4917,15 @@ TransUnit(
                                     ),
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "FileHandling",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "FileHandling",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:165:80,
+                                                        end: [ local path prefix ]/topology.fpp:165:92,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:165:80,
                                                     end: [ local path prefix ]/topology.fpp:165:92,
@@ -4030,7 +4940,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:165:80,
-                                                end: [ local path prefix ]/topology.fpp:165:118,
+                                                end: [ local path prefix ]/topology.fpp:165:105,
                                             },
                                         },
                                         port_name: Ident {
@@ -4055,8 +4965,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:168:7,
+                                                        end: [ local path prefix ]/topology.fpp:168:15,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:168:7,
                                                     end: [ local path prefix ]/topology.fpp:168:15,
@@ -4071,7 +4988,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:168:7,
-                                                end: [ local path prefix ]/topology.fpp:168:36,
+                                                end: [ local path prefix ]/topology.fpp:168:28,
                                             },
                                         },
                                         port_name: Ident {
@@ -4089,8 +5006,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "FileHandling",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "FileHandling",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:168:44,
+                                                        end: [ local path prefix ]/topology.fpp:168:56,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:168:44,
                                                     end: [ local path prefix ]/topology.fpp:168:56,
@@ -4105,7 +5029,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:168:44,
-                                                end: [ local path prefix ]/topology.fpp:168:80,
+                                                end: [ local path prefix ]/topology.fpp:168:67,
                                             },
                                         },
                                         port_name: Ident {
@@ -4130,8 +5054,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "FileHandling",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "FileHandling",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:169:7,
+                                                        end: [ local path prefix ]/topology.fpp:169:19,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:169:7,
                                                     end: [ local path prefix ]/topology.fpp:169:19,
@@ -4146,7 +5077,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:169:7,
-                                                end: [ local path prefix ]/topology.fpp:169:44,
+                                                end: [ local path prefix ]/topology.fpp:169:30,
                                             },
                                         },
                                         port_name: Ident {
@@ -4164,8 +5095,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "ComCcsds",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "ComCcsds",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:169:48,
+                                                        end: [ local path prefix ]/topology.fpp:169:56,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:169:48,
                                                     end: [ local path prefix ]/topology.fpp:169:56,
@@ -4180,7 +5118,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:169:48,
-                                                end: [ local path prefix ]/topology.fpp:169:88,
+                                                end: [ local path prefix ]/topology.fpp:169:69,
                                             },
                                         },
                                         port_name: Ident {
@@ -4220,8 +5158,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:174:7,
+                                                        end: [ local path prefix ]/topology.fpp:174:19,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:174:7,
                                                     end: [ local path prefix ]/topology.fpp:174:19,
@@ -4236,7 +5181,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:174:7,
-                                                end: [ local path prefix ]/topology.fpp:174:33,
+                                                end: [ local path prefix ]/topology.fpp:174:25,
                                             },
                                         },
                                         port_name: Ident {
@@ -4254,8 +5199,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "FileHandling",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "FileHandling",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:174:49,
+                                                        end: [ local path prefix ]/topology.fpp:174:61,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:174:49,
                                                     end: [ local path prefix ]/topology.fpp:174:61,
@@ -4270,7 +5222,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:174:49,
-                                                end: [ local path prefix ]/topology.fpp:174:83,
+                                                end: [ local path prefix ]/topology.fpp:174:74,
                                             },
                                         },
                                         port_name: Ident {
@@ -4295,8 +5247,15 @@ TransUnit(
                                     is_unmatched: false,
                                     from_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "FileHandling",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "FileHandling",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:175:7,
+                                                        end: [ local path prefix ]/topology.fpp:175:19,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:175:7,
                                                     end: [ local path prefix ]/topology.fpp:175:19,
@@ -4311,7 +5270,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:175:7,
-                                                end: [ local path prefix ]/topology.fpp:175:45,
+                                                end: [ local path prefix ]/topology.fpp:175:32,
                                             },
                                         },
                                         port_name: Ident {
@@ -4329,8 +5288,15 @@ TransUnit(
                                     from_index: None,
                                     to_port: PortInstanceIdentifier {
                                         interface_instance: Qualified {
-                                            qualifier: Ident {
-                                                data: "DataProducts",
+                                            qualifier: Unqualified {
+                                                name: Ident {
+                                                    data: "DataProducts",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/topology.fpp:175:49,
+                                                        end: [ local path prefix ]/topology.fpp:175:61,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/topology.fpp:175:49,
                                                     end: [ local path prefix ]/topology.fpp:175:61,
@@ -4345,7 +5311,7 @@ TransUnit(
                                             },
                                             node_id: Span {
                                                 start: [ local path prefix ]/topology.fpp:175:49,
-                                                end: [ local path prefix ]/topology.fpp:175:76,
+                                                end: [ local path prefix ]/topology.fpp:175:67,
                                             },
                                         },
                                         port_name: Ident {

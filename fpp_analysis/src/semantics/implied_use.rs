@@ -153,7 +153,10 @@ impl ImpliedUse {
         tail.into_iter().fold(
             fpp_ast::Expr {
                 node_id: pred(self.id),
-                kind: fpp_ast::ExprKind::Ident(head),
+                kind: fpp_ast::ExprKind::Ident {
+                    value: head,
+                    is_absolute: false,
+                },
             },
             |e1, s| fpp_ast::Expr {
                 node_id: pred(self.id),
@@ -180,8 +183,12 @@ impl ImpliedUse {
         let mut tail = self.name.to_ident_list();
         let head = tail.pop_front().unwrap();
         tail.into_iter().fold(
-            fpp_ast::QualIdent::Unqualified(fpp_ast::Ident {
-                data: head,
+            fpp_ast::QualIdent::Unqualified(fpp_ast::Unqualified {
+                name: fpp_ast::Ident {
+                    data: head,
+                    node_id: self.id,
+                },
+                is_absolute: false,
                 node_id: self.id,
             }),
             |e1: fpp_ast::QualIdent, s| {

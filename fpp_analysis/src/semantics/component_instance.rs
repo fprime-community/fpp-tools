@@ -150,10 +150,7 @@ impl ComponentInstance {
         };
         let component_kind = component.node.kind.clone();
 
-        let base_id = match &node.base_id {
-            Some(e) => a.get_nonnegative_big_int_value(e.node_id, e.span())?,
-            None => 0,
-        };
+        let base_id = a.get_nonnegative_big_int_value(node.base_id.node_id, node.base_id.span())?;
 
         let file = node.file.as_ref().map(get_file);
         let queue_size = get_queue_size(a, &name, loc, &component_kind, &node.queue_size)?;

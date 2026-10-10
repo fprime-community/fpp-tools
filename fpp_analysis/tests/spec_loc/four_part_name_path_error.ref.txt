@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/spec_loc/four_part_name_path_error.fpp:4:28
+  |
+4 | locate constant A.B.C.d at "wrong.fpp"
+  |                            ^^^^^^^^^^^ incorrect location path [ local path prefix ]/spec_loc/wrong.fpp
+  |
+ ::: [ local path prefix ]/spec_loc/four_part_name_path_error.fpp:1:34
+  |
+1 | module A { module B { module C { constant d = 0 } } }
+  |                                  -------------- actual location is here
+

@@ -51,7 +51,9 @@ impl CheckStateMachineUses {
         node: &QualIdent,
     ) -> SmResult {
         match node {
-            QualIdent::Unqualified(name) => self.visit_unqualified_name(sma, ng, node.id(), name),
+            QualIdent::Unqualified(unqualified) => {
+                self.visit_unqualified_name(sma, ng, node.id(), &unqualified.name)
+            }
             QualIdent::Qualified(qualified) => {
                 self.visit_qualified_name(sma, ng, node.id(), &qualified.qualifier, &qualified.name)
             }

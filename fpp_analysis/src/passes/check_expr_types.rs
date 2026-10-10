@@ -416,7 +416,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                     }
                 }
             }
-            ExprKind::Ident(_) => {} // already handled by constant_use
+            ExprKind::Ident { .. } => {} // already handled by constant_use
             ExprKind::LiteralBool(_) => {
                 a.type_map.insert(node.node_id, Arc::new(Type::Boolean));
             }

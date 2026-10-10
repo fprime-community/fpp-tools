@@ -3,9 +3,8 @@ use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
 use crate::semantics::{QualifiedName, Symbol};
 use fpp_ast::*;
-use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::ops::{ControlFlow, Deref};
+use std::ops::ControlFlow;
 
 /// An extension of the standard [Visitor] trait that allows analyzing uses of symbols
 /// [BasicUseAnalyzer] or [super::UseAnalyzer] should be used in your pass for this to work properly
@@ -253,25 +252,6 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
         }
     }
 
-    /// Gets a qualified name from a dot expression
-    pub(crate) fn expr_to_qualified_name(&self, e: &Expr) -> Option<QualifiedName> {
-        fn name_opt(e: &Expr, mut qualifier: VecDeque<String>) -> Option<QualifiedName> {
-            match &e.kind {
-                ExprKind::Ident(id) => {
-                    qualifier.push_front(id.clone());
-                    Some(qualifier.into())
-                }
-                ExprKind::Dot { e: e1, id } => {
-                    qualifier.push_back(id.data.clone());
-                    name_opt(e1.deref(), qualifier)
-                }
-                _ => None,
-            }
-        }
-
-        name_opt(e, VecDeque::new())
-    }
-
     /// Dispatch the implied constant uses recorded at an AST node
     fn visit_implied_constant_uses(
         &self,
@@ -362,15 +342,16 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
             }
             Node::Expr(e) => match &e.kind {
                 ExprKind::Dot { e: e1, .. } => {
-                    match self.expr_to_qualified_name(e) {
+                    match e.get_ident_list_opt() {
+                        // e is a qualified identifier
                         // Assume the entire qualified identifier is a use
-                        Some(use_) => visitor.constant_use(a, e, use_),
-                        // This is some other type of dot expression (not a qual ident)
+                        Some(il) => visitor.constant_use(a, e, QualifiedName::from(il)),
+                        // e is not a qualified identifier
                         // Analyze the left side, which may contain constant uses
                         None => self.visit(visitor, a, Node::Expr(e1)),
                     }
                 }
-                ExprKind::Ident(id) => visitor.constant_use(a, e, id.clone().into()),
+                ExprKind::Ident { value, .. } => visitor.constant_use(a, e, value.clone().into()),
                 _ => self.super_.visit(visitor, a, node),
             },
             Node::SpecInstance(si) => {

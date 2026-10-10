@@ -77,7 +77,7 @@ fpp_python_macros::fpp_ast_bindings! {
     node DefComponentInstance {
         name: str(data),
         component: QualIdent,
-        base_id: Expr?,
+        base_id: Expr,
         impl_type: str(data)?,
         file: str(data)?,
         queue_size: Expr?,
@@ -418,6 +418,11 @@ fpp_python_macros::fpp_ast_bindings! {
         kind: TypeNameKind,
     }
 
+    node Unqualified {
+        name: Ident,
+        is_absolute: bool,
+    }
+
     union ComponentMember {
         DefAbsType(DefAbsType),
         DefAliasType(DefAliasType),
@@ -467,7 +472,7 @@ fpp_python_macros::fpp_ast_bindings! {
     }
 
     union QualIdent {
-        Unqualified(Ident),
+        Unqualified(Unqualified),
         Qualified(Qualified),
     }
 
@@ -532,7 +537,7 @@ fpp_python_macros::fpp_ast_bindings! {
         ArraySubscript { e1: Expr, e2: Expr },
         Binop { left: Expr, op: Binop, right: Expr },
         Dot { e: Expr, id: Ident },
-        Ident(String),
+        Ident { value: String, is_absolute: bool },
         LiteralBool(bool),
         LiteralInt(String),
         LiteralFloat(String),

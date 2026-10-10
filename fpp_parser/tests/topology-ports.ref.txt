@@ -11,8 +11,15 @@ TransUnit(
             },
             members: [
                 SpecInstance {
-                    instance: Ident {
-                        data: "i",
+                    instance: Unqualified {
+                        name: Ident {
+                            data: "i",
+                            node_id: Span {
+                                start: [ local path prefix ]/topology-ports.fpp:2:14,
+                                end: [ local path prefix ]/topology-ports.fpp:2:15,
+                            },
+                        },
+                        is_absolute: false,
                         node_id: Span {
                             start: [ local path prefix ]/topology-ports.fpp:2:14,
                             end: [ local path prefix ]/topology-ports.fpp:2:15,
@@ -32,8 +39,15 @@ TransUnit(
                         },
                     },
                     underlying_port: PortInstanceIdentifier {
-                        interface_instance: Ident {
-                            data: "i",
+                        interface_instance: Unqualified {
+                            name: Ident {
+                                data: "i",
+                                node_id: Span {
+                                    start: [ local path prefix ]/topology-ports.fpp:4:15,
+                                    end: [ local path prefix ]/topology-ports.fpp:4:16,
+                                },
+                            },
+                            is_absolute: false,
                             node_id: Span {
                                 start: [ local path prefix ]/topology-ports.fpp:4:15,
                                 end: [ local path prefix ]/topology-ports.fpp:4:16,

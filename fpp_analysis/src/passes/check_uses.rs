@@ -62,14 +62,14 @@ pub(crate) fn resolve_qual_ident(
     node: &QualIdent,
 ) -> SemanticResult<Symbol> {
     match &node {
-        QualIdent::Unqualified(name) => match a.symbol_get(ng, &name.data) {
+        QualIdent::Unqualified(unqualified) => match a.symbol_get(ng, &unqualified.name.data) {
             None => Err(SemanticError::UndefinedSymbol {
                 ng: ng.to_string(),
-                name: name.data.clone(),
-                loc: name.span(),
+                name: unqualified.name.data.clone(),
+                loc: unqualified.name.span(),
             }),
             Some(sym) => {
-                a.use_def_map.insert(name.id(), sym.clone());
+                a.use_def_map.insert(unqualified.name.id(), sym.clone());
                 a.use_def_map.insert(node.id(), sym.clone());
                 Ok(sym)
             }
@@ -281,11 +281,11 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
                     }
                 }
             }
-            ExprKind::Ident(id) => match a.symbol_get(NameGroup::Value, id) {
+            ExprKind::Ident { value, .. } => match a.symbol_get(NameGroup::Value, value) {
                 None => {
                     SemanticError::UndefinedSymbol {
                         ng: NameGroup::Value.to_string(),
-                        name: id.clone(),
+                        name: value.clone(),
                         loc: node.span(),
                     }
                     .emit();
@@ -360,7 +360,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
         name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let ident = match &node.kind {
-            ExprKind::Ident(id) => id,
+            ExprKind::Ident { value, .. } => value,
             _ => return ControlFlow::Continue(()),
         };
         let sym = match a.symbol_get(NameGroup::Value, ident) {

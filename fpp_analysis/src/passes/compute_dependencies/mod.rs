@@ -184,6 +184,46 @@ mod tests {
         })
     }
 
+    /// A dotted constant use is looked up under its whole name, in source order
+    /// (fpp-depend test `expr_dot`, plus a location for the name with its last two
+    /// parts swapped).
+    #[test]
+    fn a_dotted_constant_use_depends_on_its_location() {
+        let reader = MapReader::new(&[
+            ("a.fpp", "module M { module N { constant a = 0 } }\n"),
+            ("swapped.fpp", "module M { module a { constant N = 0 } }\n"),
+        ]);
+        let src = "\
+locate constant M.N.a at \"a.fpp\"
+locate constant M.a.N at \"swapped.fpp\"
+
+constant b = M.N.a
+";
+        let deps = dependencies_of(&reader, &[("expr_dot.fpp", src)]);
+        assert_eq!(deps, vec![file("a.fpp").to_string()]);
+    }
+
+    /// A qualified identifier of four parts is looked up under its whole name, in
+    /// source order.
+    #[test]
+    fn a_four_part_type_use_depends_on_its_location() {
+        let reader = MapReader::new(&[
+            ("t.fpp", "module A { module B { module C { type T } } }\n"),
+            (
+                "swapped.fpp",
+                "module A { module C { module B { type T } } }\n",
+            ),
+        ]);
+        let src = "\
+locate type A.B.C.T at \"t.fpp\"
+locate type A.C.B.T at \"swapped.fpp\"
+
+array X = [2] A.B.C.T
+";
+        let deps = dependencies_of(&reader, &[("qual_ident.fpp", src)]);
+        assert_eq!(deps, vec![file("t.fpp").to_string()]);
+    }
+
     /// The parameter list of a template, its expansion, and the arguments of the
     /// expansion are all sources of dependencies.
     #[test]

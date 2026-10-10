@@ -9,7 +9,7 @@ pub mod visit;
 
 use std::fmt::Debug;
 
-use fpp_core::Annotated;
+use fpp_core::{Annotated, Spanned};
 use fpp_macros::{AstAnnotated, DirectWalkable, Replicate, VisitorWalkable, ast};
 
 pub use component::*;
@@ -27,17 +27,6 @@ pub trait AstNode: fpp_core::Spanned + Sized {
 /// Translation unit
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct TransUnit(pub Vec<ModuleMember>);
-
-pub enum QualIdentKind {
-    Component,
-    ComponentInstance,
-    Constant,
-    Port,
-    Topology,
-    Interface,
-    Type,
-    StateMachine,
-}
 
 #[ast]
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
@@ -104,6 +93,34 @@ pub struct TypeName {
     pub kind: TypeNameKind,
 }
 
+impl TypeName {
+    /// Gets isAbsolute if the type name represents a qualified identifier
+    pub fn get_is_absolute_opt(&self) -> Option<bool> {
+        match &self.kind {
+            TypeNameKind::QualIdent(name) => Some(name.is_absolute()),
+            _ => None,
+        }
+    }
+}
+
+/// An unqualified identifier
+///
+/// A visitor walks straight through it to its name.
+#[ast]
+#[derive(Debug, Clone, Replicate, DirectWalkable, serde::Serialize)]
+pub struct Unqualified {
+    pub name: Ident,
+    #[visitable(ignore)]
+    pub is_absolute: bool,
+}
+
+impl Unqualified {
+    /// Convert a qualified identifier to a list of identifiers
+    pub fn to_ident_list(&self) -> Vec<String> {
+        vec![self.name.data.clone()]
+    }
+}
+
 /// A qualified identifier
 #[ast]
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
@@ -112,37 +129,136 @@ pub struct Qualified {
     pub name: Ident,
 }
 
+impl Qualified {
+    /// Whether the identifier is resolved absolutely
+    pub fn is_absolute(&self) -> bool {
+        self.qualifier.is_absolute()
+    }
+
+    /// Convert a qualified identifier to a list of identifiers
+    pub fn to_ident_list(&self) -> Vec<String> {
+        let mut out = self.qualifier.to_ident_list();
+        out.push(self.name.data.clone());
+        out
+    }
+}
+
 /// A possibly-qualified identifier
 #[ast]
 #[derive(Clone, Replicate, VisitorWalkable)]
 pub enum QualIdent {
     /// An unqualified identifier
-    Unqualified(Ident),
+    Unqualified(Unqualified),
+    /// A qualified identifier
     Qualified(Qualified),
 }
 
 impl QualIdent {
-    /// Push the dotted parts of this identifier onto `out`, qualifier first.
-    pub fn write_parts<'a>(&'a self, out: &mut Vec<&'a str>) {
+    /// Whether the identifier is resolved absolutely
+    pub fn is_absolute(&self) -> bool {
         match self {
-            QualIdent::Unqualified(id) => out.push(&id.data),
-            QualIdent::Qualified(q) => {
-                q.qualifier.write_parts(out);
-                out.push(&q.name.data);
+            QualIdent::Unqualified(unqualified) => unqualified.is_absolute,
+            QualIdent::Qualified(qualified) => qualified.is_absolute(),
+        }
+    }
+
+    /// Convert a qualified identifier to a list of identifiers
+    pub fn to_ident_list(&self) -> Vec<String> {
+        match self {
+            QualIdent::Unqualified(unqualified) => unqualified.to_ident_list(),
+            QualIdent::Qualified(qualified) => qualified.to_ident_list(),
+        }
+    }
+
+    /// Construct a qualified identifier from a node list
+    ///
+    /// Every level of a qualified identifier is a node of its own, so this is
+    /// also the constructor of a qualified identifier node from a node list. The
+    /// node of each level spans the identifiers of that level: `A.B` in `A.B.C`
+    /// covers `A.B` only, and the outermost level covers the whole list. A leading
+    /// `.` that makes the identifier absolute is not part of any of these spans.
+    ///
+    /// Panics if the node list is empty.
+    pub fn from_node_list(node_list: QualIdentNodeList, is_absolute: bool) -> QualIdent {
+        let head = node_list
+            .first()
+            .expect("node list should not be empty")
+            .span();
+        match qual_ident_node_list::split(node_list) {
+            (qualifier, name) if qualifier.is_empty() => QualIdent::Unqualified(Unqualified {
+                node_id: fpp_core::Node::new(name.span()),
+                name,
+                is_absolute,
+            }),
+            (qualifier, name) => {
+                let qualifier = QualIdent::from_node_list(qualifier, is_absolute);
+                QualIdent::Qualified(Qualified {
+                    node_id: fpp_core::Node::new(span_through(head, name.span())),
+                    qualifier: Box::new(qualifier),
+                    name,
+                })
             }
         }
     }
 }
 
-impl std::fmt::Display for QualIdent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut parts = Vec::new();
-        self.write_parts(&mut parts);
-        f.write_str(&parts.join("."))
+/// The span from the start of `first` to the end of `last`
+fn span_through(first: fpp_core::Span, last: fpp_core::Span) -> fpp_core::Span {
+    let start = first.start().pos();
+    fpp_core::Span::new(
+        first.file(),
+        start,
+        last.end().pos() - start,
+        first.including_span(),
+    )
+}
+
+/// A qualified identifier represented as a list of identifier nodes
+/// This is useful during parsing
+pub type QualIdentNodeList = Vec<Ident>;
+
+/// Operations on a [`QualIdentNodeList`]
+pub mod qual_ident_node_list {
+    use crate::{Ident, QualIdentNodeList};
+
+    /// Split a qualified identifier list into qualifier and name
+    ///
+    /// Panics if the node list is empty.
+    pub fn split(mut node_list: QualIdentNodeList) -> (QualIdentNodeList, Ident) {
+        let name = node_list.pop().expect("node list should not be empty");
+        (node_list, name)
+    }
+
+    /// Get the qualifier
+    ///
+    /// Panics if the node list is empty.
+    pub fn qualifier(node_list: &[Ident]) -> &[Ident] {
+        match node_list.split_last() {
+            Some((_, qualifier)) => qualifier,
+            None => panic!("node list should not be empty"),
+        }
+    }
+
+    /// Get the unqualified name
+    ///
+    /// Panics if the node list is empty.
+    pub fn name(node_list: &[Ident]) -> &Ident {
+        node_list.last().expect("node list should not be empty")
     }
 }
 
-/// Serializes as the dotted name (`"A.B.C"`), not as nested `Qualified` tags.
+/// Writes the dotted name, with a leading `.` if the name is absolute
+impl std::fmt::Display for QualIdent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_absolute() {
+            f.write_str(".")?;
+        }
+        f.write_str(&self.to_ident_list().join("."))
+    }
+}
+
+/// Serializes as the dotted name (`"A.B.C"`, or `".A.B.C"` if the name is
+/// absolute), not as nested `Qualified` tags.
 impl serde::Serialize for QualIdent {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
@@ -175,7 +291,10 @@ pub enum ExprKind {
         id: Ident,
     },
     #[visitable(ignore)]
-    Ident(String),
+    Ident {
+        value: String,
+        is_absolute: bool,
+    },
     #[visitable(ignore)]
     LiteralBool(bool),
     #[visitable(ignore)]
@@ -199,6 +318,29 @@ pub enum ExprKind {
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct Expr {
     pub kind: ExprKind,
+}
+
+impl Expr {
+    /// Gets the identifier list, if the expression represents a qualified identifier
+    pub fn get_ident_list_opt(&self) -> Option<Vec<String>> {
+        match &self.kind {
+            ExprKind::Dot { e, id } => e.get_ident_list_opt().map(|mut il| {
+                il.push(id.data.clone());
+                il
+            }),
+            ExprKind::Ident { value, .. } => Some(vec![value.clone()]),
+            _ => None,
+        }
+    }
+
+    /// Gets isAbsolute, if the expression represents a qualified identifier
+    pub fn get_is_absolute_opt(&self) -> Option<bool> {
+        match &self.kind {
+            ExprKind::Dot { e, .. } => e.get_is_absolute_opt(),
+            ExprKind::Ident { is_absolute, .. } => Some(*is_absolute),
+            _ => None,
+        }
+    }
 }
 
 /// Formal parameter kind
@@ -304,7 +446,7 @@ pub struct DefComponent {
 pub struct DefComponentInstance {
     pub name: Name,
     pub component: QualIdent,
-    pub base_id: Option<Expr>,
+    pub base_id: Expr,
     #[visitable(ignore)]
     pub impl_type: Option<LitString>,
     #[visitable(ignore)]

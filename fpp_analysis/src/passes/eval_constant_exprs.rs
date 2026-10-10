@@ -412,7 +412,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                     }
                 }
             }
-            ExprKind::Ident(_) => {}
+            ExprKind::Ident { .. } => {}
             ExprKind::LiteralBool(v) => {
                 a.value_map
                     .insert(node.node_id, Value::Boolean(BooleanValue(*v)));

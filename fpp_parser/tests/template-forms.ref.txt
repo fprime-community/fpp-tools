@@ -1,0 +1,600 @@
+TransUnit(
+    [
+        DefModuleTemplate {
+            name: Name {
+                data: "NoParams",
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:4:17,
+                    end: [ local path prefix ]/template-forms.fpp:4:25,
+                },
+            },
+            params: [],
+            members: [
+                DefConstant {
+                    name: Name {
+                        data: "k",
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:5:14,
+                            end: [ local path prefix ]/template-forms.fpp:5:15,
+                        },
+                    },
+                    value: Expr {
+                        kind: LiteralInt(
+                            "1",
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:5:18,
+                            end: [ local path prefix ]/template-forms.fpp:5:19,
+                        },
+                    },
+                    is_dictionary_def: false,
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:5:5,
+                        end: [ local path prefix ]/template-forms.fpp:5:19,
+                    },
+                },
+            ],
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:4:1,
+                end: [ local path prefix ]/template-forms.fpp:6:2,
+            },
+            pre_annotation: [
+                "A template with no parameter list",
+            ],
+        },
+        DefModuleTemplate {
+            name: Name {
+                data: "EmptyParams",
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:9:17,
+                    end: [ local path prefix ]/template-forms.fpp:9:28,
+                },
+            },
+            params: [],
+            members: [
+                DefConstant {
+                    name: Name {
+                        data: "k",
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:10:14,
+                            end: [ local path prefix ]/template-forms.fpp:10:15,
+                        },
+                    },
+                    value: Expr {
+                        kind: LiteralInt(
+                            "1",
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:10:18,
+                            end: [ local path prefix ]/template-forms.fpp:10:19,
+                        },
+                    },
+                    is_dictionary_def: false,
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:10:5,
+                        end: [ local path prefix ]/template-forms.fpp:10:19,
+                    },
+                },
+            ],
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:9:1,
+                end: [ local path prefix ]/template-forms.fpp:11:2,
+            },
+            pre_annotation: [
+                "A template with an empty parameter list",
+            ],
+        },
+        SpecTemplateExpand {
+            template: Unqualified {
+                name: Ident {
+                    data: "NoParams",
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:14:8,
+                        end: [ local path prefix ]/template-forms.fpp:14:16,
+                    },
+                },
+                is_absolute: false,
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:14:8,
+                    end: [ local path prefix ]/template-forms.fpp:14:16,
+                },
+            },
+            args: [],
+            members: None,
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:14:1,
+                end: [ local path prefix ]/template-forms.fpp:14:16,
+            },
+            pre_annotation: [
+                "An expansion with no argument list",
+            ],
+        },
+        SpecTemplateExpand {
+            template: Unqualified {
+                name: Ident {
+                    data: "EmptyParams",
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:17:8,
+                        end: [ local path prefix ]/template-forms.fpp:17:19,
+                    },
+                },
+                is_absolute: false,
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:17:8,
+                    end: [ local path prefix ]/template-forms.fpp:17:19,
+                },
+            },
+            args: [],
+            members: None,
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:17:1,
+                end: [ local path prefix ]/template-forms.fpp:17:21,
+            },
+            pre_annotation: [
+                "An expansion with an empty argument list",
+            ],
+        },
+        SpecTemplateExpand {
+            template: Qualified {
+                qualifier: Qualified {
+                    qualifier: Unqualified {
+                        name: Ident {
+                            data: "A",
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:20:8,
+                                end: [ local path prefix ]/template-forms.fpp:20:9,
+                            },
+                        },
+                        is_absolute: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:20:8,
+                            end: [ local path prefix ]/template-forms.fpp:20:9,
+                        },
+                    },
+                    name: Ident {
+                        data: "B",
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:20:10,
+                            end: [ local path prefix ]/template-forms.fpp:20:11,
+                        },
+                    },
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:20:8,
+                        end: [ local path prefix ]/template-forms.fpp:20:11,
+                    },
+                },
+                name: Ident {
+                    data: "T",
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:20:12,
+                        end: [ local path prefix ]/template-forms.fpp:20:13,
+                    },
+                },
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:20:8,
+                    end: [ local path prefix ]/template-forms.fpp:20:13,
+                },
+            },
+            args: [
+                TemplateArg {
+                    kind: Constant(
+                        Expr {
+                            kind: LiteralInt(
+                                "1",
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:20:23,
+                                end: [ local path prefix ]/template-forms.fpp:20:24,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:20:14,
+                        end: [ local path prefix ]/template-forms.fpp:20:24,
+                    },
+                },
+            ],
+            members: None,
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:20:1,
+                end: [ local path prefix ]/template-forms.fpp:20:25,
+            },
+            pre_annotation: [
+                "A qualified template name",
+            ],
+        },
+        SpecTemplateExpand {
+            template: Unqualified {
+                name: Ident {
+                    data: "Tmpl",
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:23:8,
+                        end: [ local path prefix ]/template-forms.fpp:23:12,
+                    },
+                },
+                is_absolute: false,
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:23:8,
+                    end: [ local path prefix ]/template-forms.fpp:23:12,
+                },
+            },
+            args: [
+                TemplateArg {
+                    kind: Constant(
+                        Expr {
+                            kind: LiteralInt(
+                                "1",
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:24:14,
+                                end: [ local path prefix ]/template-forms.fpp:24:15,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:24:5,
+                        end: [ local path prefix ]/template-forms.fpp:24:15,
+                    },
+                },
+                TemplateArg {
+                    kind: Type(
+                        TypeName {
+                            kind: Integer(
+                                U32,
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:25:10,
+                                end: [ local path prefix ]/template-forms.fpp:25:13,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:25:5,
+                        end: [ local path prefix ]/template-forms.fpp:25:13,
+                    },
+                },
+                TemplateArg {
+                    kind: Interface(
+                        Unqualified {
+                            name: Ident {
+                                data: "inst1",
+                                node_id: Span {
+                                    start: [ local path prefix ]/template-forms.fpp:26:14,
+                                    end: [ local path prefix ]/template-forms.fpp:26:19,
+                                },
+                            },
+                            is_absolute: false,
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:26:14,
+                                end: [ local path prefix ]/template-forms.fpp:26:19,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:26:5,
+                        end: [ local path prefix ]/template-forms.fpp:26:19,
+                    },
+                },
+            ],
+            members: None,
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:23:1,
+                end: [ local path prefix ]/template-forms.fpp:27:2,
+            },
+            pre_annotation: [
+                "An argument list separated by newlines instead of commas",
+            ],
+        },
+        DefModuleTemplate {
+            name: Name {
+                data: "template",
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:31:17,
+                    end: [ local path prefix ]/template-forms.fpp:31:26,
+                },
+            },
+            params: [
+                TemplateParamConstant {
+                    name: Name {
+                        data: "constant",
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:32:14,
+                            end: [ local path prefix ]/template-forms.fpp:32:23,
+                        },
+                    },
+                    type_name: TypeName {
+                        kind: Integer(
+                            U32,
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:32:25,
+                            end: [ local path prefix ]/template-forms.fpp:32:28,
+                        },
+                    },
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:32:5,
+                        end: [ local path prefix ]/template-forms.fpp:32:28,
+                    },
+                },
+                TemplateParamInterface {
+                    name: Name {
+                        data: "instance",
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:33:14,
+                            end: [ local path prefix ]/template-forms.fpp:33:23,
+                        },
+                    },
+                    interface: Unqualified {
+                        name: Ident {
+                            data: "Interface",
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:33:25,
+                                end: [ local path prefix ]/template-forms.fpp:33:34,
+                            },
+                        },
+                        is_absolute: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:33:25,
+                            end: [ local path prefix ]/template-forms.fpp:33:34,
+                        },
+                    },
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:33:5,
+                        end: [ local path prefix ]/template-forms.fpp:33:34,
+                    },
+                },
+                TemplateParamType {
+                    name: Name {
+                        data: "type",
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:34:10,
+                            end: [ local path prefix ]/template-forms.fpp:34:15,
+                        },
+                    },
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:34:5,
+                        end: [ local path prefix ]/template-forms.fpp:34:15,
+                    },
+                },
+            ],
+            members: [
+                DefConstant {
+                    name: Name {
+                        data: "expand",
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:36:14,
+                            end: [ local path prefix ]/template-forms.fpp:36:21,
+                        },
+                    },
+                    value: Expr {
+                        kind: Ident {
+                            value: "constant",
+                            is_absolute: false,
+                        },
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:36:24,
+                            end: [ local path prefix ]/template-forms.fpp:36:33,
+                        },
+                    },
+                    is_dictionary_def: false,
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:36:5,
+                        end: [ local path prefix ]/template-forms.fpp:36:33,
+                    },
+                },
+            ],
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:31:1,
+                end: [ local path prefix ]/template-forms.fpp:37:2,
+            },
+            pre_annotation: [
+                "Escaped reserved words as the names of a template, its parameters, and the",
+                "definitions in its body",
+            ],
+        },
+        SpecTemplateExpand {
+            template: Unqualified {
+                name: Ident {
+                    data: "template",
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:39:8,
+                        end: [ local path prefix ]/template-forms.fpp:39:17,
+                    },
+                },
+                is_absolute: false,
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:39:8,
+                    end: [ local path prefix ]/template-forms.fpp:39:17,
+                },
+            },
+            args: [
+                TemplateArg {
+                    kind: Constant(
+                        Expr {
+                            kind: LiteralInt(
+                                "1",
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:39:27,
+                                end: [ local path prefix ]/template-forms.fpp:39:28,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:39:18,
+                        end: [ local path prefix ]/template-forms.fpp:39:28,
+                    },
+                },
+                TemplateArg {
+                    kind: Interface(
+                        Unqualified {
+                            name: Ident {
+                                data: "inst1",
+                                node_id: Span {
+                                    start: [ local path prefix ]/template-forms.fpp:39:39,
+                                    end: [ local path prefix ]/template-forms.fpp:39:44,
+                                },
+                            },
+                            is_absolute: false,
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:39:39,
+                                end: [ local path prefix ]/template-forms.fpp:39:44,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:39:30,
+                        end: [ local path prefix ]/template-forms.fpp:39:44,
+                    },
+                },
+                TemplateArg {
+                    kind: Type(
+                        TypeName {
+                            kind: Integer(
+                                U32,
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:39:51,
+                                end: [ local path prefix ]/template-forms.fpp:39:54,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:39:46,
+                        end: [ local path prefix ]/template-forms.fpp:39:54,
+                    },
+                },
+            ],
+            members: None,
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:39:1,
+                end: [ local path prefix ]/template-forms.fpp:39:55,
+            },
+        },
+        SpecLoc {
+            kind: Template,
+            symbol: Unqualified {
+                name: Ident {
+                    data: "Tmpl",
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:41:17,
+                        end: [ local path prefix ]/template-forms.fpp:41:21,
+                    },
+                },
+                is_absolute: false,
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:41:17,
+                    end: [ local path prefix ]/template-forms.fpp:41:21,
+                },
+            },
+            file: LitString {
+                data: "template.fpp",
+                inner_span: Span {
+                    start: [ local path prefix ]/template-forms.fpp:41:26,
+                    end: [ local path prefix ]/template-forms.fpp:41:38,
+                },
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:41:25,
+                    end: [ local path prefix ]/template-forms.fpp:41:39,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:41:1,
+                end: [ local path prefix ]/template-forms.fpp:41:39,
+            },
+        },
+        SpecLoc {
+            kind: Template,
+            symbol: Qualified {
+                qualifier: Qualified {
+                    qualifier: Unqualified {
+                        name: Ident {
+                            data: "A",
+                            node_id: Span {
+                                start: [ local path prefix ]/template-forms.fpp:42:17,
+                                end: [ local path prefix ]/template-forms.fpp:42:18,
+                            },
+                        },
+                        is_absolute: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:42:17,
+                            end: [ local path prefix ]/template-forms.fpp:42:18,
+                        },
+                    },
+                    name: Ident {
+                        data: "B",
+                        node_id: Span {
+                            start: [ local path prefix ]/template-forms.fpp:42:19,
+                            end: [ local path prefix ]/template-forms.fpp:42:20,
+                        },
+                    },
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:42:17,
+                        end: [ local path prefix ]/template-forms.fpp:42:20,
+                    },
+                },
+                name: Ident {
+                    data: "T",
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:42:21,
+                        end: [ local path prefix ]/template-forms.fpp:42:22,
+                    },
+                },
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:42:17,
+                    end: [ local path prefix ]/template-forms.fpp:42:22,
+                },
+            },
+            file: LitString {
+                data: "template.fpp",
+                inner_span: Span {
+                    start: [ local path prefix ]/template-forms.fpp:42:27,
+                    end: [ local path prefix ]/template-forms.fpp:42:39,
+                },
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:42:26,
+                    end: [ local path prefix ]/template-forms.fpp:42:40,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:42:1,
+                end: [ local path prefix ]/template-forms.fpp:42:40,
+            },
+        },
+        SpecLoc {
+            kind: Template,
+            symbol: Unqualified {
+                name: Ident {
+                    data: "template",
+                    node_id: Span {
+                        start: [ local path prefix ]/template-forms.fpp:43:17,
+                        end: [ local path prefix ]/template-forms.fpp:43:26,
+                    },
+                },
+                is_absolute: false,
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:43:17,
+                    end: [ local path prefix ]/template-forms.fpp:43:26,
+                },
+            },
+            file: LitString {
+                data: "template.fpp",
+                inner_span: Span {
+                    start: [ local path prefix ]/template-forms.fpp:43:31,
+                    end: [ local path prefix ]/template-forms.fpp:43:43,
+                },
+                node_id: Span {
+                    start: [ local path prefix ]/template-forms.fpp:43:30,
+                    end: [ local path prefix ]/template-forms.fpp:43:44,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/template-forms.fpp:43:1,
+                end: [ local path prefix ]/template-forms.fpp:43:44,
+            },
+        },
+    ],
+)
