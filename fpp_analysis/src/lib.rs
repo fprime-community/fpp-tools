@@ -1,3 +1,17 @@
+//! Semantic analysis of FPP models.
+//!
+//! # Collections
+//!
+//! Where the Scala compiler keeps an analysis result in an immutable `Map` or
+//! `Set` and the order in which the collection is iterated is observable (it
+//! orders diagnostics, dictionary entries or any other output), this crate keeps
+//! it in an insertion-ordered [`indexmap::IndexMap`] or [`indexmap::IndexSet`].
+//! Scala's immutable `Map` and `Set` iterate in insertion order up to four
+//! entries and in hash order beyond that, so the two orders agree exactly up to
+//! four entries; beyond four, the order here is still the deterministic insertion
+//! order, not Scala's hash order. A collection whose iteration order is not
+//! observable may be a hash map or set.
+
 mod analysis;
 mod errors;
 pub mod used_symbols;

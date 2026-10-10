@@ -372,6 +372,7 @@ dependencies = [
  "fpp_macros",
  "fpp_parser",
  "fpp_util",
+ "indexmap",
  "pretty_assertions",
  "rustc-hash 2.1.1",
 ]
