@@ -263,7 +263,7 @@ impl GeneralPortInstance {
                         symbol_name: symbol.name().data.clone(),
                         loc: qid.span(),
                         msg: "not a port symbol".to_string(),
-                        def_loc: symbol.name().span(),
+                        def_loc: symbol.node().span(),
                     });
                 }
                 None => PortInstanceType::Serial,

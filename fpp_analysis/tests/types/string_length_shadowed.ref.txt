@@ -6,5 +6,5 @@
  ::: [ local path prefix ]/types/string_length_shadowed.fpp:5:3
   |
 5 |   constant FW_FIXED_LENGTH_STRING_SIZE = 100
-  |   ------------------------------------------ M.FW_FIXED_LENGTH_STRING_SIZE defined here
+  |   ------------------------------------------ symbol is defined here
 

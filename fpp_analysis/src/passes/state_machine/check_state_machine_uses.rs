@@ -105,7 +105,7 @@ impl CheckStateMachineUses {
                     symbol_name: qualifier_symbol.get_unqualified_name().to_string(),
                     loc: qualifier.span(),
                     msg: "not a qualifier".to_string(),
-                    def_loc: qualifier_symbol.name().span(),
+                    def_loc: qualifier_symbol.node().span(),
                 }
                 .emit();
                 sma.blocking_error = true;

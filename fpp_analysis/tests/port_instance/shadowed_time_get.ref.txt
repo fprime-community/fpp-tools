@@ -6,5 +6,5 @@
   ::: [ local path prefix ]/port_instance/shadowed_time_get.fpp:5:5
    |
  5 |     port Time
-   |     --------- M.Fw.Time defined here
+   |     --------- symbol is defined here
 

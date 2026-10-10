@@ -7,5 +7,5 @@
    |
 16 | / topology Sub {
 17 | | }
-   | |_- Sub defined here
+   | |_- symbol is defined here
 

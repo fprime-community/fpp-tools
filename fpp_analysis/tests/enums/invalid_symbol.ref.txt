@@ -1,10 +1,10 @@
  --> [ local path prefix ]/enums/invalid_symbol.fpp:2:14
   |
 2 | constant c = E
-  |              ^ not a constant symbol
+  |              ^ invalid use of symbol E: not a constant symbol
   |
- ::: [ local path prefix ]/enums/invalid_symbol.fpp:1:6
+ ::: [ local path prefix ]/enums/invalid_symbol.fpp:1:1
   |
 1 | enum E { A, B, C }
-  |      - E defined here
+  | ------------------ symbol is defined here
 

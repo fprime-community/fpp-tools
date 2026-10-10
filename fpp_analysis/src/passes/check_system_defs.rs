@@ -76,10 +76,7 @@ impl<'ast> Visitor<'ast> for CheckSystemDefs {
         {
             SemanticError::InvalidSymbol {
                 symbol_name: def.name.data.clone(),
-                msg: format!(
-                    "invalid use of symbol {}: topology used here must be a deployment topology",
-                    def.name.data
-                ),
+                msg: "topology used here must be a deployment topology".to_string(),
                 loc: symbol.node().span(),
                 def_loc: def.node_id.span(),
             }

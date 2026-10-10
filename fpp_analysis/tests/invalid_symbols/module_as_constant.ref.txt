@@ -1,10 +1,14 @@
  --> [ local path prefix ]/invalid_symbols/module_as_constant.fpp:3:16
   |
-3 |   constant a = M
-  |                ^ not a constant symbol
+3 |     constant a = M
+  |                  ^ invalid use of symbol M: not a constant symbol
   |
- ::: [ local path prefix ]/invalid_symbols/module_as_constant.fpp:1:8
+ ::: [ local path prefix ]/invalid_symbols/module_as_constant.fpp:1:1
   |
-1 | module M {
-  |        - M defined here
+1 | / module M {
+2 | |  
+3 | |   constant a = M
+4 | |
+5 | | }
+  | |_- symbol is defined here
 

@@ -378,7 +378,7 @@ impl Analysis {
     fn invalid_symbol(symbol: &Symbol, id: fpp_core::Node, msg: &str) -> SemanticError {
         SemanticError::InvalidSymbol {
             symbol_name: symbol.name().data.clone(),
-            msg: format!("invalid use of symbol {}: {}", symbol.name().data, msg),
+            msg: msg.to_string(),
             loc: id.span(),
             def_loc: symbol.node().span(),
         }

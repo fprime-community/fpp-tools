@@ -535,7 +535,7 @@ impl StateMachineInstance {
                     symbol_name: symbol.name().data.clone(),
                     loc: node.state_machine.span(),
                     msg: "not a state machine symbol".to_string(),
-                    def_loc: symbol.name().span(),
+                    def_loc: symbol.node().span(),
                 });
             }
             // Unresolved use: CheckUses already reported the error.

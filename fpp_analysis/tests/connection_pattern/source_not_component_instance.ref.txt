@@ -10,5 +10,5 @@
 13 | |   instance c
 14 | |
 15 | | }
-   | |_- Inner defined here
+   | |_- symbol is defined here
 

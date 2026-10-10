@@ -8,5 +8,5 @@
   ::: [ local path prefix ]/template/type_param_implied_use.fpp:10:15
    |
 10 | expand T(type U32)
-   |               --- FwSizeStoreType defined here
+   |               --- symbol is defined here
 

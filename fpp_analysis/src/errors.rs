@@ -566,8 +566,12 @@ impl From<SemanticError> for Diagnostic {
                 msg,
                 loc,
                 def_loc,
-            } => Diagnostic::new(loc, Level::Error, msg)
-                .span_note(def_loc, format!("{} defined here", symbol_name)),
+            } => Diagnostic::new(
+                loc,
+                Level::Error,
+                format!("invalid use of symbol {}: {}", symbol_name, msg),
+            )
+            .span_note(def_loc, "symbol is defined here"),
             SemanticError::UseDefCycle { loc, cycle } => cycle.iter().enumerate().fold(
                 Diagnostic::new(loc, Level::Error, "encountered symbol use-definition cycle"),
                 |out, (i, suse)| match i {

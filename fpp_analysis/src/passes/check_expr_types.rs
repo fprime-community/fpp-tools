@@ -713,7 +713,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
                     symbol_name: symbol.name().data.clone(),
                     msg: "not a constant symbol".to_string(),
                     loc: node.span(),
-                    def_loc: symbol.name().span(),
+                    def_loc: symbol.node().span(),
                 }
                 .emit();
                 return ControlFlow::Break(());

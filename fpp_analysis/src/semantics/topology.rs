@@ -199,10 +199,7 @@ impl Topology {
         {
             return Err(SemanticError::InvalidSymbol {
                 symbol_name: symbol.name().data.clone(),
-                msg: format!(
-                    "invalid use of symbol {}: use of deployment topology is not allowed here",
-                    symbol.name().data
-                ),
+                msg: "use of deployment topology is not allowed here".to_string(),
                 loc,
                 def_loc: top.node().span(),
             });

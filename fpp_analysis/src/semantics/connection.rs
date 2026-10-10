@@ -729,10 +729,7 @@ impl Analysis {
             }
             Some(symbol) => Err(SemanticError::InvalidSymbol {
                 symbol_name: symbol.name().data.clone(),
-                msg: format!(
-                    "invalid use of symbol {}: not a component instance symbol",
-                    symbol.name().data
-                ),
+                msg: "not a component instance symbol".to_string(),
                 loc: id.span(),
                 def_loc: symbol.node().span(),
             }),

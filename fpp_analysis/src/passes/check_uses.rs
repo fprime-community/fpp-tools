@@ -128,8 +128,8 @@ impl<'ast> CheckUses<'ast> {
             SemanticError::InvalidSymbol {
                 symbol_name: sym.name().data.clone(),
                 msg: format!(
-                    "invalid use of symbol {}: a template parameter may not satisfy the implied use of {}",
-                    sym.name().data, iu_name
+                    "a template parameter may not satisfy the implied use of {}",
+                    iu_name
                 ),
                 loc,
                 def_loc: sym.node().span(),
@@ -150,7 +150,7 @@ impl<'ast> CheckUses<'ast> {
             };
             SemanticError::InvalidSymbol {
                 symbol_name: sym_qualified_name.clone(),
-                msg: format!("invalid use of symbol {}: {}", sym_qualified_name, msg),
+                msg,
                 loc,
                 def_loc: sym.node().span(),
             }
