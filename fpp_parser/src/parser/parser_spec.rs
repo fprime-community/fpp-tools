@@ -1170,6 +1170,29 @@ fn trans_unit_end_of_input_construct_error() {
     }
 }
 
+// Rust-only: a subscript that fails before its commit point, or at the end
+// of the input, is not a selector, so the expression ends before it, and
+// what must follow the expression fails at the bracket, or where the
+// subscript fails if that does not commit
+#[test]
+fn trans_unit_subscript_error() {
+    let cases = [
+        ("module M {\n  constant a = b[ * 3\n}\n", (2, 17)),
+        ("module M {\n  constant a = (b[ * 3\n}\n", (2, 20)),
+        ("constant a = (b[)\n", (1, 17)),
+        ("constant a = a[b[ * 3]\n", (1, 17)),
+        ("array A = [b[ * 3] U32\n", (1, 13)),
+        ("constant a = (b[1", (1, 16)),
+        ("constant a = a[b[1", (1, 17)),
+        ("array A = [b[1", (1, 13)),
+        ("constant a = sizeof(string size b[1", (1, 34)),
+        ("module M {\n  constant a = a[b[1", (2, 19)),
+    ];
+    for (s, location) in cases {
+        assert_eq!(first_error_location(s), Some(location), "{s}");
+    }
+}
+
 #[test]
 fn type_name_error() {
     parse_all_error(|p| p.type_name(), &["a.", "1+3"]);

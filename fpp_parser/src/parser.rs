@@ -43,6 +43,13 @@ pub struct Parser<'a> {
     /// replaced. If the element sequences end without another error at the
     /// top level, it is the error.
     eof_error: Option<ParseError>,
+    /// The bracket of a subscript that is not a selector, before which the
+    /// expression being parsed ends, and the failure of the subscript if it
+    /// fails at a token after the bracket and before its commit point. A
+    /// token that must follow the expression is expected at the bracket, or,
+    /// if the token does not commit, the failure of the subscript is the
+    /// failure, which is further.
+    selector_failure: Option<((fpp_core::Span, TokenKind), Option<ParseError>)>,
 }
 
 /// The state of the element being parsed in an element sequence.
@@ -167,6 +174,7 @@ impl<'a> Parser<'a> {
             ends: vec![],
             element: ElementState::default(),
             eof_error: None,
+            selector_failure: None,
         }
     }
 
@@ -1050,12 +1058,7 @@ impl<'a> Parser<'a> {
                 let e = match self.expr_node() {
                     Ok(e) => e,
                     Err(err) => {
-                        return Err(self.alternative_failed(
-                            err,
-                            committed,
-                            first.span(),
-                            "expression",
-                        ));
+                        return Err(self.enclosed_expression_failed(err, committed, first.span()));
                     }
                 };
                 // The parenthesized expression does not commit
@@ -1095,17 +1098,15 @@ impl<'a> Parser<'a> {
                 let type_name = match self.consume(LeftParen).and_then(|_| self.type_name()) {
                     Ok(type_name) => type_name,
                     Err(err) => {
-                        return Err(self.alternative_failed(
-                            err,
-                            committed,
-                            first.span(),
-                            "expression",
-                        ));
+                        return Err(self.enclosed_expression_failed(err, committed, first.span()));
                     }
                 };
                 // The size expression does not commit
                 self.element.committed = committed;
-                if let Some(err) = self.dot_selector_failure() {
+                // A qualified identifier may go on after a dot
+                if let TypeNameKind::QualIdent(_) = type_name.kind
+                    && let Some(err) = self.dot_selector_failure()
+                {
                     return Err(err);
                 }
                 if let Err(err) = self.consume(RightParen) {
@@ -1222,18 +1223,39 @@ impl<'a> Parser<'a> {
                     });
                     let e2 = match e2 {
                         Ok(e2) => e2,
-                        // A subscript that fails before its commit point, or
-                        // at the end of the input inside an element sequence
-                        // that a token ends, is not a selector, so the
-                        // expression ends before the `[`. At the top level, a
-                        // failure at the end of the input after the commit
-                        // point is the first error that passed a commit
-                        // point, which is the error.
-                        Err(err)
-                            if !self.element.committed
-                                || (err.is_at_end_of_input() && self.sequence_end() != EOF) =>
-                        {
+                        // The expression ends before a subscript that is not
+                        // a selector, and this subscript requires `]` there
+                        Err(_) if self.selector_failure.is_some() => {
+                            let ((last, got), _) = self.selector_failure.take().unwrap();
                             self.element.committed = true;
+                            return Err(ParseError::ExpectedToken {
+                                expected: RightSquare,
+                                got,
+                                last,
+                                msg: "unexpected token",
+                            });
+                        }
+                        // A subscript that fails before its commit point, or
+                        // at the end of the input, is not a selector, so the
+                        // expression ends before the `[`
+                        Err(err) if !self.element.committed || err.is_at_end_of_input() => {
+                            let committed_failure = self.element.committed;
+                            self.element.committed = true;
+                            if !err.is_at_end_of_input() {
+                                self.selector_failure = Some((bracket, Some(err)));
+                                return Err(self.sequence_ended_at(bracket));
+                            }
+                            self.selector_failure = Some((bracket, None));
+                            if !committed_failure {
+                                return Err(self.sequence_ended_at(bracket));
+                            }
+                            if self.sequence_end() == EOF {
+                                // At the top level, the failure is the first
+                                // error that passed a commit point, which is
+                                // the error if the expression ends the element
+                                return Err(err);
+                            }
+                            self.eof_error.get_or_insert(err);
                             return Err(self.sequence_ended_at(bracket));
                         }
                         Err(err) => return Err(err),
@@ -1389,7 +1411,21 @@ impl<'a> Parser<'a> {
     fn index(&mut self) -> ParseResult<Expr> {
         self.consume(LeftSquare)?;
         self.commit();
-        let out = self.expr_node()?;
+        let out = match self.expr_node() {
+            Ok(out) => out,
+            // The expression ends before a subscript that is not a selector,
+            // and `]` is required there
+            Err(_) if self.selector_failure.is_some() => {
+                let ((last, got), _) = self.selector_failure.take().unwrap();
+                return Err(ParseError::ExpectedToken {
+                    expected: RightSquare,
+                    got,
+                    last,
+                    msg: "unexpected token",
+                });
+            }
+            Err(err) => return Err(err),
+        };
         self.consume(RightSquare)?;
         Ok(out)
     }
@@ -3138,10 +3174,9 @@ impl<'a> Parser<'a> {
     }
 
     /// The failure of a member selection or qualifier that the next token, a
-    /// dot that no identifier follows, would start, if the token after the
-    /// dot is not the end of the input. The selection fails there, which is
-    /// further than the token that the dot ends an expression or a type name
-    /// before.
+    /// dot that no identifier follows, would start after an expression or a
+    /// qualified identifier, if the token after the dot is not the end of the
+    /// input. The selection fails there, which is further than the dot.
     fn dot_selector_failure(&mut self) -> Option<ParseError> {
         if self.peek(0) != Dot || matches!(self.peek(1), Identifier | EOF) {
             return None;
@@ -3153,6 +3188,36 @@ impl<'a> Parser<'a> {
             last,
             msg: "unexpected token",
         })
+    }
+
+    /// The failure of a parenthesized expression or a size, an alternative
+    /// begun at `loc` when the element was `committed`, whose expression or
+    /// type name failed with `err`. If the expression ends before a subscript
+    /// that is not a selector, the parenthesized expression fails where the
+    /// subscript does.
+    fn enclosed_expression_failed(
+        &mut self,
+        err: ParseError,
+        committed: bool,
+        loc: fpp_core::Span,
+    ) -> ParseError {
+        match self.selector_failure.take() {
+            // The subscript fails further than the `)`
+            Some((_, Some(selector_failure))) => {
+                self.element.committed = committed;
+                selector_failure
+            }
+            Some(((last, got), None)) => {
+                self.element.committed = committed;
+                ParseError::ExpectedToken {
+                    expected: RightParen,
+                    got,
+                    last,
+                    msg: "unexpected token",
+                }
+            }
+            None => self.alternative_failed(err, committed, loc, "expression"),
+        }
     }
 
     /// Begin an alternative of a Scala alternation that is not its first
@@ -3183,7 +3248,9 @@ impl<'a> Parser<'a> {
         loc: fpp_core::Span,
         construct: &'static str,
     ) -> ParseError {
-        if !err.is_at_end_of_input() {
+        // A subscript that is not a selector ends the expression, and does
+        // not fail the alternative
+        if !err.is_at_end_of_input() || self.selector_failure.is_some() {
             return self.end_alternative(committed, err);
         }
         if self.element.committed {
@@ -3313,6 +3380,7 @@ impl<'a> Parser<'a> {
         element_start: Option<(fpp_core::Span, TokenKind)>,
         punct: TokenKind,
     ) -> bool {
+        self.selector_failure = None;
         let mut at_eof = err.is_at_end_of_input();
         if at_eof
             && !(state.committed && state.eof_error_survives)
