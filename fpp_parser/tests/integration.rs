@@ -15,6 +15,13 @@ fn run_test(file_path: &str) {
 /// Parse each of the files `file_paths` (without the `.fpp`), resolve their
 /// includes, and compare the result with `ref_path`.ref.txt
 fn run_test_files(file_paths: &[&str], ref_path: &str) {
+    run_test_with(file_paths, ref_path, true)
+}
+
+/// Parse each of the files `file_paths` (without the `.fpp`), resolve their
+/// includes if `resolve_includes` is set, and compare the result with
+/// `ref_path`.ref.txt
+fn run_test_with(file_paths: &[&str], ref_path: &str, resolve_includes: bool) {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
 
@@ -42,8 +49,11 @@ fn run_test_files(file_paths: &[&str], ref_path: &str) {
 
             // Parse the source
             let mut ast = parse(src, |p| p.trans_unit(), None);
-            let mut source_files = Default::default();
-            let _ = ResolveIncludes::new(FsReader {}).visit_trans_unit(&mut source_files, &mut ast);
+            if resolve_includes {
+                let mut source_files = Default::default();
+                let _ =
+                    ResolveIncludes::new(FsReader {}).visit_trans_unit(&mut source_files, &mut ast);
+            }
             out.push_str(&format!("{:#?}", ast));
         }
         out
@@ -192,8 +202,13 @@ fn state_machine() {
 }
 
 #[test]
-fn syntax() {
-    run_test("syntax")
+fn syntax_ast() {
+    run_test_with(&["syntax"], "syntax-ast", false)
+}
+
+#[test]
+fn syntax_include_ast() {
+    run_test_files(&["syntax"], "syntax-include-ast")
 }
 
 #[test]
