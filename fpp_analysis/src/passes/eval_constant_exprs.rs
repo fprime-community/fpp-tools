@@ -172,8 +172,8 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                 a.value_map.get(&constant.node_id)
                 && let Some(old) = values.insert(value.1, constant.span())
             {
-                SemanticError::DuplicateEnumConstant {
-                    value: value.1,
+                SemanticError::DuplicateEnumValue {
+                    value: value.1.to_string(),
                     loc: constant.span(),
                     prev_loc: old,
                 }

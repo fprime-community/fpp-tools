@@ -71,6 +71,21 @@ fn invalid_constants() {
 }
 
 #[test]
+fn invalid_constants_mixed() {
+    run_test("enums/invalid_constants_mixed")
+}
+
+#[test]
+fn invalid_constants_multiline() {
+    run_test("enums/invalid_constants_multiline")
+}
+
+#[test]
+fn invalid_constants_duplicate_value() {
+    run_test("enums/invalid_constants_duplicate_value")
+}
+
+#[test]
 fn dictionary_ok() {
     run_test("enums/dictionary_ok")
 }

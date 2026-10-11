@@ -80,15 +80,13 @@ pub enum SemanticError {
     EmptyArray {
         loc: Span,
     },
-    EnumConstantShouldBeImplied {
-        loc: Span,
-    },
-    EnumConstantShouldBeExplicit {
+    /// Invalid enum constants
+    InvalidEnumConstants {
         loc: Span,
     },
     /// Duplicate enum value
-    DuplicateEnumConstant {
-        value: i128,
+    DuplicateEnumValue {
+        value: String,
         loc: Span,
         prev_loc: Span,
     },
@@ -645,24 +643,17 @@ impl From<SemanticError> for Diagnostic {
             SemanticError::EmptyArray { loc } => {
                 Diagnostic::new(loc, Level::Error, "array expression may not be empty")
             }
-            SemanticError::EnumConstantShouldBeImplied { loc } => {
-                Diagnostic::new(loc, Level::Error, "expected constant value to be implied")
-                    .note("enum constants must be all explicit or all implied")
-            }
-            SemanticError::EnumConstantShouldBeExplicit { loc } => {
-                Diagnostic::new(loc, Level::Error, "expected constant value to be explicit")
-                    .note("enum constants must be all explicit or all implied")
-            }
-            SemanticError::DuplicateEnumConstant {
+            SemanticError::InvalidEnumConstants { loc } => Diagnostic::new(
+                loc,
+                Level::Error,
+                "enum constants must be all explicit or all implied",
+            ),
+            SemanticError::DuplicateEnumValue {
                 value,
                 loc,
                 prev_loc,
-            } => Diagnostic::new(
-                loc,
-                Level::Error,
-                format!("duplicate enum constant `{}`", value),
-            )
-            .span_note(prev_loc, "previously defined here"),
+            } => Diagnostic::new(loc, Level::Error, format!("duplicate enum value {}", value))
+                .span_note(prev_loc, "previous occurrence is here"),
             SemanticError::InvalidIntValue { loc, v, msg } => {
                 let diag = Diagnostic::new(loc, Level::Error, msg);
                 match v {
