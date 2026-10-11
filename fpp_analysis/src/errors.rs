@@ -293,7 +293,7 @@ pub enum SemanticError {
         loc: Span,
         prev_loc: Span,
     },
-    /// A model has more than one system definition.
+    /// Duplicate system definition
     DuplicateSystemDefinition {
         loc: Span,
         prev_loc: Span,
@@ -479,10 +479,10 @@ pub enum SemanticError {
         msg: String,
         /// Locations along the transition path (rendered as notes)
         path: Vec<Span>,
-        /// Locations of duplicate initial transistions
+        /// Locations of duplicate initial transitions
         duplicate: Vec<Span>,
     },
-    /// A cycle of choices in the transition graph
+    /// Choice cycle
     ChoiceCycle {
         loc: Span,
         /// The transitions of the cycle, each with its location (rendered as
