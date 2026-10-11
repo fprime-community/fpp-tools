@@ -1,0 +1,20 @@
+  --> [ local path prefix ]/port_matching/unmatched_after_type_error.fpp:18:5
+   |
+18 |     c2.pOut -> c1.qIn
+   |     ^^^^^^^ cannot connect port types P and Q
+   |
+  ::: [ local path prefix ]/port_matching/unmatched_after_type_error.fpp:5:3
+   |
+ 5 |   output port pOut: P
+   |   ------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/port_matching/unmatched_after_type_error.fpp:7:3
+   |
+ 7 |   sync input port qIn: Q
+   |   ---------------------- to port is specified here
+
+  --> [ local path prefix ]/port_matching/unmatched_after_type_error.fpp:17:15
+   |
+17 |     unmatched c1.pOut -> c2.pIn
+   |               ^^^^^^^ unmatched connection must go from or to a matched port
+

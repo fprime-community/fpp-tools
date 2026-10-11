@@ -118,6 +118,9 @@ pub struct Topology {
     /// The connections of this topology, indexed by graph name. Each list holds
     /// the most recently added connection first.
     pub connection_map: IndexMap<String, Vec<Connection>>,
+    /// The connections of this topology marked as unmatched, in the order they
+    /// were added
+    pub unmatched_connection_set: Vec<Connection>,
     /// The connections defined locally, not imported. Each list holds the most
     /// recently added connection first.
     pub local_connection_map: IndexMap<String, Vec<Connection>>,
@@ -150,6 +153,7 @@ impl Topology {
             port_interface: PortInterface::new("topology"),
             pattern_map: IndexMap::default(),
             connection_map: IndexMap::default(),
+            unmatched_connection_set: Vec::new(),
             local_connection_map: IndexMap::default(),
             output_connection_map: BTreeMap::new(),
             input_connection_map: BTreeMap::new(),
@@ -297,6 +301,9 @@ impl Topology {
             .entry(graph_name.to_string())
             .or_default()
             .insert(0, c.clone());
+        if c.is_unmatched && !self.unmatched_connection_set.contains(&c) {
+            self.unmatched_connection_set.push(c.clone());
+        }
         self.output_connection_map
             .entry(c.from.port.clone())
             .or_default()
@@ -326,6 +333,7 @@ impl Topology {
     pub fn clear_connections(&mut self) {
         self.local_connection_map.clear();
         self.connection_map.clear();
+        self.unmatched_connection_set.clear();
         self.output_connection_map.clear();
         self.input_connection_map.clear();
         self.from_port_number_map.clear();

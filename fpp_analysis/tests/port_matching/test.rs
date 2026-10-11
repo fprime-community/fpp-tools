@@ -74,3 +74,23 @@ fn template_unmatched_remote_arg() {
 fn missing_connection_order() {
     run_test("port_matching/missing_connection_order")
 }
+
+#[test]
+fn unmatched_after_type_error() {
+    run_test("port_matching/unmatched_after_type_error")
+}
+
+#[test]
+fn unmatched_after_too_many_ports() {
+    run_test("port_matching/unmatched_after_too_many_ports")
+}
+
+#[test]
+fn unmatched_after_instance_error() {
+    run_test("port_matching/unmatched_after_instance_error")
+}
+
+#[test]
+fn unmatched_order() {
+    run_test("port_matching/unmatched_order")
+}

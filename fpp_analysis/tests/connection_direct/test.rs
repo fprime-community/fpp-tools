@@ -41,8 +41,13 @@ fn mismatched_port_types() {
 }
 
 #[test]
-fn invalid_unmatched_connection() {
-    run_test("connection_direct/invalid_unmatched_connection")
+fn invalid_unmatched_component_connection() {
+    run_test("connection_direct/invalid_unmatched_component_connection")
+}
+
+#[test]
+fn invalid_unmatched_topology_connection() {
+    run_test("connection_direct/invalid_unmatched_topology_connection")
 }
 
 #[test]

@@ -203,6 +203,12 @@ fn assign_numbers(t: &mut Topology, state: &mut State, matching_loc: Span) -> Se
 
 /// Apply matched numbering
 pub fn apply(a: &Analysis, t: &mut Topology) -> SemanticResult {
+    // Check for invalid 'unmatched' keywords
+    for c in &t.unmatched_connection_set {
+        if !c.is_match_constrained(a) {
+            return Err(SemanticError::MissingPortMatching { loc: c.get_loc() });
+        }
+    }
     // Fold over instances and matchings
     for (ci, _) in t.component_instance_map() {
         let Some(comp) = a.component_map.get(&ci.component_symbol) else {

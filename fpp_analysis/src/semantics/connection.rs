@@ -566,11 +566,6 @@ impl Connection {
         connection.check_directions()?;
         connection.check_types()?;
         connection.check_serial_with_typed_input()?;
-        if !connection.is_match_constrained(a) && connection.is_unmatched {
-            return Err(SemanticError::MissingPortMatching {
-                loc: connection.get_loc(),
-            });
-        }
         Ok(Some(connection))
     }
 
@@ -669,13 +664,12 @@ impl Connection {
         Ok(())
     }
 
-    /// Whether either endpoint's port participates in a port matching on its
-    /// component. Used to validate `unmatched` connections.
+    /// Checks whether a connection is match constrained
     ///
     /// Each endpoint is first resolved through any topology-port aliases, so a
     /// connection written against a topology port that aliases a matched
     /// component port is still recognized as match constrained.
-    fn is_match_constrained(&self, a: &Analysis) -> bool {
+    pub(crate) fn is_match_constrained(&self, a: &Analysis) -> bool {
         let port_matching_exists = |ci: &ComponentInstance, pi: &PortInstance| -> bool {
             match a.component_map.get(&ci.component_symbol) {
                 Some(comp) => comp.port_matching_list.iter().any(|pm| pm.matches(pi)),

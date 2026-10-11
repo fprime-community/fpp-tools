@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/port_matching/unmatched_after_too_many_ports.fpp:3:3
+  |
+3 |   output port pOut: P
+  |   ^^^^^^^^^^^^^^^^^^^ too many ports connected here (found 2, max is 1)
+  |
+ ::: [ local path prefix ]/port_matching/unmatched_after_too_many_ports.fpp:8:1
+  |
+8 | instance c1: C base id 0x100
+  | ---------------------------- for this component instance
+
