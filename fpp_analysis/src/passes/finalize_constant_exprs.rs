@@ -35,44 +35,6 @@ impl<'ast> FinalizeConstantExprs<'ast> {
         }
     }
 
-    /// The common type of the elements of an array expression
-    fn common_elt_type(&self, a: &Analysis, elts: &[Expr]) -> Result<Arc<Type>, SemanticError> {
-        let Some((first, rest)) = elts.split_first() else {
-            return Err(SemanticError::EmptyArray {
-                loc: elts.first().map_or_else(
-                    || panic!("an array expression with no elements has no location"),
-                    |e| e.span(),
-                ),
-            });
-        };
-        let mut prev = first;
-        let mut common = match a.type_map.get(&first.node_id) {
-            None => return Err(SemanticError::EmptyArray { loc: first.span() }),
-            Some(ty) => ty.clone(),
-        };
-        for elt in rest {
-            let Some(elt_ty) = a.type_map.get(&elt.node_id) else {
-                continue;
-            };
-            match Type::common_type(&common, elt_ty) {
-                Some(ty) => common = ty,
-                None => {
-                    return Err(SemanticError::InvalidType {
-                        loc: prev.span(),
-                        msg: format!(
-                            "cannot compute common type of {} and {}",
-                            common.as_ref(),
-                            elt_ty.as_ref()
-                        ),
-                        notes: vec![],
-                    });
-                }
-            }
-            prev = elt;
-        }
-        Ok(common)
-    }
-
     /// Recompute the type and value of an array expression
     fn finalize_array(
         &self,
@@ -80,7 +42,9 @@ impl<'ast> FinalizeConstantExprs<'ast> {
         node: &'ast Expr,
         elts: &'ast [Expr],
     ) -> ControlFlow<()> {
-        let elt_type = match self.common_elt_type(a, elts) {
+        let empty_list_error = SemanticError::EmptyArray { loc: node.span() };
+        let ids: Vec<fpp_core::Node> = elts.iter().map(|e| e.node_id).collect();
+        let elt_type = match a.common_type(&ids, empty_list_error) {
             Ok(ty) => ty,
             Err(err) => {
                 err.emit();
@@ -96,13 +60,13 @@ impl<'ast> FinalizeConstantExprs<'ast> {
                 .filter_map(|e| a.type_map.get(&e.node_id))
                 .map(|ty| ty.to_string())
                 .collect();
-            SemanticError::InvalidType {
+            SemanticError::TypeMismatch {
                 loc: node.span(),
                 msg: format!(
                     "cannot compute common type of array value with elements: {}",
                     type_names.join(", ")
                 ),
-                notes: vec![],
+                reason: None,
             }
             .emit();
             return ControlFlow::Break(());
@@ -268,6 +232,11 @@ impl<'ast> Visitor<'ast> for FinalizeConstantExprs<'ast> {
     }
 
     fn visit_expr(&self, a: &mut Analysis, node: &'ast Expr) -> ControlFlow<Self::Break> {
+        // An expression with no value failed to type check or to evaluate, and
+        // that error is already reported
+        if !a.value_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
         self.super_visit(a, Node::Expr(node))?;
         match &node.kind {
             ExprKind::Array(elts) => self.finalize_array(a, node, elts),
@@ -354,10 +323,10 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for FinalizeConstantExprs<'ast> {
                 ControlFlow::Continue(())
             }
             None => {
-                SemanticError::InvalidType {
+                SemanticError::TypeMismatch {
                     loc,
                     msg: format!("cannot convert value {} to type {}", v, ty),
-                    notes: vec![],
+                    reason: None,
                 }
                 .emit();
                 // The bound parameter has no usable value, so every use of it

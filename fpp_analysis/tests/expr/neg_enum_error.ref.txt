@@ -1,7 +1,7 @@
  --> [ local path prefix ]/expr/neg_enum_error.fpp:3:27
   |
 3 | struct S { x: E } default { x = -E.A }
-  |                           ^^^^^^^^^^^^ default value cannot be converted to S
+  |                           ^^^^^^^^^^^^ cannot convert anonymous struct { x: Integer } to S
   |
   = note: struct member `x` type cannot be converted
   = note: Integer cannot be converted to E

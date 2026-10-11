@@ -3,7 +3,7 @@ use crate::semantics::{
     Component, ComponentInstance, Dictionary, FppSystem, FrameworkDefinitions, ImpliedUse,
     ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, NameGroup, NestedScope, QualifiedName,
     Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion, TlmPacketSet, Topology, Type,
-    UseDefMatching, Value, state_machine::StateMachine,
+    TypeConversionError, UseDefMatching, Value, state_machine::StateMachine,
 };
 use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc};
 use fpp_core::{File, SourceFile, Span, Spanned};
@@ -267,6 +267,38 @@ impl Analysis {
     /// Add a value to the value map
     pub fn assign_value(&mut self, node: fpp_core::Node, value: Value) {
         self.value_map.insert(node, value);
+    }
+
+    /// Compute the common type for a list of node Ids
+    pub(crate) fn common_type(
+        &self,
+        nodes: &[fpp_core::Node],
+        empty_list_error: SemanticError,
+    ) -> SemanticResult<Arc<Type>> {
+        let Some((first_node_id, rest)) = nodes.split_first() else {
+            return Err(empty_list_error);
+        };
+        let mut prev_node_id = *first_node_id;
+        let mut prev_type = self.type_map[first_node_id].clone();
+        for node_id in rest {
+            let current_type = &self.type_map[node_id];
+            let loc = prev_node_id.span();
+            prev_type = Analysis::common_type_of_types(&prev_type, current_type, loc)?;
+            prev_node_id = *node_id;
+        }
+        Ok(prev_type)
+    }
+
+    /// Compute the common type for two node Ids
+    pub(crate) fn common_type_of_pair(
+        &self,
+        id1: fpp_core::Node,
+        id2: fpp_core::Node,
+        error_loc: Span,
+    ) -> SemanticResult<Arc<Type>> {
+        let t1 = &self.type_map[&id1];
+        let t2 = &self.type_map[&id2];
+        Analysis::common_type_of_types(t1, t2, error_loc)
     }
 
     /// Gets the finalized type of a type-name use node.
@@ -575,6 +607,22 @@ impl Analysis {
         Ok(())
     }
 
+    /// Compute the common type for two types
+    pub(crate) fn common_type_of_types(
+        t1: &Arc<Type>,
+        t2: &Arc<Type>,
+        error_loc: Span,
+    ) -> SemanticResult<Arc<Type>> {
+        match Type::common_type(t1, t2) {
+            None => Err(SemanticError::TypeMismatch {
+                loc: error_loc,
+                msg: format!("cannot compute common type of {} and {}", t1, t2),
+                reason: None,
+            }),
+            Some(t) => Ok(t),
+        }
+    }
+
     /// Check that a formal parameter list has no duplicate parameter names.
     pub fn check_for_duplicate_parameter(params: &[FormalParam]) -> SemanticResult {
         let mut seen: HashMap<String, Span> = HashMap::default();
@@ -588,6 +636,26 @@ impl Analysis {
             }
         }
         Ok(())
+    }
+
+    /// Convert one type to another
+    pub(crate) fn convert_types(
+        loc: Span,
+        t1: &Arc<Type>,
+        t2: &Arc<Type>,
+    ) -> SemanticResult<Arc<Type>> {
+        match Type::convert(t1, t2) {
+            Ok(()) => Ok(t2.clone()),
+            Err(err) => Err(SemanticError::TypeMismatch {
+                loc,
+                msg: format!("cannot convert {} to {}", t1, t2),
+                reason: match err {
+                    // The message already names the two types
+                    TypeConversionError::Mismatch { .. } => None,
+                    err => Some(Box::new(err)),
+                },
+            }),
+        }
     }
 
     /// Gets the reason for a non-displayable type at an AST node id, as the

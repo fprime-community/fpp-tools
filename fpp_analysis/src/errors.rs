@@ -68,6 +68,14 @@ pub enum SemanticError {
         msg: String,
         err: Box<TypeConversionError>,
     },
+    /// Type mismatch
+    TypeMismatch {
+        loc: Span,
+        msg: String,
+        /// For a failed type conversion, why the one type cannot be converted
+        /// to the other, when that says more than `msg`
+        reason: Option<Box<TypeConversionError>>,
+    },
     /// Empty array
     EmptyArray {
         loc: Span,
@@ -611,6 +619,13 @@ impl From<SemanticError> for Diagnostic {
                 .span_note(prev_loc, "previously defined here"),
             SemanticError::TypeConversion { loc, msg, err } => {
                 err.annotate(Diagnostic::new(loc, Level::Error, msg))
+            }
+            SemanticError::TypeMismatch { loc, msg, reason } => {
+                let diag = Diagnostic::new(loc, Level::Error, msg);
+                match reason {
+                    Some(reason) => reason.annotate(diag),
+                    None => diag,
+                }
             }
             SemanticError::EmptyArray { loc } => {
                 Diagnostic::new(loc, Level::Error, "array expression may not be empty")

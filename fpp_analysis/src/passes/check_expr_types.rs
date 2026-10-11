@@ -5,14 +5,13 @@ use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
     AnonArrayType, AnonStructType, QualifiedName, Symbol, SymbolInterface, Type,
-    TypeConversionResult,
 };
 use fpp_ast::{
-    DefAliasType, DefArray, DefConstant, DefEnum, DefEnumConstant, DefStruct, Expr, ExprKind,
-    FloatKind, IntegerKind, Node, SpecCommand, SpecContainer, SpecEvent, SpecGeneralPortInstance,
-    SpecInit, SpecInternalPort, SpecParam, SpecRecord, SpecSpecialPortInstance,
-    SpecStateMachineInstance, SpecTlmChannel, SpecTlmPacket, StructTypeMember, TypeName,
-    TypeNameKind, Visitable, Visitor,
+    DefAliasType, DefArray, DefConstant, DefEnum, DefEnumConstant, DefStruct, EventThrottle, Expr,
+    ExprKind, FloatKind, IntegerKind, Node, SpecCommand, SpecContainer, SpecEvent,
+    SpecGeneralPortInstance, SpecInit, SpecInternalPort, SpecParam, SpecRecord,
+    SpecSpecialPortInstance, SpecStateMachineInstance, SpecTlmChannel, SpecTlmPacket,
+    StructTypeMember, TypeName, TypeNameKind, Visitable, Visitor,
 };
 use fpp_core::{Span, Spanned};
 use rustc_hash::FxHashMap as HashMap;
@@ -36,20 +35,6 @@ impl<'ast> CheckExprTypes<'ast> {
         Self {
             super_: UseAnalyzer::new(),
         }
-    }
-
-    fn convert_type(
-        &self,
-        a: &Analysis,
-        expr: &'ast Expr,
-        to_ty: &Arc<Type>,
-    ) -> TypeConversionResult {
-        let from_ty = match a.type_map.get(&expr.node_id) {
-            None => return Ok(()),
-            Some(ty) => ty,
-        };
-
-        Type::convert(from_ty, to_ty)
     }
 
     /// Check that the type of a node may be converted to a numeric type. A node
@@ -122,28 +107,76 @@ impl<'ast> CheckExprTypes<'ast> {
         }
     }
 
-    fn check_expr_matches_node(&self, a: &Analysis, expr: &'ast Expr, node: &fpp_core::Node) {
-        if let Some(ty) = a.type_map.get(node) {
-            match self.convert_type(a, expr, ty) {
-                Ok(_) => {}
-                Err(err) => SemanticError::TypeConversion {
-                    loc: expr.span(),
-                    msg: format!("default value cannot be converted to {}", ty),
-                    err: Box::new(err),
+    /// Check that the type of a default value may be converted to the type
+    /// of the node that it is the default for
+    fn convert_default(
+        a: &Analysis,
+        default: &Option<Expr>,
+        node: fpp_core::Node,
+    ) -> SemanticResult {
+        match default {
+            Some(default_node) => {
+                match (a.type_map.get(&default_node.node_id), a.type_map.get(&node)) {
+                    (Some(default_type), Some(t)) => {
+                        let loc = default_node.span();
+                        Analysis::convert_types(loc, default_type, t).map(|_| ())
+                    }
+                    // A default with no type failed to type check
+                    _ => Ok(()),
                 }
-                .emit(),
             }
+            None => Ok(()),
         }
     }
 
-    fn check_expr_opt_matches_node(
-        &self,
+    /// Check the interval of an event throttle
+    fn check_throttle_interval(a: &Analysis, every: &Expr) -> SemanticResult {
+        match a.type_map.get(&every.node_id) {
+            Some(t) => {
+                let loc = every.span();
+                let interval_type = Arc::new(Type::AnonStruct(AnonStructType {
+                    members: vec![
+                        (
+                            "seconds".to_string(),
+                            Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
+                        ),
+                        (
+                            "useconds".to_string(),
+                            Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
+                        ),
+                    ],
+                }));
+                Analysis::convert_types(loc, t, &interval_type).map(|_| ())
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// Check an event throttle
+    fn check_throttle(a: &Analysis, throttle: &EventThrottle) -> SemanticResult {
+        Self::convert_node_to_numeric(a, &throttle.count)?;
+        match &throttle.every {
+            Some(every) => Self::check_throttle_interval(a, every),
+            None => Ok(()),
+        }
+    }
+
+    /// Check a telemetry limit expression against the channel type
+    fn check_limit_expr(
         a: &Analysis,
-        expr: &'ast Option<Expr>,
-        node: &fpp_core::Node,
-    ) {
-        if let Some(expr) = &expr {
-            self.check_expr_matches_node(a, expr, node)
+        e: &Expr,
+        channel_type_node: fpp_core::Node,
+    ) -> SemanticResult {
+        Self::convert_node_to_numeric(a, e)?;
+        match (
+            a.type_map.get(&e.node_id),
+            a.type_map.get(&channel_type_node),
+        ) {
+            (Some(limit_type), Some(channel_type)) => {
+                let loc = e.span();
+                Analysis::convert_types(loc, limit_type, channel_type).map(|_| ())
+            }
+            _ => Ok(()),
         }
     }
 }
@@ -163,7 +196,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::DefArray(node))?;
         Self::emit_error(Self::convert_node_to_numeric(a, &node.size));
-        self.check_expr_opt_matches_node(a, &node.default, &node.node_id);
+        Self::emit_error(Self::convert_default(a, &node.default, node.node_id));
 
         ControlFlow::Continue(())
     }
@@ -206,7 +239,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::DefEnum(node))?;
-        self.check_expr_opt_matches_node(a, &node.default, &node.node_id);
+        Self::emit_error(Self::convert_default(a, &node.default, node.node_id));
 
         ControlFlow::Continue(())
     }
@@ -231,7 +264,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast DefStruct,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::DefStruct(node))?;
-        self.check_expr_opt_matches_node(a, &node.default, &node.node_id);
+        Self::emit_error(Self::convert_default(a, &node.default, node.node_id));
 
         ControlFlow::Continue(())
     }
@@ -240,58 +273,21 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         self.super_visit(a, Node::Expr(node))?;
 
         match &node.kind {
-            ExprKind::Array(array) => {
-                let first_node = match array.first() {
-                    None => {
-                        SemanticError::EmptyArray { loc: node.span() }.emit();
-                        return ControlFlow::Break(());
-                    }
-                    Some(first) => first,
-                };
-
-                let first_ty = match a.type_map.get(&first_node.node_id) {
-                    Some(first_ty) => first_ty.clone(),
-                    // Node doesn't have a type
-                    None => return ControlFlow::Continue(()),
-                };
-
-                #[allow(clippy::manual_try_fold)]
-                let common = array.iter().skip(1).fold(Ok(first_ty), |common, next| {
-                    match (common, a.type_map.get(&next.node_id)) {
-                        (Ok(common), Some(next_type)) => {
-                            match Type::common_type(&common, next_type) {
-                                None => Err(SemanticError::InvalidType {
-                                    loc: next.span(),
-                                    msg: format!(
-                                        "cannot find common type between {} and {}",
-                                        next_type.as_ref(),
-                                        common.as_ref()
-                                    ),
-                                    notes: vec![],
-                                }),
-                                Some(new_ty) => Ok(new_ty),
-                            }
-                        }
-                        (Ok(common), None) => {
-                            // Node does not have a type
-                            Ok(common)
-                        }
-                        (Err(err), _) => Err(err),
-                    }
-                });
-
-                match common {
-                    Ok(common) => {
-                        // A common type was found across all the elements
-                        // Assign the full expression to an array of the proper size
-                        a.type_map.insert(
-                            node.node_id,
-                            Arc::new(Type::AnonArray(AnonArrayType {
-                                elt_type: common,
-                                size: Some(array.len()),
-                            })),
-                        );
-                    }
+            ExprKind::Array(elts) => {
+                // An element with no type failed to type check
+                if elts.iter().any(|e| !a.type_map.contains_key(&e.node_id)) {
+                    return ControlFlow::Continue(());
+                }
+                let empty_list_error = SemanticError::EmptyArray { loc: node.span() };
+                let ids: Vec<fpp_core::Node> = elts.iter().map(|e| e.node_id).collect();
+                match a.common_type(&ids, empty_list_error) {
+                    Ok(t) => a.assign_type(
+                        node.node_id,
+                        Arc::new(Type::AnonArray(AnonArrayType {
+                            elt_type: t,
+                            size: Some(elts.len()),
+                        })),
+                    ),
                     Err(err) => {
                         err.emit();
                         return ControlFlow::Break(());
@@ -335,28 +331,17 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                     }
                 }
                 _ => {
-                    let ty = match (
-                        a.type_map.get(&left.node_id),
-                        a.type_map.get(&right.node_id),
-                    ) {
-                        (Some(lty), Some(rty)) => match Type::common_type(lty, rty) {
-                            None => {
-                                SemanticError::InvalidType {
-                                    loc: node.span(),
-                                    msg: format!(
-                                        "invalid binary operation between {} and {}",
-                                        lty, rty
-                                    ),
-                                    notes: vec![],
-                                }
-                                .emit();
-                                return ControlFlow::Break(());
-                            }
-                            Some(ty) => ty,
-                        },
-                        _ => {
-                            // One of the sides of the binary operation does not have a type
-                            return ControlFlow::Continue(());
+                    // An operand with no type failed to type check
+                    if !a.type_map.contains_key(&left.node_id)
+                        || !a.type_map.contains_key(&right.node_id)
+                    {
+                        return ControlFlow::Continue(());
+                    }
+                    let ty = match a.common_type_of_pair(left.node_id, right.node_id, node.span()) {
+                        Ok(ty) => ty,
+                        Err(err) => {
+                            err.emit();
+                            return ControlFlow::Break(());
                         }
                     };
 
@@ -518,38 +503,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         self.super_visit(a, Node::SpecEvent(node))?;
         Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
 
-        // Check that the throttle count/every are valid
-        match &node.throttle {
-            None => {}
-            Some(throttle) => {
-                Self::emit_error(Self::convert_node_to_numeric(a, &throttle.count));
-                if let Some(every) = &throttle.every
-                    && let Err(err) = self.convert_type(
-                        a,
-                        every,
-                        &Arc::new(Type::AnonStruct(AnonStructType {
-                            members: vec![
-                                (
-                                    "seconds".to_string(),
-                                    Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
-                                ),
-                                (
-                                    "useconds".to_string(),
-                                    Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
-                                ),
-                            ],
-                        })),
-                    )
-                {
-                    SemanticError::TypeConversion {
-                        loc: every.span(),
-                        msg: "event throttle every must be convertable to a time interval"
-                            .to_string(),
-                        err: Box::new(err),
-                    }
-                    .emit()
-                }
-            }
+        if let Some(throttle) = &node.throttle {
+            Self::emit_error(Self::check_throttle(a, throttle));
         }
 
         ControlFlow::Continue(())
@@ -582,7 +537,11 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecParam(node))?;
 
-        self.check_expr_opt_matches_node(a, &node.default, &node.type_name.node_id);
+        Self::emit_error(Self::convert_default(
+            a,
+            &node.default,
+            node.type_name.node_id,
+        ));
         Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
         Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.set_opcode));
         Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.save_opcode));
@@ -640,14 +599,12 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecTlmChannel(node))?;
         Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
-        for limit in &node.low {
-            Self::emit_error(Self::convert_node_to_numeric(a, &limit.value));
-            self.check_expr_matches_node(a, &limit.value, &node.type_name.node_id)
-        }
-
-        for limit in &node.high {
-            Self::emit_error(Self::convert_node_to_numeric(a, &limit.value));
-            self.check_expr_matches_node(a, &limit.value, &node.type_name.node_id)
+        for limit in node.low.iter().chain(&node.high) {
+            Self::emit_error(Self::check_limit_expr(
+                a,
+                &limit.value,
+                node.type_name.node_id,
+            ));
         }
 
         ControlFlow::Continue(())
@@ -750,22 +707,23 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
         // Compute the type of the argument
         visit_template_arg(self, a, arg)?;
 
-        let Some(param_ty) = a.type_map.get(&param_def.type_name.node_id).cloned() else {
+        // Make sure the value can be converted into the type in the template
+        let (Some(value_ty), Some(param_ty)) = (
+            a.type_map.get(&value.node_id),
+            a.type_map.get(&param_def.type_name.node_id),
+        ) else {
             return ControlFlow::Continue(());
         };
-        if let Some(value_ty) = a.type_map.get(&value.node_id).cloned()
-            && let Err(err) = Type::convert(&value_ty, &param_ty)
-        {
-            SemanticError::TypeConversion {
-                loc: value.span(),
-                msg: format!("template argument cannot be converted to {}", param_ty),
-                err: Box::new(err),
+        match Analysis::convert_types(value.span(), value_ty, param_ty) {
+            Ok(ty) => {
+                a.assign_type(value.node_id, ty);
+                ControlFlow::Continue(())
             }
-            .emit();
-            return ControlFlow::Break(());
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
         }
-        a.type_map.insert(value.node_id, param_ty);
-        ControlFlow::Continue(())
     }
 
     fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {

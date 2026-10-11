@@ -638,10 +638,10 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for EvalConstantExprs<'ast> {
                 ControlFlow::Continue(())
             }
             None => {
-                SemanticError::InvalidType {
+                SemanticError::TypeMismatch {
                     loc,
                     msg: format!("cannot convert value {} to type {}", v, ty),
-                    notes: vec![],
+                    reason: None,
                 }
                 .emit();
                 // The bound parameter has no usable value, so every use of it
