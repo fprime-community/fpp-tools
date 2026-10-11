@@ -43,9 +43,7 @@ impl<'a> DictionaryUsedSymbols<'a> {
         a: &mut Analysis,
         ci: &ComponentInstance,
     ) -> HashSet<Symbol> {
-        let Some(component) = ci.get_component(a) else {
-            return HashSet::default();
-        };
+        let component = ci.component(a);
         let commands: Vec<_> = component
             .command_map
             .values()

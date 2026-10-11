@@ -85,12 +85,7 @@ impl<'a> DictionaryEntries<'a> {
     {
         let add_entries_for_instance =
             |entry_map: &mut IndexMap<i128, E, FxBuildHasher>, ci: &ComponentInstance| {
-                // A component instance whose component failed to check has no
-                // component
-                let Some(component) = ci.get_component(self.a) else {
-                    return;
-                };
-                for (local_id, s) in get_spec_map(component) {
+                for (local_id, s) in get_spec_map(ci.component(self.a)) {
                     add_entry(entry_map, &construct_entry, ci, *local_id, s);
                 }
             };
