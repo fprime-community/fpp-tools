@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/template/expand_before_invalid_composition.fpp:9:23
+  |
+9 | module template B() { expand Y() }
+  |                       ^^^^^^^^^^ template expansion specifiers cannot appear inside a module template
+  |
+ ::: [ local path prefix ]/template/expand_before_invalid_composition.fpp:9:1
+  |
+9 | module template B() { expand Y() }
+  | ---------------------------------- enclosing template defined here
+

@@ -260,7 +260,7 @@ pub fn resolve_includes<Reader: FileReader>(
 pub fn resolve_templates(a: &mut Analysis, ast: &mut [fpp_ast::TransUnit]) -> ControlFlow<()> {
     EnterSymbols.visit_trans_units(a, ast.iter())?;
     CheckTemplateUses::new().visit_trans_units(a, ast.iter())?;
-    if let Err(err) = ExpandTemplates::transform(a, ast) {
+    if let Err(err) = ExpandTemplates::transform_list(a, ast) {
         err.emit();
         return ControlFlow::Break(());
     }

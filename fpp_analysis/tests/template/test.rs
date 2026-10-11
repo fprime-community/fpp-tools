@@ -106,6 +106,16 @@ fn duplicate_def() {
 }
 
 #[test]
+fn expand_before_invalid_composition() {
+    run_test("template/expand_before_invalid_composition")
+}
+
+#[test]
+fn expand_before_invalid_nested() {
+    run_test("template/expand_before_invalid_nested")
+}
+
+#[test]
 fn expand_not_a_template() {
     run_test("template/expand_not_a_template")
 }
