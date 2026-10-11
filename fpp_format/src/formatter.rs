@@ -161,6 +161,9 @@ impl Formatter {
                     parts.push(sep_doc(p, &f));
                 }
                 parts.push(self.lower(n));
+                if is_eol_separated_element(n) {
+                    parts.push(Doc::text(","));
+                }
                 if let Some(l) = last_token(n) {
                     prev = Some(l);
                 }
@@ -682,6 +685,23 @@ fn is_absolute_name_dot(tok: &SyntaxToken) -> bool {
             QUAL_IDENT | EXPR_IDENT | PORT_INSTANCE_IDENTIFIER | TLM_CHANNEL_IDENTIFIER => true,
             _ => false,
         })
+}
+
+/// Whether `node` is an element of an `implements` list that only an end of
+/// line separates from the next element. The formatter drops that end of
+/// line, so it writes a comma there instead.
+fn is_eol_separated_element(node: &SyntaxNode) -> bool {
+    if node.kind() != QUAL_IDENT || node.parent().is_none_or(|p| p.kind() != IMPLEMENTS_CLAUSE) {
+        return false;
+    }
+    let mut next = node.next_sibling_or_token();
+    while let Some(el) = next {
+        match el.kind() {
+            WHITESPACE | EOL | COMMENT => next = el.next_sibling_or_token(),
+            kind => return kind == QUAL_IDENT,
+        }
+    }
+    false
 }
 
 fn is_hex_literal(tok: &SyntaxToken) -> bool {

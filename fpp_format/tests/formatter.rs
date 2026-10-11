@@ -153,6 +153,7 @@ fmt_test!(blank_lines, "blank-lines");
 fmt_test!(absolute_names, "absolute-names");
 fmt_test!(component_dictionary, "component-dictionary");
 fmt_test!(float_literals, "float-literals");
+fmt_test!(implements_list, "implements-list");
 fmt_test!(
     multiline_string_trailing_space,
     "multiline-string-trailing-space"
