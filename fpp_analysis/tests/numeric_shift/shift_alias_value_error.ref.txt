@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/numeric_shift/shift_alias_value_error.fpp:4:16
+  |
+4 |   constant c = p << 1
+  |                ^ T is not an integer or enum type
+  |
+  = note: expanded at [ local path prefix ]/numeric_shift/shift_alias_value_error.fpp:6:1
+

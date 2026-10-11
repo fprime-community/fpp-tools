@@ -1,15 +1,20 @@
- --> [ local path prefix ]/state_machine/initial_transitions/sm_multiple_transitions.fpp:1:15
+ --> [ local path prefix ]/state_machine/initial_transitions/sm_multiple_transitions.fpp:1:1
   |
-1 | state machine M {
-  |               ^ state machine has 2 initial transitions; only one is allowed
+1 | / state machine M {
+2 | |   initial enter S
+3 | |   initial enter T
+4 | |   state S
+5 | |   state T
+6 | | }
+  | |_^ state machine has 2 initial transitions; only one is allowed
   |
  ::: [ local path prefix ]/state_machine/initial_transitions/sm_multiple_transitions.fpp:2:3
   |
-2 |   initial enter S
-  |   --------------- initial transition defined here
+2 |     initial enter S
+  |     --------------- initial transition defined here
   |
  ::: [ local path prefix ]/state_machine/initial_transitions/sm_multiple_transitions.fpp:3:3
   |
-3 |   initial enter T
-  |   --------------- initial transition defined here
+3 |     initial enter T
+  |     --------------- initial transition defined here
 

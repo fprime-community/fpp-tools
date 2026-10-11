@@ -25,11 +25,23 @@ pub enum ComponentMember {
     SpecInterfaceImport(SpecInterfaceImport),
 }
 
+/// The kind of a command, or the input kind of a special port instance
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum InputPortKind {
     Async,
     Guarded,
     Sync,
+}
+
+/// Writes the kind as it is spelled in a command or port specifier
+impl std::fmt::Display for InputPortKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            InputPortKind::Async => "async",
+            InputPortKind::Guarded => "guarded",
+            InputPortKind::Sync => "sync",
+        })
+    }
 }
 
 /// Queue full behavior
@@ -39,6 +51,18 @@ pub enum QueueFull {
     Block,
     Drop,
     Hook,
+}
+
+/// Writes the queue full behavior
+impl std::fmt::Display for QueueFull {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            QueueFull::Assert => "assert",
+            QueueFull::Block => "block",
+            QueueFull::Drop => "drop",
+            QueueFull::Hook => "hook",
+        })
+    }
 }
 
 /// Queue full behavior specifier
@@ -83,6 +107,22 @@ pub enum EventSeverity {
     WarningLow,
 }
 
+/// Writes the severity level
+impl std::fmt::Display for EventSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            EventSeverity::ActivityHigh => "activity high",
+            EventSeverity::ActivityLow => "activity low",
+            EventSeverity::Command => "command",
+            EventSeverity::Diagnostic => "diagnostic",
+            EventSeverity::Fatal => "fatal",
+            EventSeverity::WarningHigh => "warning high",
+            EventSeverity::WarningLow => "warning low",
+        })
+    }
+}
+
+/// Event throttle clause
 #[ast]
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct EventThrottle {
@@ -134,6 +174,16 @@ pub struct SpecParam {
 pub enum GeneralPortInstanceKind {
     Input(InputPortKind),
     Output,
+}
+
+/// Writes the kind as it is spelled in a port instance specifier
+impl std::fmt::Display for GeneralPortInstanceKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GeneralPortInstanceKind::Input(kind) => write!(f, "{kind} input"),
+            GeneralPortInstanceKind::Output => f.write_str("output"),
+        }
+    }
 }
 
 /// Special port instance kind
@@ -212,12 +262,33 @@ pub enum TlmChannelUpdate {
     OnChange,
 }
 
+/// Writes the update kind
+impl std::fmt::Display for TlmChannelUpdate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            TlmChannelUpdate::Always => "always",
+            TlmChannelUpdate::OnChange => "on change",
+        })
+    }
+}
+
 /// Telemetry limit kind
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum TlmChannelLimitKind {
     Red,
     Orange,
     Yellow,
+}
+
+/// Writes the limit kind
+impl std::fmt::Display for TlmChannelLimitKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            TlmChannelLimitKind::Red => "red",
+            TlmChannelLimitKind::Orange => "orange",
+            TlmChannelLimitKind::Yellow => "yellow",
+        })
+    }
 }
 
 /// Telemetry limit

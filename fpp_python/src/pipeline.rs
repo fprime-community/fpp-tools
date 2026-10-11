@@ -60,7 +60,8 @@ impl pyo3_stub_gen::PyStubType for Paths {
 enum Depth {
     /// Parse + include resolution.
     Syntax,
-    /// ...then `add_state_enums` + `resolve_templates` + `check_semantics`.
+    /// The whole of `CheckSemantics::tu_list`: include resolution, the state
+    /// enums, symbol entering, template expansion and the semantic checks.
     Full,
 }
 
@@ -128,7 +129,7 @@ fn run_pipeline(inputs: Vec<UnitInput>, depth: Depth) -> (ModelData, Vec<OwnedDi
     let emitter = SharedEmitter::default();
     let mut ctx = fpp_core::CompilerContext::new(emitter.clone());
     let (units, analysis, tables, by_qualified_name) = fpp_core::run(&mut ctx, || {
-        // `resolve_includes` needs an `Analysis` only for its `include_context_map`,
+        // Include resolution needs an `Analysis` only for its `include_context_map`,
         // so the same one accumulates across all units.
         let mut analysis = fpp_analysis::Analysis::new();
         // The syntax trees are collected apart from the per-unit bookkeeping because
@@ -138,9 +139,8 @@ fn run_pipeline(inputs: Vec<UnitInput>, depth: Depth) -> (ModelData, Vec<OwnedDi
         for input in inputs {
             let src = fpp_core::SourceFile::new(&input.uri, input.content);
             let mut tu = fpp_parser::parse(src, |p| p.trans_unit(), None);
-            let _ = fpp_analysis::resolve_includes(&mut analysis, fpp_fs::FsReader {}, &mut tu);
-            if depth == Depth::Full {
-                fpp_analysis::add_state_enums(&mut tu);
+            if depth == Depth::Syntax {
+                let _ = fpp_analysis::resolve_includes(&mut analysis, fpp_fs::FsReader {}, &mut tu);
             }
             labels.push((input.uri, input.is_source));
             trans_units.push(tu);
@@ -150,15 +150,18 @@ fn run_pipeline(inputs: Vec<UnitInput>, depth: Depth) -> (ModelData, Vec<OwnedDi
         // which is the whole point of an import: it is analyzed exactly like a
         // source, and only `UnitData::is_source` tells them apart afterwards.
         //
-        // `resolve_templates` is what enters the model's symbols, and it splices a
-        // copy of each expanded template body into the AST, so it has to precede
-        // both `check_semantics` and the walk below. When it breaks, the symbol
-        // table it would have built is incomplete, and checking semantics against
-        // it would bury the real diagnostic under a cascade of unresolved names.
-        if depth == Depth::Full
-            && fpp_analysis::resolve_templates(&mut analysis, &mut trans_units).is_continue()
-        {
-            let _ = fpp_analysis::check_semantics(&mut analysis, trans_units.iter().collect());
+        // `CheckSemantics::tu_list` resolves the includes, enters the model's
+        // symbols and splices a copy of each expanded template body into the AST,
+        // so it has to precede the walk below. It stops before the semantic checks
+        // when symbol entering or template expansion fails, since checking
+        // semantics against an incomplete symbol table would bury the real
+        // diagnostic under a cascade of unresolved names.
+        if depth == Depth::Full {
+            let _ = fpp_analysis::CheckSemantics::tu_list(
+                &mut analysis,
+                fpp_fs::FsReader {},
+                &mut trans_units,
+            );
         }
 
         let mut units: Vec<UnitData> = labels

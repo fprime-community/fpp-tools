@@ -1,5 +1,5 @@
  --> [ local path prefix ]/include-missing-file.fpp:1:9
   |
 1 | include "this-file-should-not-exist.fppi"
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ No such file or directory (os error 2)
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot open file [ local path prefix ]/this-file-should-not-exist.fppi
 

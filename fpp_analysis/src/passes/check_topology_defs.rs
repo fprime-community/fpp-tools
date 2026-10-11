@@ -1,77 +1,167 @@
 use crate::Analysis;
+use crate::analyzers::module_analyzer::visit_expansion;
+use crate::errors::SemanticError;
 use crate::semantics::resolve_topology;
-use crate::semantics::{Connection, ConnectionPattern, Symbol, cmp_span};
+use crate::semantics::{Connection, ConnectionPattern, Symbol};
+use fpp_ast::{
+    DefModule, DefTopology, SpecDirectConnectionGraph, SpecPatternConnectionGraph,
+    SpecTemplateExpand, SpecTlmPacketSet, Visitor, Walkable,
+};
+use fpp_core::Spanned;
+use std::ops::ControlFlow;
+use std::sync::Arc;
 
-/// Check topology definitions: resolve direct connections, build the resolved
-/// instance map across imports, and check connection membership.
+/// Check topology definitions
 pub struct CheckTopologyDefs;
 
 impl CheckTopologyDefs {
-    /// Resolve every topology in dependency order (source order for stability).
-    pub fn resolve_all(&self, a: &mut Analysis) {
-        let mut symbols: Vec<(Symbol, fpp_core::Span)> = a
-            .partial_topology_map
-            .iter()
-            .map(|(s, t)| (s.clone(), t.get_loc()))
-            .collect();
-        symbols.sort_by(|x, y| cmp_span(&x.1, &y.1));
-        for (sym, _) in symbols {
-            self.resolve(a, &sym);
-        }
-    }
-
-    fn resolve(&self, a: &mut Analysis, symbol: &Symbol) {
-        // Topology is already resolved: nothing to do.
-        if a.topology_map.contains_key(symbol) {
-            return;
-        }
-
-        // Resolve imported topologies first. A topology may be imported through
-        // a bound port interface instance template parameter, so follow those to
-        // the topology they name.
-        let deps: Vec<Symbol> = a
-            .partial_topology_map
-            .get(symbol)
-            .map(|t| t.get_imported_topology_symbols(a))
-            .unwrap_or_default();
-        for dep in &deps {
-            self.resolve(a, dep);
-        }
-
-        let Some(mut top) = a.partial_topology_map.get(symbol).cloned() else {
-            return;
+    /// Visit a topology definition: resolve the topologies it imports, then its
+    /// members, then the topology itself, and enter it into the topology map.
+    ///
+    /// The visitor hook calls this for the topologies of the model, and this
+    /// calls itself for each imported topology through the definition its
+    /// symbol holds, which has the same node identities as the one in the model.
+    fn def_topology(&self, a: &mut Analysis, node: &DefTopology) -> ControlFlow<()> {
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
         };
+        if a.topology_map.contains_key(&symbol) {
+            // Topology is already in the map: nothing to do
+            return ControlFlow::Continue(());
+        }
+        // Topology is not in the map: visit it
 
-        // Resolve raw direct connections (now that imports are resolved).
-        let graphs = top.raw_direct_graphs.clone();
-        for graph in &graphs {
-            let name = graph.name.data.clone();
-            for conn in &graph.connections {
-                match Connection::from_node(a, conn) {
-                    Ok(Some(c)) => top.add_local_connection(&name, c),
-                    Ok(None) => {}
-                    Err(err) => err.emit(),
-                }
+        // Resolve connections on topologies imported into this topology
+        {
+            // Resolve topologies imported by top, updating a.
+            let top = a
+                .partial_topology_map
+                .get(&symbol)
+                .expect("CheckTopologyInstances entered every topology");
+            let tops = top.get_imported_topology_symbols(a);
+            for ts in tops {
+                let Symbol::Topology(def) = ts else {
+                    unreachable!("an imported topology has a topology symbol");
+                };
+                self.def_topology(a, &def)?;
             }
         }
 
-        let patterns = top.raw_patterns.clone();
-        for spec in &patterns {
-            match ConnectionPattern::from_spec(a, spec) {
-                Ok(Some(p)) => {
-                    if let Err(err) = top.add_pattern(p) {
-                        err.emit();
-                    }
+        // Visit topology members and compute unresolved top
+        let prev = a.topology.replace(a.partial_topology_map[&symbol].clone());
+        let result = node.walk(a, self);
+        let top = a
+            .topology
+            .take()
+            .expect("the topology under construction is set");
+        a.topology = prev;
+        result?;
+
+        // Use the updated analysis to resolve top
+        let mut top = top;
+        if let Err(err) = resolve_topology::resolve(a, &mut top) {
+            err.emit();
+        }
+        a.topology_map.insert(symbol, top);
+        ControlFlow::Continue(())
+    }
+}
+
+impl<'ast> Visitor<'ast> for CheckTopologyDefs {
+    type Break = ();
+    type State = Analysis;
+
+    /// The members generated by a template expansion are members of the
+    /// enclosing module, so analyze them here.
+    fn visit_spec_template_expand(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecTemplateExpand,
+    ) -> ControlFlow<Self::Break> {
+        visit_expansion(self, a, node)
+    }
+
+    fn visit_def_module(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefModule,
+    ) -> ControlFlow<Self::Break> {
+        node.walk(a, self)
+    }
+
+    fn visit_def_topology(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefTopology,
+    ) -> ControlFlow<Self::Break> {
+        self.def_topology(a, node)
+    }
+
+    fn visit_spec_direct_connection_graph(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecDirectConnectionGraph,
+    ) -> ControlFlow<Self::Break> {
+        for ast in &node.connections {
+            match Connection::from_ast(a, ast) {
+                Ok(Some(c)) => {
+                    let top = a
+                        .topology
+                        .as_mut()
+                        .expect("a topology is under construction");
+                    top.add_local_connection(&node.name.data, c);
                 }
+                // An endpoint names an instance that is unresolved or whose
+                // definition failed to check (already reported)
                 Ok(None) => {}
                 Err(err) => err.emit(),
             }
         }
+        ControlFlow::Continue(())
+    }
 
-        if let Err(err) = resolve_topology::resolve(a, &mut top) {
+    fn visit_spec_pattern_connection_graph(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecPatternConnectionGraph,
+    ) -> ControlFlow<Self::Break> {
+        let pattern = Arc::new(node.clone());
+        let result = ConnectionPattern::from_spec_connection_graph(a, &pattern).and_then(|p| {
+            let Some(p) = p else {
+                // The pattern names an instance that is unresolved or whose
+                // definition failed to check (already reported)
+                return Ok(());
+            };
+            let top = a
+                .topology
+                .as_mut()
+                .expect("a topology is under construction");
+            top.add_pattern(&node.kind, p)
+        });
+        if let Err(err) = result {
             err.emit();
         }
+        ControlFlow::Continue(())
+    }
 
-        a.topology_map.insert(symbol.clone(), top);
+    fn visit_spec_tlm_packet_set(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecTlmPacketSet,
+    ) -> ControlFlow<Self::Break> {
+        let top = a
+            .topology
+            .as_ref()
+            .expect("a topology is under construction");
+        if !top.node().is_deployment {
+            SemanticError::InvalidTlmPacketSet {
+                loc: node.span(),
+                name: node.name.data.clone(),
+                msg: "only a deployment topology may specify a telemetry packet set".to_string(),
+                notes: vec![],
+            }
+            .emit();
+        }
+        ControlFlow::Continue(())
     }
 }

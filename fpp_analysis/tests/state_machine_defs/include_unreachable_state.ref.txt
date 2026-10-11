@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/state_machine_defs/include_unreachable_state.fppi:1:1
+  |
+1 | state U
+  | ^^^^^^^ state U is unreachable
+  |
+  = note: included from [ local path prefix ]/state_machine_defs/include_unreachable_state.fpp:5:11
+

@@ -8,5 +8,5 @@
 4 | / module N {
 5 | |   constant x = 1
 6 | | }
-  | |_- N defined here
+  | |_- symbol is defined here
 

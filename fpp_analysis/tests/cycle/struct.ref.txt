@@ -1,0 +1,20 @@
+ --> [ local path prefix ]/cycle/struct.fpp:1:1
+  |
+1 | struct A { x: B }
+  | ^^^^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycle/struct.fpp:1:15
+  |
+1 | struct A { x: B }
+  |               - use B refers to definition B
+  |
+ ::: [ local path prefix ]/cycle/struct.fpp:2:15
+  |
+2 | struct B { x: C }
+  |               - use C refers to definition C
+  |
+ ::: [ local path prefix ]/cycle/struct.fpp:3:15
+  |
+3 | struct C { x: A }
+  |               - use A refers to definition A
+

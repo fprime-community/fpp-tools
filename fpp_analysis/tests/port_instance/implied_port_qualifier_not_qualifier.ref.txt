@@ -1,0 +1,17 @@
+ --> [ local path prefix ]/port_instance/implied_port_qualifier_not_qualifier.fpp:3:23
+  |
+3 | passive component C { time get port timeGetOut }
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^ invalid use of symbol Fw: not a qualifier
+  |
+ ::: [ local path prefix ]/port_instance/implied_port_qualifier_not_qualifier.fpp:1:1
+  |
+1 | port Fw
+  | ------- symbol is defined here
+  |
+  = note: the symbol Fw.Time has an implied use at the point of the error
+
+ --> [ local path prefix ]/port_instance/implied_port_qualifier_not_qualifier.fpp:3:23
+  |
+3 | passive component C { time get port timeGetOut }
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^ not a port symbol
+

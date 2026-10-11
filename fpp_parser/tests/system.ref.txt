@@ -95,8 +95,15 @@ TransUnit(
                             end: [ local path prefix ]/system.fpp:10:12,
                         },
                     },
-                    topology: Ident {
-                        data: "T",
+                    topology: Unqualified {
+                        name: Ident {
+                            data: "T",
+                            node_id: Span {
+                                start: [ local path prefix ]/system.fpp:10:14,
+                                end: [ local path prefix ]/system.fpp:10:15,
+                            },
+                        },
+                        is_absolute: false,
                         node_id: Span {
                             start: [ local path prefix ]/system.fpp:10:14,
                             end: [ local path prefix ]/system.fpp:10:15,
@@ -116,8 +123,15 @@ TransUnit(
                         },
                     },
                     topology: Qualified {
-                        qualifier: Ident {
-                            data: "M1",
+                        qualifier: Unqualified {
+                            name: Ident {
+                                data: "M1",
+                                node_id: Span {
+                                    start: [ local path prefix ]/system.fpp:11:14,
+                                    end: [ local path prefix ]/system.fpp:11:16,
+                                },
+                            },
+                            is_absolute: false,
                             node_id: Span {
                                 start: [ local path prefix ]/system.fpp:11:14,
                                 end: [ local path prefix ]/system.fpp:11:16,
@@ -150,8 +164,15 @@ TransUnit(
                     },
                     topology: Qualified {
                         qualifier: Qualified {
-                            qualifier: Ident {
-                                data: "M1",
+                            qualifier: Unqualified {
+                                name: Ident {
+                                    data: "M1",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/system.fpp:12:14,
+                                        end: [ local path prefix ]/system.fpp:12:16,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
                                     start: [ local path prefix ]/system.fpp:12:14,
                                     end: [ local path prefix ]/system.fpp:12:16,
@@ -166,7 +187,7 @@ TransUnit(
                             },
                             node_id: Span {
                                 start: [ local path prefix ]/system.fpp:12:14,
-                                end: [ local path prefix ]/system.fpp:12:21,
+                                end: [ local path prefix ]/system.fpp:12:19,
                             },
                         },
                         name: Ident {
@@ -189,8 +210,15 @@ TransUnit(
                 SpecLoc {
                     kind: System,
                     symbol: Qualified {
-                        qualifier: Ident {
-                            data: "a",
+                        qualifier: Unqualified {
+                            name: Ident {
+                                data: "a",
+                                node_id: Span {
+                                    start: [ local path prefix ]/system.fpp:14:17,
+                                    end: [ local path prefix ]/system.fpp:14:18,
+                                },
+                            },
+                            is_absolute: false,
                             node_id: Span {
                                 start: [ local path prefix ]/system.fpp:14:17,
                                 end: [ local path prefix ]/system.fpp:14:18,
@@ -228,8 +256,15 @@ TransUnit(
                 SpecLoc {
                     kind: StateMachine,
                     symbol: Qualified {
-                        qualifier: Ident {
-                            data: "a",
+                        qualifier: Unqualified {
+                            name: Ident {
+                                data: "a",
+                                node_id: Span {
+                                    start: [ local path prefix ]/system.fpp:15:24,
+                                    end: [ local path prefix ]/system.fpp:15:25,
+                                },
+                            },
+                            is_absolute: false,
                             node_id: Span {
                                 start: [ local path prefix ]/system.fpp:15:24,
                                 end: [ local path prefix ]/system.fpp:15:25,

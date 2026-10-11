@@ -1,0 +1,7 @@
+  --> [ local path prefix ]/template/expanded_topology_import_order.fpp:11:7
+   |
+11 |       B.b -> c.pIn
+   |       ^^^ instance B is not a member of topology A
+   |
+   = note: expanded at [ local path prefix ]/template/expanded_topology_import_order.fpp:19:1
+

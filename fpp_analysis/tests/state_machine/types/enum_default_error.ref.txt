@@ -1,12 +1,12 @@
  --> [ local path prefix ]/state_machine/types/enum_default_error.fpp:2:27
   |
 2 |   enum E { X, Y } default "abc"
-  |                           ^^^^^ default value cannot be converted to E
-  |
-  = note: string cannot be converted to E
+  |                           ^^^^^ cannot convert string to enum E
 
- --> [ local path prefix ]/state_machine/types/enum_default_error.fpp:1:15
+ --> [ local path prefix ]/state_machine/types/enum_default_error.fpp:1:1
   |
-1 | state machine SM {
-  |               ^^ state machine must have initial transition
+1 | / state machine SM {
+2 | |   enum E { X, Y } default "abc"
+3 | | }
+  | |_^ state machine must have initial transition
 

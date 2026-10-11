@@ -1,17 +1,22 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::basic_use_analyzer::{BasicUseAnalyzer, UseAnalysisPass, visit_template_arg};
-use crate::errors::{SemanticError, SemanticResult};
-use crate::semantics::{NameGroup, QualifiedName, ScopeOwner, Symbol, SymbolInterface};
+use crate::errors::SemanticError;
+use crate::passes::CheckUsesHelpers;
+use crate::semantics::{
+    ImpliedUse, ImpliedUseKind, NameGroup, NameGroupMap, NameSymbolMap, QualifiedName, ScopeOwner,
+    Symbol, SymbolInterface,
+};
 use fpp_ast::{
-    AstNode, Expr, ExprKind, Ident, Node, QualIdent, SpecTemplateExpand, Visitable, Visitor,
+    AstNode, DefComponent, DefEnum, DefModule, DefStateMachine, Expr, ExprKind, Ident, Node,
+    QualIdent, SpecTemplateExpand, TypeName, TypeNameKind, Visitable, Visitor,
 };
 use fpp_core::Spanned;
-use std::ops::{ControlFlow, Deref};
+use std::ops::ControlFlow;
 
 /// Match uses to their definitions
 pub struct CheckUses<'ast> {
-    super_: BasicUseAnalyzer<'ast, Analysis, Self>,
+    super_: BasicUseAnalyzer<'ast, Self>,
 }
 
 impl<'ast> Default for CheckUses<'ast> {
@@ -20,76 +25,26 @@ impl<'ast> Default for CheckUses<'ast> {
     }
 }
 
-/// Resolve `qualifier` `.` `name` in name group `ng`, recording the use
-fn resolve_qualified(
-    a: &mut Analysis,
-    ng: NameGroup,
-    qualifier: &QualIdent,
-    name: &Ident,
-) -> SemanticResult<Symbol> {
-    let qual_sym = resolve_qual_ident(a, ng, qualifier)?;
-    let scope = {
-        match a.lookup_scope(&qual_sym) {
-            None => {
-                return Err(SemanticError::InvalidSymbol {
-                    symbol_name: qual_sym.name().data.clone(),
-                    msg: "not a qualifier".to_string(),
-                    loc: qualifier.span(),
-                    def_loc: qual_sym.node().span(),
-                });
-            }
-            Some(scope) => scope,
-        }
-    };
+/// The check uses helpers for the analysis.
+///
+/// The scope of a symbol is [`Analysis::lookup_scope`], which includes the
+/// symbols defined by the template expansion being analyzed.
+pub(crate) const HELPERS: CheckUsesHelpers<
+    Analysis,
+    NameGroup,
+    Symbol,
+    NameGroupMap<NameSymbolMap>,
+> = CheckUsesHelpers {
+    get_nested_scope_symbol: Analysis::nested_scope_get,
+    get_symbol_scope: Analysis::lookup_scope,
+    get_use_def_map: |a| &mut a.use_def_map,
+};
 
-    match scope.get(ng, &name.data) {
-        None => Err(SemanticError::UndefinedSymbol {
-            ng: ng.to_string(),
-            name: name.data.clone(),
-            loc: name.span(),
-        }),
-        Some(sym) => {
-            a.use_def_map.insert(name.id(), sym.clone());
-            Ok(sym)
-        }
-    }
-}
-
-/// Resolve a qualified identifier node in name group `ng`, recording the use
-pub(crate) fn resolve_qual_ident(
-    a: &mut Analysis,
-    ng: NameGroup,
-    node: &QualIdent,
-) -> SemanticResult<Symbol> {
-    match &node {
-        QualIdent::Unqualified(name) => match a.symbol_get(ng, &name.data) {
-            None => Err(SemanticError::UndefinedSymbol {
-                ng: ng.to_string(),
-                name: name.data.clone(),
-                loc: name.span(),
-            }),
-            Some(sym) => {
-                a.use_def_map.insert(name.id(), sym.clone());
-                a.use_def_map.insert(node.id(), sym.clone());
-                Ok(sym)
-            }
-        },
-        QualIdent::Qualified(qualified) => {
-            resolve_qualified(a, ng, qualified.qualifier.deref(), &qualified.name)
-        }
-    }
-}
-
-/// Resolve a qualified identifier node in name group `ng`, recording the use and
+/// Visit a qualified identifier node in name group `ng` and check the use,
 /// emitting any error
 pub(crate) fn check_qual_ident(a: &mut Analysis, ng: NameGroup, node: &QualIdent) {
-    match resolve_qual_ident(a, ng, node) {
-        Ok(sym) => {
-            a.use_def_map.insert(node.id(), sym);
-        }
-        Err(err) => {
-            err.emit();
-        }
+    if let Err(err) = HELPERS.visit_qual_ident_node(ng, a, node) {
+        err.emit();
     }
 }
 
@@ -100,62 +55,81 @@ impl<'ast> CheckUses<'ast> {
         }
     }
 
-    fn visit_qual_ident_impl(
+    fn visit_expr_ident(&self, a: &mut Analysis, node: &Expr, name: &str, is_absolute: bool) {
+        let mapping = |name: &str| a.nested_scope_get(is_absolute, NameGroup::Value, name);
+        match HELPERS.get_symbol_for_name(NameGroup::Value, mapping, node.id(), name) {
+            Ok(symbol) => {
+                a.use_def_map.insert(node.id(), symbol);
+            }
+            Err(err) => err.emit(),
+        }
+    }
+
+    fn visit_expr_dot(
         &self,
         a: &mut Analysis,
-        ng: NameGroup,
-        node: &QualIdent,
-    ) -> SemanticResult<Symbol> {
-        resolve_qual_ident(a, ng, node)
+        node: &Expr,
+        e: &Expr,
+        id: &Ident,
+    ) -> ControlFlow<()> {
+        // Visit the left side of the dot recursively
+        e.visit(a, self)?;
+
+        // Find the symbol referred to by the left side (if-any)
+        let symbol = match a.use_def_map.get(&e.id()) {
+            // Left side is a constant, we are selecting a member of this constant
+            // we are not creating another use.
+            Some(Symbol::Constant(_) | Symbol::TemplateConstantArg { .. }) => Ok(None),
+
+            // The left side is some symbol other than a constant (a qualifier),
+            // look up this symbol and add it to the use-def entries
+            Some(qual) => match a.lookup_scope(qual) {
+                Some(scope) => {
+                    let mapping = |name: &str| scope.get(NameGroup::Value, name);
+                    HELPERS
+                        .get_symbol_for_name(NameGroup::Value, mapping, id.id(), &id.data)
+                        .map(Some)
+                }
+                // The left side is a value with no scope (an enumerated
+                // constant), so the dot selects a member of the value
+                None => Ok(None),
+            },
+
+            // Left-hand side is not a symbol
+            // There is no resolution on the dot expression
+            None => Ok(None),
+        };
+
+        match symbol {
+            Ok(Some(symbol)) => {
+                a.use_def_map.insert(node.id(), symbol);
+            }
+            Ok(None) => {}
+            Err(err) => {
+                err.emit();
+                // A use that does not resolve has no definition. The nodes of
+                // an implied use share one id, so the entry the left side
+                // recorded would otherwise stand for the whole use.
+                a.use_def_map.remove(&node.id());
+            }
+        }
+        ControlFlow::Continue(())
     }
 
-    fn visit_qual_ident(&self, a: &mut Analysis, ng: NameGroup, node: &QualIdent) {
-        check_qual_ident(a, ng, node)
-    }
-
-    // Check that an implied use (a) is not a member of a def and (b) does not
-    // shadow the required def. Same check as in `implied_port_use`.
-    fn implied_use_shadow_check(
+    /// Visit a definition with members in the scope that it opens
+    fn visit_in_scope<N: AstNode>(
         &self,
-        a: &Analysis,
-        loc: fpp_core::Span,
-        iu_name: &QualifiedName,
-        sym: &Symbol,
-    ) {
-        // A bound template parameter is not a global definition, so it cannot
-        // satisfy an implied use
-        if sym.is_template_arg() {
-            SemanticError::InvalidSymbol {
-                symbol_name: sym.name().data.clone(),
-                msg: format!(
-                    "invalid use of symbol {}: a template parameter may not satisfy the implied use of {}",
-                    sym.name().data, iu_name
-                ),
-                loc,
-                def_loc: sym.node().span(),
-            }
-            .emit();
-            return;
-        }
-        let sym_qualified_name = a.get_qualified_name(sym);
-        let iu_name = iu_name.to_string();
-        // Check that the name of the def matches the name of the use
-        if sym_qualified_name != iu_name {
-            let msg = if sym_qualified_name.len() < iu_name.len() {
-                // Definition has a shorter name: the use is a member of the definition
-                format!("it has {} as a member", iu_name)
-            } else {
-                // Definition has a longer name: it shadows the required definition
-                format!("it shadows {} here", iu_name)
-            };
-            SemanticError::InvalidSymbol {
-                symbol_name: sym_qualified_name.clone(),
-                msg: format!("invalid use of symbol {}: {}", sym_qualified_name, msg),
-                loc,
-                def_loc: sym.node().span(),
-            }
-            .emit();
-        }
+        a: &mut Analysis,
+        def: &N,
+        node: Node<'ast>,
+    ) -> ControlFlow<()> {
+        let symbol = a
+            .get_symbol(def)
+            .expect("definition should be entered by EnterSymbols");
+        a.nested_scope.push(ScopeOwner::Symbol(symbol));
+        let res = self.super_visit(a, node);
+        a.nested_scope.pop();
+        res
     }
 }
 
@@ -163,25 +137,60 @@ impl<'ast> Visitor<'ast> for CheckUses<'ast> {
     type Break = ();
     type State = Analysis;
 
-    // Walk all nodes deeply and collect up scope where relevant
     fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
         self.super_.visit(self, a, node)
     }
 
+    fn visit_def_component(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefComponent,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_in_scope(a, node, Node::DefComponent(node))
+    }
+
+    /// Resolve the representation type in the enclosing scope, and the
+    /// constants and the default value in the scope of the enum
+    fn visit_def_enum(&self, a: &mut Analysis, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
+        node.type_name.visit(a, self)?;
+        let symbol = a.get_symbol(node);
+        if let Some(symbol) = &symbol {
+            a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
+        }
+        let res = match node.constants.visit(a, self) {
+            ControlFlow::Continue(()) => node.default.visit(a, self),
+            res => res,
+        };
+        if symbol.is_some() {
+            a.nested_scope.pop();
+        }
+        res
+    }
+
+    fn visit_def_module(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefModule,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_in_scope(a, node, Node::DefModule(node))
+    }
+
     /// Resolve the names inside an expanded template.
     ///
-    /// A name in the body of a template resolves at the point of the template
-    /// definition, not at the point of expansion. So the scope stack used here is
-    /// built from scratch: the stack at the point of the definition, with the
-    /// bound parameters and the definitions of the expansion pushed on top.
+    /// We do use-analysis on the scope of the definition + param scope. A name
+    /// in the body of a template resolves at the point of the template
+    /// definition, not at the point of expansion, so the nested scope used here
+    /// is built from scratch: the nested scope at the point of the definition,
+    /// with the bound parameters and the definitions of the expansion pushed on
+    /// top.
     fn visit_spec_template_expand(
         &self,
         a: &mut Analysis,
         node: &'ast SpecTemplateExpand,
     ) -> ControlFlow<Self::Break> {
         let Some(members) = &node.members else {
-            // This specifier was not expanded: CheckTemplateUses has already
-            // reported why
+            // The template of an expansion that is not expanded did not
+            // resolve, and CheckTemplateUses reported that
             return ControlFlow::Continue(());
         };
         if !a.template_expansion_map.contains_key(&node.node_id) {
@@ -195,210 +204,41 @@ impl<'ast> Visitor<'ast> for CheckUses<'ast> {
         nested_scope.push(ScopeOwner::TemplateParams(node.node_id));
         nested_scope.push(ScopeOwner::TemplateExpansion(node.node_id));
 
+        // Analyze the inside of the template expansion
         let saved_scope = std::mem::replace(&mut a.nested_scope, nested_scope);
         let saved_expansion = a.template_expansion.replace(node.node_id);
         let res = members.visit(a, self);
+
+        // Reset the use analysis scope back to the outer scope
         a.nested_scope = saved_scope;
         a.template_expansion = saved_expansion;
         res?;
 
-        // Analyze the argument list, which is written at the expansion site and
-        // so resolves in the enclosing scope
+        // Analyze the parameter list
         let params = a.expansion_at(node.node_id).params.clone();
         for param in &params {
             self.template_param(a, param)?;
         }
         ControlFlow::Continue(())
     }
+
+    fn visit_def_state_machine(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefStateMachine,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_in_scope(a, node, Node::DefStateMachine(node))
+    }
 }
 
-impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
+impl<'ast> UseAnalysisPass<'ast> for CheckUses<'ast> {
     fn component_use(
         &self,
         a: &mut Analysis,
         node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let _ = name;
-        self.visit_qual_ident(a, NameGroup::Component, node);
-        ControlFlow::Continue(())
-    }
-
-    fn interface_instance_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let _ = name;
-        self.visit_qual_ident(a, NameGroup::PortInterfaceInstance, node);
-        ControlFlow::Continue(())
-    }
-
-    fn constant_use(
-        &self,
-        a: &mut Analysis,
-        node: &'ast Expr,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        match &node.kind {
-            ExprKind::Dot { e, id } => {
-                // Visit the left side of the dot recursively
-                e.visit(a, self)?;
-
-                // Find the symbol referred to by the left side (if-any)
-                let symbol = match a.use_def_map.get(&e.id()) {
-                    // Left-hand side is not a symbol
-                    // There is no resolution on the dot expression
-                    None => None,
-                    // Left side is a constant, we are selecting a member of this constant
-                    // we are not creating another use.
-                    Some(Symbol::Constant(_) | Symbol::TemplateConstantArg { .. }) => None,
-
-                    // The left side is some symbol other than a constant (a qualifier),
-                    // look up this symbol and add it to the use-def entries
-                    Some(qual) => {
-                        let scope = a.lookup_scope(qual).expect("qualifier has a scope");
-                        match scope.get(NameGroup::Value, &id.data) {
-                            None => {
-                                SemanticError::UndefinedSymbol {
-                                    ng: NameGroup::Value.to_string(),
-                                    name: id.data.clone(),
-                                    loc: id.span(),
-                                }
-                                .emit();
-                                None
-                            }
-                            Some(sym) => Some(sym),
-                        }
-                    }
-                };
-
-                match symbol {
-                    None => {}
-                    Some(symbol) => {
-                        a.use_def_map.insert(node.id(), symbol);
-                    }
-                }
-            }
-            ExprKind::Ident(id) => match a.symbol_get(NameGroup::Value, id) {
-                None => {
-                    SemanticError::UndefinedSymbol {
-                        ng: NameGroup::Value.to_string(),
-                        name: id.clone(),
-                        loc: node.span(),
-                    }
-                    .emit();
-                }
-                Some(symbol) => {
-                    a.use_def_map.insert(node.id(), symbol);
-                }
-            },
-            _ => panic!("constant use should be qualified identifier"),
-        }
-
-        ControlFlow::Continue(())
-    }
-
-    fn port_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let _ = name;
-        self.visit_qual_ident(a, NameGroup::Port, node);
-        ControlFlow::Continue(())
-    }
-
-    // Check that an implied use (a) is not a member
-    // of a def and (b) does not shadow the required def
-    fn implied_port_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let sym = match self.visit_qual_ident_impl(a, NameGroup::Port, node) {
-            Ok(sym) => sym,
-            Err(err) => {
-                err.emit();
-                return ControlFlow::Continue(());
-            }
-        };
-        a.use_def_map.insert(node.id(), sym.clone());
-        self.implied_use_shadow_check(a, node.span(), &name, &sym);
-        ControlFlow::Continue(())
-    }
-
-    // An implied use of a type (e.g. `FwSizeStoreType` for a string type).
-    // Resolve it and check it does not shadow / is not a member of another def.
-    fn implied_type_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let sym = match self.visit_qual_ident_impl(a, NameGroup::Type, node) {
-            Ok(sym) => sym,
-            Err(err) => {
-                err.emit();
-                return ControlFlow::Continue(());
-            }
-        };
-        a.use_def_map.insert(node.id(), sym.clone());
-        self.implied_use_shadow_check(a, node.span(), &name, &sym);
-        ControlFlow::Continue(())
-    }
-
-    // An implied use of a constant (e.g. `FW_FIXED_LENGTH_STRING_SIZE` for a
-    // default-size string type). Implied constant uses are always unqualified.
-    fn implied_constant_use(
-        &self,
-        a: &mut Analysis,
-        node: &Expr,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let ident = match &node.kind {
-            ExprKind::Ident(id) => id,
-            _ => return ControlFlow::Continue(()),
-        };
-        let sym = match a.symbol_get(NameGroup::Value, ident) {
-            None => {
-                SemanticError::UndefinedSymbol {
-                    ng: NameGroup::Value.to_string(),
-                    name: ident.clone(),
-                    loc: node.span(),
-                }
-                .emit();
-                return ControlFlow::Continue(());
-            }
-            Some(sym) => sym,
-        };
-        a.use_def_map.insert(node.id(), sym.clone());
-        self.implied_use_shadow_check(a, node.span(), &name, &sym);
-        ControlFlow::Continue(())
-    }
-
-    fn interface_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let _ = name;
-        self.visit_qual_ident(a, NameGroup::PortInterface, node);
-        ControlFlow::Continue(())
-    }
-
-    fn type_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let _ = name;
-        self.visit_qual_ident(a, NameGroup::Type, node);
+        check_qual_ident(a, NameGroup::Component, node);
         ControlFlow::Continue(())
     }
 
@@ -406,10 +246,94 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
         &self,
         a: &mut Analysis,
         node: &QualIdent,
-        name: QualifiedName,
+        _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        let _ = name;
-        self.visit_qual_ident(a, NameGroup::StateMachine, node);
+        check_qual_ident(a, NameGroup::StateMachine, node);
+        ControlFlow::Continue(())
+    }
+
+    fn constant_use(
+        &self,
+        a: &mut Analysis,
+        node: &Expr,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        match &node.kind {
+            ExprKind::Ident { value, is_absolute } => {
+                self.visit_expr_ident(a, node, value, *is_absolute);
+                ControlFlow::Continue(())
+            }
+            ExprKind::Dot { e, id } => self.visit_expr_dot(a, node, e, id),
+            _ => panic!("constant use should be qualified identifier"),
+        }
+    }
+
+    // Check that we found the required implied use, and not some other symbol
+    fn implied_use(
+        &self,
+        a: &mut Analysis,
+        iu: &ImpliedUse,
+        _: ImpliedUseKind,
+    ) -> ControlFlow<Self::Break> {
+        // A use that does not resolve has been reported already
+        let Some(sym) = a.use_def_map.get(&iu.id()).cloned() else {
+            return ControlFlow::Continue(());
+        };
+        let iu_name = iu.name().to_string();
+        if sym.is_template_arg() {
+            // Definition is a template argument
+            // This should not happen, because implied uses are absolute
+            // qualified identifiers
+            panic!("definition should not be a template arg");
+        }
+        let sym_qualified_name = a.get_qualified_name(&sym);
+        // Check that the name of the def matches the name of the use
+        if sym_qualified_name != iu_name {
+            if sym_qualified_name.len() > iu_name.len() {
+                // Definition has a longer name: it shadows the required definition
+                // This should not happen, because implied uses are absolute
+                // qualified identifiers
+                panic!("definition should not have a longer name");
+            }
+            // Definition has a shorter name: the use is a member of the definition
+            SemanticError::InvalidSymbol {
+                name: sym_qualified_name,
+                loc: iu.id().span(),
+                msg: format!("it has {} as a member", iu_name),
+                def_loc: sym.get_loc(),
+            }
+            .emit();
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn port_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        check_qual_ident(a, NameGroup::Port, node);
+        ControlFlow::Continue(())
+    }
+
+    fn interface_instance_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        check_qual_ident(a, NameGroup::PortInterfaceInstance, node);
+        ControlFlow::Continue(())
+    }
+
+    fn interface_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        check_qual_ident(a, NameGroup::PortInterface, node);
         ControlFlow::Continue(())
     }
 
@@ -417,10 +341,27 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
         &self,
         a: &mut Analysis,
         node: &QualIdent,
-        name: QualifiedName,
+        _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        let _ = name;
-        self.visit_qual_ident(a, NameGroup::Template, node);
+        check_qual_ident(a, NameGroup::Template, node);
+        ControlFlow::Continue(())
+    }
+
+    fn type_use(
+        &self,
+        a: &mut Analysis,
+        node: &TypeName,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        match &node.kind {
+            TypeNameKind::QualIdent(qual_ident) => {
+                check_qual_ident(a, NameGroup::Type, qual_ident);
+                if let Some(symbol) = a.use_def_map.get(&qual_ident.id()).cloned() {
+                    a.use_def_map.insert(node.node_id, symbol);
+                }
+            }
+            _ => panic!("type use should be qualified identifier"),
+        }
         ControlFlow::Continue(())
     }
 

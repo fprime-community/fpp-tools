@@ -1,0 +1,18 @@
+ --> [ local path prefix ]/event/bad_throttle_count_and_interval.fpp:4:52
+  |
+4 |   event E severity activity low format "" throttle "abc" every false
+  |                                                    ^^^^^ cannot convert string to a numeric type
+
+ --> [ local path prefix ]/event/bad_throttle_count_and_interval.fpp:4:64
+  |
+4 |   event E severity activity low format "" throttle "abc" every false
+  |                                                                ^^^^^ cannot convert bool to { seconds: U32, useconds: U32 }
+  |
+  = note: struct member `seconds` type cannot be converted
+  = note: bool cannot be converted to U32
+
+ --> [ local path prefix ]/event/bad_throttle_count_and_interval.fpp:4:3
+  |
+4 |   event E severity activity low format "" throttle "abc" every false
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ event throttle count must be greater than zero
+

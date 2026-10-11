@@ -9,7 +9,7 @@ macro_rules! node_kinds {
         /// recursively on any node in the AST.
         ///
         /// This allows for composing together "analyzers" which look at various
-        /// parts of the AST and build.
+        /// parts of the AST and build up analysis state.
         #[derive(Debug, Clone, Copy, DirectRefWalkable)]
         pub enum Node<'a> {
             $( $ty(&'a $ty), )+
@@ -114,7 +114,8 @@ node_kinds! {
 }
 
 impl<'a> Node<'a> {
-    /// The unqualified name this node introduces, if any.
+    /// The identifier this node carries, if any: the name of a definition or
+    /// specifier, or the identifier itself for an identifier or name.
     pub fn name(&self) -> Option<&'a str> {
         match self {
             Node::DefAbsType(n) => Some(&n.name.data),

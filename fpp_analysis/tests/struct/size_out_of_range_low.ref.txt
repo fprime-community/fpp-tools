@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/struct/size_out_of_range_low.fpp:1:16
+  |
+1 | struct S { a: [-2147483649] U32 }
+  |                ^^^^^^^^^^^ invalid integer value -2147483649
+  |
+  = note: value out of range
+

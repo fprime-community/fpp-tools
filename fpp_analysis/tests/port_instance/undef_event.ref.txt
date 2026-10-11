@@ -2,6 +2,8 @@
   |
 3 |   event port eventOut
   |   ^^^^^^^^^^^^^^^^^^^ cannot find port `Fw` in scope
+  |
+  = note: the symbol Fw.Log has an implied use at the point of the error
 
  --> [ local path prefix ]/port_instance/undef_event.fpp:3:3
   |

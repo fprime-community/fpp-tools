@@ -6,27 +6,29 @@ use crate::Analysis;
 
 /// The interface for an FPP symbol
 pub trait SymbolInterface: Clone {
-    /// Gets the AST node ID of the symbol
-    fn node(&self) -> Node;
-    /// Gets the unqualified name of the symbol
-    fn name(&self) -> &fpp_ast::Name;
     /// Gets the location of the symbol
     fn get_loc(&self) -> Span {
         self.node().span()
     }
-    /// Gets the location to report when this symbol conflicts with one that is
-    /// already in scope
-    fn redefined_loc(&self) -> Span {
-        self.name().span()
-    }
+    /// Gets the AST node ID of the symbol
+    fn node(&self) -> Node;
+    /// Gets the unqualified name of the symbol
+    fn name(&self) -> &fpp_ast::Name;
 }
 
+/// The definition of a module symbol: the id and the name of a module
+/// definition.
+///
+/// A module may be defined in several parts, which share one symbol, and the
+/// symbol stands for the module rather than for one part, so it does not hold
+/// the members of a definition.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DefModuleStub {
     pub node_id: Node,
     pub name: fpp_ast::Name,
 }
 
+/// The stub of a module definition
 impl From<&fpp_ast::DefModule> for DefModuleStub {
     fn from(value: &fpp_ast::DefModule) -> Self {
         Self {
@@ -74,17 +76,18 @@ pub enum Symbol {
 }
 
 impl Symbol {
-    /// The unqualified (leaf) name of this symbol.
+    /// Gets the unqualified name of the symbol
     pub fn unqualified_name(&self) -> &str {
         &self.name().data
     }
 
-    /// The fully-qualified name of this symbol.
+    /// The qualified name of the symbol in an analysis.
+    /// See [`Analysis::get_qualified_name`].
     pub fn qualified_name(&self, a: &Analysis) -> String {
         a.get_qualified_name(self)
     }
 
-    /// The parent (enclosing) symbol, if any.
+    /// The parent (enclosing) symbol of the symbol in an analysis, if any
     pub fn parent<'a>(&self, a: &'a Analysis) -> Option<&'a Symbol> {
         a.parent_symbol_map.get(self)
     }
@@ -101,8 +104,9 @@ impl Symbol {
         }
     }
 
-    /// Whether this symbol is a bound template parameter. A bound template
-    /// parameter is not a global definition, so it has no qualified name.
+    /// Whether this is a template argument symbol: a template parameter bound
+    /// to a template argument. It is not a global definition, so it has no
+    /// qualified name.
     pub fn is_template_arg(&self) -> bool {
         matches!(
             self,
@@ -112,7 +116,7 @@ impl Symbol {
         )
     }
 
-    /// Whether this symbol may be a port interface instance
+    /// Whether this is a port interface instance symbol
     pub fn is_interface_instance(&self) -> bool {
         matches!(
             self,
@@ -172,18 +176,6 @@ impl SymbolInterface for Symbol {
             Symbol::TemplateConstantArg { param_def, .. } => &param_def.name,
             Symbol::TemplateTypeArg { param_def, .. } => &param_def.name,
             Symbol::TemplateInterfaceArg { param_def, .. } => &param_def.name,
-        }
-    }
-
-    fn redefined_loc(&self) -> Span {
-        if self.is_template_arg() {
-            // The name of a bound parameter is in the template definition, which
-            // may be expanded many times. It is this expansion's arguments that
-            // put two parameters of the same name in scope together, so report
-            // the conflict there.
-            self.get_loc()
-        } else {
-            self.name().span()
         }
     }
 }

@@ -154,7 +154,8 @@ def test_parse_leaves_the_specifier_unexpanded():
     # Nothing resolved the template name, so there is no body to splice in — but
     # the specifier itself is fully parsed.
     assert spec.members is None
-    assert spec.template.data == "Scaled"
+    assert spec.template.name.data == "Scaled"
+    assert not spec.template.is_absolute
     assert [type(a.kind).__name__ for a in spec.args] == [
         "TemplateArgConstant",
         "TemplateArgType",

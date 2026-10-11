@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/uncommitted-member.fpp:2:3
+  |
+2 |   initial enter 3
+  |   ^^^^^^^ syntax error: unexpected token
+  |
+  = note: expected }
+  = note: got initial
+

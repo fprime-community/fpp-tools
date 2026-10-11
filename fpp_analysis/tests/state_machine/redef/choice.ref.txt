@@ -1,15 +1,20 @@
- --> [ local path prefix ]/state_machine/redef/choice.fpp:5:10
+ --> [ local path prefix ]/state_machine/redef/choice.fpp:5:3
   |
 5 |   choice C { if g enter S else enter S }
-  |          ^ redefinition of symbol C
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ redefinition of symbol C
   |
  ::: [ local path prefix ]/state_machine/redef/choice.fpp:4:3
   |
 4 |   choice C { if g enter S else enter S }
   |   -------------------------------------- previous definition is here
 
- --> [ local path prefix ]/state_machine/redef/choice.fpp:1:15
+ --> [ local path prefix ]/state_machine/redef/choice.fpp:1:1
   |
-1 | state machine M {
-  |               ^ state machine must have initial transition
+1 | / state machine M {
+2 | |   guard g
+3 | |   state S
+4 | |   choice C { if g enter S else enter S }
+5 | |   choice C { if g enter S else enter S }
+6 | | }
+  | |_^ state machine must have initial transition
 

@@ -519,6 +519,39 @@ module M {
     );
 }
 
+/// An expansion names its template the way any qualified identifier names a
+/// definition: a relative name resolves in the innermost enclosing scope that has
+/// it, and an absolute name (`.T`) in the global scope only.
+#[test]
+fn an_absolute_template_name_skips_the_enclosing_scopes() {
+    let dir = TempDir::new("absolute");
+    let model = "\
+module template T {
+  passive component Global { }
+}
+module M {
+  module template T {
+    passive component Nested { }
+  }
+  module N {
+    expand .T
+  }
+  module O {
+    expand T
+  }
+}
+";
+    let out = query(
+        &dir,
+        "expand = [\"templates\"]\n\n[[group]]\nnode = \"DefComponent\"\ngenerate = [\"ComponentAc.hpp\"]\n",
+        model,
+    );
+    assert_eq!(
+        names(&out, dir.path()),
+        ["GlobalComponentAc.hpp", "NestedComponentAc.hpp"]
+    );
+}
+
 /// A state machine an expansion contributes gets its implicit `State` like a
 /// hand-written one, so the two expansions cannot be run in either order: whichever
 /// runs first must leave its output where the other still reaches it.

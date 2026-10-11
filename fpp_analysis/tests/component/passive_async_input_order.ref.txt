@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/component/passive_async_input_order.fpp:5:3
+  |
+5 |   async input port b: P
+  |   ^^^^^^^^^^^^^^^^^^^^^ passive component may not have async input
+

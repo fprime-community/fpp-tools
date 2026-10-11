@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::basic_use_analyzer::UseAnalysisPass;
+use crate::analyzers::basic_use_analyzer::{UseAnalysisPass, visit_template_arg};
 use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::semantics::{QualifiedName, Symbol, Type};
 use fpp_ast::*;
@@ -33,7 +33,120 @@ impl<'ast> UsedSymbols<'ast> {
             super_: UseAnalyzer::new(),
         }
     }
+}
 
+impl<'ast> Visitor<'ast> for UsedSymbols<'ast> {
+    type Break = ();
+    type State = Analysis;
+
+    fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
+        self.super_.visit(self, a, node)
+    }
+
+    // When resolving uses, if the default value of an enum definition is an enum
+    // constant, then don't visit it. In this case the symbol is ignored (for
+    // shallow resolution) or converted to a use of this enum (for deep resolution).
+    // So it adds nothing to the resolution.
+    fn visit_def_enum(&self, a: &mut Analysis, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
+        node.type_name.visit(a, self)?;
+        node.constants.visit(a, self)?;
+        match &node.default {
+            Some(default) => match a.use_def_map.get(&default.node_id) {
+                Some(Symbol::EnumConstant(_)) => ControlFlow::Continue(()),
+                _ => default.visit(a, self),
+            },
+            None => ControlFlow::Continue(()),
+        }
+    }
+}
+
+impl<'ast> UseAnalysisPass<'ast> for UsedSymbols<'ast> {
+    fn component_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
+    fn state_machine_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
+    fn template_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
+    fn interface_instance_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
+    fn constant_use(
+        &self,
+        a: &mut Analysis,
+        node: &Expr,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
+    fn interface_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
+    fn type_use(
+        &self,
+        a: &mut Analysis,
+        node: &TypeName,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.node_id)
+    }
+
+    fn port_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+
+    fn template_interface_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+}
+
+impl<'ast> UsedSymbols<'ast> {
     // We could convert enum constant symbols to enum symbols here.
     // This would convert E.A to a use of E in shallow resolution.
     // Currently we don't do this, because we convert E.A to a numeric
@@ -50,6 +163,8 @@ impl<'ast> UsedSymbols<'ast> {
     /// Replaces uses of enum constants with uses of the corresponding enums
     pub fn resolve_uses(&self, a: &mut Analysis, ss: &HashSet<Symbol>) -> HashSet<Symbol> {
         let mut out = HashSet::default();
+        // The symbols whose uses are resolved, so that the uses of each symbol
+        // are followed once
         let mut visited = HashSet::default();
         for s in ss {
             self.resolve_node(a, s, &mut visited, &mut out);
@@ -57,6 +172,7 @@ impl<'ast> UsedSymbols<'ast> {
         out
     }
 
+    // Helper function for recursive resolution
     fn resolve_node(
         &self,
         a: &mut Analysis,
@@ -102,13 +218,15 @@ impl<'ast> UsedSymbols<'ast> {
             Symbol::EnumType(node) => node.visit(a, self),
             Symbol::EnumConstant(node) => node.visit(a, self),
             Symbol::Interface(node) => node.visit(a, self),
+            // A module symbol holds no members, and no use in a model that
+            // passes the analysis refers to a module
             Symbol::Module(_) => ControlFlow::Continue(()),
             Symbol::Port(node) => node.visit(a, self),
             Symbol::StateMachine(node) => node.visit(a, self),
             Symbol::StructType(node) => node.visit(a, self),
             Symbol::System(node) => node.visit(a, self),
-            Symbol::Template(node) => node.visit(a, self),
             Symbol::Topology(node) => node.visit(a, self),
+            Symbol::Template(node) => node.visit(a, self),
             // A bound template parameter is not a definition of its own: the
             // symbols it uses are the ones in the argument bound to it
             Symbol::TemplateConstantArg { value, .. } => value.visit(a, self),
@@ -117,122 +235,5 @@ impl<'ast> UsedSymbols<'ast> {
                 self.interface_instance_use(a, &value, value.as_ref().into())
             }
         }
-    }
-}
-
-impl<'ast> Visitor<'ast> for UsedSymbols<'ast> {
-    type Break = ();
-    type State = Analysis;
-
-    fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
-        self.super_.visit(self, a, node)
-    }
-
-    // When resolving uses, if the default value of an enum definition is an enum
-    // constant, then don't visit it. In this case the symbol is ignored (for
-    // shallow resolution) or converted to a use of this enum (for deep resolution).
-    // So it adds nothing to the resolution.
-    fn visit_def_enum(&self, a: &mut Analysis, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        node.type_name.visit(a, self)?;
-        node.constants.visit(a, self)?;
-        match &node.default {
-            Some(default) => match a.use_def_map.get(&default.node_id) {
-                Some(Symbol::EnumConstant(_)) => ControlFlow::Continue(()),
-                _ => default.visit(a, self),
-            },
-            None => ControlFlow::Continue(()),
-        }
-    }
-}
-
-impl<'ast> UseAnalysisPass<'ast, Analysis> for UsedSymbols<'ast> {
-    fn component_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn state_machine_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn interface_instance_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn constant_use(
-        &self,
-        a: &mut Analysis,
-        node: &'ast Expr,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn interface_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn template_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn type_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn port_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn implied_type_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn implied_constant_use(
-        &self,
-        a: &mut Analysis,
-        node: &Expr,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
     }
 }

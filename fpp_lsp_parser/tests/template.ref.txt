@@ -1,4 +1,4 @@
-ROOT@0..1359
+ROOT@0..457
   DEF_MODULE_TEMPLATE@0..353
     MODULE_KW@0..6 "module"
     WHITESPACE@6..7 " "
@@ -101,302 +101,38 @@ ROOT@0..1359
       EOL@351..352 "\n"
       RIGHT_CURLY@352..353 "}"
   EOL@353..355 "\n\n"
-  PRE_ANNOTATION@355..390 "@ A template with no  ..."
-  EOL@390..391 "\n"
-  DEF_MODULE_TEMPLATE@391..438
-    MODULE_KW@391..397 "module"
-    WHITESPACE@397..398 " "
-    TEMPLATE_KW@398..406 "template"
-    WHITESPACE@406..407 " "
-    NAME@407..415
-      IDENT@407..415 "NoParams"
-    WHITESPACE@415..416 " "
-    MODULE_MEMBER_LIST@416..438
-      LEFT_CURLY@416..417 "{"
-      EOL@417..418 "\n"
-      WHITESPACE@418..422 "    "
-      DEF_CONSTANT@422..436
-        CONSTANT_KW@422..430 "constant"
-        WHITESPACE@430..431 " "
-        NAME@431..432
-          IDENT@431..432 "k"
-        WHITESPACE@432..433 " "
-        EQUALS@433..434 "="
-        WHITESPACE@434..435 " "
-        EXPR@435..436
-          EXPR_LITERAL@435..436
-            LITERAL_INT@435..436 "1"
-      EOL@436..437 "\n"
-      RIGHT_CURLY@437..438 "}"
-  EOL@438..440 "\n\n"
-  PRE_ANNOTATION@440..481 "@ A template with an  ..."
-  EOL@481..482 "\n"
-  DEF_MODULE_TEMPLATE@482..534
-    MODULE_KW@482..488 "module"
-    WHITESPACE@488..489 " "
-    TEMPLATE_KW@489..497 "template"
-    WHITESPACE@497..498 " "
-    NAME@498..509
-      IDENT@498..509 "EmptyParams"
-    TEMPLATE_PARAM_LIST@509..511
-      LEFT_PAREN@509..510 "("
-      RIGHT_PAREN@510..511 ")"
-    WHITESPACE@511..512 " "
-    MODULE_MEMBER_LIST@512..534
-      LEFT_CURLY@512..513 "{"
-      EOL@513..514 "\n"
-      WHITESPACE@514..518 "    "
-      DEF_CONSTANT@518..532
-        CONSTANT_KW@518..526 "constant"
-        WHITESPACE@526..527 " "
-        NAME@527..528
-          IDENT@527..528 "k"
-        WHITESPACE@528..529 " "
-        EQUALS@529..530 "="
-        WHITESPACE@530..531 " "
-        EXPR@531..532
-          EXPR_LITERAL@531..532
-            LITERAL_INT@531..532 "1"
-      EOL@532..533 "\n"
-      RIGHT_CURLY@533..534 "}"
-  EOL@534..536 "\n\n"
-  PRE_ANNOTATION@536..557 "@ Expansion specifier"
-  EOL@557..558 "\n"
-  SPEC_TEMPLATE_EXPAND@558..613
-    EXPAND_KW@558..564 "expand"
-    WHITESPACE@564..565 " "
-    QUAL_IDENT@565..569
-      IDENT@565..569 "Tmpl"
-    TEMPLATE_ARG_LIST@569..613
-      LEFT_PAREN@569..570 "("
-      TEMPLATE_ARG@570..581
-        CONSTANT_KW@570..578 "constant"
-        WHITESPACE@578..579 " "
-        EXPR@579..581
-          EXPR_LITERAL@579..581
-            LITERAL_INT@579..581 "10"
-      COMMA@581..582 ","
-      WHITESPACE@582..583 " "
-      TEMPLATE_ARG@583..592
-        TYPE_KW@583..587 "type"
-        WHITESPACE@587..588 " "
-        TYPE_NAME@588..592
-          QUAL_IDENT@588..592
-            IDENT@588..592 "Type"
-      COMMA@592..593 ","
-      WHITESPACE@593..594 " "
-      TEMPLATE_ARG@594..612
-        INSTANCE_KW@594..602 "instance"
-        WHITESPACE@602..603 " "
-        QUAL_IDENT@603..612
-          IDENT@603..612 "instance1"
-      RIGHT_PAREN@612..613 ")"
-  EOL@613..614 "\n"
-  POST_ANNOTATION@614..636 "@< Expansion specifier"
-  EOL@636..638 "\n\n"
-  PRE_ANNOTATION@638..674 "@ An expansion with n ..."
-  EOL@674..675 "\n"
-  SPEC_TEMPLATE_EXPAND@675..690
-    EXPAND_KW@675..681 "expand"
-    WHITESPACE@681..682 " "
-    QUAL_IDENT@682..690
-      IDENT@682..690 "NoParams"
-  EOL@690..692 "\n\n"
-  PRE_ANNOTATION@692..734 "@ An expansion with a ..."
-  EOL@734..735 "\n"
-  SPEC_TEMPLATE_EXPAND@735..755
-    EXPAND_KW@735..741 "expand"
-    WHITESPACE@741..742 " "
-    QUAL_IDENT@742..753
-      IDENT@742..753 "EmptyParams"
-    TEMPLATE_ARG_LIST@753..755
-      LEFT_PAREN@753..754 "("
-      RIGHT_PAREN@754..755 ")"
-  EOL@755..757 "\n\n"
-  PRE_ANNOTATION@757..784 "@ A qualified templat ..."
-  EOL@784..785 "\n"
-  SPEC_TEMPLATE_EXPAND@785..809
-    EXPAND_KW@785..791 "expand"
-    WHITESPACE@791..792 " "
-    QUAL_IDENT@792..797
-      IDENT@792..793 "A"
-      DOT@793..794 "."
-      IDENT@794..795 "B"
-      DOT@795..796 "."
-      IDENT@796..797 "T"
-    TEMPLATE_ARG_LIST@797..809
-      LEFT_PAREN@797..798 "("
-      TEMPLATE_ARG@798..808
-        CONSTANT_KW@798..806 "constant"
-        WHITESPACE@806..807 " "
-        EXPR@807..808
-          EXPR_LITERAL@807..808
-            LITERAL_INT@807..808 "1"
-      RIGHT_PAREN@808..809 ")"
-  EOL@809..811 "\n\n"
-  PRE_ANNOTATION@811..869 "@ An argument list se ..."
-  EOL@869..870 "\n"
-  SPEC_TEMPLATE_EXPAND@870..931
-    EXPAND_KW@870..876 "expand"
-    WHITESPACE@876..877 " "
-    QUAL_IDENT@877..881
-      IDENT@877..881 "Tmpl"
-    TEMPLATE_ARG_LIST@881..931
-      LEFT_PAREN@881..882 "("
-      EOL@882..883 "\n"
-      WHITESPACE@883..887 "    "
-      TEMPLATE_ARG@887..897
-        CONSTANT_KW@887..895 "constant"
-        WHITESPACE@895..896 " "
-        EXPR@896..897
-          EXPR_LITERAL@896..897
-            LITERAL_INT@896..897 "1"
-      EOL@897..898 "\n"
-      WHITESPACE@898..902 "    "
-      TEMPLATE_ARG@902..910
-        TYPE_KW@902..906 "type"
-        WHITESPACE@906..907 " "
-        TYPE_NAME@907..910
-          U32_KW@907..910 "U32"
-      EOL@910..911 "\n"
-      WHITESPACE@911..915 "    "
-      TEMPLATE_ARG@915..929
-        INSTANCE_KW@915..923 "instance"
-        WHITESPACE@923..924 " "
-        QUAL_IDENT@924..929
-          IDENT@924..929 "inst1"
-      EOL@929..930 "\n"
-      RIGHT_PAREN@930..931 ")"
-  EOL@931..933 "\n\n"
-  PRE_ANNOTATION@933..1009 "@ Escaped reserved wo ..."
-  EOL@1009..1010 "\n"
-  PRE_ANNOTATION@1010..1035 "@ definitions in its  ..."
-  EOL@1035..1036 "\n"
-  DEF_MODULE_TEMPLATE@1036..1178
-    MODULE_KW@1036..1042 "module"
-    WHITESPACE@1042..1043 " "
-    TEMPLATE_KW@1043..1051 "template"
-    WHITESPACE@1051..1052 " "
-    NAME@1052..1061
-      IDENT@1052..1061 "$template"
-    TEMPLATE_PARAM_LIST@1061..1141
-      LEFT_PAREN@1061..1062 "("
-      EOL@1062..1063 "\n"
-      WHITESPACE@1063..1067 "    "
-      TEMPLATE_PARAM@1067..1090
-        CONSTANT_KW@1067..1075 "constant"
-        WHITESPACE@1075..1076 " "
-        NAME@1076..1085
-          IDENT@1076..1085 "$constant"
-        COLON@1085..1086 ":"
-        WHITESPACE@1086..1087 " "
-        TYPE_NAME@1087..1090
-          U32_KW@1087..1090 "U32"
-      EOL@1090..1091 "\n"
-      WHITESPACE@1091..1095 "    "
-      TEMPLATE_PARAM@1095..1124
-        INSTANCE_KW@1095..1103 "instance"
-        WHITESPACE@1103..1104 " "
-        NAME@1104..1113
-          IDENT@1104..1113 "$instance"
-        COLON@1113..1114 ":"
-        WHITESPACE@1114..1115 " "
-        QUAL_IDENT@1115..1124
-          IDENT@1115..1124 "Interface"
-      EOL@1124..1125 "\n"
-      WHITESPACE@1125..1129 "    "
-      TEMPLATE_PARAM@1129..1139
-        TYPE_KW@1129..1133 "type"
-        WHITESPACE@1133..1134 " "
-        NAME@1134..1139
-          IDENT@1134..1139 "$type"
-      EOL@1139..1140 "\n"
-      RIGHT_PAREN@1140..1141 ")"
-    WHITESPACE@1141..1142 " "
-    MODULE_MEMBER_LIST@1142..1178
-      LEFT_CURLY@1142..1143 "{"
-      EOL@1143..1144 "\n"
-      WHITESPACE@1144..1148 "    "
-      DEF_CONSTANT@1148..1176
-        CONSTANT_KW@1148..1156 "constant"
-        WHITESPACE@1156..1157 " "
-        NAME@1157..1164
-          IDENT@1157..1164 "$expand"
-        WHITESPACE@1164..1165 " "
-        EQUALS@1165..1166 "="
-        WHITESPACE@1166..1167 " "
-        EXPR@1167..1176
-          EXPR_IDENT@1167..1176
-            IDENT@1167..1176 "$constant"
-      EOL@1176..1177 "\n"
-      RIGHT_CURLY@1177..1178 "}"
-  EOL@1178..1180 "\n\n"
-  SPEC_TEMPLATE_EXPAND@1180..1234
-    EXPAND_KW@1180..1186 "expand"
-    WHITESPACE@1186..1187 " "
-    QUAL_IDENT@1187..1196
-      IDENT@1187..1196 "$template"
-    TEMPLATE_ARG_LIST@1196..1234
-      LEFT_PAREN@1196..1197 "("
-      TEMPLATE_ARG@1197..1207
-        CONSTANT_KW@1197..1205 "constant"
-        WHITESPACE@1205..1206 " "
-        EXPR@1206..1207
-          EXPR_LITERAL@1206..1207
-            LITERAL_INT@1206..1207 "1"
-      COMMA@1207..1208 ","
-      WHITESPACE@1208..1209 " "
-      TEMPLATE_ARG@1209..1223
-        INSTANCE_KW@1209..1217 "instance"
-        WHITESPACE@1217..1218 " "
-        QUAL_IDENT@1218..1223
-          IDENT@1218..1223 "inst1"
-      COMMA@1223..1224 ","
-      WHITESPACE@1224..1225 " "
-      TEMPLATE_ARG@1225..1233
-        TYPE_KW@1225..1229 "type"
-        WHITESPACE@1229..1230 " "
-        TYPE_NAME@1230..1233
-          U32_KW@1230..1233 "U32"
-      RIGHT_PAREN@1233..1234 ")"
-  EOL@1234..1236 "\n\n"
-  SPEC_LOC@1236..1274
-    LOCATE_KW@1236..1242 "locate"
-    WHITESPACE@1242..1243 " "
-    TEMPLATE_KW@1243..1251 "template"
-    WHITESPACE@1251..1252 " "
-    QUAL_IDENT@1252..1256
-      IDENT@1252..1256 "Tmpl"
-    WHITESPACE@1256..1257 " "
-    AT_KW@1257..1259 "at"
-    WHITESPACE@1259..1260 " "
-    LITERAL_STRING@1260..1274 "\"template.fpp\""
-  EOL@1274..1275 "\n"
-  SPEC_LOC@1275..1314
-    LOCATE_KW@1275..1281 "locate"
-    WHITESPACE@1281..1282 " "
-    TEMPLATE_KW@1282..1290 "template"
-    WHITESPACE@1290..1291 " "
-    QUAL_IDENT@1291..1296
-      IDENT@1291..1292 "A"
-      DOT@1292..1293 "."
-      IDENT@1293..1294 "B"
-      DOT@1294..1295 "."
-      IDENT@1295..1296 "T"
-    WHITESPACE@1296..1297 " "
-    AT_KW@1297..1299 "at"
-    WHITESPACE@1299..1300 " "
-    LITERAL_STRING@1300..1314 "\"template.fpp\""
-  EOL@1314..1315 "\n"
-  SPEC_LOC@1315..1358
-    LOCATE_KW@1315..1321 "locate"
-    WHITESPACE@1321..1322 " "
-    TEMPLATE_KW@1322..1330 "template"
-    WHITESPACE@1330..1331 " "
-    QUAL_IDENT@1331..1340
-      IDENT@1331..1340 "$template"
-    WHITESPACE@1340..1341 " "
-    AT_KW@1341..1343 "at"
-    WHITESPACE@1343..1344 " "
-    LITERAL_STRING@1344..1358 "\"template.fpp\""
-  EOL@1358..1359 "\n"
+  PRE_ANNOTATION@355..376 "@ Expansion specifier"
+  EOL@376..377 "\n"
+  SPEC_TEMPLATE_EXPAND@377..433
+    EXPAND_KW@377..383 "expand"
+    WHITESPACE@383..384 " "
+    QUAL_IDENT@384..388
+      IDENT@384..388 "Tmpl"
+    TEMPLATE_ARG_LIST@388..433
+      LEFT_PAREN@388..389 "("
+      TEMPLATE_ARG@389..400
+        CONSTANT_KW@389..397 "constant"
+        WHITESPACE@397..398 " "
+        EXPR@398..400
+          EXPR_LITERAL@398..400
+            LITERAL_INT@398..400 "10"
+      COMMA@400..401 ","
+      WHITESPACE@401..402 " "
+      TEMPLATE_ARG@402..411
+        TYPE_KW@402..406 "type"
+        WHITESPACE@406..407 " "
+        TYPE_NAME@407..411
+          QUAL_IDENT@407..411
+            IDENT@407..411 "Type"
+      COMMA@411..412 ","
+      WHITESPACE@412..413 " "
+      TEMPLATE_ARG@413..432
+        INSTANCE_KW@413..421 "instance"
+        WHITESPACE@421..422 " "
+        QUAL_IDENT@422..432
+          DOT@422..423 "."
+          IDENT@423..432 "instance1"
+      RIGHT_PAREN@432..433 ")"
+  EOL@433..434 "\n"
+  POST_ANNOTATION@434..456 "@< Expansion specifier"
+  EOL@456..457 "\n"

@@ -3,14 +3,14 @@ use pretty_assertions::assert_eq;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-fn run_test_inner(fpp_file: &Path, ref_file: &Path) {
+fn run_test_inner(fpp_file: &Path, ref_file: &Path, entry: TopEntryPoint) {
     let source_file_path = fpp_file.to_str().unwrap();
     let src = match fs::read_to_string(source_file_path) {
         Ok(src) => src,
         Err(err) => panic!("failed to open {}: {}", source_file_path, err),
     };
 
-    let out = parse(&src, TopEntryPoint::Module);
+    let out = parse(&src, entry);
     let out_s = out.debug_dump();
 
     match env::var("FPP_UPDATE_REF") {
@@ -39,7 +39,7 @@ fn run_test(file_path: &str) {
     ref_file.push(file_path);
     ref_file.set_extension("ref.txt");
 
-    run_test_inner(&fpp_file, &ref_file);
+    run_test_inner(&fpp_file, &ref_file, TopEntryPoint::Module);
 }
 
 fn run_test_from_fpp_parser(file_path: &str) {
@@ -54,7 +54,24 @@ fn run_test_from_fpp_parser(file_path: &str) {
     ref_file.push(file_path);
     ref_file.set_extension("ref.txt");
 
-    run_test_inner(&fpp_file, &ref_file);
+    run_test_inner(&fpp_file, &ref_file, TopEntryPoint::Module);
+}
+
+/// Parse the include fragment `file_name` of fpp_parser/tests with the entry
+/// point of the construct that includes it, and compare the tree with
+/// `ref_name`.ref.txt.
+fn run_fragment_test_from_fpp_parser(file_name: &str, entry: TopEntryPoint, ref_name: &str) {
+    let cargo_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut fpp_file = cargo_dir.clone();
+    fpp_file.push("../fpp_parser/tests");
+    fpp_file.push(file_name);
+
+    let mut ref_file = cargo_dir.clone();
+    ref_file.push("tests");
+    ref_file.push(ref_name);
+    ref_file.set_extension("ref.txt");
+
+    run_test_inner(&fpp_file, &ref_file, entry);
 }
 
 #[test]
@@ -65,6 +82,11 @@ fn simple() {
 #[test]
 fn comments() {
     run_test_from_fpp_parser("comments")
+}
+
+#[test]
+fn crlf() {
+    run_test_from_fpp_parser("crlf")
 }
 
 #[test]
@@ -80,6 +102,11 @@ fn cycle_2() {
 #[test]
 fn cycle_3() {
     run_test_from_fpp_parser("cycle-3")
+}
+
+#[test]
+fn dictionary_specifier() {
+    run_test_from_fpp_parser("dictionary-specifier")
 }
 
 #[test]
@@ -128,6 +155,11 @@ fn include_parse_error() {
 }
 
 #[test]
+fn include_state_machine() {
+    run_test_from_fpp_parser("include-state-machine")
+}
+
+#[test]
 fn include_subdir() {
     run_test_from_fpp_parser("include-subdir")
 }
@@ -135,6 +167,73 @@ fn include_subdir() {
 #[test]
 fn include_topology() {
     run_test_from_fpp_parser("include-topology")
+}
+
+#[test]
+fn numeric_shift() {
+    run_test_from_fpp_parser("numeric-shift")
+}
+
+// The fragments that the include tests include, each parsed as the members
+// of the construct that includes it
+
+#[test]
+fn fragment_constant_in_component() {
+    run_fragment_test_from_fpp_parser(
+        "constant.fppi",
+        TopEntryPoint::Component,
+        "fragment-constant-component",
+    )
+}
+
+#[test]
+fn fragment_constant_in_module() {
+    run_fragment_test_from_fpp_parser(
+        "constant.fppi",
+        TopEntryPoint::Module,
+        "fragment-constant-module",
+    )
+}
+
+#[test]
+fn fragment_instance() {
+    run_fragment_test_from_fpp_parser(
+        "instance.fppi",
+        TopEntryPoint::Topology,
+        "fragment-instance",
+    )
+}
+
+#[test]
+fn fragment_packet() {
+    run_fragment_test_from_fpp_parser(
+        "packet.fppi",
+        TopEntryPoint::TlmPacketSet,
+        "fragment-packet",
+    )
+}
+
+#[test]
+fn fragment_channel() {
+    run_fragment_test_from_fpp_parser("channel.fppi", TopEntryPoint::TlmPacket, "fragment-channel")
+}
+
+#[test]
+fn fragment_state_in_state_machine() {
+    run_fragment_test_from_fpp_parser(
+        "subdir/state.fppi",
+        TopEntryPoint::StateMachine,
+        "fragment-state-state-machine",
+    )
+}
+
+#[test]
+fn fragment_state_in_state() {
+    run_fragment_test_from_fpp_parser(
+        "subdir/state.fppi",
+        TopEntryPoint::State,
+        "fragment-state-state",
+    )
 }
 
 #[test]

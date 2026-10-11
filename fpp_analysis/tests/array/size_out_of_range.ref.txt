@@ -1,7 +1,7 @@
  --> [ local path prefix ]/array/size_out_of_range.fpp:1:12
   |
 1 | array A = [4294967296] U8
-  |            ^^^^^^^^^^ value out of range
+  |            ^^^^^^^^^^ invalid integer value 4294967296
   |
-  = note: expression evaluated to `4294967296`
+  = note: value out of range
 

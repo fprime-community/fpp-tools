@@ -1,10 +1,10 @@
  --> [ local path prefix ]/expr/sizeof_propagation.fpp:8:3
   |
 8 |   Y = 5
-  |   ^^^^^ duplicate enum constant `5`
+  |   ^^^^^ duplicate enum value 5
   |
  ::: [ local path prefix ]/expr/sizeof_propagation.fpp:7:3
   |
 7 |   X = c
-  |   ----- previously defined here
+  |   ----- previous occurrence is here
 

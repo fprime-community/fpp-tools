@@ -1,10 +1,16 @@
  --> [ local path prefix ]/framework_defs/user_data_size_not_module_qualified.fpp:5:5
   |
-5 |     constant CONTAINER_USER_DATA_SIZE = 10
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ framework definition Fw.DpCfg.CONTAINER_USER_DATA_SIZE must have module qualifiers: Fw.DpCfg is not a module symbol
+5 |       constant CONTAINER_USER_DATA_SIZE = 10
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ invalid qualifier Fw.DpCfg: not a module symbol
   |
- ::: [ local path prefix ]/framework_defs/user_data_size_not_module_qualified.fpp:3:21
+ ::: [ local path prefix ]/framework_defs/user_data_size_not_module_qualified.fpp:3:3
   |
-3 |   passive component DpCfg {
-  |                     ----- not a module symbol
+3 | /   passive component DpCfg {
+4 | |
+5 | |     constant CONTAINER_USER_DATA_SIZE = 10
+6 | |
+7 | |   }
+  | |___- symbol is defined here
+  |
+  = note: framework definition Fw.DpCfg.CONTAINER_USER_DATA_SIZE must have module qualifiers
 

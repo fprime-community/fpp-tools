@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/template/array_params_common_type_error.fpp:4:18
+  |
+4 |   constant c = p + q
+  |                  ^^^ cannot convert array of U32 to a numeric or string type
+  |
+  = note: expanded at [ local path prefix ]/template/array_params_common_type_error.fpp:6:1
+

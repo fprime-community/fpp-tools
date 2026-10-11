@@ -1,20 +1,21 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
-use crate::semantics::{Interface, PortInstance, Symbol, resolve_interface};
+use crate::analyzers::module_analyzer::visit_expansion;
+use crate::semantics::resolve_topology::resolve_interface;
+use crate::semantics::{Interface, PortInstance, Symbol};
 use fpp_ast::{
     AstNode, DefInterface, DefModule, SpecGeneralPortInstance, SpecInterfaceImport,
-    SpecSpecialPortInstance, SpecTemplateExpand, Visitor, Walkable,
+    SpecPortInstance, SpecSpecialPortInstance, SpecTemplateExpand, Visitor, Walkable,
 };
 use std::ops::ControlFlow;
 
-/// Check interface definitions.
+/// Check interface definitions
 pub struct CheckInterfaceDefs;
 
 impl CheckInterfaceDefs {
     /// Resolve an interface: collect its ports and imports, resolve the
     /// interfaces it directly imports, then merge them in. Results are
     /// memoized in `a.interface_map`.
-    fn resolve(&self, a: &mut Analysis, symbol: &Symbol) {
+    fn def_interface(&self, a: &mut Analysis, symbol: &Symbol) {
         // Interface is already in the map: nothing to do
         if a.interface_map.contains_key(symbol) {
             return;
@@ -35,15 +36,31 @@ impl CheckInterfaceDefs {
 
         // Resolve interfaces directly imported by iface, updating a
         for (import_symbol, _) in iface.imports_in_source_order() {
-            self.resolve(a, &import_symbol);
+            self.def_interface(a, &import_symbol);
         }
 
         // Use the updated analysis to resolve iface
-        if let Err(err) = resolve_interface(&a.interface_map, &mut iface) {
+        if let Err(err) = resolve_interface::resolve(a, &mut iface) {
             err.emit();
         }
 
         a.interface_map.insert(symbol.clone(), iface);
+    }
+
+    /// Adds a port instance to the interface under construction
+    fn spec_port_instance(&self, a: &mut Analysis, node: &SpecPortInstance) {
+        let Some(interface) = a.interface.take() else {
+            return;
+        };
+        match PortInstance::from_spec_port_instance(a, node)
+            .and_then(|instance| interface.add_port_instance(instance))
+        {
+            Ok(updated) => a.interface = Some(updated),
+            Err(err) => {
+                a.interface = Some(interface);
+                err.emit();
+            }
+        }
     }
 }
 
@@ -61,7 +78,7 @@ impl<'ast> Visitor<'ast> for CheckInterfaceDefs {
         visit_expansion(self, a, node)
     }
 
-    /// Descend into modules, where interface definitions live.
+    /// Visit translation unit members and module members
     fn visit_def_module(
         &self,
         a: &mut Self::State,
@@ -78,7 +95,7 @@ impl<'ast> Visitor<'ast> for CheckInterfaceDefs {
         let Some(symbol) = a.get_symbol(node) else {
             return ControlFlow::Continue(());
         };
-        self.resolve(a, &symbol);
+        self.def_interface(a, &symbol);
         ControlFlow::Continue(())
     }
 
@@ -87,12 +104,7 @@ impl<'ast> Visitor<'ast> for CheckInterfaceDefs {
         a: &mut Self::State,
         node: &'ast SpecGeneralPortInstance,
     ) -> ControlFlow<Self::Break> {
-        if a.interface.is_some() {
-            match PortInstance::from_general(a, node) {
-                Ok(instance) => add_resolved_port_instance(a, instance),
-                Err(err) => err.emit(),
-            }
-        }
+        self.spec_port_instance(a, &SpecPortInstance::General(node.clone()));
         ControlFlow::Continue(())
     }
 
@@ -101,12 +113,7 @@ impl<'ast> Visitor<'ast> for CheckInterfaceDefs {
         a: &mut Self::State,
         node: &'ast SpecSpecialPortInstance,
     ) -> ControlFlow<Self::Break> {
-        if a.interface.is_some() {
-            match PortInstance::from_special(a, node) {
-                Ok(instance) => add_resolved_port_instance(a, instance),
-                Err(err) => err.emit(),
-            }
-        }
+        self.spec_port_instance(a, &SpecPortInstance::Special(node.clone()));
         ControlFlow::Continue(())
     }
 
@@ -115,35 +122,23 @@ impl<'ast> Visitor<'ast> for CheckInterfaceDefs {
         a: &mut Self::State,
         node: &'ast SpecInterfaceImport,
     ) -> ControlFlow<Self::Break> {
-        add_imported_interface(a, node);
+        let iface = match a.get_interface_symbol(node.interface.id()) {
+            Ok(Some(iface)) => iface,
+            Ok(None) => return ControlFlow::Continue(()),
+            Err(err) => {
+                err.emit();
+                return ControlFlow::Continue(());
+            }
+        };
+        if let Some(interface) = a.interface.take() {
+            match interface.add_imported_interface_symbol(iface, node) {
+                Ok(i) => a.interface = Some(i),
+                Err(err) => {
+                    a.interface = Some(interface);
+                    err.emit();
+                }
+            }
+        }
         ControlFlow::Continue(())
-    }
-}
-
-pub(crate) fn add_resolved_port_instance(a: &mut Analysis, instance: PortInstance) {
-    if let Some(iface) = a.interface.take() {
-        match iface.add_port_instance(instance) {
-            Ok(updated) => a.interface = Some(updated),
-            Err(err) => {
-                a.interface = Some(iface);
-                err.emit();
-            }
-        }
-    }
-}
-
-fn add_imported_interface(a: &mut Analysis, node: &SpecInterfaceImport) {
-    let symbol = match a.use_def_map.get(&node.interface.id()) {
-        Some(symbol @ Symbol::Interface(_)) => symbol.clone(),
-        _ => return,
-    };
-    if let Some(iface) = a.interface.take() {
-        match iface.add_imported_interface_symbol(symbol, node) {
-            Ok(updated) => a.interface = Some(updated),
-            Err(err) => {
-                a.interface = Some(iface);
-                err.emit();
-            }
-        }
     }
 }

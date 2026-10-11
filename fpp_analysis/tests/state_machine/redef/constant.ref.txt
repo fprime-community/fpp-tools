@@ -1,15 +1,18 @@
- --> [ local path prefix ]/state_machine/redef/constant.fpp:3:12
+ --> [ local path prefix ]/state_machine/redef/constant.fpp:3:3
   |
 3 |   constant c = 1
-  |            ^ redefinition of symbol c
+  |   ^^^^^^^^^^^^^^ redefinition of symbol c
   |
  ::: [ local path prefix ]/state_machine/redef/constant.fpp:2:3
   |
 2 |   constant c = 0
   |   -------------- previous definition is here
 
- --> [ local path prefix ]/state_machine/redef/constant.fpp:1:15
+ --> [ local path prefix ]/state_machine/redef/constant.fpp:1:1
   |
-1 | state machine SM {
-  |               ^^ state machine must have initial transition
+1 | / state machine SM {
+2 | |   constant c = 0
+3 | |   constant c = 1
+4 | | }
+  | |_^ state machine must have initial transition
 

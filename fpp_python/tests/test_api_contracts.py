@@ -432,7 +432,7 @@ def test_a_sized_string_outside_a_type_definition_reaches_the_semantic_type():
 def test_an_invalid_string_size_is_reported_outside_a_type_definition_too():
     bad = f.analyze(source=FRAMEWORK + "module M { port P(m: string size -1) }")
     assert bad.has_errors
-    assert "negative string sizes" in bad.diagnostics[0].message
+    assert "invalid string size -1" in bad.diagnostics[0].message
 
 
 # --- sources vs imports --------------------------------------------------
@@ -790,9 +790,9 @@ module Ref {
         return str(a.type_map[m.lookup(name).node_id])
 
     assert spelled("Ref.Abs") == "Abs"
-    assert spelled("Ref.Arr") == "Arr"
-    assert spelled("Ref.E") == "E"
-    assert spelled("Ref.Simple") == "Simple"
+    assert spelled("Ref.Arr") == "array Arr"
+    assert spelled("Ref.E") == "enum E"
+    assert spelled("Ref.Simple") == "struct Simple"
 
     simple = a.type_map[m.lookup("Ref.Simple").node_id]
     anon = simple.anon_struct
@@ -803,7 +803,7 @@ module Ref {
     # Every member renders by `Display` too, so an aggregate stays one line.
     assert (
         str(simple.anon_struct)
-        == "anonymous struct { b: boolean, f: F32, x: U32, y: string }"
+        == "{ x: U32, y: string, b: bool, f: F32 }"
     )
 
     arr = a.type_map[m.lookup("Ref.Arr").node_id]
@@ -824,7 +824,7 @@ def test_repr_names_the_concrete_class_and_identifies_the_value():
 
     # A type: the class, then the compiler's rendering of the value.
     array = a.type_map[m.lookup("M.A").node_id]
-    assert repr(array) == "<ArrayType A>"
+    assert repr(array) == "<ArrayType array A>"
     assert repr(array.anon_array.elt_type) == "<PrimitiveIntType U32>"
 
     # A value: likewise, so a folded constant reads as what it folded to.

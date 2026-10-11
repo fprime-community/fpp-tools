@@ -1,10 +1,5 @@
  --> [ local path prefix ]/array/format_too_many_repls.fpp:1:30
   |
 1 | array A = [3] U32 format "{} {} {}"
-  |                              ^^ extraneous format replacement field
-  |
- ::: [ local path prefix ]/array/format_too_many_repls.fpp:1:33
-  |
-1 | array A = [3] U32 format "{} {} {}"
-  |                                 ^^ extraneous format replacement field
+  |                              ^^ invalid format string: too many replacement fields
 

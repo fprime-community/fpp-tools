@@ -56,7 +56,9 @@ fn index_workspace(folder: &Path) -> GlobalState {
     state
 }
 
+/// The test creates a directory symbolic link, which needs the Unix API
 #[test]
+#[cfg(unix)]
 fn scan_mode_resolves_uses_through_symlinked_root() {
     let real = fixture_dir("ws_scan_real");
     let link = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -282,6 +284,36 @@ expand M.
     );
 }
 
+/// The implements clause of a topology is a list of port interface names, so
+/// completion after `implements` or after a comma in the list offers port
+/// interfaces. The list may be empty, so nothing there is a syntax error.
+#[test]
+fn completion_in_implements_clause_offers_interfaces() {
+    let dir = fixture_dir("ws_implements_completion");
+    // Lines 2 and 4 leave a name of the list empty.
+    let text = "\
+interface Iface { }
+passive component Comp { }
+topology T implements  {
+}
+topology U implements Iface,  {
+}
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    for (line, character) in [(2, 22), (4, 29)] {
+        let labels = completion_labels_at(&state, &uri, line, character);
+        assert!(
+            labels.contains(&"Iface".to_string()),
+            "line {line}: the implements clause should offer port interfaces, got {labels:?}"
+        );
+        assert!(
+            !labels.contains(&"Comp".to_string()),
+            "line {line}: the implements clause must not offer components, got {labels:?}"
+        );
+    }
+}
+
 /// An `instance` template argument is a bare qualified identifier, so completion
 /// there must offer interface instances. The other two argument kinds are an
 /// expression and a type name, which the generic expression/type paths handle.
@@ -463,6 +495,159 @@ module B {
     assert_eq!(expansion_lines, vec![4, 7]);
 }
 
+/// The server names its files by `file://` URI, while a location specifier names
+/// the file of its definition by a path relative to the specifier. A specifier
+/// that names the right file is accepted however its path is spelled, and one
+/// that names another file is reported with the path that it names.
+#[test]
+fn location_specifiers_compare_paths_of_file_uris() {
+    let dir = fixture_dir("ws_spec_loc");
+    let text = "\
+locate constant a at \"Top.fpp\"
+locate constant b at \"./sub/../Top.fpp\"
+locate constant c at \"../ws_spec_loc/Top.fpp\"
+locate constant c at \"Top.fpp\"
+locate constant d at \"Other.fpp\"
+constant a = 0
+constant b = 1
+constant c = 2
+constant d = 3
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let diagnostics = state.diagnostics.get(&uri);
+    let messages: Vec<(u32, &str)> = diagnostics
+        .iter()
+        .map(|d| (d.range.start.line, d.message.as_str()))
+        .collect();
+    let other = dir.join("Other.fpp");
+    assert_eq!(
+        messages,
+        vec![(
+            4,
+            format!("incorrect location path {}", other.display()).as_str()
+        )]
+    );
+}
+
+/// The line and character that goto-definition jumps to from a zero-based
+/// `line`/`character`, if it jumps anywhere.
+fn definition_at(state: &GlobalState, uri: &str, line: u32, character: u32) -> Option<(u32, u32)> {
+    let response = crate::handlers::handle_goto_definition(
+        state,
+        lsp_types::GotoDefinitionParams {
+            text_document_position_params: lsp_types::TextDocumentPositionParams {
+                text_document: lsp_types::TextDocumentIdentifier {
+                    uri: Uri::from_str(uri).unwrap(),
+                },
+                position: lsp_types::Position { line, character },
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        },
+    )
+    .expect("goto definition should not error");
+    match response? {
+        lsp_types::GotoDefinitionResponse::Scalar(location) => {
+            Some((location.range.start.line, location.range.start.character))
+        }
+        other => panic!("expected one location, got {other:?}"),
+    }
+}
+
+/// A binary expression is located at its operator, so its left operand lies
+/// before its location. Goto-definition must still find the uses in either
+/// operand, at any depth of the expression.
+#[test]
+fn goto_definition_reaches_both_operands_of_a_binary_expression() {
+    let dir = fixture_dir("ws_binop_goto");
+    let text = "\
+module M {
+  constant A = 1
+}
+constant B = M.A + 1
+constant C = 1 + M.A
+constant D = M.A * 2 + M.A << 1
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let module_m = Some((0, 7));
+    let constant_a = Some((1, 11));
+    for (line, character, definition) in [
+        (3, 13, module_m),
+        (3, 15, constant_a),
+        (4, 19, constant_a),
+        (5, 13, module_m),
+        (5, 15, constant_a),
+        (5, 25, constant_a),
+    ] {
+        assert_eq!(
+            definition_at(&state, &uri, line, character),
+            definition,
+            "goto definition at {line}:{character}"
+        );
+    }
+}
+
+/// The start and end (line, character) of each location that find-references
+/// returns from a zero-based `line`/`character`, in the order returned.
+fn references_at(
+    state: &GlobalState,
+    uri: &str,
+    line: u32,
+    character: u32,
+) -> Vec<((u32, u32), (u32, u32))> {
+    crate::handlers::handle_references(
+        state,
+        lsp_types::ReferenceParams {
+            text_document_position: lsp_types::TextDocumentPositionParams {
+                text_document: lsp_types::TextDocumentIdentifier {
+                    uri: Uri::from_str(uri).unwrap(),
+                },
+                position: lsp_types::Position { line, character },
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+            context: lsp_types::ReferenceContext {
+                include_declaration: false,
+            },
+        },
+    )
+    .expect("references should not error")
+    .unwrap_or_default()
+    .into_iter()
+    .map(|l| {
+        (
+            (l.range.start.line, l.range.start.character),
+            (l.range.end.line, l.range.end.character),
+        )
+    })
+    .collect()
+}
+
+/// A type use is recorded under its type name, its qualified identifier and
+/// the identifier's name, all with the same span. Find-references lists each
+/// use once, in source order.
+#[test]
+fn references_list_each_type_use_once() {
+    let dir = fixture_dir("ws_references_dedup");
+    let text = "\
+array A = [3] U32
+struct S { x: A, y: A }
+type T = A
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    assert_eq!(state.diagnostics.all(), Default::default());
+    let uses = vec![((1, 14), (1, 15)), ((1, 20), (1, 21)), ((2, 9), (2, 10))];
+    assert_eq!(
+        references_at(&state, &uri, 0, 6),
+        uses,
+        "from the definition"
+    );
+    assert_eq!(references_at(&state, &uri, 1, 20), uses, "from a use");
+}
+
 /// A module template body is a module member list, so it may hold `include`
 /// specifiers. The document-link visitor must descend into it, or the include in
 /// a template body is not a clickable link.
@@ -501,7 +686,9 @@ module M {
     );
 }
 
+/// The test creates a directory symbolic link, which needs the Unix API
 #[test]
+#[cfg(unix)]
 fn locs_mode_resolves_uses_through_symlinked_root() {
     let real = fixture_dir("ws_locs_real");
     let link = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -534,5 +721,53 @@ fn locs_mode_resolves_uses_through_symlinked_root() {
         state.use_def_count(),
         1,
         "the use of `A` in `constant B = A` was not resolved"
+    );
+}
+
+/// The analysis that the server runs reaches every pass on a model that
+/// resolves includes, absolute names and template expansions: the model has no
+/// diagnostics, and the constants of an expansion are evaluated.
+#[test]
+fn analysis_resolves_includes_absolute_names_and_templates() {
+    let dir = fixture_dir("ws_analysis_smoke");
+    std::fs::write(dir.join("Defs.fppi"), "constant A = 1\n").unwrap();
+    std::fs::write(
+        dir.join("Body.fppi"),
+        "constant D = c + .M.B\narray Arr = [2] t\n",
+    )
+    .unwrap();
+    let text = "\
+module M {
+  include \"Defs.fppi\"
+  constant B = .M.A
+  module template T(constant c: U32, type t) {
+    include \"Body.fppi\"
+  }
+  module N {
+    expand .M.T(constant 2, type U8)
+  }
+}
+module M {
+  constant E = N.D + .M.N.D
+  array Arrs = [3] .M.N.Arr
+}
+";
+    let (state, _) = state_with_open_document(&dir, text);
+
+    assert_eq!(state.diagnostics.all(), Default::default());
+    let analysis = state.snapshot_analysis();
+    let m = analysis
+        .global_scope
+        .get(NameGroup::Value, "M")
+        .and_then(|m| analysis.symbol_scope_map.get(&m).cloned())
+        .expect("module `M` should have a scope");
+    let e = m
+        .get_group(NameGroup::Value)
+        .get("E")
+        .expect("constant `E` should be in module `M`'s scope");
+    assert_eq!(analysis.get_int_value(e.node()), Some(6));
+    assert!(
+        m.get_group(NameGroup::Type).get("Arrs").is_some(),
+        "array `Arrs` should be in module `M`'s scope"
     );
 }

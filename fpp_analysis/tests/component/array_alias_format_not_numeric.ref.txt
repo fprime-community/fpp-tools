@@ -1,10 +1,5 @@
  --> [ local path prefix ]/component/array_alias_format_not_numeric.fpp:6:25
   |
 6 | array A = [3] T format "{.3f}"
-  |                         ^^^^^ Fixed format replacement cannot be used for type `T`
-  |
- ::: [ local path prefix ]/component/array_alias_format_not_numeric.fpp:6:15
-  |
-6 | array A = [3] T format "{.3f}"
-  |               - type defined here
+  |                         ^^^^^ invalid format string: T is not a floating-point type
 

@@ -1,6 +1,11 @@
 use crate::run_test;
 
 #[test]
+fn duplicate_phase() {
+    run_test("spec_init/duplicate_phase")
+}
+
+#[test]
 fn ok() {
     run_test("spec_init/ok")
 }
@@ -10,11 +15,9 @@ fn undef_phase() {
     run_test("spec_init/undef_phase")
 }
 
-#[test]
-fn duplicate_phase() {
-    run_test("spec_init/duplicate_phase")
-}
+// Rust-only tests (no Scala counterpart)
 
+/// An init phase outside the 32-bit range is an error
 #[test]
 fn phase_out_of_range() {
     run_test("spec_init/phase_out_of_range")

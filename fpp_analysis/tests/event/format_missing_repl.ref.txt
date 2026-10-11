@@ -1,7 +1,7 @@
- --> [ local path prefix ]/event/format_missing_repl.fpp:3:14
+ --> [ local path prefix ]/event/format_missing_repl.fpp:3:48
   |
 3 |   event E(a: U32) severity activity low format "abc"
-  |              ^^^ missing format replacement field
+  |                                                ^^^^^ invalid format string: missing replacement field
 
  --> [ local path prefix ]/event/format_missing_repl.fpp:1:1
   |

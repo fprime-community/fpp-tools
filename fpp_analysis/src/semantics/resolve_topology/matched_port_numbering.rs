@@ -1,3 +1,5 @@
+//! Apply matched port numbering
+
 use super::port_numbering_state::PortNumberingState;
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
@@ -6,14 +8,13 @@ use crate::semantics::{
     PortMatching, Topology,
 };
 use fpp_core::Span;
+use indexmap::IndexMap;
 use rustc_hash::FxHashMap as HashMap;
 use std::collections::BTreeSet;
 
-// Apply matched port numbering
-
 // A map from component instances to connections for tracking
 // matching pairs of connections
-type InstanceConnectionMap = HashMap<ComponentInstance, Connection>;
+type InstanceConnectionMap = IndexMap<ComponentInstance, Connection>;
 
 // A map from port numbers to connections for tracking port
 // assignments
@@ -62,6 +63,120 @@ impl State {
         self.pcm2.insert(n, c);
     }
 
+    // Number a connection pair
+    fn number_connection_pair(
+        t: &mut Topology,
+        state: &mut State,
+        matching_loc: Span,
+        c1: &Connection,
+        c2: &Connection,
+    ) -> SemanticResult {
+        let n1_opt = t.get_port_number(&state.pi1, c1);
+        let n2_opt = t.get_port_number(&state.pi2, c2);
+        match (n1_opt, n2_opt) {
+            (Some(n1), Some(n2)) => {
+                // Both ports have a number
+                if n1 == n2 {
+                    // Numbers match: OK, nothing to do
+                    Ok(())
+                } else {
+                    // Numbers don't match: error
+                    let p1_loc = c1.get_this_endpoint(&state.pi1).loc;
+                    let p2_loc = c2.get_this_endpoint(&state.pi2).loc;
+                    Err(SemanticError::MismatchedPortNumbers {
+                        p1_loc,
+                        p1_number: n1,
+                        p2_loc,
+                        p2_number: n2,
+                        matching_loc,
+                    })
+                }
+            }
+            (Some(n), None) => {
+                // Only pi1 has a number
+                match state.pcm2.get(&n) {
+                    Some(prev_c) => {
+                        // Number is already assigned at pi2: error
+                        Err(SemanticError::ImplicitDuplicateConnectionAtMatchedPort {
+                            loc: c2.get_loc(),
+                            port: state.pi2.to_string(),
+                            port_num: n,
+                            implying_loc: c1.get_loc(),
+                            matching_loc,
+                            prev_loc: prev_c.get_loc(),
+                        })
+                    }
+                    None => {
+                        // Assign the number to c2 at pi2 and update the state
+                        t.assign_port_number(&state.pi2, c2, n);
+                        state.update_port_connection_map2(n, c2.clone());
+                        Ok(())
+                    }
+                }
+            }
+            (None, Some(n)) => {
+                // Only pi2 has a number
+                match state.pcm1.get(&n) {
+                    Some(prev_c) => {
+                        // Number is already assigned at pi1: error
+                        Err(SemanticError::ImplicitDuplicateConnectionAtMatchedPort {
+                            loc: c1.get_loc(),
+                            port: state.pi1.to_string(),
+                            port_num: n,
+                            implying_loc: c2.get_loc(),
+                            matching_loc,
+                            prev_loc: prev_c.get_loc(),
+                        })
+                    }
+                    None => {
+                        // Assign the number to c1 at pi1 and update the state
+                        t.assign_port_number(&state.pi1, c1, n);
+                        state.update_port_connection_map1(n, c1.clone());
+                        Ok(())
+                    }
+                }
+            }
+            (None, None) => {
+                // Neither port has a number; get a new one
+                let n = state.get_port_number();
+                if n >= state.pi1.get_array_size() {
+                    // Port number is out of range: error
+                    Err(SemanticError::NoPortAvailableForMatchedNumbering {
+                        loc1: c1.get_loc(),
+                        loc2: c2.get_loc(),
+                        matching_loc,
+                    })
+                } else {
+                    // Assign the number to both sides and update the state
+                    t.assign_port_number(&state.pi1, c1, n);
+                    t.assign_port_number(&state.pi2, c2, n);
+                    state.update_port_connection_map1(n, c1.clone());
+                    state.update_port_connection_map2(n, c2.clone());
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    // For each pair of connections (c1, c2), check that numbers
+    // match and/or assign numbers
+    fn assign_numbers(t: &mut Topology, state: &mut State, matching_loc: Span) -> SemanticResult {
+        // Take icm1 out of the state, so that numbering it needs no copy. Nothing
+        // reads it again: the state is dropped once the matching is numbered.
+        let mut list1: Vec<(ComponentInstance, Connection)> =
+            std::mem::take(&mut state.icm1).into_iter().collect();
+        list1.sort_by(|x, y| x.1.cmp(&y.1));
+        for (ci, c1) in list1 {
+            let c2 = state
+                .icm2
+                .get(&ci)
+                .expect("matching instance present in icm2")
+                .clone();
+            State::number_connection_pair(t, state, matching_loc, &c1, &c2)?;
+        }
+        Ok(())
+    }
+
     fn initial(
         pi1: PortInstance,
         icm1: InstanceConnectionMap,
@@ -86,128 +201,17 @@ impl State {
     }
 }
 
-// Number a connection pair
-fn number_connection_pair(
-    t: &mut Topology,
-    state: &mut State,
-    matching_loc: Span,
-    c1: &Connection,
-    c2: &Connection,
-) -> SemanticResult {
-    let n1_opt = t.get_port_number(&state.pi1, c1);
-    let n2_opt = t.get_port_number(&state.pi2, c2);
-    match (n1_opt, n2_opt) {
-        (Some(n1), Some(n2)) => {
-            // Both ports have a number
-            if n1 == n2 {
-                // Numbers match: OK, nothing to do
-                Ok(())
-            } else {
-                // Numbers don't match: error
-                let p1_loc = c1.get_this_endpoint(&state.pi1).loc;
-                let p2_loc = c2.get_this_endpoint(&state.pi2).loc;
-                Err(SemanticError::MismatchedPortNumbers {
-                    p1_loc,
-                    p1_number: n1,
-                    p2_loc,
-                    p2_number: n2,
-                    matching_loc,
-                })
-            }
-        }
-        (Some(n), None) => {
-            // Only pi1 has a number
-            match state.pcm2.get(&n) {
-                Some(prev_c) => {
-                    // Number is already assigned at pi2: error
-                    Err(SemanticError::ImplicitDuplicateConnectionAtMatchedPort {
-                        loc: c2.get_loc(),
-                        port: state.pi2.to_string(),
-                        port_num: n,
-                        implying_loc: c1.get_loc(),
-                        matching_loc,
-                        prev_loc: prev_c.get_loc(),
-                    })
-                }
-                None => {
-                    // Assign the number to c2 at pi2 and update the state
-                    t.assign_port_number(&state.pi2, c2, n);
-                    state.update_port_connection_map2(n, c2.clone());
-                    Ok(())
-                }
-            }
-        }
-        (None, Some(n)) => {
-            // Only pi2 has a number
-            match state.pcm1.get(&n) {
-                Some(prev_c) => {
-                    // Number is already assigned at pi1: error
-                    Err(SemanticError::ImplicitDuplicateConnectionAtMatchedPort {
-                        loc: c1.get_loc(),
-                        port: state.pi1.to_string(),
-                        port_num: n,
-                        implying_loc: c2.get_loc(),
-                        matching_loc,
-                        prev_loc: prev_c.get_loc(),
-                    })
-                }
-                None => {
-                    // Assign the number to c1 at pi1 and update the state
-                    t.assign_port_number(&state.pi1, c1, n);
-                    state.update_port_connection_map1(n, c1.clone());
-                    Ok(())
-                }
-            }
-        }
-        (None, None) => {
-            // Neither port has a number; get a new one
-            let n = state.get_port_number();
-            if n >= state.pi1.get_array_size() {
-                // Port number is out of range: error
-                Err(SemanticError::NoPortAvailableForMatchedNumbering {
-                    loc1: c1.get_loc(),
-                    loc2: c2.get_loc(),
-                    matching_loc,
-                })
-            } else {
-                // Assign the number to both sides and update the state
-                t.assign_port_number(&state.pi1, c1, n);
-                t.assign_port_number(&state.pi2, c2, n);
-                state.update_port_connection_map1(n, c1.clone());
-                state.update_port_connection_map2(n, c2.clone());
-                Ok(())
-            }
-        }
-    }
-}
-
-// For each pair of connections (c1, c2), check that numbers
-// match and/or assign numbers
-fn assign_numbers(t: &mut Topology, state: &mut State, matching_loc: Span) -> SemanticResult {
-    // Take icm1 out of the state, so that numbering it needs no copy. Nothing
-    // reads it again: the state is dropped once the matching is numbered.
-    let mut list1: Vec<(ComponentInstance, Connection)> =
-        std::mem::take(&mut state.icm1).into_iter().collect();
-    list1.sort_by(|x, y| x.1.cmp(&y.1));
-    for (ci, c1) in list1 {
-        let c2 = state
-            .icm2
-            .get(&ci)
-            .expect("matching instance present in icm2")
-            .clone();
-        number_connection_pair(t, state, matching_loc, &c1, &c2)?;
-    }
-    Ok(())
-}
-
 /// Apply matched numbering
 pub fn apply(a: &Analysis, t: &mut Topology) -> SemanticResult {
+    // Check for invalid 'unmatched' keywords
+    for c in &t.unmatched_connection_set {
+        if !c.is_match_constrained(a) {
+            return Err(SemanticError::MissingPortMatching { loc: c.get_loc() });
+        }
+    }
     // Fold over instances and matchings
     for (ci, _) in t.component_instance_map() {
-        let Some(comp) = a.component_map.get(&ci.component_symbol) else {
-            continue;
-        };
-        let matchings = comp.port_matching_list.clone();
+        let matchings = ci.component(a).port_matching_list.clone();
         for pm in &matchings {
             handle_port_matching(t, &ci, pm)?;
         }
@@ -264,7 +268,7 @@ fn handle_port_matching(
     check_for_missing_connections(loc, &icm1, &icm2)?;
 
     let mut state = State::initial(pi1, icm1, pcm1, pi2, icm2, pcm2);
-    assign_numbers(t, &mut state, loc)
+    State::assign_numbers(t, &mut state, loc)
 }
 
 // Map remote component instances to connections at pi
@@ -279,14 +283,14 @@ fn compute_instance_connection_map(
         port_instance: pi.clone(),
     };
     let cs = t.get_connections_at(&pii);
-    let mut m: InstanceConnectionMap = HashMap::default();
+    let mut m: InstanceConnectionMap = IndexMap::default();
     for c in cs {
         if c.is_unmatched {
             continue;
         }
         let pii_remote = &c.get_other_endpoint(pi).port;
         // Every endpoint of a connection that reaches port numbering refers to a
-        // component instance (after flattenning)
+        // component instance (after flattening)
         debug_assert!(
             pii_remote
                 .interface_instance

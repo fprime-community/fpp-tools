@@ -1,19 +1,11 @@
-#![cfg(test)]
-
-use super::test_helpers::*;
-use crate::semantics::{SerializedSizeError, Type};
-
-#[test]
-fn node_id_memo_identity() {
-    with_test_ctx(|| {
-        let e1 = enumeration("E", fpp_ast::IntegerKind::I32, 0);
-        let e2 = enumeration("E", fpp_ast::IntegerKind::I32, 0);
-        assert!(Type::identical(&e1, &e2), "same id -> identical");
-
-        let e3 = enumeration("E", fpp_ast::IntegerKind::I32, 1);
-        assert!(!Type::identical(&e1, &e3), "different id -> not identical");
-    });
-}
+use super::spec::*;
+use crate::Analysis;
+use crate::semantics::{
+    IntegerValue, SerializedSize, SerializedSizeError, Symbol, Type, TypeVisitor, Value,
+};
+use fpp_ast::DefConstant;
+use std::ops::Deref;
+use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
 // "type identity" should ...
@@ -22,25 +14,24 @@ fn node_id_memo_identity() {
 #[test]
 fn type_identity_holds_for_identical_pairs() {
     with_test_ctx(|| {
-        // duplicate(x) -> (x, x); each must be identical to itself.
-        let cases: Vec<(std::sync::Arc<Type>, std::sync::Arc<Type>)> = vec![
-            (default_abs_type(), default_abs_type()),
-            (default_array(), default_array()),
-            (default_enum(), default_enum()),
-            (default_struct(), default_struct()),
-            (default_alias_type(), default_alias_type()),
-            (boolean(), boolean()),
-            (f32(), f32()),
-            (f64(), f64()),
-            (i16(), i16()),
-            (i32(), i32()),
-            (i64(), i64()),
-            (i8(), i8()),
-            (integer(), integer()),
-            (u16(), u16()),
-            (u32(), u32()),
-            (u64(), u64()),
-            (u8(), u8()),
+        let cases: Vec<(Arc<Type>, Arc<Type>)> = vec![
+            duplicate(default_abs_type()),
+            duplicate(default_array()),
+            duplicate(default_enum()),
+            duplicate(default_struct()),
+            duplicate(default_alias_type()),
+            duplicate(boolean()),
+            duplicate(f32()),
+            duplicate(f64()),
+            duplicate(i16()),
+            duplicate(i32()),
+            duplicate(i64()),
+            duplicate(i8()),
+            duplicate(integer()),
+            duplicate(u16()),
+            duplicate(u32()),
+            duplicate(u64()),
+            duplicate(u8()),
         ];
         for (a, b) in cases {
             assert!(Type::identical(&a, &b), "expected identical: {a} == {b}");
@@ -52,7 +43,7 @@ fn type_identity_holds_for_identical_pairs() {
 fn type_identity_does_not_hold_for_distinct_pairs() {
     with_test_ctx(|| {
         use fpp_ast::IntegerKind::*;
-        let cases: Vec<(std::sync::Arc<Type>, std::sync::Arc<Type>)> = vec![
+        let cases: Vec<(Arc<Type>, Arc<Type>)> = vec![
             (abs_type("T0", 0), abs_type("T1", 1)),
             (enumeration("E0", I32, 0), enumeration("E1", U32, 1)),
             (
@@ -60,26 +51,21 @@ fn type_identity_does_not_hold_for_distinct_pairs() {
                 array("A1", anon_array(None, u32()), 1),
             ),
             (
-                struct_ty("S0", anon_struct(&[]), 0),
-                struct_ty("S1", anon_struct(&[]), 1),
+                struct_("S0", anon_struct(&[]), 0, &[]),
+                struct_("S1", anon_struct(&[]), 1, &[]),
             ),
             (
                 array("A", anon_array(None, i32()), 0),
-                struct_ty("S0", anon_struct(&[]), 1),
+                struct_("S0", anon_struct(&[]), 1, &[]),
             ),
             (default_abs_type(), default_enum()),
             (default_array(), default_struct()),
             (boolean(), string(None)),
-            // duplicate(String(None)) -> two unsized strings are NOT identical:
-            // identical() has no String arm, so they fall through to the
-            // def_node_id comparison, which strings lack.
-            (string(None), string(None)),
+            duplicate(string(None)),
             (f32(), f64()),
             (i8(), u32()),
-            // duplicate(AnonArray(None, I32)) -> anon arrays are not identical
-            (anon_array(None, i32()), anon_array(None, i32())),
-            // duplicate(AnonStruct(Map())) -> anon structs are not identical
-            (anon_struct(&[]), anon_struct(&[])),
+            duplicate(anon_array(None, i32())),
+            duplicate(anon_struct(&[])),
             (alias_type("TAliasU32", u32(), 0), u32()),
             (
                 alias_type("AliasE", enumeration("E", I32, 0), 1),
@@ -99,7 +85,7 @@ fn type_identity_does_not_hold_for_distinct_pairs() {
 // "type conversion" should ...
 // ---------------------------------------------------------------------------
 
-fn may_be_converted(from: &std::sync::Arc<Type>, to: &std::sync::Arc<Type>) -> bool {
+fn may_be_converted(from: &Arc<Type>, to: &Arc<Type>) -> bool {
     Type::convert(from, to).is_ok()
 }
 
@@ -108,7 +94,7 @@ fn type_conversion_allowed_pairs() {
     with_test_ctx(|| {
         use fpp_ast::IntegerKind::*;
         // (from, to) pairs that must be convertible.
-        let cases: Vec<(std::sync::Arc<Type>, std::sync::Arc<Type>)> = vec![
+        let cases: Vec<(Arc<Type>, Arc<Type>)> = vec![
             (i32(), i32()),
             (i32(), f32()),
             (enumeration("E", I32, 0), i32()),
@@ -148,12 +134,12 @@ fn type_conversion_allowed_pairs() {
                 anon_struct(&[("x", i32()), ("y", i32())]),
             ),
             (
-                struct_ty("S", anon_struct(&[("x", i32())]), 0),
+                struct_("S", anon_struct(&[("x", i32())]), 0, &[]),
                 anon_struct(&[("x", i32())]),
             ),
             (
-                struct_ty("S0", anon_struct(&[("x", i32())]), 0),
-                struct_ty("S1", anon_struct(&[("x", i32())]), 1),
+                struct_("S0", anon_struct(&[("x", i32())]), 0, &[]),
+                struct_("S1", anon_struct(&[("x", i32())]), 1, &[]),
             ),
             (string(None), anon_struct(&[("x", string(None))])),
             (
@@ -187,7 +173,7 @@ fn type_conversion_allowed_pairs() {
 fn type_conversion_disallowed_pairs() {
     with_test_ctx(|| {
         use fpp_ast::IntegerKind::*;
-        let cases: Vec<(std::sync::Arc<Type>, std::sync::Arc<Type>)> = vec![
+        let cases: Vec<(Arc<Type>, Arc<Type>)> = vec![
             (string(None), boolean()),
             (i32(), enumeration("E", I32, 0)),
             (
@@ -210,19 +196,19 @@ fn type_conversion_disallowed_pairs() {
             ),
             (anon_struct(&[("x", i32())]), anon_struct(&[("y", i32())])),
             (
-                struct_ty("S", anon_struct(&[("x", i32())]), 0),
+                struct_("S", anon_struct(&[("x", i32())]), 0, &[]),
                 anon_struct(&[("x", string(None))]),
             ),
             (
-                struct_ty("S0", anon_struct(&[("x", i32())]), 0),
-                struct_ty("S1", anon_struct(&[("x", string(None))]), 1),
+                struct_("S0", anon_struct(&[("x", i32())]), 0, &[]),
+                struct_("S1", anon_struct(&[("x", string(None))]), 1, &[]),
             ),
             (string(None), anon_struct(&[("x", i32())])),
             (anon_array(None, i32()), anon_struct(&[])),
             (anon_struct(&[]), anon_array(None, i32())),
             (i32(), alias_type("AliasE", enumeration("E", I32, 0), 1)),
             (
-                struct_ty("S", anon_struct(&[("x", i32())]), 0),
+                struct_("S", anon_struct(&[("x", i32())]), 0, &[]),
                 alias_type("U32Alias", enumeration("E", U16, 1), 2),
             ),
         ];
@@ -244,8 +230,8 @@ fn common_types_allowed_pairs() {
     with_test_ctx(|| {
         use fpp_ast::IntegerKind::*;
         // ((t1, t2), expected)
-        type P = (std::sync::Arc<Type>, std::sync::Arc<Type>);
-        let cases: Vec<(P, std::sync::Arc<Type>)> = vec![
+        type P = (Arc<Type>, Arc<Type>);
+        let cases: Vec<(P, Arc<Type>)> = vec![
             ((i32(), i32()), i32()),
             ((default_abs_type(), default_abs_type()), default_abs_type()),
             ((default_array(), default_array()), default_array()),
@@ -346,21 +332,21 @@ fn common_types_allowed_pairs() {
             ),
             (
                 (
-                    struct_ty("S0", anon_struct(&[("x", i32())]), 0),
-                    struct_ty("A1", anon_struct(&[("x", i8())]), 1),
+                    struct_("S0", anon_struct(&[("x", i32())]), 0, &[]),
+                    struct_("A1", anon_struct(&[("x", i8())]), 1, &[]),
                 ),
                 anon_struct(&[("x", integer())]),
             ),
             (
                 (
                     anon_struct(&[("x", i32())]),
-                    struct_ty("A1", anon_struct(&[("x", i8())]), 1),
+                    struct_("A1", anon_struct(&[("x", i8())]), 1, &[]),
                 ),
                 anon_struct(&[("x", integer())]),
             ),
             (
                 (
-                    struct_ty("S0", anon_struct(&[("x", i32())]), 0),
+                    struct_("S0", anon_struct(&[("x", i32())]), 0, &[]),
                     anon_struct(&[("x", i8())]),
                 ),
                 anon_struct(&[("x", integer())]),
@@ -420,7 +406,7 @@ fn common_types_allowed_pairs() {
 #[test]
 fn common_types_disallowed_pairs() {
     with_test_ctx(|| {
-        type P = (std::sync::Arc<Type>, std::sync::Arc<Type>);
+        type P = (Arc<Type>, Arc<Type>);
         let cases: Vec<P> = vec![
             (string(None), boolean()),
             (anon_array(None, i32()), anon_struct(&[])),
@@ -467,8 +453,7 @@ fn common_types_disallowed_pairs() {
 #[test]
 fn displayable_types() {
     with_test_ctx(|| {
-        use fpp_ast::IntegerKind::*;
-        let displayable: Vec<std::sync::Arc<Type>> = vec![
+        let displayable: Vec<Arc<Type>> = vec![
             i32(),
             f32(),
             boolean(),
@@ -481,13 +466,13 @@ fn displayable_types() {
                 anon_array(None, array("A2", anon_array(None, i32()), 10)),
                 11,
             ),
-            struct_ty("S1", anon_struct(&[("x", i32())]), 12),
+            struct_("S1", anon_struct(&[("x", i32())]), 12, &[]),
         ];
         for ty in displayable {
             assert!(ty.is_displayable(), "expected displayable: {ty}");
         }
 
-        let not_displayable: Vec<std::sync::Arc<Type>> = vec![
+        let not_displayable: Vec<Arc<Type>> = vec![
             integer(),
             anon_array(None, i32()),
             anon_struct(&[]),
@@ -498,17 +483,17 @@ fn displayable_types() {
                 anon_array(None, array("A5", anon_array(None, default_abs_type()), 21)),
                 22,
             ),
-            struct_ty("S2", anon_struct(&[("x", default_abs_type())]), 23),
-            struct_ty(
+            struct_("S2", anon_struct(&[("x", default_abs_type())]), 23, &[]),
+            struct_(
                 "S3",
                 anon_struct(&[(
                     "x",
-                    struct_ty("S4", anon_struct(&[("x", default_abs_type())]), 24),
+                    struct_("S4", anon_struct(&[("x", default_abs_type())]), 24, &[]),
                 )]),
                 25,
+                &[],
             ),
         ];
-        let _ = U8;
         for ty in not_displayable {
             assert!(!ty.is_displayable(), "expected NOT displayable: {ty}");
         }
@@ -517,16 +502,84 @@ fn displayable_types() {
 
 // ---------------------------------------------------------------------------
 // "size of" should ...
-//
-// String data size default = FW_FIXED_LENGTH_STRING_SIZE = 256; the length
-// prefix type FwSizeStoreType = U16 contributes 2 bytes.
 // ---------------------------------------------------------------------------
+
+/// The types and the analysis that the size-of tests use
+struct SizeOf {
+    enum1: Arc<Type>,
+    enum_alias: Arc<Type>,
+    array1: Arc<Type>,
+    array2: Arc<Type>,
+    string_alias: Arc<Type>,
+    string_size_10: Arc<Type>,
+    a: Analysis,
+}
+
+fn size_of() -> SizeOf {
+    use fpp_ast::IntegerKind::U16;
+    // Types and constants used in test
+    let enum1 = enumeration("E", U16, 100);
+    let enum_alias = alias_type("EnumAlias", enum1.clone(), 101);
+    let array1 = array("A", anon_array(Some(3), i64()), 102);
+    let array2 = array("A2", anon_array(Some(2), array1.clone()), 103);
+    let string_alias = alias_type("StringAlias", string_with_size(100), 104);
+    let string_size_10 = string_with_size(10);
+    SizeOf {
+        enum1,
+        enum_alias,
+        array1,
+        array2,
+        string_alias,
+        string_size_10,
+        a: sizeof_test_analysis(),
+    }
+}
+
+/// Create analysis data structure and fill in the framework definitions, types,
+/// and values required for computing the serialized size of a type:
+/// `FwSizeStoreType = U16` (the string length prefix type, 2 bytes) and
+/// `FW_FIXED_LENGTH_STRING_SIZE = 256` (the default string data size).
+///
+/// A string type holds its size, so the analysis needs no values for string
+/// sizes, only the two framework definitions.
+fn sizeof_test_analysis() -> Analysis {
+    let mut a = Analysis::new();
+
+    // FwSizeStoreType = U16 (id chosen high to avoid colliding with type ids).
+    let store_id = 900_001;
+    let store_ty = alias_type("FwSizeStoreType", u16(), store_id);
+    let store_def = match store_ty.deref() {
+        Type::Alias(al) => al.node.clone(),
+        _ => unreachable!(),
+    };
+    a.framework_definitions
+        .type_map
+        .insert("FwSizeStoreType".to_string(), Symbol::AliasType(store_def));
+    a.type_map.insert(node_for(store_id), store_ty);
+
+    // FW_FIXED_LENGTH_STRING_SIZE = 256
+    let const_id = 900_002;
+    let const_def = DefConstant {
+        name: name_with_id("FW_FIXED_LENGTH_STRING_SIZE", const_id),
+        value: expr_lit_int("256", const_id.wrapping_add(1)),
+        is_dictionary_def: false,
+        node_id: node_for(const_id),
+    };
+    a.framework_definitions.constant_map.insert(
+        "FW_FIXED_LENGTH_STRING_SIZE".to_string(),
+        Symbol::Constant(Arc::new(const_def)),
+    );
+    a.value_map
+        .insert(node_for(const_id), Value::Integer(IntegerValue(256)));
+
+    a
+}
 
 #[test]
 fn size_of_primitives() {
     with_test_ctx(|| {
-        let a = sizeof_test_analysis();
-        let cases: Vec<(std::sync::Arc<Type>, i128)> = vec![
+        let SizeOf { a, .. } = size_of();
+        for (ty, expected) in [
             (u8(), 1),
             (u16(), 2),
             (u32(), 4),
@@ -538,9 +591,8 @@ fn size_of_primitives() {
             (f32(), 4),
             (f64(), 8),
             (boolean(), 1),
-        ];
-        for (ty, expected) in cases {
-            assert_eq!(ty.serialized_size(&a), Ok(expected), "size of {ty}");
+        ] {
+            assert_eq!(SerializedSize.ty(&a, &ty), Ok(expected), "size of {ty}");
         }
     });
 }
@@ -548,117 +600,121 @@ fn size_of_primitives() {
 #[test]
 fn size_of_alias_types() {
     with_test_ctx(|| {
-        use fpp_ast::IntegerKind::U16;
-        let a = sizeof_test_analysis();
-
-        // StringAlias = alias of (string size 100) -> 2 + 100 = 102
-        let string_alias = alias_type("StringAlias", string_with_size(100), 104);
-        assert_eq!(string_alias.serialized_size(&a), Ok(102));
-
-        // alias of unsized string -> 2 + 256 = 258
-        let string_default_alias = alias_type("StringDefaultAlias", string(None), 105);
-        assert_eq!(string_default_alias.serialized_size(&a), Ok(258));
-
-        // EnumAlias = alias of (enum rep U16) -> 2
-        let enum1 = enumeration("E", U16, 100);
-        let enum_alias = alias_type("EnumAlias", enum1, 101);
-        assert_eq!(enum_alias.serialized_size(&a), Ok(2));
+        let SizeOf {
+            enum_alias,
+            string_alias,
+            a,
+            ..
+        } = size_of();
+        assert_eq!(SerializedSize.ty(&a, &string_alias), Ok(102));
+        assert_eq!(
+            SerializedSize.ty(&a, &alias_type("StringDefaultAlias", string(None), 105)),
+            Ok(258)
+        );
+        assert_eq!(SerializedSize.ty(&a, &enum_alias), Ok(2));
     });
 }
 
 #[test]
 fn size_of_arrays() {
     with_test_ctx(|| {
-        use fpp_ast::IntegerKind::U16;
-        let a = sizeof_test_analysis();
-        let _ = U16;
-        // array1 = [3] I64 -> 3 * 8 = 24
-        let array1 = array("A", anon_array(Some(3), i64()), 102);
-        assert_eq!(array1.serialized_size(&a), Ok(24));
-        // array2 = [2] array1 -> 2 * 24 = 48
-        let array2 = array("A2", anon_array(Some(2), array1), 103);
-        assert_eq!(array2.serialized_size(&a), Ok(48));
+        let SizeOf {
+            array1, array2, a, ..
+        } = size_of();
+        assert_eq!(SerializedSize.ty(&a, &array1), Ok(24));
+        assert_eq!(SerializedSize.ty(&a, &array2), Ok(48));
     });
 }
 
 #[test]
 fn size_of_enums() {
     with_test_ctx(|| {
-        use fpp_ast::IntegerKind::U16;
-        let a = sizeof_test_analysis();
-        let enum1 = enumeration("E", U16, 100);
-        assert_eq!(enum1.serialized_size(&a), Ok(2));
+        let SizeOf { enum1, a, .. } = size_of();
+        assert_eq!(SerializedSize.ty(&a, &enum1), Ok(2));
     });
 }
 
 #[test]
 fn size_of_structs() {
     with_test_ctx(|| {
-        use fpp_ast::IntegerKind::U16;
-        let a = sizeof_test_analysis();
-
-        let array1 = array("A", anon_array(Some(3), i64()), 102); // 24
-        let array2 = array("A2", anon_array(Some(2), array1.clone()), 103); // 48
-        let enum1 = enumeration("E", U16, 100);
-        let enum_alias = alias_type("EnumAlias", enum1, 101); // 2
-        let string_size_10 = string_with_size(10); // 12
-        let string_alias = alias_type("StringAlias", string_with_size(100), 104); // 102
-
-        // struct1: m1=array1(24)*2=48, m2=F64(8)=8, m3=enum_alias(2)=2, m4=string10(12)*3=36 => 94
-        let struct1 = struct_ty_sized(
+        let SizeOf {
+            enum_alias,
+            array1,
+            array2,
+            string_alias,
+            string_size_10,
+            a,
+            ..
+        } = size_of();
+        let struct1 = struct_(
             "S",
             anon_struct(&[
-                ("m1", array1.clone()),
+                ("m1", array1),
                 ("m2", f64()),
-                ("m3", enum_alias.clone()),
-                ("m4", string_size_10.clone()),
+                ("m3", enum_alias),
+                ("m4", string_size_10),
             ]),
             110,
             &[("m1", 2), ("m3", 1), ("m4", 3)],
         );
-        assert_eq!(struct1.serialized_size(&a), Ok(94));
-
-        // struct2: m1=array2(48)=48, m2=string_alias(102)=102, m3=struct1(94)*2=188 => 338
-        let struct2 = struct_ty_sized(
+        let struct2 = struct_(
             "S2",
             anon_struct(&[
-                ("m1", array2.clone()),
-                ("m2", string_alias.clone()),
+                ("m1", array2),
+                ("m2", string_alias),
                 ("m3", struct1.clone()),
             ]),
             111,
             &[("m3", 2)],
         );
-        assert_eq!(struct2.serialized_size(&a), Ok(338));
+        assert_eq!(SerializedSize.ty(&a, &struct1), Ok(94));
+        assert_eq!(SerializedSize.ty(&a, &struct2), Ok(338));
     });
 }
 
 #[test]
 fn size_of_types_with_no_size() {
     with_test_ctx(|| {
-        let a = sizeof_test_analysis();
+        let SizeOf { a, .. } = size_of();
         assert_eq!(
-            default_abs_type().serialized_size(&a),
+            SerializedSize.ty(&a, &default_abs_type()),
             Err(SerializedSizeError::Unavailable)
         );
-
         let arr = array("A", anon_array(Some(3), default_abs_type()), 120);
         assert_eq!(
-            arr.serialized_size(&a),
+            SerializedSize.ty(&a, &arr),
             Err(SerializedSizeError::Unavailable)
         );
-
-        let s = struct_ty(
+        let s = struct_(
             "S",
             anon_struct(&[("m1", i32()), ("m2", default_abs_type())]),
             121,
+            &[],
         );
-        assert_eq!(s.serialized_size(&a), Err(SerializedSizeError::Unavailable));
-
+        assert_eq!(
+            SerializedSize.ty(&a, &s),
+            Err(SerializedSizeError::Unavailable)
+        );
         let x = alias_type("X", default_abs_type(), 122);
-        assert_eq!(x.serialized_size(&a), Err(SerializedSizeError::Unavailable));
+        assert_eq!(
+            SerializedSize.ty(&a, &x),
+            Err(SerializedSizeError::Unavailable)
+        );
+        // An anonymous type is not displayable, so it has no serialized size
+        assert_eq!(
+            SerializedSize.ty(&a, &anon_array(Some(3), i32())),
+            Err(SerializedSizeError::Unavailable)
+        );
+        assert_eq!(
+            SerializedSize.ty(&a, &anon_struct(&[("m1", i32())])),
+            Err(SerializedSizeError::Unavailable)
+        );
     });
 }
+
+// ---------------------------------------------------------------------------
+// Rust-only
+// ---------------------------------------------------------------------------
 
 /// A serialized size is a product over the type's nesting depth, so it outgrows
 /// an `i128` long before any single array size runs out of room: `array A = [2]
@@ -667,10 +723,9 @@ fn size_of_types_with_no_size() {
 #[test]
 fn size_of_too_large_to_represent() {
     with_test_ctx(|| {
-        let a = sizeof_test_analysis();
+        let SizeOf { a, .. } = size_of();
 
-        // 2^127 fits (it is `i128::MIN` as a bit pattern only, so stop at 126
-        // doublings of a 1-byte element and check the next one)
+        // 2^126 still fits in an i128; one more doubling (2^127) does not
         let mut ty = boolean();
         for id in 0..126 {
             ty = array("A", anon_array(Some(2), ty), 200 + id);
@@ -692,10 +747,11 @@ fn size_of_too_large_to_represent() {
 
         // The struct arms accumulate with the same care: two members of 2^126
         // bytes each overflow their sum
-        let two_members = struct_ty(
+        let two_members = struct_(
             "S",
             anon_struct(&[("m1", ty.clone()), ("m2", ty.clone())]),
             402,
+            &[],
         );
         assert_eq!(
             two_members.serialized_size(&a),
@@ -703,7 +759,7 @@ fn size_of_too_large_to_represent() {
         );
 
         // ... and so does one member repeated, which is a product
-        let repeated_member = struct_ty_sized("S2", anon_struct(&[("m1", ty)]), 403, &[("m1", 4)]);
+        let repeated_member = struct_("S2", anon_struct(&[("m1", ty)]), 403, &[("m1", 4)]);
         assert_eq!(
             repeated_member.serialized_size(&a),
             Err(SerializedSizeError::TooLarge)
@@ -711,12 +767,26 @@ fn size_of_too_large_to_represent() {
     });
 }
 
-// ---------------------------------------------------------------------------
-// Additional coverage: `Type` predicate/helper methods (many recurse through
-// alias types), exercising the same `Type` surface.
-// ---------------------------------------------------------------------------
+#[test]
+fn node_id_memo_identity() {
+    with_test_ctx(|| {
+        let e1 = enumeration("E", fpp_ast::IntegerKind::I32, 0);
+        let e2 = enumeration("E", fpp_ast::IntegerKind::I32, 0);
+        assert!(Type::identical(&e1, &e2), "same id -> identical");
 
-use crate::semantics::Value;
+        let e3 = enumeration("E", fpp_ast::IntegerKind::I32, 1);
+        assert!(!Type::identical(&e1, &e3), "different id -> not identical");
+    });
+}
+
+/// Two string types are not identical, whatever their sizes, so the common
+/// type of two strings of the same size is the unsized string type.
+#[test]
+fn identical_strings_are_not_identical() {
+    assert!(!Type::identical(&string_with_size(8), &string_with_size(8)));
+    let ct = Type::common_type(&string_with_size(8), &string_with_size(8));
+    assert_common_type_eq(&ct, &string(None));
+}
 
 #[test]
 fn type_predicates_and_helpers() {
@@ -727,28 +797,39 @@ fn type_predicates_and_helpers() {
         let alias_enum = alias_type("AE", default_enum(), 603);
         let alias_arr = alias_type("AA", anon_array(Some(3), i32()), 604);
 
-        // is_int / is_float / is_numeric / is_primitive through aliases
-        assert!(alias_i32.is_int());
-        assert!(alias_f32.is_float());
-        assert!(alias_i32.is_numeric());
-        assert!(alias_i32.is_primitive());
-        assert!(alias_bool.is_primitive());
-        assert!(!alias_arr.is_primitive());
+        // is_int / is_float / is_numeric / is_primitive: an alias type is none
+        // of these, and its underlying type answers for the aliased type
+        assert!(!alias_i32.is_int());
+        assert!(!alias_f32.is_float());
+        assert!(!alias_i32.is_numeric());
+        assert!(!alias_i32.is_primitive());
+        assert!(!alias_bool.is_primitive());
+        assert!(Type::underlying_type(&alias_i32).is_int());
+        assert!(Type::underlying_type(&alias_f32).is_float());
+        assert!(Type::underlying_type(&alias_i32).is_numeric());
+        assert!(Type::underlying_type(&alias_bool).is_primitive());
+        assert!(!Type::underlying_type(&alias_arr).is_primitive());
 
-        // is_convertible_to_numeric: enums (and aliases of enums) are convertible
-        assert!(alias_enum.is_convertible_to_numeric());
+        // is_convertible_to_numeric: numeric types and enums are convertible;
+        // an alias of an enum is not, though its underlying type is
+        assert!(!alias_enum.is_convertible_to_numeric());
+        assert!(Type::underlying_type(&alias_enum).is_convertible_to_numeric());
         assert!(default_enum().is_convertible_to_numeric());
         assert!(!string(None).is_convertible_to_numeric());
 
-        // is_promotable_to_array: numeric/bool/string/enum yes; abs type no
+        // is_promotable_to_array: numeric/bool/string/enum yes; abs type and
+        // alias type no
         assert!(i32().is_promotable_to_array());
         assert!(boolean().is_promotable_to_array());
         assert!(string(None).is_promotable_to_array());
         assert!(default_enum().is_promotable_to_array());
         assert!(!default_abs_type().is_promotable_to_array());
+        assert!(!alias_i32.is_promotable_to_array());
 
-        // array_size through alias / array / anon-array; None otherwise
-        assert_eq!(alias_arr.array_size(), Some(3));
+        // array_size of an array or anonymous array; None otherwise, including
+        // for an alias of an array type
+        assert_eq!(alias_arr.array_size(), None);
+        assert_eq!(Type::underlying_type(&alias_arr).array_size(), Some(3));
         assert_eq!(anon_array(Some(5), i32()).array_size(), Some(5));
         assert_eq!(
             array("A", anon_array(Some(2), i32()), 605).array_size(),
@@ -756,7 +837,8 @@ fn type_predicates_and_helpers() {
         );
         assert_eq!(i32().array_size(), None);
 
-        // has_numeric_members: arrays/structs of numerics yes; of strings no
+        // has_numeric_members: arrays/structs of numerics yes; of strings no;
+        // an alias type has numeric members if its underlying type does
         assert!(anon_array(Some(2), i32()).has_numeric_members());
         assert!(anon_struct(&[("x", i32()), ("y", f32())]).has_numeric_members());
         assert!(!anon_struct(&[("x", string(None))]).has_numeric_members());
@@ -808,10 +890,6 @@ fn type_default_values() {
     });
 }
 
-// ---------------------------------------------------------------------------
-// "definition symbol" should ...
-// ---------------------------------------------------------------------------
-
 /// `Type::def_symbol` must yield the symbol that `EnterSymbols` interned for the
 /// same definition.
 #[test]
@@ -832,8 +910,11 @@ struct S { x: U32, y: F64 }
         let source = fpp_core::SourceFile::new("def_symbol_spec.fpp", src.to_string());
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = crate::Analysis::new();
-        let _ = crate::resolve_templates(&mut a, std::slice::from_mut(&mut ast));
-        let _ = crate::check_semantics(&mut a, vec![&ast]);
+        let _ = crate::CheckSemantics::tu_list(
+            &mut a,
+            fpp_fs::FsReader {},
+            std::slice::from_mut(&mut ast),
+        );
 
         // Every type-definition symbol the pipeline entered.
         let type_symbols: Vec<Symbol> = a

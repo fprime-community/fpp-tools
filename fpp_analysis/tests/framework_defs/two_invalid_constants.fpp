@@ -1,0 +1,2 @@
+constant FW_FIXED_LENGTH_STRING_SIZE = -1
+constant FW_ASSERT_COUNT_MAX = -1

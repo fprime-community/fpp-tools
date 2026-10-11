@@ -1,16 +1,7 @@
  --> [ local path prefix ]/tlm_channel/limit_not_numeric.fpp:3:30
   |
 3 |   telemetry T: U32 low { red "abc" }
-  |                              ^^^^^ cannot convert expression to integer
-  |
-  = note: string cannot be converted to Integer
-
- --> [ local path prefix ]/tlm_channel/limit_not_numeric.fpp:3:30
-  |
-3 |   telemetry T: U32 low { red "abc" }
-  |                              ^^^^^ default value cannot be converted to U32
-  |
-  = note: string cannot be converted to U32
+  |                              ^^^^^ cannot convert string to a numeric type
 
  --> [ local path prefix ]/tlm_channel/limit_not_numeric.fpp:1:1
   |

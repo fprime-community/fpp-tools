@@ -1,7 +1,7 @@
  --> [ local path prefix ]/template/struct_parameter_nested_default_bad_arg.fpp:6:19
   |
 6 | expand M(constant { inner = { a = "abc" } })
-  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^ template argument cannot be converted to S
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^ cannot convert { inner: { a: string } } to struct S
   |
   = note: struct member `inner` type cannot be converted
   = note: struct member `a` type cannot be converted

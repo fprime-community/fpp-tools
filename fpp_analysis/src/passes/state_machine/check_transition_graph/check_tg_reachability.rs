@@ -1,5 +1,6 @@
 use crate::analyzers::state_machine::SmResult;
 use crate::errors::SemanticError;
+use crate::semantics::SymbolInterface;
 use crate::semantics::state_machine::StateMachineAnalysis;
 use crate::semantics::state_machine::transition_graph::Node as TgNode;
 use rustc_hash::FxHashSet as HashSet;
@@ -16,7 +17,7 @@ impl CheckTGReachability {
             if !reachable_nodes.contains(&node) {
                 // Unreachable node is non-blocking: emit and keep checking the
                 // remaining nodes.
-                let loc = node.soc.get_symbol().get_span();
+                let loc = node.soc.get_symbol().get_loc();
                 let name = node.soc.get_name();
                 SemanticError::UnreachableNode { name, loc }.emit();
             }

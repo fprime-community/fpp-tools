@@ -5,6 +5,7 @@ use crate::{Analysis, semantics::Symbol};
 /// A type definition that [`crate::passes::EnterSymbols`] interns into a
 /// [`Symbol`]
 pub trait InternedDef: fpp_ast::AstNode + Clone {
+    /// The definition held by a symbol of this kind of definition
     fn from_symbol(symbol: &Symbol) -> Option<&Arc<Self>>;
 }
 
@@ -30,10 +31,15 @@ impl_interned_def! {
 }
 
 impl Analysis {
+    /// The definition held by the symbol entered for a definition node, so
+    /// that the types built for a definition share its symbol's node.
+    /// [`crate::passes::EnterSymbols`] enters a symbol for every type
+    /// definition that the analysis visits.
     pub fn interned_def<D: InternedDef>(&self, node: &D) -> Arc<D> {
-        match self.symbol_map.get(&node.id()).and_then(D::from_symbol) {
-            Some(def) => def.clone(),
-            None => Arc::new(node.clone()),
-        }
+        self.symbol_map
+            .get(&node.id())
+            .and_then(D::from_symbol)
+            .expect("type definition was entered by EnterSymbols")
+            .clone()
     }
 }

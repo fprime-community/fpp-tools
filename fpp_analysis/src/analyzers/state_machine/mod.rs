@@ -1,11 +1,13 @@
 mod state_machine_analysis_visitor;
 pub use state_machine_analysis_visitor::*;
 
-mod state_machine_use_analyzer;
-pub use state_machine_use_analyzer::*;
+pub mod state_analyzer;
 
-mod transition_expr_analyzer;
-pub use transition_expr_analyzer::*;
+pub mod state_machine_use_analyzer;
+pub use state_machine_use_analyzer::StateMachineUseAnalyzer;
 
-mod sm_typed_element_analyzer;
-pub use sm_typed_element_analyzer::*;
+pub mod transition_expr_analyzer;
+pub use transition_expr_analyzer::TransitionExprAnalyzer;
+
+pub mod sm_typed_element_analyzer;
+pub use sm_typed_element_analyzer::SmTypedElementAnalyzer;

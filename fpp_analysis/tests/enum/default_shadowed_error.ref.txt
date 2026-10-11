@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/enum/default_shadowed_error.fpp:4:27
+  |
+4 |   enum E { A, B } default .a
+  |                           ^^ cannot convert Integer to enum E
+

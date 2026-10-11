@@ -1,4 +1,7 @@
 use crate::Analysis;
+use crate::analyzers::state_machine::sm_typed_element_analyzer::{
+    self, sm_typed_element_analyzer_hooks,
+};
 use crate::analyzers::state_machine::{
     SmResult, SmTypedElementAnalyzer, StateMachineAnalysisVisitor,
 };
@@ -6,10 +9,7 @@ use crate::semantics::state_machine::transition_graph::Node as TgNode;
 use crate::semantics::state_machine::{
     StateMachineAnalysis, StateMachineSymbol, StateMachineTypedElement, StateOrChoice,
 };
-use fpp_ast::{
-    AstNode, DefChoice, DefState, DefStateMachine, SpecInitialTransition, SpecStateEntry,
-    SpecStateExit, SpecStateTransition,
-};
+use fpp_ast::{AstNode, DefStateMachine};
 use std::ops::ControlFlow;
 
 /// Compute the type option map
@@ -58,7 +58,8 @@ impl SmTypedElementAnalyzer for ComputeTypeOptionMap<'_> {
         match arcs.split_first() {
             None => {
                 // Handle the case where no arc comes into J.
-                // This happens when J is the initial node in the transition graph.
+                // This happens when J is the initial node in the transition graph,
+                // or when J is an unreachable choice that no transition enters.
                 sma.type_option_map.insert(te.clone(), None);
             }
             Some((head, tail)) => {
@@ -130,41 +131,11 @@ impl SmTypedElementAnalyzer for ComputeTypeOptionMap<'_> {
         if sma.type_option_map.contains_key(&te) {
             ControlFlow::Continue(())
         } else {
-            self.dispatch_typed_element(sma, te)
+            sm_typed_element_analyzer::visit_typed_element(self, sma, te)
         }
     }
 }
 
 impl StateMachineAnalysisVisitor for ComputeTypeOptionMap<'_> {
-    fn def_choice(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
-        self.def_choice_te(sma, node)
-    }
-
-    fn spec_state_entry(&self, sma: &mut StateMachineAnalysis, node: &SpecStateEntry) -> SmResult {
-        self.spec_state_entry_te(sma, node)
-    }
-
-    fn spec_state_exit(&self, sma: &mut StateMachineAnalysis, node: &SpecStateExit) -> SmResult {
-        self.spec_state_exit_te(sma, node)
-    }
-
-    fn spec_initial_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecInitialTransition,
-    ) -> SmResult {
-        self.spec_initial_transition_te(sma, node)
-    }
-
-    fn spec_state_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecStateTransition,
-    ) -> SmResult {
-        self.spec_state_transition_te(sma, node)
-    }
-
-    fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
-        self.state_analyzer_def_state(sma, node)
-    }
+    sm_typed_element_analyzer_hooks!();
 }

@@ -8,7 +8,7 @@
 use fpp_analysis::semantics::{
     Command, ComponentInstance, NonParamKind, ParamKind, Symbol, SymbolInterface, Type, Value,
 };
-use fpp_analysis::{Analysis, add_state_enums, check_semantics, resolve_templates};
+use fpp_analysis::{Analysis, CheckSemantics};
 use fpp_ast::{QueueFull, TlmChannelLimitKind, TlmChannelUpdate};
 use fpp_core::{SourceFile, Spanned};
 use std::sync::Arc;
@@ -22,9 +22,8 @@ fn with_analysis(src: &str, f: impl FnOnce(&Analysis)) {
         let source = SourceFile::new("semantics_test.fpp", src.to_string());
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = Analysis::new();
-        add_state_enums(&mut ast);
-        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
-        let _ = check_semantics(&mut a, vec![&ast]);
+        let _ =
+            CheckSemantics::tu_list(&mut a, fpp_fs::FsReader {}, std::slice::from_mut(&mut ast));
         f(&a);
     });
     let output = String::from_utf8(diagnostics).expect("diagnostics are UTF-8");
@@ -380,7 +379,8 @@ instance c: C base id 0x100 \
         assert_eq!(instance.cpu, Some(0));
         // The implementation file is resolved against the directory of the file
         // that specifies it, then normalized.
-        assert_eq!(instance.file.as_deref(), Some("impl/C.hpp"));
+        let file = fpp_core::File::get_path("impl/C.hpp");
+        assert_eq!(instance.file.as_deref(), file.to_str());
         assert!(instance.get_component(a).is_some());
         assert!(instance.get_interface(a).is_some());
     });
@@ -487,7 +487,7 @@ fn nested_array_default_shares_its_repeated_element() {
                 .all(|e| Arc::ptr_eq(e, inner_first)),
             "Inner's default does not share its repeated element"
         );
-        assert!(inner.anon_array.iter().all(|e| e.to_string() == "0"));
+        assert!(inner.anon_array.iter().all(|e| e.to_string() == "0: U8"));
     });
 }
 

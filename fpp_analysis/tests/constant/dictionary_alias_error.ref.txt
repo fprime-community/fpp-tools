@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/constant/dictionary_alias_error.fpp:8:1
+  |
+8 | dictionary constant d = M.c
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ dictionary constant must have a numeric, Boolean, string, or enum type
+

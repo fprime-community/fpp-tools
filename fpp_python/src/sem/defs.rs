@@ -59,13 +59,14 @@ fpp_python_macros::fpp_sem_bindings! {
             get_finalized_type(node: node) -> opt(union(Type)),
             get_int_value(node: node) -> opt(i128),
             get_int_value_checked(node: node, loc: span) throws(SemanticError) -> i128,
-            get_interface(id: node) -> opt(entity(Interface)),
-            get_interface_instance(id: node) -> opt(union(InterfaceInstance)),
+            get_interface(id: node) throws(SemanticError) -> opt(entity(Interface)),
+            get_interface_instance(id: node) throws(SemanticError) -> opt(union(InterfaceInstance)),
             get_interface_instance_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
             get_interface_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
             get_nonnegative_big_int_value(node: node, loc: span) throws(SemanticError) -> i128,
             get_nonnegative_big_int_value_opt(expr: ref opt(astnode(Expr))) throws(SemanticError) -> opt(i128),
             get_nonnegative_int_value(node: node, loc: span) throws(SemanticError) -> i128,
+            get_nonnegative_int_value_opt(expr: ref opt(astnode(Expr))) throws(SemanticError) -> opt(i128),
             get_qualified_name(symbol: ref union(Symbol)) -> str,
             get_reason_for_non_displayable_type_at(node: node) -> list(tuple(span, str)),
             get_represented_component_instance(id: node) throws(SemanticError) -> opt(rewrap(InterfaceInstance::Component)),
@@ -118,7 +119,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union InterfaceInstance native fpp_analysis::semantics::InterfaceInstance handle clone alias "InterfaceInstance" accessor native repr name(qualified_name) {
+    union InterfaceInstance native fpp_analysis::semantics::InterfaceInstance handle clone alias "InterfaceInstance" accessor native repr display {
         variants {
             Component => ComponentInterfaceInstance : payload,
             Topology => TopologyInterfaceInstance : payload,
@@ -167,7 +168,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union PortInstanceType native fpp_analysis::semantics::PortInstanceType handle clone alias "PortInstanceType" accessor native {
+    union PortInstanceType native fpp_analysis::semantics::PortInstanceType handle clone alias "PortInstanceType" accessor native repr display {
         variants {
             DefPort => DefPortPortInstanceType : astdef(DefPort),
             Serial => SerialPortInstanceType : unit,
@@ -311,6 +312,7 @@ fpp_python_macros::fpp_sem_bindings! {
             has_numeric_members -> bool,
             assoc identical(t2: ref union(Type)) -> bool,
             is_canonical -> bool,
+            is_convertible_to(t: ref arc(union(Type))) -> bool,
             is_convertible_to_numeric -> bool,
             is_displayable -> bool,
             is_float -> bool,
@@ -451,6 +453,9 @@ fpp_python_macros::fpp_sem_bindings! {
         fields {
             value: tuple(str, i128),
             ty: rewrap(Type::Enum),
+        }
+        methods {
+            convert_to_rep_type -> union(Value),
         }
     }
 
@@ -603,14 +608,14 @@ fpp_python_macros::fpp_sem_bindings! {
             event_map: map(i128, entity(Event)),
             default_event_id: i128,
             param_map: map(i128, entity(Param)),
+            spec_port_matching_list: list(astdef(SpecPortMatching)),
+            state_machine_instance_map: map(str, entity(StateMachineInstance)),
+            port_matching_list: list(entity(PortMatching)),
             default_param_id: i128,
             container_map: map(i128, entity(Container)),
             default_container_id: i128,
             record_map: map(i128, entity(Record)),
             default_record_id: i128,
-            state_machine_instance_map: map(str, entity(StateMachineInstance)),
-            spec_port_matching_list: list(astdef(SpecPortMatching)),
-            port_matching_list: list(entity(PortMatching)),
         }
         methods {
             get_max_id -> i128,
@@ -627,7 +632,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Connection native fpp_analysis::semantics::Connection {
+    entity Connection native fpp_analysis::semantics::Connection repr display {
         fields {
             from: entity(Endpoint),
             to: entity(Endpoint),
@@ -684,7 +689,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Endpoint native fpp_analysis::semantics::Endpoint {
+    entity Endpoint native fpp_analysis::semantics::Endpoint repr display {
         fields {
             loc: span,
             port: entity(PortInstanceIdentifier),
@@ -808,7 +813,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity PortInstanceIdentifier native fpp_analysis::semantics::PortInstanceIdentifier identity qualified_name(qualified_name) repr name(qualified_name) {
+    entity PortInstanceIdentifier native fpp_analysis::semantics::PortInstanceIdentifier identity qualified_name(qualified_name) repr display {
         fields {
             interface_instance: union(InterfaceInstance),
             port_instance: union(PortInstance),
@@ -871,7 +876,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Scope native fpp_analysis::semantics::Scope {
+    entity Scope native fpp_analysis::semantics::Scope repr display {
     }
 
     entity StateMachine native fpp_analysis::semantics::StateMachine {
@@ -921,7 +926,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity StateMachineInstance native fpp_analysis::semantics::StateMachineInstance repr name(get_name) {
+    entity StateMachineInstance native fpp_analysis::semantics::state_machine::StateMachineInstance repr name(get_name) {
         fields {
             node: astdef(SpecStateMachineInstance),
             state_machine: astdef(DefStateMachine),
@@ -938,11 +943,12 @@ fpp_python_macros::fpp_sem_bindings! {
 
     entity StateMachineNestedScope native fpp_analysis::semantics::state_machine::StateMachineNestedScope {
         methods {
+            global_scope -> entity(StateMachineNestedScope),
             inner_scope -> ref entity(StateMachineScope),
         }
     }
 
-    entity StateMachineScope native fpp_analysis::semantics::state_machine::StateMachineScope {
+    entity StateMachineScope native fpp_analysis::semantics::state_machine::StateMachineScope repr display {
     }
 
     entity TemplateExpansion native fpp_analysis::semantics::TemplateExpansion {
@@ -1033,12 +1039,12 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Topology native fpp_analysis::semantics::Topology repr name(unqualified_name) {
+    entity Topology native fpp_analysis::semantics::Topology repr name(get_qualified_name) {
         fields {
             symbol: union(Symbol),
             qualified_name: str,
-            direct_component_instances: map(union(Symbol), span),
             direct_topologies: map(union(Symbol), span),
+            direct_component_instances: map(union(Symbol), span),
             direct_template_args: map(union(Symbol), span),
             transitive_import_set: list(union(Symbol)),
             instance_map: map(union(InterfaceInstance), span),
@@ -1049,6 +1055,7 @@ fpp_python_macros::fpp_sem_bindings! {
             port_interface: entity(PortInterface),
             pattern_map: map(leaf(crate::ast::ConnectionPatternKind), entity(ConnectionPattern)),
             connection_map: map(str, list(entity(Connection))),
+            unmatched_connection_set: list(entity(Connection)),
             local_connection_map: map(str, list(entity(Connection))),
             output_connection_map: map(entity(PortInstanceIdentifier), list(entity(Connection))),
             input_connection_map: map(entity(PortInstanceIdentifier), list(entity(Connection))),
@@ -1066,6 +1073,7 @@ fpp_python_macros::fpp_sem_bindings! {
             get_imported_topology_symbols(a: analysis) -> list(union(Symbol)),
             get_name -> ref str,
             get_port_number(pi: ref union(PortInstance), c: ref entity(Connection)) -> opt(i128),
+            get_qualified_name -> ref str,
             get_used_port_numbers(pi: ref union(PortInstance), cs: ref list(entity(Connection))) -> list(i128),
             look_up_instance_at(instance: ref union(InterfaceInstance), loc: span) throws(SemanticError) -> unit,
             node -> ref astdef(DefTopology),

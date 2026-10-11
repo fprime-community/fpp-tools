@@ -1,0 +1,9 @@
+ --> [ local path prefix ]/array/default_struct_element_size_error.fpp:3:25
+  |
+3 | array A = [1] T default [{ b = [1, 2, 3] }]
+  |                         ^^^^^^^^^^^^^^^^^^^ cannot convert [1] { b: [3] Integer } to array A
+  |
+  = note: array element type cannot be converted
+  = note: struct member `b` type cannot be converted
+  = note: array sizes do not match 3 != 2
+

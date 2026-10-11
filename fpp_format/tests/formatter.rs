@@ -1,4 +1,4 @@
-use fpp_format::{FormatOptions, Formatter};
+use fpp_format::FormatOptions;
 use fpp_lsp_parser::{TopEntryPoint, parse};
 use pretty_assertions::assert_eq;
 use std::path::PathBuf;
@@ -9,23 +9,37 @@ fn format_src(
     entry: TopEntryPoint,
     options: FormatOptions,
 ) -> Result<String, fpp_format::FormatError> {
-    let parse = parse(text, entry);
-    let errors = parse.errors();
-    if !errors.is_empty() {
-        return Err(fpp_format::FormatError::ParseError(errors));
-    }
-    let root = parse.syntax_node();
-    Ok(Formatter::new(options).format(&root))
+    fpp_format::format_text(text, entry, options)
 }
 
-fn dup(entry: &TopEntryPoint) -> TopEntryPoint {
-    match entry {
-        TopEntryPoint::Module => TopEntryPoint::Module,
-        TopEntryPoint::Component => TopEntryPoint::Component,
-        TopEntryPoint::Topology => TopEntryPoint::Topology,
-        TopEntryPoint::TlmPacket => TopEntryPoint::TlmPacket,
-        TopEntryPoint::TlmPacketSet => TopEntryPoint::TlmPacketSet,
-    }
+/// The AST that fpp_parser builds for `text`, serialized without spans, so
+/// two sources compare equal exactly when they mean the same thing.
+fn ast_json(text: &str, entry: TopEntryPoint) -> String {
+    let mut diagnostics = vec![];
+    let mut ctx = fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
+    let json = fpp_core::run(&mut ctx, || {
+        let src = fpp_core::SourceFile::new("input.fpp", text.to_string());
+        match entry {
+            TopEntryPoint::Module => {
+                serde_json::to_string_pretty(&fpp_parser::parse(src, |p| p.trans_unit(), None))
+            }
+            TopEntryPoint::Component => serde_json::to_string_pretty(&fpp_parser::parse(
+                src,
+                |p| p.component_members(),
+                None,
+            )),
+            _ => unimplemented!("no AST comparison for {:?}", entry),
+        }
+        .unwrap()
+    });
+    drop(ctx);
+    assert!(
+        diagnostics.is_empty(),
+        "fpp_parser rejects the input:\n{}\n{}",
+        String::from_utf8_lossy(&diagnostics),
+        text
+    );
+    json
 }
 
 fn run_test(file_name: &str, entry: TopEntryPoint) {
@@ -48,7 +62,7 @@ fn run_test(file_name: &str, entry: TopEntryPoint) {
         }
     };
 
-    let formatted = match format_src(&src, dup(&entry), FormatOptions::default()) {
+    let formatted = match format_src(&src, entry, FormatOptions::default()) {
         Ok(f) => f,
         Err(e) => panic!("{}: formatting failed: {:?}", file_name, e),
     };
@@ -66,7 +80,7 @@ fn run_test(file_name: &str, entry: TopEntryPoint) {
         }
     }
 
-    let parse_result = parse(&formatted, dup(&entry));
+    let parse_result = parse(&formatted, entry);
     if !parse_result.errors().is_empty() {
         panic!(
             "{}: output has parse errors: {:?}\nOutput:\n{}",
@@ -75,6 +89,14 @@ fn run_test(file_name: &str, entry: TopEntryPoint) {
             formatted
         );
     }
+
+    // Formatting preserves the meaning of the source.
+    assert_eq!(
+        ast_json(&src, entry),
+        ast_json(&formatted, entry),
+        "{}: formatting changed the AST",
+        file_name
+    );
 
     let formatted2 = format_src(&formatted, entry, FormatOptions::default())
         .expect("second format should succeed");
@@ -122,6 +144,15 @@ fmt_test!(constant_align, "constant-align");
 fmt_test!(enum_annotation_align, "enum-annotation-align");
 fmt_test!(param_annotation, "param-annotation");
 fmt_test!(blank_lines, "blank-lines");
+fmt_test!(absolute_names, "absolute-names");
+fmt_test!(component_dictionary, "component-dictionary");
+fmt_test!(float_literals, "float-literals");
+fmt_test!(crlf, "crlf");
+fmt_test!(implements_list, "implements-list");
+fmt_test!(
+    multiline_string_trailing_space,
+    "multiline-string-trailing-space"
+);
 
 #[test]
 fn component_inner() {

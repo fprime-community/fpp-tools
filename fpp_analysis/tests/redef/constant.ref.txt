@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/constant.fpp:2:10
+ --> [ local path prefix ]/redef/constant.fpp:2:1
   |
 2 | constant x = 1
-  |          ^ redefinition of symbol x
+  | ^^^^^^^^^^^^^^ redefinition of symbol x
   |
  ::: [ local path prefix ]/redef/constant.fpp:1:1
   |

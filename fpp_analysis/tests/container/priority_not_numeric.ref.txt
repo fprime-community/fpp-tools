@@ -1,9 +1,7 @@
  --> [ local path prefix ]/container/priority_not_numeric.fpp:3:49
   |
 3 |   product container C id 0x100 default priority "abc"
-  |                                                 ^^^^^ cannot convert expression to integer
-  |
-  = note: string cannot be converted to Integer
+  |                                                 ^^^^^ cannot convert string to a numeric type
 
  --> [ local path prefix ]/container/priority_not_numeric.fpp:1:1
   |

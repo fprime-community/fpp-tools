@@ -1,10 +1,11 @@
 use crate::semantics::{
     AbsTypeValue, AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue,
     FloatValue, Format, IntegerValue, PrimitiveIntegerValue, StringValue, StructValue, Symbol,
-    Value,
+    SymbolInterface, TypeVisitor, Value,
 };
 use fpp_ast::{FloatKind, IntegerKind};
 use fpp_core::Diagnostic;
+use indexmap::IndexMap;
 use rustc_hash::FxHashMap as HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
@@ -17,42 +18,32 @@ pub enum Type {
     PrimitiveInt(IntegerKind),
     /// Floating-point types
     Float(FloatKind),
-    /// The type of a string
+    /// The type of a string, with its size. The size is the value of the size
+    /// expression of a `string size e` type name, which `FinalizeTypeDefs`
+    /// evaluates into the type; before that, and for a string with no size, it
+    /// is `None`.
     String(Option<i128>),
     /// The Boolean type
     Boolean,
     /// The type of arbitrary-width integers
     Integer,
+    /// An abstract type
     Abs(Arc<AbsType>),
+    /// An alias type
     Alias(AliasType),
+    /// A named array type
     Array(Arc<ArrayType>),
+    /// An anonymous array type
     AnonArray(AnonArrayType),
+    /// An enum type
     Enum(Arc<EnumType>),
+    /// A named struct type
     Struct(Arc<StructType>),
+    /// An anonymous struct type
     AnonStruct(AnonStructType),
 }
 
-/// Why [`Type::serialized_size`] could not produce a size
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum SerializedSizeError {
-    /// The size depends on information that is not there: a framework definition
-    /// that is not defined, a type that is not finalized, or a type with no
-    /// serialized representation at all (`Integer`, an abstract type).
-    Unavailable,
-    /// The size does not fit in an `i128`. Sizes are represented exactly here, so
-    /// an inexpressible size is reported rather than silently wrapped.
-    TooLarge,
-}
-
 impl Type {
-    /// Get the underlying type
-    pub fn underlying_type(ty: &Arc<Type>) -> Arc<Type> {
-        match ty.deref() {
-            Type::Alias(alias) => Type::underlying_type(&alias.alias_type),
-            _ => ty.clone(),
-        }
-    }
-
     /// Get the default value
     pub fn default_value(self: &Arc<Type>) -> Option<Value> {
         match self.deref() {
@@ -98,36 +89,29 @@ impl Type {
                 }
 
                 Some(Value::AnonStruct(AnonStructValue {
-                    members: HashMap::from_iter(members),
+                    members: IndexMap::from_iter(members),
                 }))
             }
-        }
-    }
-
-    /// The anonymous array structure of an array type, named or not
-    pub fn as_anon_array(&self) -> Option<&AnonArrayType> {
-        match self {
-            Type::Array(ty) => Some(&ty.anon_array),
-            Type::AnonArray(ty) => Some(ty),
-            _ => None,
-        }
-    }
-
-    /// The anonymous struct structure of a struct type, named or not
-    pub fn as_anon_struct(&self) -> Option<&AnonStructType> {
-        match self {
-            Type::Struct(ty) => Some(&ty.anon_struct),
-            Type::AnonStruct(ty) => Some(ty),
-            _ => None,
         }
     }
 
     /// Get the array size
     pub fn array_size(&self) -> Option<usize> {
         match self {
-            Type::Alias(ty) => ty.alias_type.array_size(),
             Type::AnonArray(arr) => arr.size,
             Type::Array(arr) => arr.anon_array.size,
+            _ => None,
+        }
+    }
+
+    /// Get the definition node identifier, if any
+    pub fn def_node_id(&self) -> Option<fpp_core::Node> {
+        match self {
+            Type::Abs(ty) => Some(ty.node.node_id),
+            Type::Alias(ty) => Some(ty.node.node_id),
+            Type::Array(ty) => Some(ty.node.node_id),
+            Type::Enum(ty) => Some(ty.node.node_id),
+            Type::Struct(ty) => Some(ty.node.node_id),
             _ => None,
         }
     }
@@ -147,19 +131,18 @@ impl Type {
         }
     }
 
-    /// Get the definition node identifier, if any
-    pub fn def_node_id(&self) -> Option<fpp_core::Node> {
-        match self {
-            Type::Abs(ty) => Some(ty.node.node_id),
-            Type::Alias(ty) => Some(ty.node.node_id),
-            Type::Array(ty) => Some(ty.node.node_id),
-            Type::Enum(ty) => Some(ty.node.node_id),
-            Type::Struct(ty) => Some(ty.node.node_id),
-            _ => None,
+    /// Get the underlying type
+    pub fn underlying_type(ty: &Arc<Type>) -> Arc<Type> {
+        match ty.deref() {
+            Type::Alias(alias) => Type::underlying_type(&alias.alias_type),
+            _ => ty.clone(),
         }
     }
 
     /// Does this type have numeric members?
+    ///
+    /// A type has numeric members if its underlying type does (spec, Types
+    /// with Numeric Members), so this predicate looks through an alias type.
     pub fn has_numeric_members(&self) -> bool {
         match self {
             Type::Alias(ty) => ty.alias_type.has_numeric_members(),
@@ -181,7 +164,6 @@ impl Type {
     /// Is this type convertible to a numeric type?
     pub fn is_convertible_to_numeric(&self) -> bool {
         match self {
-            Type::Alias(ty) => ty.alias_type.is_convertible_to_numeric(),
             Type::Enum(_) => true,
             _ => self.is_numeric(),
         }
@@ -190,7 +172,6 @@ impl Type {
     /// Is this type promotable to an array type?
     pub fn is_promotable_to_array(&self) -> bool {
         match self {
-            Type::Alias(ty) => ty.alias_type.is_promotable_to_array(),
             Type::String(_) => true,
             Type::Boolean => true,
             Type::Enum(_) => true,
@@ -224,19 +205,69 @@ impl Type {
 
     /// Is this type a float type?
     pub fn is_float(&self) -> bool {
+        matches!(self, Type::Float(_))
+    }
+
+    /// Is this type an int type?
+    pub fn is_int(&self) -> bool {
+        matches!(self, Type::PrimitiveInt(_) | Type::Integer)
+    }
+
+    /// Is this type a primitive type?
+    pub fn is_primitive(&self) -> bool {
+        matches!(self, Type::PrimitiveInt(_) | Type::Float(_) | Type::Boolean)
+    }
+
+    /// Is this type a canonical (non-aliased) type?
+    pub fn is_canonical(&self) -> bool {
+        !matches!(self, Type::Alias(_))
+    }
+
+    /// Is this type promotable to a struct type?
+    pub fn is_promotable_to_struct(&self) -> bool {
+        self.is_promotable_to_array()
+    }
+
+    /// Is this type numeric?
+    pub fn is_numeric(&self) -> bool {
+        self.is_int() || self.is_float()
+    }
+
+    /// Is this type convertible to type t?
+    pub fn is_convertible_to(self: &Arc<Type>, t: &Arc<Type>) -> bool {
+        Type::convert(self, t).is_ok()
+    }
+
+    // Rust helpers
+
+    /// Whether a size is valid for a string type: a nonnegative value that fits
+    /// in an `i32`
+    pub fn is_valid_string_size(size: i128) -> bool {
+        size >= 0 && size <= i32::MAX as i128
+    }
+
+    /// The anonymous array structure of an array type, named or not
+    pub fn as_anon_array(&self) -> Option<&AnonArrayType> {
         match self {
-            Type::Alias(ty) => ty.alias_type.is_float(),
-            Type::Float(_) => true,
-            _ => false,
+            Type::Array(ty) => Some(&ty.anon_array),
+            Type::AnonArray(ty) => Some(ty),
+            _ => None,
         }
     }
 
-    /// Best-effort serialized size, in bytes, for framework-independent types.
-    ///
-    /// Returns `None` for types whose serialized size depends on framework
-    /// definitions (e.g. strings, which need `FwSizeStoreType` /
-    /// `FW_FIXED_LENGTH_STRING_SIZE`) or on type finalization
-    /// (arrays/structs) that is not available within the current pass set.
+    /// The anonymous struct structure of a struct type, named or not
+    pub fn as_anon_struct(&self) -> Option<&AnonStructType> {
+        match self {
+            Type::Struct(ty) => Some(&ty.anon_struct),
+            Type::AnonStruct(ty) => Some(ty),
+            _ => None,
+        }
+    }
+
+    /// The serialized size, in bytes, of a type whose size does not depend on
+    /// framework definitions or on finalization: a primitive type, or an alias
+    /// or enum of one. `None` for any other type; [`Type::serialized_size`]
+    /// computes the size of every type that has one.
     pub fn primitive_serialized_size(&self) -> Option<i128> {
         match self {
             Type::Alias(alias) => alias.alias_type.primitive_serialized_size(),
@@ -254,432 +285,10 @@ impl Type {
         }
     }
 
-    /// Compute the serialized size of a type. Unlike
-    /// [`Type::primitive_serialized_size`], this
-    /// resolves string, array, and struct sizes using the F Prime framework
-    /// definitions (`FwSizeStoreType`, `FW_FIXED_LENGTH_STRING_SIZE`) recorded by
-    /// `CheckFrameworkDefs`. Requires the type to be finalized (array/string
-    /// sizes known).
-    ///
-    /// The size is a product over the nesting depth of the type, so it grows
-    /// faster than any single array size: 128 levels of `array A = [2] B` reach
-    /// 2^128 bytes. An `i128` cannot hold that, so a size that does not fit is
-    /// reported as [`SerializedSizeError::TooLarge`] rather than wrapped.
+    /// Computes the serialized size of a type, as the `SerializedSize` type
+    /// visitor does
     pub fn serialized_size(&self, a: &crate::Analysis) -> Result<i128, SerializedSizeError> {
-        use crate::semantics::SymbolInterface;
-        use SerializedSizeError::Unavailable;
-
-        /// `n * size`, or [`SerializedSizeError::TooLarge`]
-        fn scale(n: usize, size: i128) -> Result<i128, SerializedSizeError> {
-            (n as i128)
-                .checked_mul(size)
-                .ok_or(SerializedSizeError::TooLarge)
-        }
-
-        match self {
-            Type::Alias(alias) => alias.alias_type.serialized_size(a),
-            Type::Boolean => Ok(1),
-            Type::Float(FloatKind::F32) => Ok(4),
-            Type::Float(FloatKind::F64) => Ok(8),
-            Type::PrimitiveInt(_) => self.primitive_serialized_size().ok_or(Unavailable),
-            Type::Enum(ty) => Type::PrimitiveInt(ty.rep_type).serialized_size(a),
-            Type::Array(arr) => {
-                let n = arr.anon_array.size.ok_or(Unavailable)?;
-                scale(n, arr.anon_array.elt_type.serialized_size(a)?)
-            }
-            Type::AnonArray(arr) => {
-                let n = arr.size.ok_or(Unavailable)?;
-                scale(n, arr.elt_type.serialized_size(a)?)
-            }
-            Type::String(size) => {
-                let store_symbol = a
-                    .framework_definitions
-                    .type_map
-                    .get("FwSizeStoreType")
-                    .ok_or(Unavailable)?;
-                let store_size = a
-                    .type_map
-                    .get(&store_symbol.node())
-                    .ok_or(Unavailable)?
-                    .serialized_size(a)?;
-                let data_size = match size {
-                    Some(n) => *n,
-                    None => {
-                        let c = a
-                            .framework_definitions
-                            .constant_map
-                            .get("FW_FIXED_LENGTH_STRING_SIZE")
-                            .ok_or(Unavailable)?;
-                        a.get_int_value(c.node()).ok_or(Unavailable)?
-                    }
-                };
-                store_size
-                    .checked_add(data_size)
-                    .ok_or(SerializedSizeError::TooLarge)
-            }
-            Type::Struct(ty) => {
-                let mut total = 0i128;
-                for (name, member_ty) in &ty.anon_struct.members {
-                    let member_size = member_ty.serialized_size(a)?;
-                    let mult = ty.sizes.get(name).copied().unwrap_or(1);
-                    total = total
-                        .checked_add(scale(mult as usize, member_size)?)
-                        .ok_or(SerializedSizeError::TooLarge)?;
-                }
-                Ok(total)
-            }
-            Type::AnonStruct(ty) => {
-                let mut total = 0i128;
-                for (_, member_ty) in &ty.members {
-                    total = total
-                        .checked_add(member_ty.serialized_size(a)?)
-                        .ok_or(SerializedSizeError::TooLarge)?;
-                }
-                Ok(total)
-            }
-            Type::Integer | Type::Abs(_) => Err(Unavailable),
-        }
-    }
-
-    /// Is this type an int type?
-    pub fn is_int(&self) -> bool {
-        match self {
-            Type::Alias(ty) => ty.alias_type.is_int(),
-            Type::PrimitiveInt(_) => true,
-            Type::Integer => true,
-            _ => false,
-        }
-    }
-
-    /// Is this type a primitive type?
-    pub fn is_primitive(&self) -> bool {
-        match self {
-            Type::Alias(ty) => ty.alias_type.is_primitive(),
-            Type::PrimitiveInt(_) => true,
-            Type::Float(_) => true,
-            Type::Boolean => true,
-            _ => false,
-        }
-    }
-
-    /// Is this type a canonical (non-aliased) type?
-    pub fn is_canonical(&self) -> bool {
-        !matches!(self, Type::Alias(_))
-    }
-
-    /// Is this type promotable to a struct type?
-    pub fn is_promotable_to_struct(&self) -> bool {
-        self.is_promotable_to_array()
-    }
-
-    /// Is this type numeric?
-    pub fn is_numeric(&self) -> bool {
-        match self {
-            Type::Alias(ty) => ty.alias_type.is_numeric(),
-            _ => self.is_int() || self.is_float(),
-        }
-    }
-
-    /// Is `from` convertible to `to`?
-    pub fn convert(from: &Arc<Type>, to: &Arc<Type>) -> TypeConversionResult {
-        Type::convert_impl(
-            Type::underlying_type(from).deref(),
-            Type::underlying_type(to).deref(),
-        )
-    }
-
-    fn convert_impl(from: &Type, to: &Type) -> TypeConversionResult {
-        assert!(from.is_canonical());
-        assert!(to.is_canonical());
-
-        if Self::identical(from, to) {
-            return Ok(());
-        }
-
-        if from.is_convertible_to_numeric() && to.is_numeric() {
-            return Ok(());
-        }
-
-        // String -> String
-        if let (Type::String(_), Type::String(_)) = (from, to) {
-            return Ok(());
-        }
-
-        // Array -> Array
-        if let (Some(from_arr), Some(to_arr)) = (from.as_anon_array(), to.as_anon_array()) {
-            // Check the sizes match
-            match (&from_arr.size, &to_arr.size) {
-                (Some(from_size), Some(to_size)) if from_size != to_size => {
-                    return Err(TypeConversionError::ArraySizeMismatch {
-                        from: *from_size,
-                        to: *to_size,
-                    });
-                }
-                _ => {}
-            }
-
-            return match Type::convert(&from_arr.elt_type, &to_arr.elt_type) {
-                Ok(()) => Ok(()),
-                Err(err) => Err(TypeConversionError::ArrayElement(Box::new(err))),
-            };
-        }
-
-        // Convert a single element to an array
-        if let Some(to_arr) = to.as_anon_array() {
-            if !from.is_promotable_to_array() {
-                return Err(TypeConversionError::NotPromotableToArray(Box::new(
-                    from.clone(),
-                )));
-            }
-
-            return match Type::convert_impl(from, Type::underlying_type(&to_arr.elt_type).deref()) {
-                Ok(_) => Ok(()),
-                Err(err) => Err(TypeConversionError::ArrayElementDuringPromotion(Box::new(
-                    err,
-                ))),
-            };
-        }
-
-        // Struct -> Struct
-        if let (Some(from_struct), Some(to_struct)) = (from.as_anon_struct(), to.as_anon_struct()) {
-            // May sure all the members in 'from' can fit into 'to'
-            for (name, from_member_ty) in &from_struct.members {
-                match to_struct.get_member(name) {
-                    None => return Err(TypeConversionError::MissingStructMember(name.clone())),
-                    Some(to_member_ty) => match Type::convert(from_member_ty, to_member_ty) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            return Err(TypeConversionError::StructMember {
-                                name: name.clone(),
-                                err: Box::new(err),
-                            });
-                        }
-                    },
-                }
-            }
-
-            return Ok(());
-        }
-
-        // Convert a single element to a struct
-        if let Some(to_struct) = to.as_anon_struct() {
-            if !from.is_promotable_to_struct() {
-                return Err(TypeConversionError::NotPromotableToStruct(Box::new(
-                    from.clone(),
-                )));
-            }
-
-            // Make sure that 'from' can fit all members in to_struct
-            for (name, to_member_ty) in &to_struct.members {
-                let to_member_ty_underlying = Type::underlying_type(to_member_ty);
-                match Type::convert_impl(from, to_member_ty_underlying.deref()) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        return Err(TypeConversionError::StructMember {
-                            name: name.clone(),
-                            err: Box::new(err),
-                        });
-                    }
-                }
-            }
-
-            return Ok(());
-        }
-
-        Err(TypeConversionError::Mismatch {
-            from: Box::new(from.clone()),
-            to: Box::new(to.clone()),
-        })
-    }
-
-    /// Check for type identity
-    pub fn identical(t1: &Type, t2: &Type) -> bool {
-        match (t1, t2) {
-            (Type::PrimitiveInt(k1), Type::PrimitiveInt(k2)) => k1 == k2,
-            (Type::Float(k1), Type::Float(k2)) => k1 == k2,
-            (Type::Integer, Type::Integer) => true,
-            (Type::Boolean, Type::Boolean) => true,
-            _ => match (t1.def_node_id(), t2.def_node_id()) {
-                (Some(n1), Some(n2)) => n1 == n2,
-                _ => false,
-            },
-        }
-    }
-
-    /// Compute the common type for a pair of types
-    pub fn common_type(t1_a: &Arc<Type>, t2_a: &Arc<Type>) -> Option<Arc<Type>> {
-        // Trivial case, types are the same
-        if Type::identical(t1_a, t2_a) {
-            return Some(t1_a.clone());
-        }
-
-        // Types share a common ancestor in the alias type hierarchy
-        if !t1_a.is_canonical() || !t2_a.is_canonical() {
-            fn lca(a: &Arc<Type>, b: &Arc<Type>) -> Option<Arc<Type>> {
-                fn get_ancestors(t: &Arc<Type>, out: &mut Vec<Arc<Type>>) {
-                    out.push(t.clone());
-                    if let Type::Alias(AliasType { alias_type, .. }) = t.deref() {
-                        get_ancestors(alias_type, out)
-                    }
-                }
-
-                let mut ancestors_of_a = vec![];
-                get_ancestors(a, &mut ancestors_of_a);
-
-                let mut ancestors_of_b = vec![];
-                get_ancestors(b, &mut ancestors_of_b);
-
-                // Traverse the ancestry of 'b' from youngest to oldest until we find
-                // a common ancestor with 'a'. Youngest-first order yields the least
-                // common ancestor.
-                ancestors_of_b
-                    .iter()
-                    .find(|b| ancestors_of_a.iter().any(|a| Type::identical(a, b)))
-                    .cloned()
-            }
-
-            if let Some(ty) = lca(t1_a, t2_a) {
-                return Some(ty);
-            }
-        }
-
-        // Do the rest of the operations on the underlying types since none of aliases
-        // in the parent chain matched
-        let t1 = Type::underlying_type(t1_a);
-        let t2 = Type::underlying_type(t2_a);
-
-        // Check for numeric common types
-        if t1.is_float() && t2.is_numeric() {
-            return Some(Arc::new(Type::Float(FloatKind::F64)));
-        }
-        if t1.is_numeric() && t2.is_float() {
-            return Some(Arc::new(Type::Float(FloatKind::F64)));
-        }
-        if t1.is_numeric() && t2.is_numeric() {
-            return Some(Arc::new(Type::Integer));
-        }
-
-        match (t1.deref(), t2.deref()) {
-            // String -> String
-            (Type::String(_), Type::String(_)) => return Some(Arc::new(Type::String(None))),
-
-            // Strip off any enum wrappers over the representable type
-            (Type::Enum(ty), _) => {
-                return Self::common_type(&Arc::new(Type::PrimitiveInt(ty.rep_type)), &t2);
-            }
-            (_, Type::Enum(ty)) => {
-                return Self::common_type(&t1, &Arc::new(Type::PrimitiveInt(ty.rep_type)));
-            }
-
-            _ => {}
-        }
-
-        // t1 + t2 are both array/anon array
-        if let (Some(t1_arr), Some(t2_arr)) = (t1.as_anon_array(), t2.as_anon_array()) {
-            // Check if the sizes match
-            let size = match (t1_arr.size, t2_arr.size) {
-                (Some(t1_size), Some(t2_size)) => {
-                    if t1_size == t2_size {
-                        Some(t1_size)
-                    } else {
-                        return None;
-                    }
-                }
-                _ => None,
-            };
-
-            let elt_type = Type::common_type(&t1_arr.elt_type, &t2_arr.elt_type)?;
-            return Some(Arc::new(Type::AnonArray(AnonArrayType { size, elt_type })));
-        }
-
-        // An array and a non array. Try to promote the non-array to the array
-        if let Some((arr, other)) = match (t1.as_anon_array(), t2.as_anon_array()) {
-            (Some(arr), None) => Some((arr, t2.deref())),
-            (None, Some(arr)) => Some((arr, t1.deref())),
-            _ => None,
-        } {
-            if !other.is_promotable_to_array() {
-                return None;
-            }
-            // Treat the 'other' type as an element of the array
-            let elt_type = Type::common_type(&Arc::new(other.clone()), &arr.elt_type)?;
-
-            // Promote the single element to an array keeping the same size
-            return Some(Arc::new(Type::AnonArray(AnonArrayType {
-                elt_type,
-                size: arr.size,
-            })));
-        }
-
-        // Struct -> Struct
-        if let (Some(t1_struct), Some(t2_struct)) = (t1.as_anon_struct(), t2.as_anon_struct()) {
-            // For each member in t1 and t2:
-            // - If the member only exists in t1, bring it in unchanged
-            // - If the member only exists in t2, bring it in unchanged
-            // - If the member exists in _both_, find the common type of the member on both
-            //    - If there is no common type, return None
-            let mut out_members = Vec::default();
-
-            for (name, t1_ty) in &t1_struct.members {
-                match t2_struct.get_member(name) {
-                    None => {
-                        out_members.push((name.clone(), t1_ty.clone()));
-                    }
-                    Some(t2_ty) => {
-                        let member_common = Type::common_type(t1_ty, t2_ty)?;
-                        out_members.push((name.clone(), member_common));
-                    }
-                }
-            }
-
-            // Add the remaining members left over in t2
-            for (name, t2_ty) in &t2_struct.members {
-                if !t1_struct.has_member(name) {
-                    out_members.push((name.clone(), t2_ty.clone()));
-                }
-            }
-
-            return Some(Arc::new(Type::AnonStruct(AnonStructType {
-                members: out_members,
-            })));
-        }
-
-        // A struct and a non struct. The non struct can fill every member in the struct
-        if let Some((str, other)) = match (t1.as_anon_struct(), t2.as_anon_struct()) {
-            (Some(str), None) => Some((str, t2.deref())),
-            (None, Some(str)) => Some((str, t1.deref())),
-            _ => None,
-        } {
-            if !other.is_promotable_to_struct() {
-                return None;
-            }
-            // Build a new struct with the same members as the old one while trying
-            // to find the common type between the single element and all the members
-            let mut out_members = Vec::default();
-            let other_rc = Arc::new(other.clone());
-
-            for (name, in_member_ty) in &str.members {
-                let out_member_ty = Type::common_type(&other_rc, in_member_ty)?;
-                out_members.push((name.clone(), out_member_ty));
-            }
-
-            // Create a new struct with similar shape of the old struct
-            return Some(Arc::new(Type::AnonStruct(AnonStructType {
-                members: out_members,
-            })));
-        }
-
-        None
-    }
-}
-
-/// A type rendered by its [`Display`] inside a `Debug` builder, which is what
-/// [`Formatter::debug_struct`]'s `field` takes.
-struct Displayed<'a>(&'a Type);
-
-impl Debug for Displayed<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(self.0, f)
+        SerializedSize.ty(a, self)
     }
 }
 
@@ -689,113 +298,67 @@ impl Display for Type {
             Type::PrimitiveInt(kind) => Debug::fmt(kind, f),
             Type::Float(kind) => Debug::fmt(kind, f),
             Type::String(_) => f.write_str("string"),
-            Type::Boolean => f.write_str("boolean"),
+            Type::Boolean => f.write_str("bool"),
             Type::Integer => f.write_str("Integer"),
             Type::Abs(ty) => f.write_str(&ty.node.name.data),
             Type::Alias(ty) => f.write_str(&ty.node.name.data),
-            Type::Array(arr) => f.write_str(&arr.node.name.data),
-            Type::AnonArray(anon_arr) => {
-                match anon_arr.size {
-                    None => f.write_str("[] ")?,
-                    Some(size) => f.write_fmt(format_args!("[{}] ", size))?,
+            Type::Array(arr) => write!(f, "array {}", arr.node.name.data),
+            Type::AnonArray(anon_arr) => match anon_arr.size {
+                Some(n) => write!(f, "[{}] {}", n, anon_arr.elt_type),
+                None => write!(f, "array of {}", anon_arr.elt_type),
+            },
+            Type::Enum(ty) => write!(f, "enum {}", ty.node.name.data),
+            Type::Struct(ty) => write!(f, "struct {}", ty.node.name.data),
+            Type::AnonStruct(anon_struct) => match anon_struct.members.len() {
+                0 => f.write_str("{ }"),
+                _ => {
+                    f.write_str("{ ")?;
+                    for (i, (name, member_ty)) in anon_struct.members.iter().enumerate() {
+                        if i > 0 {
+                            f.write_str(", ")?;
+                        }
+                        write!(f, "{}: {}", name, member_ty)?;
+                    }
+                    f.write_str(" }")
                 }
-
-                Display::fmt(&anon_arr.elt_type, f)
-            }
-            Type::Enum(ty) => f.write_str(&ty.node.name.data),
-            Type::Struct(ty) => f.write_str(&ty.node.name.data),
-            Type::AnonStruct(anon_struct) => {
-                let mut s = f.debug_struct("anonymous struct");
-                let mut members: Vec<(String, Arc<Type>)> =
-                    anon_struct.members.clone().into_iter().collect();
-                members.sort_by(|a, b| a.0.cmp(&b.0));
-                for (name, member_ty) in &members {
-                    s.field(name, &Displayed(member_ty.deref()));
-                }
-
-                s.finish()
-            }
+            },
         }
     }
 }
-
-#[derive(Debug)]
-pub enum TypeConversionError {
-    ArraySizeMismatch {
-        from: usize,
-        to: usize,
-    },
-    ArrayElementDuringPromotion(Box<TypeConversionError>),
-    ArrayElement(Box<TypeConversionError>),
-    NotPromotableToArray(Box<Type>),
-    NotPromotableToStruct(Box<Type>),
-    MissingStructMember(String),
-    StructMember {
-        name: String,
-        err: Box<TypeConversionError>,
-    },
-    Mismatch {
-        from: Box<Type>,
-        to: Box<Type>,
-    },
-}
-
-impl TypeConversionError {
-    pub fn annotate(&self, diagnostic: Diagnostic) -> Diagnostic {
-        match self {
-            TypeConversionError::ArraySizeMismatch { from, to } => {
-                diagnostic.note(format!("array sizes do not match {} != {}", from, to))
-            }
-            TypeConversionError::ArrayElement(err) => {
-                err.annotate(diagnostic.note("array element type cannot be converted"))
-            }
-            TypeConversionError::ArrayElementDuringPromotion(err) => {
-                err.annotate(diagnostic.note("single element could not be promoted to array"))
-            }
-            TypeConversionError::NotPromotableToArray(ty) => {
-                diagnostic.note(format!("{} cannot be promoted to array", ty))
-            }
-            TypeConversionError::NotPromotableToStruct(ty) => {
-                diagnostic.note(format!("{} cannot be promoted to struct", ty))
-            }
-            TypeConversionError::MissingStructMember(name) => {
-                diagnostic.note(format!("struct missing member `{}`", name))
-            }
-            TypeConversionError::StructMember { name, err } => err.annotate(
-                diagnostic.note(format!("struct member `{}` type cannot be converted", name)),
-            ),
-            TypeConversionError::Mismatch { from, to } => {
-                diagnostic.note(format!("{} cannot be converted to {}", from, to))
-            }
-        }
-    }
-}
-
-pub type TypeConversionResult = Result<(), TypeConversionError>;
 
 /// Primitive types
-pub trait PrimitiveType {
+pub trait Primitive {
+    /// The width of the type, in bits
     fn bit_width(&self) -> u32;
 }
 
+/// Primitive integer types, given by their kinds
+pub trait PrimitiveInt: Primitive {
+    /// The signedness of the type
+    fn signedness(&self) -> Signedness;
+}
+
+/// The signedness of a primitive integer type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrimitiveIntSignedness {
+pub enum Signedness {
     Signed,
     Unsigned,
 }
 
-pub fn int_kind_signedness(kind: IntegerKind) -> PrimitiveIntSignedness {
-    match kind {
-        IntegerKind::I8 | IntegerKind::I16 | IntegerKind::I32 | IntegerKind::I64 => {
-            PrimitiveIntSignedness::Signed
-        }
-        IntegerKind::U8 | IntegerKind::U16 | IntegerKind::U32 | IntegerKind::U64 => {
-            PrimitiveIntSignedness::Unsigned
+impl PrimitiveInt for IntegerKind {
+    fn signedness(&self) -> Signedness {
+        match self {
+            IntegerKind::I8 | IntegerKind::I16 | IntegerKind::I32 | IntegerKind::I64 => {
+                Signedness::Signed
+            }
+            IntegerKind::U8 | IntegerKind::U16 | IntegerKind::U32 | IntegerKind::U64 => {
+                Signedness::Unsigned
+            }
         }
     }
 }
 
-impl PrimitiveType for IntegerKind {
+impl Primitive for IntegerKind {
     fn bit_width(&self) -> u32 {
         match self {
             IntegerKind::I8 => 8,
@@ -810,7 +373,7 @@ impl PrimitiveType for IntegerKind {
     }
 }
 
-impl PrimitiveType for FloatKind {
+impl Primitive for FloatKind {
     fn bit_width(&self) -> u32 {
         match self {
             FloatKind::F32 => 32,
@@ -848,13 +411,22 @@ pub struct ArrayType {
     pub format: Option<Format>,
 }
 
-/// An anonymous array type
-#[derive(Debug, Clone)]
-pub struct AnonArrayType {
-    /// The array size
-    pub size: Option<usize>,
-    /// The element type
-    pub elt_type: Arc<Type>,
+impl ArrayType {
+    /// Check whether two array sizes match
+    pub fn sizes_match(size1: Option<usize>, size2: Option<usize>) -> bool {
+        match (size1, size2) {
+            (Some(n1), Some(n2)) => n1 == n2,
+            _ => true,
+        }
+    }
+
+    /// Compute a common array size
+    pub fn common_size(size1: Option<usize>, size2: Option<usize>) -> Option<usize> {
+        match (size1, size2) {
+            (Some(n1), Some(n2)) if n1 == n2 => Some(n1),
+            _ => None,
+        }
+    }
 }
 
 /// An enum type
@@ -883,6 +455,31 @@ pub struct StructType {
     pub formats: HashMap<String, Format>,
 }
 
+/// A member of a struct type: its name and its type
+pub(crate) type StructMember = (String, Arc<Type>);
+
+/// The members of a struct type, in order
+pub(crate) type StructMembers = Vec<StructMember>;
+
+impl StructType {
+    /// Resolve a member map, generating a new member map
+    pub(crate) fn resolve_members(
+        resolver: impl Fn(&StructMember) -> Option<StructMember>,
+        members: &[StructMember],
+    ) -> Option<StructMembers> {
+        members.iter().map(resolver).collect()
+    }
+}
+
+/// An anonymous array type
+#[derive(Debug, Clone)]
+pub struct AnonArrayType {
+    /// The array size
+    pub size: Option<usize>,
+    /// The element type
+    pub elt_type: Arc<Type>,
+}
+
 /// An anonymous struct type
 #[derive(Debug, Clone)]
 pub struct AnonStructType {
@@ -891,214 +488,502 @@ pub struct AnonStructType {
 }
 
 impl AnonStructType {
+    /// The type of the member named `name`, if there is one
     pub fn get_member(&self, name: &str) -> Option<&Arc<Type>> {
         self.members
             .iter()
             .find_map(|(k, v)| if k == name { Some(v) } else { None })
     }
 
+    /// Whether there is a member named `name`
     pub fn has_member(&self, name: &str) -> bool {
         self.get_member(name).is_some()
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn string(size: Option<i128>) -> Arc<Type> {
-        Arc::new(Type::String(size))
-    }
-
-    fn anon_array(elt: Arc<Type>, size: Option<usize>) -> Arc<Type> {
-        Arc::new(Type::AnonArray(AnonArrayType {
-            elt_type: elt,
-            size,
-        }))
-    }
-
-    fn prim_int(kind: IntegerKind) -> Arc<Type> {
-        Arc::new(Type::PrimitiveInt(kind))
-    }
-
-    /// Regression for the `common_type` enum arm (fidelity bug #1): the enum
-    /// case must recurse on `(rep_type, t2)`, not `(rep_type, t1)`, so the
-    /// *other* operand is not dropped. `enum + F64` must widen to `F64`.
-    #[test]
-    fn common_type_enum_and_float() {
-        // Build a minimal enum type (needs a node span, hence a context).
-        let mut buf = vec![];
-        let mut ctx = fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut buf));
-        fpp_core::run(&mut ctx, || {
-            let src = fpp_core::SourceFile::new("test", "enum E { X }".to_string());
-            let span = fpp_core::Span::new(src, 0, 1, None);
-            let def_enum = Arc::new(fpp_ast::DefEnum {
-                name: fpp_ast::Name {
-                    data: "E".to_string(),
-                    node_id: fpp_core::Node::new(span),
-                },
-                type_name: None,
-                constants: vec![],
-                default: None,
-                is_dictionary_def: false,
-                node_id: fpp_core::Node::new(span),
-            });
-            let enum_ty = Arc::new(Type::Enum(Arc::new(EnumType {
-                node: def_enum,
-                rep_type: IntegerKind::I32,
-                default: None,
-            })));
-            let f64_ty = Arc::new(Type::Float(FloatKind::F64));
-
-            // enum + F64 -> F64 (widens through the rep type to the float)
-            let ct = Type::common_type(&enum_ty, &f64_ty).expect("common type");
-            assert!(ct.is_float(), "expected F64, got {ct}");
-            // symmetric
-            let ct = Type::common_type(&f64_ty, &enum_ty).expect("common type");
-            assert!(ct.is_float(), "expected F64, got {ct}");
-        });
-    }
-
-    /// Regression for `identical` (fidelity bug #6): two equal fixed-size strings
-    /// are NOT identical (there is no `String` case in the identity check), so
-    /// their common type is the unsized `String(None)`.
-    #[test]
-    fn identical_strings_are_not_identical() {
-        assert!(!Type::identical(
-            &Type::String(Some(8)),
-            &Type::String(Some(8))
-        ));
-        let ct = Type::common_type(&string(Some(8)), &string(Some(8))).expect("common type");
-        assert!(
-            matches!(ct.deref(), Type::String(None)),
-            "expected String(None), got {ct}"
-        );
-    }
-
-    /// An array default holds `size` references to one element value, so a
-    /// nested array default costs the SUM of the nested sizes and not their
-    /// PRODUCT.
-    ///
-    /// The pointer-identity assertions are what bound the memory: with an
-    /// independent copy per element, `array Inner = [n] U8` +
-    /// `array Outer = [n] Inner` builds n^2 values of 64 bytes each (measured
-    /// peak RSS 1.1 GB at n=4000 and 4.2 GB at n=8000), and at the size bound
-    /// (n = 2^31-1) it cannot complete.
-    #[test]
-    fn array_default_shares_its_repeated_element() {
-        const N: usize = 2000;
-
-        let inner = anon_array(prim_int(IntegerKind::U8), Some(N));
-        let outer = anon_array(inner, Some(N));
-
-        let Some(Value::AnonArray(outer_default)) = outer.default_value() else {
-            panic!("expected an anonymous array default");
-        };
-        assert_eq!(outer_default.elements.len(), N);
-
-        // Every element of the outer array is the one shared inner array
-        let first = &outer_default.elements[0];
-        assert!(
-            outer_default.elements.iter().all(|e| Arc::ptr_eq(e, first)),
-            "the outer array's elements are not shared"
-        );
-
-        // ... and that inner array shares its own repeated element in turn, so
-        // the whole default holds 2N references to 2 distinct values
-        let Value::AnonArray(inner_default) = first.deref() else {
-            panic!("expected an anonymous array element");
-        };
-        assert_eq!(inner_default.elements.len(), N);
-        let inner_first = &inner_default.elements[0];
-        assert!(
-            inner_default
-                .elements
-                .iter()
-                .all(|e| Arc::ptr_eq(e, inner_first)),
-            "the inner array's elements are not shared"
-        );
-        assert!(matches!(
-            inner_first.deref(),
-            Value::PrimitiveInteger(PrimitiveIntegerValue {
-                value: 0,
-                kind: IntegerKind::U8
-            })
-        ));
-
-        // Reading the value is unaffected by the sharing
-        assert_eq!(inner_default.iter().count(), N);
-        assert!(inner_default.iter().all(|e| e.to_string() == "0"));
-        assert!(inner_default.get(N - 1).is_some());
-        assert!(inner_default.get(N).is_none());
-    }
-
-    /// A scalar promoted to an array of known size shares the promoted element
-    /// too, and an array of unknown size records it as the array's scalar.
-    #[test]
-    fn promoted_scalar_shares_its_element() {
-        const N: usize = 1000;
-        let scalar = Value::PrimitiveInteger(PrimitiveIntegerValue {
-            value: 7,
-            kind: IntegerKind::U32,
-        });
-
-        let u32_array = |size| anon_array(prim_int(IntegerKind::U32), size);
-        let Some(Value::AnonArray(promoted)) = scalar.convert(&u32_array(Some(N))) else {
-            panic!("expected an anonymous array");
-        };
-        assert_eq!(promoted.elements.len(), N);
-        let first = &promoted.elements[0];
-        assert!(promoted.elements.iter().all(|e| Arc::ptr_eq(e, first)));
-
-        // Unknown size: no elements, and the value is kept as the scalar
-        let Some(Value::AnonArray(unsized_array)) = scalar.convert(&u32_array(None)) else {
-            panic!("expected an anonymous array");
-        };
-        assert!(unsized_array.elements.is_empty());
-        assert!(unsized_array.scalar.is_some());
-    }
-
-    /// Converting and truncating an array preserve the sharing, so neither turns
-    /// a shared default back into one copy per element.
-    #[test]
-    fn array_conversion_preserves_sharing() {
-        const N: usize = 2000;
-        let u8_array = anon_array(prim_int(IntegerKind::U8), Some(N));
-        let u32_array = anon_array(prim_int(IntegerKind::U32), Some(N));
-        let value = u8_array.default_value().expect("an array default");
-
-        for converted in [
-            value.convert(&u32_array),
-            value.truncate().convert(&u8_array),
-            Some(value.truncate()),
-        ] {
-            let Some(Value::AnonArray(a)) = converted else {
-                panic!("expected an anonymous array");
-            };
-            assert_eq!(a.elements.len(), N);
-            let first = &a.elements[0];
-            assert!(
-                a.elements.iter().all(|e| Arc::ptr_eq(e, first)),
-                "sharing was not preserved"
-            );
+impl Type {
+    /// Check for type identity
+    pub fn identical(t1: &Type, t2: &Type) -> bool {
+        match (t1, t2) {
+            (Type::PrimitiveInt(k1), Type::PrimitiveInt(k2)) => k1 == k2,
+            (Type::Float(k1), Type::Float(k2)) => k1 == k2,
+            (Type::Integer, Type::Integer) => true,
+            (Type::Boolean, Type::Boolean) => true,
+            _ => match (t1.def_node_id(), t2.def_node_id()) {
+                (Some(n1), Some(n2)) => n1 == n2,
+                _ => false,
+            },
         }
     }
 
-    /// Regression for `is_displayable` (fidelity bug #7): anonymous aggregates
-    /// (`AnonArray`/`AnonStruct`) inherit the base `false` even when their
-    /// elements are displayable.
-    #[test]
-    fn anon_aggregates_are_not_displayable() {
-        assert!(
-            !anon_array(Arc::new(Type::Boolean), Some(3)).is_displayable(),
-            "anonymous array must not be displayable"
-        );
-        assert!(
-            !Type::AnonStruct(AnonStructType {
-                members: vec![("x".to_string(), Arc::new(Type::Boolean))]
+    /// Check for type convertibility: whether `from` is convertible to `to`,
+    /// and if not, why not
+    pub fn convert(from: &Arc<Type>, to: &Arc<Type>) -> TypeConversionResult {
+        Type::may_be_converted(
+            Type::underlying_type(from).deref(),
+            Type::underlying_type(to).deref(),
+        )
+    }
+
+    /// Check for type convertibility on a pair of canonical types
+    ///
+    /// The types are convertible if they are identical, or if one of the
+    /// numeric, string, array, and struct rules applies to them and accepts
+    /// them. A rule that applies but rejects the pair gives the reason.
+    fn may_be_converted(t1: &Type, t2: &Type) -> TypeConversionResult {
+        assert!(t1.is_canonical());
+        assert!(t2.is_canonical());
+
+        let numeric = || (t1.is_convertible_to_numeric() && t2.is_numeric()).then_some(Ok(()));
+        let string = || matches!((t1, t2), (Type::String(_), Type::String(_))).then_some(Ok(()));
+        let array = || match (t1.as_anon_array(), t2.as_anon_array()) {
+            (Some(anon_array1), Some(anon_array2)) => Some(
+                if ArrayType::sizes_match(anon_array1.size, anon_array2.size) {
+                    Type::convert(&anon_array1.elt_type, &anon_array2.elt_type)
+                        .map_err(|err| TypeConversionError::ArrayElement(Box::new(err)))
+                } else {
+                    Err(TypeConversionError::ArraySizeMismatch {
+                        from: anon_array1.size.expect("an unequal size"),
+                        to: anon_array2.size.expect("an unequal size"),
+                    })
+                },
+            ),
+            (_, Some(anon_array2)) => Some(if t1.is_promotable_to_array() {
+                Type::may_be_converted(t1, Type::underlying_type(&anon_array2.elt_type).deref())
+                    .map_err(|err| TypeConversionError::ArrayElementDuringPromotion(Box::new(err)))
+            } else {
+                Err(TypeConversionError::NotPromotableToArray(Box::new(
+                    t1.clone(),
+                )))
+            }),
+            _ => None,
+        };
+        let struct_ = || {
+            // A member of t1 exists in the members of t2, with a type that it
+            // converts to
+            let member_exists_in =
+                |members: &AnonStructType, (name, member_type1): &StructMember| {
+                    let Some(member_type2) = members.get_member(name) else {
+                        return Err(TypeConversionError::MissingStructMember(name.clone()));
+                    };
+                    Type::convert(member_type1, member_type2).map_err(|err| {
+                        TypeConversionError::StructMember {
+                            name: name.clone(),
+                            err: Box::new(err),
+                        }
+                    })
+                };
+            match (t1.as_anon_struct(), t2.as_anon_struct()) {
+                (Some(anon_struct1), Some(anon_struct2)) => Some(
+                    anon_struct1
+                        .members
+                        .iter()
+                        .try_for_each(|member| member_exists_in(anon_struct2, member)),
+                ),
+                (_, Some(anon_struct2)) => Some(if t1.is_promotable_to_struct() {
+                    // t1 converts to the type of every member of t2
+                    anon_struct2
+                        .members
+                        .iter()
+                        .try_for_each(|(name, member_type2)| {
+                            Type::may_be_converted(t1, Type::underlying_type(member_type2).deref())
+                                .map_err(|err| TypeConversionError::StructMember {
+                                    name: name.clone(),
+                                    err: Box::new(err),
+                                })
+                        })
+                } else {
+                    Err(TypeConversionError::NotPromotableToStruct(Box::new(
+                        t1.clone(),
+                    )))
+                }),
+                _ => None,
+            }
+        };
+
+        if Type::identical(t1, t2) {
+            return Ok(());
+        }
+        numeric()
+            .or_else(string)
+            .or_else(array)
+            .or_else(struct_)
+            .unwrap_or_else(|| {
+                Err(TypeConversionError::Mismatch {
+                    from: Box::new(t1.clone()),
+                    to: Box::new(t2.clone()),
+                })
             })
-            .is_displayable(),
-            "anonymous struct must not be displayable"
-        );
+    }
+
+    /// Compute the common type for a pair of types
+    ///
+    /// The rules are tried in order, and the first one that gives a type wins.
+    pub fn common_type(t1_a: &Arc<Type>, t2_a: &Arc<Type>) -> Option<Arc<Type>> {
+        let (t1, t2) = (t1_a, t2_a);
+        let rules: [CommonTypeRule; 7] = [
+            Type::common_type_identical,
+            Type::common_type_alias,
+            Type::common_type_numeric,
+            Type::common_type_string,
+            Type::common_type_enumeration,
+            Type::common_type_array,
+            Type::common_type_struct,
+        ];
+        rules.iter().find_map(|rule| rule(t1, t2))
+    }
+
+    fn common_type_identical(t1: &Arc<Type>, t2: &Arc<Type>) -> Option<Arc<Type>> {
+        Type::identical(t1, t2).then(|| t1.clone())
+    }
+
+    fn common_type_alias(t1: &Arc<Type>, t2: &Arc<Type>) -> Option<Arc<Type>> {
+        fn lca(a: &Arc<Type>, b: &Arc<Type>) -> Option<Arc<Type>> {
+            /// The ancestors of a type in the alias hierarchy, youngest first
+            fn get_ancestors(t: &Arc<Type>) -> Vec<Arc<Type>> {
+                let mut ancestors = vec![t.clone()];
+                let mut t = t.clone();
+                while let Type::Alias(AliasType { alias_type, .. }) = t.deref() {
+                    let parent = alias_type.clone();
+                    ancestors.push(parent.clone());
+                    t = parent;
+                }
+                ancestors
+            }
+            let ancestors_of_a = get_ancestors(a);
+            let ancestors_of_b = get_ancestors(b);
+            // Traverse the ancestry of 'b' until we find a common ancestor with 'a'
+            ancestors_of_b
+                .into_iter()
+                .find(|bi| ancestors_of_a.iter().any(|ai| Type::identical(ai, bi)))
+        }
+
+        // Apply this rule if either of t1 and t2 is an alias type
+        if !t1.is_canonical() || !t2.is_canonical() {
+            match lca(t1, t2) {
+                // If there is a least common ancestor, then use it
+                Some(c) => Some(c),
+                // Otherwise use the common type of the underlying types
+                None => Type::common_type(&Type::underlying_type(t1), &Type::underlying_type(t2)),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn common_type_numeric(t1: &Arc<Type>, t2: &Arc<Type>) -> Option<Arc<Type>> {
+        if (t1.is_float() && t2.is_numeric()) || (t1.is_numeric() && t2.is_float()) {
+            Some(Arc::new(Type::Float(FloatKind::F64)))
+        } else if t1.is_numeric() && t2.is_numeric() {
+            Some(Arc::new(Type::Integer))
+        } else {
+            None
+        }
+    }
+
+    fn common_type_string(t1: &Arc<Type>, t2: &Arc<Type>) -> Option<Arc<Type>> {
+        match (t1.deref(), t2.deref()) {
+            (Type::String(_), Type::String(_)) => Some(Arc::new(Type::String(None))),
+            _ => None,
+        }
+    }
+
+    fn common_type_enumeration(t1: &Arc<Type>, t2: &Arc<Type>) -> Option<Arc<Type>> {
+        match (t1.deref(), t2.deref()) {
+            (Type::Enum(ty), _) => {
+                Type::common_type(&Arc::new(Type::PrimitiveInt(ty.rep_type)), t2)
+            }
+            (_, Type::Enum(ty)) => {
+                Type::common_type(t1, &Arc::new(Type::PrimitiveInt(ty.rep_type)))
+            }
+            _ => None,
+        }
+    }
+
+    fn common_type_array(t1: &Arc<Type>, t2: &Arc<Type>) -> Option<Arc<Type>> {
+        /// Handle the case of a single anonymous array in either position
+        fn single_anon_array(anon_array: &AnonArrayType, other: &Arc<Type>) -> Option<Arc<Type>> {
+            if other.is_promotable_to_array() {
+                let elt_type = Type::common_type(other, &anon_array.elt_type)?;
+                Some(Arc::new(Type::AnonArray(AnonArrayType {
+                    size: anon_array.size,
+                    elt_type,
+                })))
+            } else {
+                None
+            }
+        }
+        match (t1.deref(), t2.deref()) {
+            (_, Type::Array(array2)) => {
+                Type::common_type(t1, &Arc::new(Type::AnonArray(array2.anon_array.clone())))
+            }
+            (Type::Array(array1), _) => {
+                Type::common_type(&Arc::new(Type::AnonArray(array1.anon_array.clone())), t2)
+            }
+            (Type::AnonArray(anon_array1), Type::AnonArray(anon_array2)) => {
+                if ArrayType::sizes_match(anon_array1.size, anon_array2.size) {
+                    let size = ArrayType::common_size(anon_array1.size, anon_array2.size);
+                    let elt_type = Type::common_type(&anon_array1.elt_type, &anon_array2.elt_type)?;
+                    Some(Arc::new(Type::AnonArray(AnonArrayType { size, elt_type })))
+                } else {
+                    None
+                }
+            }
+            (_, Type::AnonArray(anon_array)) => single_anon_array(anon_array, t1),
+            (Type::AnonArray(anon_array), _) => single_anon_array(anon_array, t2),
+            _ => None,
+        }
+    }
+
+    fn common_type_struct(t1: &Arc<Type>, t2: &Arc<Type>) -> Option<Arc<Type>> {
+        /// Handle the case of two anonymous structs
+        fn two_anon_structs(
+            anon_struct1: &AnonStructType,
+            anon_struct2: &AnonStructType,
+        ) -> Option<Arc<Type>> {
+            // Resolve a member of t1 against the corresponding member of t2, if
+            // it exists
+            let resolve_t1_member = |member: &StructMember| {
+                let (name1, ty1) = member;
+                match anon_struct2.get_member(name1) {
+                    Some(ty2) => Some((name1.clone(), Type::common_type(ty1, ty2)?)),
+                    None => Some(member.clone()),
+                }
+            };
+            // Resolve each member of t1 against the corresponding member of t2,
+            // if it exists
+            let t1_resolved_members =
+                StructType::resolve_members(resolve_t1_member, &anon_struct1.members)?;
+            let t2_resolved_members = anon_struct2
+                .members
+                .iter()
+                .filter(|(name, _)| !anon_struct1.has_member(name))
+                .cloned();
+            Some(Arc::new(Type::AnonStruct(AnonStructType {
+                members: t1_resolved_members
+                    .into_iter()
+                    .chain(t2_resolved_members)
+                    .collect(),
+            })))
+        }
+        /// Handle the case of a single anonymous struct in either position
+        fn single_anon_struct(
+            anon_struct: &AnonStructType,
+            other: &Arc<Type>,
+        ) -> Option<Arc<Type>> {
+            if other.is_promotable_to_struct() {
+                // Resolve a member of t2 against t1
+                let resolve_member =
+                    |(name, t): &StructMember| Some((name.clone(), Type::common_type(other, t)?));
+                // Resolve all members of t2 against t1
+                let resolved_members =
+                    StructType::resolve_members(resolve_member, &anon_struct.members)?;
+                Some(Arc::new(Type::AnonStruct(AnonStructType {
+                    members: resolved_members,
+                })))
+            } else {
+                None
+            }
+        }
+        match (t1.deref(), t2.deref()) {
+            (_, Type::Struct(struct2)) => {
+                Type::common_type(t1, &Arc::new(Type::AnonStruct(struct2.anon_struct.clone())))
+            }
+            (Type::Struct(struct1), _) => {
+                Type::common_type(&Arc::new(Type::AnonStruct(struct1.anon_struct.clone())), t2)
+            }
+            (Type::AnonStruct(anon_struct1), Type::AnonStruct(anon_struct2)) => {
+                two_anon_structs(anon_struct1, anon_struct2)
+            }
+            (_, Type::AnonStruct(anon_struct)) => single_anon_struct(anon_struct, t1),
+            (Type::AnonStruct(anon_struct), _) => single_anon_struct(anon_struct, t2),
+            _ => None,
+        }
+    }
+}
+
+/// A rule of [`Type::common_type`]: the common type of a pair of types, if the
+/// rule applies to them
+type CommonTypeRule = fn(&Arc<Type>, &Arc<Type>) -> Option<Arc<Type>>;
+
+/// Why a type is not convertible to another type. Each case is reported as a
+/// note on the error that the failed conversion causes.
+#[derive(Debug)]
+pub enum TypeConversionError {
+    /// The array sizes do not match
+    ArraySizeMismatch { from: usize, to: usize },
+    /// A single value promoted to an array does not convert to the element type
+    ArrayElementDuringPromotion(Box<TypeConversionError>),
+    /// The element type of an array does not convert
+    ArrayElement(Box<TypeConversionError>),
+    /// The type is not promotable to an array type
+    NotPromotableToArray(Box<Type>),
+    /// The type is not promotable to a struct type
+    NotPromotableToStruct(Box<Type>),
+    /// A member of the struct type converted from is not a member of the struct
+    /// type converted to
+    MissingStructMember(String),
+    /// The type of a struct member does not convert
+    StructMember {
+        name: String,
+        err: Box<TypeConversionError>,
+    },
+    /// The types are not convertible
+    Mismatch { from: Box<Type>, to: Box<Type> },
+}
+
+impl TypeConversionError {
+    /// Adds the notes explaining this conversion failure to a diagnostic
+    pub fn annotate(&self, diagnostic: Diagnostic) -> Diagnostic {
+        match self {
+            TypeConversionError::ArraySizeMismatch { from, to } => {
+                diagnostic.note(format!("array sizes do not match {} != {}", from, to))
+            }
+            TypeConversionError::ArrayElement(err) => {
+                err.annotate(diagnostic.note("array element type cannot be converted"))
+            }
+            TypeConversionError::ArrayElementDuringPromotion(err) => {
+                err.annotate(diagnostic.note("single element could not be promoted to array"))
+            }
+            TypeConversionError::NotPromotableToArray(ty) => {
+                diagnostic.note(format!("{} cannot be promoted to array", ty))
+            }
+            TypeConversionError::NotPromotableToStruct(ty) => {
+                diagnostic.note(format!("{} cannot be promoted to struct", ty))
+            }
+            TypeConversionError::MissingStructMember(name) => {
+                diagnostic.note(format!("no member `{}` in the struct type", name))
+            }
+            TypeConversionError::StructMember { name, err } => err.annotate(
+                diagnostic.note(format!("struct member `{}` type cannot be converted", name)),
+            ),
+            TypeConversionError::Mismatch { from, to } => {
+                diagnostic.note(format!("{} cannot be converted to {}", from, to))
+            }
+        }
+    }
+}
+
+/// Whether a type converts to another, and if not, why not
+pub type TypeConversionResult = Result<(), TypeConversionError>;
+
+/// Why [`Type::serialized_size`] could not produce a size
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SerializedSizeError {
+    /// The size depends on information that is not there: a framework definition
+    /// that is not defined, a type that is not finalized, or a type with no
+    /// serialized representation at all (`Integer`, an abstract type).
+    Unavailable,
+    /// The size does not fit in an `i128`, the representation of a size, so it
+    /// is reported rather than silently wrapped.
+    TooLarge,
+}
+
+/// Computes the serialized size of a type
+///
+/// Only displayable types have a serialized size; any other type has the error
+/// [`SerializedSizeError::Unavailable`]. Assumes that `FinalizeTypeDefs` has
+/// been run on the analysis: the size of a string uses the framework
+/// definitions `FwSizeStoreType` and `FW_FIXED_LENGTH_STRING_SIZE`, and the
+/// size of an array or struct uses the sizes that `FinalizeTypeDefs` computes.
+///
+/// The size is a product over the nesting depth of the type, so it grows faster
+/// than any single array size: 128 levels of `array A = [2] B` reach 2^128
+/// bytes. Sizes are `i128` values, so a size that does not fit is reported as
+/// [`SerializedSizeError::TooLarge`] rather than wrapped.
+pub(crate) struct SerializedSize;
+
+impl SerializedSize {
+    /// `n * size`, or [`SerializedSizeError::TooLarge`]
+    fn scale(n: usize, size: i128) -> Result<i128, SerializedSizeError> {
+        (n as i128)
+            .checked_mul(size)
+            .ok_or(SerializedSizeError::TooLarge)
+    }
+}
+
+impl TypeVisitor for SerializedSize {
+    type In<'a> = &'a crate::Analysis;
+
+    type Out = Result<i128, SerializedSizeError>;
+
+    fn default(&self, _: &crate::Analysis, _: &Type) -> Self::Out {
+        Err(SerializedSizeError::Unavailable)
+    }
+
+    fn alias_type(&self, a: &crate::Analysis, t: &AliasType) -> Self::Out {
+        self.ty(a, &Type::underlying_type(&t.alias_type))
+    }
+
+    fn array(&self, a: &crate::Analysis, t: &Arc<ArrayType>) -> Self::Out {
+        let n = t.anon_array.size.ok_or(SerializedSizeError::Unavailable)?;
+        SerializedSize::scale(n, self.ty(a, &t.anon_array.elt_type)?)
+    }
+
+    fn boolean(&self, _: &crate::Analysis) -> Self::Out {
+        Ok(1)
+    }
+
+    fn enumeration(&self, a: &crate::Analysis, t: &Arc<EnumType>) -> Self::Out {
+        self.primitive_int(a, t.rep_type)
+    }
+
+    fn float(&self, _: &crate::Analysis, kind: FloatKind) -> Self::Out {
+        match kind {
+            FloatKind::F32 => Ok(4),
+            FloatKind::F64 => Ok(8),
+        }
+    }
+
+    fn primitive_int(&self, _: &crate::Analysis, kind: IntegerKind) -> Self::Out {
+        match kind {
+            IntegerKind::I8 | IntegerKind::U8 => Ok(1),
+            IntegerKind::I16 | IntegerKind::U16 => Ok(2),
+            IntegerKind::I32 | IntegerKind::U32 => Ok(4),
+            IntegerKind::I64 | IntegerKind::U64 => Ok(8),
+        }
+    }
+
+    fn string(&self, a: &crate::Analysis, size: Option<i128>) -> Self::Out {
+        use SerializedSizeError::Unavailable;
+        let length_size = {
+            let fw_store_size_symbol = a
+                .framework_definitions
+                .type_map
+                .get("FwSizeStoreType")
+                .ok_or(Unavailable)?;
+            let store_size_type = a
+                .type_map
+                .get(&fw_store_size_symbol.node())
+                .ok_or(Unavailable)?;
+            self.ty(a, store_size_type)?
+        };
+        let data_size = match size {
+            Some(v) => v,
+            None => {
+                let default_string_size_symbol = a
+                    .framework_definitions
+                    .constant_map
+                    .get("FW_FIXED_LENGTH_STRING_SIZE")
+                    .ok_or(Unavailable)?;
+                a.get_int_value(default_string_size_symbol.node())
+                    .ok_or(Unavailable)?
+            }
+        };
+        length_size
+            .checked_add(data_size)
+            .ok_or(SerializedSizeError::TooLarge)
+    }
+
+    fn struct_(&self, a: &crate::Analysis, t: &Arc<StructType>) -> Self::Out {
+        let mut size = 0i128;
+        for (m, t1) in &t.anon_struct.members {
+            let member_size = self.ty(a, t1)?;
+            let n = t.sizes.get(m).copied().unwrap_or(1);
+            size = size
+                .checked_add(SerializedSize::scale(n as usize, member_size)?)
+                .ok_or(SerializedSizeError::TooLarge)?;
+        }
+        Ok(size)
     }
 }

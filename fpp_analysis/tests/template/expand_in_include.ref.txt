@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/template/expand_in_include.fpp:5:16
+  |
+5 |   constant k = undefinedX
+  |                ^^^^^^^^^^ cannot find constant `undefinedX` in scope
+  |
+  = note: expanded at [ local path prefix ]/template/expand_in_include.fppi:1:1
+  = note: included from [ local path prefix ]/template/expand_in_include.fpp:8:9
+

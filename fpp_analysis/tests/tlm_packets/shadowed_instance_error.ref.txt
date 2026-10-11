@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/tlm_packets/shadowed_instance_error.fpp:16:12
+   |
+16 |         c1.T
+   |            ^ T is not a telemetry channel of component C
+

@@ -3,3 +3,13 @@
 4 | type T = string size sizeof(A)
   |                             ^ cannot find type `A` in scope
 
+ --> [ local path prefix ]/expr/string_size_sizeof_undefined.fpp:4:29
+  |
+4 | type T = string size sizeof(A)
+  |                             ^ size of type <unknown> is not known in the model
+  |
+ ::: [ local path prefix ]/expr/string_size_sizeof_undefined.fpp:4:29
+  |
+4 | type T = string size sizeof(A)
+  |                             - type is defined here
+

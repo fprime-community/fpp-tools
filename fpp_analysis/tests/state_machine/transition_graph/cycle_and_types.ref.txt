@@ -1,14 +1,15 @@
- --> [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:6:3
-  |
-6 |   choice C2 { if g enter C1 else enter C1 }
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle:
-  choice transition at [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:6.20 to choice C1
-  choice transition at [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:5.34 to choice C2
-
  --> [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:5:3
   |
 5 |   choice C1 { if g enter C2 else enter C2 }
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle:
-  choice transition at [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:5.34 to choice C2
-  choice transition at [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:6.20 to choice C1
+  |
+ ::: [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:5:20
+  |
+5 |   choice C1 { if g enter C2 else enter C2 }
+  |                    -------- choice transition to choice C2
+  |
+ ::: [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:6:20
+  |
+6 |   choice C2 { if g enter C1 else enter C1 }
+  |                    -------- choice transition to choice C1
 

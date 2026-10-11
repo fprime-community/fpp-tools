@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/template/expand_absolute_global_template.fpp:7:16
+  |
+7 |   constant x = d
+  |                ^ cannot find constant `d` in scope
+

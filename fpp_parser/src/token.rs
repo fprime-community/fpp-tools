@@ -2,17 +2,21 @@ use fpp_core::{BytePos, SourceFile, Span, Spanned};
 use fpp_lexer::TokenKind;
 use std::fmt::Debug;
 
+/// A token of the grammar
 #[derive(Debug)]
 pub struct Token {
+    /// The kind of the token
     pub kind: TokenKind,
+    /// The location of the token
     pub span: Span,
-    pub text: Option<String>,
+    /// The string value of an identifier, annotation or literal
+    pub str: Option<String>,
 }
 
 impl Token {
     pub fn new(
         kind: TokenKind,
-        text: Option<String>,
+        str: Option<String>,
         file: SourceFile,
         start: BytePos,
         length: BytePos,
@@ -21,7 +25,7 @@ impl Token {
         Token {
             kind,
             span: Span::new(file, start, length, include_span),
-            text,
+            str,
         }
     }
 
@@ -29,8 +33,9 @@ impl Token {
         self.kind
     }
 
-    pub fn text(&self) -> &str {
-        match self.text.as_ref() {
+    /// The string value of the token, empty if it has none
+    pub fn str(&self) -> &str {
+        match self.str.as_ref() {
             None => "",
             Some(txt) => txt,
         }

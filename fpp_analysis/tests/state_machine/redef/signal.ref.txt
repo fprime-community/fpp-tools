@@ -1,15 +1,18 @@
- --> [ local path prefix ]/state_machine/redef/signal.fpp:3:10
+ --> [ local path prefix ]/state_machine/redef/signal.fpp:3:3
   |
 3 |   signal s
-  |          ^ redefinition of symbol s
+  |   ^^^^^^^^ redefinition of symbol s
   |
  ::: [ local path prefix ]/state_machine/redef/signal.fpp:2:3
   |
 2 |   signal s
   |   -------- previous definition is here
 
- --> [ local path prefix ]/state_machine/redef/signal.fpp:1:15
+ --> [ local path prefix ]/state_machine/redef/signal.fpp:1:1
   |
-1 | state machine M {
-  |               ^ state machine must have initial transition
+1 | / state machine M {
+2 | |   signal s
+3 | |   signal s
+4 | | }
+  | |_^ state machine must have initial transition
 

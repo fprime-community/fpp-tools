@@ -1,0 +1,14 @@
+ --> [ local path prefix ]/interface/import_module.fpp:5:12
+  |
+5 |       import M
+  |              ^ invalid use of symbol M: not a interface symbol
+  |
+ ::: [ local path prefix ]/interface/import_module.fpp:1:1
+  |
+1 | / module M {
+2 | |
+3 | |   interface I {
+... |
+9 | | }
+  | |_- symbol is defined here
+

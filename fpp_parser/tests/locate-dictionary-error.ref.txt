@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/locate-dictionary-error.fpp:1:19
+  |
+1 | locate dictionary component C at "c.fpp"
+  |                   ^^^^^^^^^ syntax error: dictionary location kind expected
+  |
+  = note: expected one of constant, type
+  = note: got component
+

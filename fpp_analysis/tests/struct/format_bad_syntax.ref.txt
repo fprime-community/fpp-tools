@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/struct/format_bad_syntax.fpp:1:28
+  |
+1 | struct S { x: U32 format "{" }
+  |                            ^ invalid format string: invalid replacement field
+

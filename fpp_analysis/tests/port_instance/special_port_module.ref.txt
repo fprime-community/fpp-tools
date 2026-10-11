@@ -1,0 +1,12 @@
+  --> [ local path prefix ]/port_instance/special_port_module.fpp:13:3
+   |
+13 |     time get port timeGetOut
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ invalid use of symbol Time: not a port symbol
+   |
+  ::: [ local path prefix ]/port_instance/special_port_module.fpp:5:3
+   |
+ 5 | /   module Time {
+ 6 | |
+ 7 | |   }
+   | |___- symbol is defined here
+

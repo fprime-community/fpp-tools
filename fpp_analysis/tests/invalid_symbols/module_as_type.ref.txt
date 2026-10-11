@@ -1,10 +1,14 @@
  --> [ local path prefix ]/invalid_symbols/module_as_type.fpp:3:17
   |
-3 |   array a = [3] M
-  |                 ^ not a type symbol
+3 |     array a = [3] M
+  |                   ^ invalid use of symbol M: not a type symbol
   |
- ::: [ local path prefix ]/invalid_symbols/module_as_type.fpp:1:8
+ ::: [ local path prefix ]/invalid_symbols/module_as_type.fpp:1:1
   |
-1 | module M {
-  |        - M defined here
+1 | / module M {
+2 | |  
+3 | |   array a = [3] M
+4 | |
+5 | | }
+  | |_- symbol is defined here
 

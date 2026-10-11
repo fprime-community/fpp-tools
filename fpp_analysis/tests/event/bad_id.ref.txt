@@ -1,9 +1,7 @@
  --> [ local path prefix ]/event/bad_id.fpp:3:36
   |
 3 |   event E severity activity low id "abc" format ""
-  |                                    ^^^^^ cannot convert expression to integer
-  |
-  = note: string cannot be converted to Integer
+  |                                    ^^^^^ cannot convert string to a numeric type
 
  --> [ local path prefix ]/event/bad_id.fpp:1:1
   |

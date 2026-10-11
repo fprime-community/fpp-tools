@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/invalid_symbols/module_as_interface_instance_arg.fpp:6:19
+  |
+6 | expand T(instance M)
+  |                   ^ invalid use of symbol M: not a component instance or topology symbol
+  |
+ ::: [ local path prefix ]/invalid_symbols/module_as_interface_instance_arg.fpp:2:1
+  |
+2 | module M {}
+  | ----------- symbol is defined here
+

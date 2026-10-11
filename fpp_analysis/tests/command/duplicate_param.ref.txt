@@ -1,10 +1,10 @@
  --> [ local path prefix ]/command/duplicate_param.fpp:3:26
   |
 3 |   sync command C(a: U32, a: I32)
-  |                          ^ duplicate parameter `a`
+  |                          ^^^^^^ duplicate parameter a
   |
  ::: [ local path prefix ]/command/duplicate_param.fpp:3:18
   |
 3 |   sync command C(a: U32, a: I32)
-  |                  - previously defined here
+  |                  ------ previous parameter is here
 

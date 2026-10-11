@@ -120,6 +120,8 @@ pub struct SpecStateTransition {
     pub transition_or_do: TransitionOrDo,
 }
 
+/// The actions of a `do` expression. A node of its own, so that the
+/// expression has a location.
 #[ast]
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct DoExpr {

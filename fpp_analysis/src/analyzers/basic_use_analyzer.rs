@@ -1,51 +1,65 @@
-use crate::analyzers::NestedScopeState;
-use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
-use crate::semantics::{QualifiedName, Symbol};
+use crate::Analysis;
+use crate::analyzers::analyzer::{Analyzer, NestedScopeState};
+use crate::analyzers::module_analyzer::visit_expansion;
+use crate::analyzers::type_expression_analyzer::TypeExpressionAnalyzer;
+use crate::semantics::{ImpliedUse, ImpliedUseKind, QualifiedName, Symbol};
 use fpp_ast::*;
-use std::collections::VecDeque;
-use std::marker::PhantomData;
-use std::ops::{ControlFlow, Deref};
+use std::ops::ControlFlow;
 
-/// An extension of the standard [Visitor] trait that allows analyzing uses of symbols
-/// [BasicUseAnalyzer] or [super::UseAnalyzer] should be used in your pass for this to work properly
-pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
+/// The use hooks of [`BasicUseAnalyzer`], and the hooks of its analysis of
+/// template expansions
+///
+/// A pass gets these hooks called by running [`BasicUseAnalyzer`] or
+/// [`super::UseAnalyzer`] as its super visitor. A hook receives the node of the
+/// use and the qualified name the use names.
+///
+/// [`BasicUseAnalyzer`] analyzes the parameters on a template expansion through
+/// the template hooks, where [`super::TemplateExpandAnalyzer`] visits the
+/// arguments of the expansion specifier. The template argument hooks do
+/// nothing by default. Visiting a bound argument needs a visitor for the
+/// lifetime of the argument, which only a concrete pass can provide, so a pass
+/// that analyzes the bound arguments overrides these hooks with
+/// [`visit_template_arg`].
+pub trait UseAnalysisPass<'ast>: Visitor<'ast, State = Analysis> {
     /// A use of a component definition
     fn component_use(
         &self,
         a: &mut Self::State,
         node: &QualIdent,
-        name: QualifiedName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = node;
-        let _ = name;
+        let _ = use_;
         ControlFlow::Continue(())
     }
 
-    /// A use of an interface instance (topology def or component instance def)
+    /// A use of a interface instance (topology def or component instance def)
     fn interface_instance_use(
         &self,
         a: &mut Self::State,
         node: &QualIdent,
-        name: QualifiedName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = node;
-        let _ = name;
+        let _ = use_;
         ControlFlow::Continue(())
     }
 
     /// A use of a constant definition or enumerated constant definition
+    ///
+    /// The expression of an implied constant use is built for the visit, so
+    /// `node` need not be part of the model.
     fn constant_use(
         &self,
         a: &mut Self::State,
-        node: &'ast Expr,
-        name: QualifiedName,
+        node: &Expr,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = node;
-        let _ = name;
+        let _ = use_;
         ControlFlow::Continue(())
     }
 
@@ -54,48 +68,11 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         &self,
         a: &mut Self::State,
         node: &QualIdent,
-        name: QualifiedName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = node;
-        let _ = name;
-        ControlFlow::Continue(())
-    }
-
-    /// An implied use of a port definition (from a special port instance)
-    fn implied_port_use(
-        &self,
-        a: &mut Self::State,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.port_use(a, node, name)
-    }
-
-    /// An implied use of a type definition (e.g. `FwSizeStoreType` for strings)
-    fn implied_type_use(
-        &self,
-        a: &mut Self::State,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let _ = a;
-        let _ = node;
-        let _ = name;
-        ControlFlow::Continue(())
-    }
-
-    /// An implied use of a constant definition (e.g. `FW_FIXED_LENGTH_STRING_SIZE`
-    /// for default-size strings)
-    fn implied_constant_use(
-        &self,
-        a: &mut Self::State,
-        node: &Expr,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let _ = a;
-        let _ = node;
-        let _ = name;
+        let _ = use_;
         ControlFlow::Continue(())
     }
 
@@ -104,24 +81,27 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         &self,
         a: &mut Self::State,
         node: &QualIdent,
-        name: QualifiedName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = node;
-        let _ = name;
+        let _ = use_;
         ControlFlow::Continue(())
     }
 
     /// A use of a type definition
+    ///
+    /// The type name of an implied type use is built for the visit, so `node`
+    /// need not be part of the model.
     fn type_use(
         &self,
         a: &mut Self::State,
-        node: &QualIdent,
-        name: QualifiedName,
+        node: &TypeName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = node;
-        let _ = name;
+        let _ = use_;
         ControlFlow::Continue(())
     }
 
@@ -130,45 +110,42 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         &self,
         a: &mut Self::State,
         node: &QualIdent,
-        name: QualifiedName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = node;
-        let _ = name;
+        let _ = use_;
         ControlFlow::Continue(())
     }
 
-    /// A use of a module template definition
+    /// A use of a template definition
     fn template_use(
         &self,
         a: &mut Self::State,
         node: &QualIdent,
-        name: QualifiedName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = node;
-        let _ = name;
+        let _ = use_;
         ControlFlow::Continue(())
     }
 
-    /// A use of a bound constant template parameter.
-    ///
-    /// A pass that analyzes the bound argument calls [`visit_template_arg`],
-    /// which is the shared behavior these hooks build on.
+    /// A use of a template constant parameter
     fn template_constant_arg(&self, a: &mut Self::State, arg: &Symbol) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = arg;
         ControlFlow::Continue(())
     }
 
-    /// A use of a bound type template parameter
+    /// A use of a template type parameter
     fn template_type_arg(&self, a: &mut Self::State, arg: &Symbol) -> ControlFlow<Self::Break> {
         let _ = a;
         let _ = arg;
         ControlFlow::Continue(())
     }
 
-    /// A use of a bound port interface instance template parameter
+    /// A use of a template interface parameter
     fn template_interface_arg(
         &self,
         a: &mut Self::State,
@@ -179,17 +156,53 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /// A bound template parameter of an expansion
-    fn template_param(&self, a: &mut Self::State, arg: &Symbol) -> ControlFlow<Self::Break> {
-        match arg {
-            Symbol::TemplateConstantArg { .. } => self.template_constant_arg(a, arg),
-            Symbol::TemplateTypeArg { .. } => self.template_type_arg(a, arg),
-            Symbol::TemplateInterfaceArg { .. } => self.template_interface_arg(a, arg),
-            _ => ControlFlow::Continue(()),
-        }
+    /// An implied constant use: a use of the constant definition named by the
+    /// expression of the implied use
+    fn implied_constant_use(
+        &self,
+        a: &mut Self::State,
+        node: &Expr,
+        use_: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.constant_use(a, node, use_)
     }
 
-    /// A template argument of an expansion that has not been resolved
+    /// An implied port use: a use of the port definition named by the
+    /// qualified identifier of the implied use
+    fn implied_port_use(
+        &self,
+        a: &mut Self::State,
+        node: &QualIdent,
+        use_: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.port_use(a, node, use_)
+    }
+
+    /// An implied type use: a use of the type definition named by the type
+    /// name of the implied use
+    fn implied_type_use(
+        &self,
+        a: &mut Self::State,
+        node: &TypeName,
+        use_: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.type_use(a, node, use_)
+    }
+
+    /// An implied use. It is visited after the use of the definition it names.
+    fn implied_use(
+        &self,
+        a: &mut Self::State,
+        iu: &ImpliedUse,
+        kind: ImpliedUseKind,
+    ) -> ControlFlow<Self::Break> {
+        let _ = a;
+        let _ = iu;
+        let _ = kind;
+        ControlFlow::Continue(())
+    }
+
+    /// A template argument of an expansion that has not been resolved.
     fn template_arg_node(
         &self,
         a: &mut Self::State,
@@ -198,27 +211,35 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         match &node.kind {
             TemplateArgKind::Constant(e) => e.visit(a, self),
             TemplateArgKind::Type(tn) => tn.visit(a, self),
-            // An unresolved interface argument names no definition yet
             TemplateArgKind::Interface(_) => ControlFlow::Continue(()),
+        }
+    }
+
+    /// A bound template parameter of an expansion
+    fn template_param(&self, a: &mut Self::State, arg: &Symbol) -> ControlFlow<Self::Break> {
+        match arg {
+            Symbol::TemplateConstantArg { .. } => self.template_constant_arg(a, arg),
+            Symbol::TemplateTypeArg { .. } => self.template_type_arg(a, arg),
+            Symbol::TemplateInterfaceArg { .. } => self.template_interface_arg(a, arg),
+            _ => panic!("template parameter should be a template argument symbol"),
         }
     }
 }
 
-/// The uses in the argument bound to a template parameter: a constant argument
-/// is an expression, a type argument is a type name, and a port interface
-/// instance argument is a use of a port interface instance.
+/// The use analysis of the argument bound to a template parameter: a use of a
+/// template constant parameter visits the constant expression, a use of a
+/// template type parameter the type name, and a use of a template interface
+/// parameter is a use of a port interface instance.
 ///
-/// This is the analysis a use pass performs on a bound parameter before doing
-/// its own work with it, so it plays the role of the base-class behavior the
-/// [`UseAnalysisPass`] template-argument hooks extend.
-pub fn visit_template_arg<'ast, S, V>(
+/// This is the default analysis of the template argument hooks of
+/// [`UseAnalysisPass`] for a use analysis.
+pub fn visit_template_arg<'ast, V>(
     visitor: &V,
-    a: &mut S,
+    a: &mut Analysis,
     arg: &'ast Symbol,
 ) -> ControlFlow<V::Break>
 where
-    S: NestedScopeState,
-    V: UseAnalysisPass<'ast, S>,
+    V: UseAnalysisPass<'ast>,
 {
     match arg {
         Symbol::TemplateConstantArg { value, .. } => value.visit(a, visitor),
@@ -232,99 +253,142 @@ where
 
 /// Basic use analysis
 /// Assumes all qualified identifiers are constant uses
-pub struct BasicUseAnalyzer<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> {
-    super_: NestedAnalyzer<'ast, S, V>,
-    phantom_data: PhantomData<S>,
+pub struct BasicUseAnalyzer<'ast, V: UseAnalysisPass<'ast>> {
+    super_: TypeExpressionAnalyzer<'ast, V>,
 }
 
-impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Default
-    for BasicUseAnalyzer<'ast, S, V>
-{
+impl<'ast, V: UseAnalysisPass<'ast>> Default for BasicUseAnalyzer<'ast, V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'ast, S, V> {
-    pub fn new() -> BasicUseAnalyzer<'ast, S, V> {
+impl<'ast, V: UseAnalysisPass<'ast>> BasicUseAnalyzer<'ast, V> {
+    pub fn new() -> BasicUseAnalyzer<'ast, V> {
         BasicUseAnalyzer {
-            super_: NestedAnalyzer::new(NestedAnalyzerMode::DEEP),
-            phantom_data: Default::default(),
+            super_: TypeExpressionAnalyzer::new(),
         }
     }
 
-    /// Gets a qualified name from a dot expression
-    pub(crate) fn expr_to_qualified_name(&self, e: &Expr) -> Option<QualifiedName> {
-        fn name_opt(e: &Expr, mut qualifier: VecDeque<String>) -> Option<QualifiedName> {
-            match &e.kind {
-                ExprKind::Ident(id) => {
-                    qualifier.push_front(id.clone());
-                    Some(qualifier.into())
-                }
-                ExprKind::Dot { e: e1, id } => {
-                    qualifier.push_back(id.data.clone());
-                    name_opt(e1.deref(), qualifier)
-                }
-                _ => None,
+    /// An implied constant use
+    fn implied_constant_use(
+        &self,
+        visitor: &V,
+        a: &mut Analysis,
+        iu: &ImpliedUse,
+    ) -> ControlFlow<V::Break> {
+        iu.annotate_emitted_errors(|| {
+            visitor.implied_constant_use(a, &iu.as_expr_node(), iu.name().clone())?;
+            visitor.implied_use(a, iu, ImpliedUseKind::Constant)
+        })
+    }
+
+    /// An implied port use
+    fn implied_port_use(
+        &self,
+        visitor: &V,
+        a: &mut Analysis,
+        iu: &ImpliedUse,
+    ) -> ControlFlow<V::Break> {
+        iu.annotate_emitted_errors(|| {
+            visitor.implied_port_use(a, &iu.as_qual_ident_node(), iu.name().clone())?;
+            visitor.implied_use(a, iu, ImpliedUseKind::Port)
+        })
+    }
+
+    /// An implied type use
+    fn implied_type_use(
+        &self,
+        visitor: &V,
+        a: &mut Analysis,
+        iu: &ImpliedUse,
+    ) -> ControlFlow<V::Break> {
+        iu.annotate_emitted_errors(|| {
+            visitor.implied_type_use(a, &iu.as_type_name_node(), iu.name().clone())?;
+            visitor.implied_use(a, iu, ImpliedUseKind::Type)
+        })
+    }
+
+    fn port_instance_identifier_node(
+        &self,
+        visitor: &V,
+        a: &mut Analysis,
+        node: &PortInstanceIdentifier,
+    ) -> ControlFlow<V::Break> {
+        visitor.interface_instance_use(
+            a,
+            &node.interface_instance,
+            (&node.interface_instance).into(),
+        )
+    }
+
+    fn tlm_channel_identifier_node(
+        &self,
+        visitor: &V,
+        a: &mut Analysis,
+        node: &TlmChannelIdentifier,
+    ) -> ControlFlow<V::Break> {
+        visitor.interface_instance_use(
+            a,
+            &node.component_instance,
+            (&node.component_instance).into(),
+        )
+    }
+
+    fn tlm_packet_member(
+        &self,
+        visitor: &V,
+        a: &mut Analysis,
+        member: &TlmPacketMember,
+    ) -> ControlFlow<V::Break> {
+        match member {
+            TlmPacketMember::SpecInclude(_) => ControlFlow::Continue(()),
+            TlmPacketMember::TlmChannelIdentifier(node) => {
+                self.tlm_channel_identifier_node(visitor, a, node)
             }
         }
-
-        name_opt(e, VecDeque::new())
     }
 
-    /// Dispatch the implied constant uses recorded at an AST node
     fn visit_implied_constant_uses(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
-        if let Some(uses) = a.implied_uses(id) {
-            for iu in &uses.constants {
-                let e = iu.as_expr();
-                visitor.implied_constant_use(a, &e, iu.name().clone())?;
-            }
+        for iu in a.get_implied_uses(ImpliedUseKind::Constant, id) {
+            self.implied_constant_use(visitor, a, &iu)?;
         }
         ControlFlow::Continue(())
     }
 
-    /// Dispatch the implied port uses recorded at an AST node
     fn visit_implied_port_uses(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
-        if let Some(uses) = a.implied_uses(id) {
-            for iu in &uses.ports {
-                let qi = iu.as_qual_ident();
-                visitor.implied_port_use(a, &qi, iu.name().clone())?;
-            }
+        for iu in a.get_implied_uses(ImpliedUseKind::Port, id) {
+            self.implied_port_use(visitor, a, &iu)?;
         }
         ControlFlow::Continue(())
     }
 
-    /// Dispatch the implied type uses recorded at an AST node
     fn visit_implied_type_uses(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
-        if let Some(uses) = a.implied_uses(id) {
-            for iu in &uses.types {
-                let qi = iu.as_qual_ident();
-                visitor.implied_type_use(a, &qi, iu.name().clone())?;
-            }
+        for iu in a.get_implied_uses(ImpliedUseKind::Type, id) {
+            self.implied_type_use(visitor, a, &iu)?;
         }
         ControlFlow::Continue(())
     }
 
-    /// Dispatch every implied use recorded at an AST node
     fn visit_implied_uses(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
         self.visit_implied_constant_uses(visitor, a, id)?;
@@ -333,14 +397,19 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
     }
 }
 
-impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
-    for BasicUseAnalyzer<'ast, S, V>
-{
-    fn visit(&self, visitor: &V, a: &mut V::State, node: Node<'ast>) -> ControlFlow<V::Break> {
+impl<'ast, V: UseAnalysisPass<'ast>> Analyzer<'ast, V> for BasicUseAnalyzer<'ast, V> {
+    fn visit(&self, visitor: &V, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<V::Break> {
         match node {
             Node::DefComponentInstance(ci) => {
                 visitor.component_use(a, &ci.component, (&ci.component).into())?;
-                ci.walk(a, visitor)
+                self.super_.visit(visitor, a, node)
+            }
+            Node::DefSystem(s) => {
+                visitor.interface_instance_use(a, &s.topology, (&s.topology).into())
+            }
+            Node::DefStateMachine(sm) => {
+                self.visit_implied_uses(visitor, a, sm.node_id)?;
+                self.super_.visit(visitor, a, node)
             }
             Node::DefTopology(t) => {
                 self.visit_implied_uses(visitor, a, t.node_id)?;
@@ -350,52 +419,84 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                     visitor.interface_use(a, i, i.into())?;
                 }
 
-                t.walk(a, visitor)
-            }
-            Node::DefStateMachine(sm) => {
-                self.visit_implied_uses(visitor, a, sm.node_id)?;
                 self.super_.visit(visitor, a, node)
             }
-            Node::DefSystem(s) => {
-                visitor.interface_instance_use(a, &s.topology, (&s.topology).into())?;
-                s.walk(a, visitor)
-            }
             Node::Expr(e) => match &e.kind {
-                ExprKind::Dot { e: e1, .. } => {
-                    match self.expr_to_qualified_name(e) {
-                        // Assume the entire qualified identifier is a use
-                        Some(use_) => visitor.constant_use(a, e, use_),
-                        // This is some other type of dot expression (not a qual ident)
-                        // Analyze the left side, which may contain constant uses
-                        None => self.visit(visitor, a, Node::Expr(e1)),
-                    }
-                }
-                ExprKind::Ident(id) => visitor.constant_use(a, e, id.clone().into()),
+                ExprKind::Dot { e: e1, .. } => match e.get_ident_list_opt() {
+                    // e is a qualified identifier
+                    // Assume the entire qualified identifier is a use
+                    Some(il) => visitor.constant_use(a, e, QualifiedName::from(il)),
+                    // e is not a qualified identifier
+                    // Analyze the left side, which may contain constant uses
+                    None => e1.visit(a, visitor),
+                },
+                ExprKind::Ident { value, .. } => visitor.constant_use(a, e, value.clone().into()),
                 _ => self.super_.visit(visitor, a, node),
             },
             Node::SpecInstance(si) => {
                 visitor.interface_instance_use(a, &si.instance, (&si.instance).into())
             }
-            Node::DefModuleTemplate(d) => {
-                // The body of a template is analyzed where the template is
-                // expanded, not here. The parameter list is analyzed here,
-                // because it does not depend on the body.
-                for param in &d.params {
-                    match param {
-                        TemplateParam::Constant(p) => p.type_name.visit(a, visitor)?,
-                        TemplateParam::Interface(p) => {
-                            visitor.interface_use(a, &p.interface, (&p.interface).into())?
-                        }
-                        TemplateParam::Type(_) => {}
-                    }
+            Node::SpecStateMachineInstance(si) => {
+                visitor.state_machine_use(a, &si.state_machine, (&si.state_machine).into())?;
+                self.super_.visit(visitor, a, node)
+            }
+            Node::Connection(c) => {
+                self.port_instance_identifier_node(visitor, a, &c.from_port)?;
+                c.from_index.visit(a, visitor)?;
+                self.port_instance_identifier_node(visitor, a, &c.to_port)?;
+                c.to_index.visit(a, visitor)
+            }
+            Node::SpecPatternConnectionGraph(cg) => {
+                visitor.interface_instance_use(a, &cg.source, (&cg.source).into())?;
+                for target in &cg.targets {
+                    visitor.interface_instance_use(a, target, target.into())?;
                 }
                 ControlFlow::Continue(())
             }
+            Node::SpecGeneralPortInstance(pi) => {
+                pi.size.visit(a, visitor)?;
+                if let Some(port) = &pi.port {
+                    visitor.port_use(a, port, port.into())?;
+                }
+                pi.priority.visit(a, visitor)
+            }
+            Node::SpecSpecialPortInstance(pi) => {
+                pi.priority.visit(a, visitor)?;
+                self.visit_implied_port_uses(visitor, a, pi.node_id)
+            }
+            Node::SpecTlmPacket(p) => {
+                self.super_.visit(visitor, a, node)?;
+                for member in &p.members {
+                    self.tlm_packet_member(visitor, a, member)?;
+                }
+                ControlFlow::Continue(())
+            }
+            Node::SpecTlmPacketSet(s) => {
+                self.super_.visit(visitor, a, node)?;
+                for omitted in &s.omitted {
+                    self.tlm_channel_identifier_node(visitor, a, omitted)?;
+                }
+                ControlFlow::Continue(())
+            }
+            Node::SpecInterfaceImport(i) => {
+                visitor.interface_use(a, &i.interface, (&i.interface).into())
+            }
+            Node::SpecTopPort(p) => {
+                self.port_instance_identifier_node(visitor, a, &p.underlying_port)
+            }
+            Node::TypeName(tn) => match &tn.kind {
+                TypeNameKind::QualIdent(qi) => visitor.type_use(a, tn, qi.into()),
+                TypeNameKind::String(_) => {
+                    self.visit_implied_uses(visitor, a, tn.node_id)?;
+                    self.super_.visit(visitor, a, node)
+                }
+                _ => self.super_.visit(visitor, a, node),
+            },
             Node::SpecTemplateExpand(s) => {
                 visitor.template_use(a, &s.template, (&s.template).into())?;
 
-                // Analyze the parameters bound by this expansion. Before the
-                // expansion exists, all we have are the argument nodes.
+                // Analyze the parameters on this template expansion. An
+                // expansion that has not been resolved has only its arguments.
                 match a.template_expansion_params(s.node_id) {
                     Some(params) => {
                         for param in &params {
@@ -409,54 +510,22 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                     }
                 }
 
-                self.super_.visit(visitor, a, node)
+                visit_expansion(visitor, a, s)
             }
-            Node::SpecStateMachineInstance(si) => {
-                visitor.state_machine_use(a, &si.state_machine, (&si.state_machine).into())?;
-                si.walk(a, visitor)
-            }
-            Node::SpecPatternConnectionGraph(cg) => {
-                for target in &cg.targets {
-                    visitor.interface_instance_use(a, target, target.into())?;
+            Node::DefModuleTemplate(d) => {
+                // Visit the type of each constant parameter and the interface
+                // of each interface parameter
+                for param in &d.params {
+                    match param {
+                        TemplateParam::Constant(p) => p.type_name.visit(a, visitor)?,
+                        TemplateParam::Interface(p) => {
+                            visitor.interface_use(a, &p.interface, (&p.interface).into())?
+                        }
+                        TemplateParam::Type(_) => {}
+                    }
                 }
-
-                visitor.interface_instance_use(a, &cg.source, (&cg.source).into())?;
-
-                self.super_.visit(visitor, a, node)
+                ControlFlow::Continue(())
             }
-            Node::SpecGeneralPortInstance(pi) => {
-                match &pi.port {
-                    None => ControlFlow::Continue(()),
-                    Some(pqi) => visitor.port_use(a, pqi, pqi.into()),
-                }?;
-
-                self.super_.visit(visitor, a, node)
-            }
-            Node::SpecSpecialPortInstance(pi) => {
-                self.visit_implied_port_uses(visitor, a, pi.node_id)?;
-                self.super_.visit(visitor, a, node)
-            }
-            Node::PortInstanceIdentifier(pii) => visitor.interface_instance_use(
-                a,
-                &pii.interface_instance,
-                (&pii.interface_instance).into(),
-            ),
-            Node::TlmChannelIdentifier(ci) => visitor.interface_instance_use(
-                a,
-                &ci.component_instance,
-                (&ci.component_instance).into(),
-            ),
-            Node::SpecInterfaceImport(i) => {
-                visitor.interface_use(a, &i.interface, (&i.interface).into())
-            }
-            Node::TypeName(tn) => match &tn.kind {
-                TypeNameKind::QualIdent(qi) => visitor.type_use(a, qi, qi.into()),
-                TypeNameKind::String(_) => {
-                    self.visit_implied_uses(visitor, a, tn.node_id)?;
-                    self.super_.visit(visitor, a, node)
-                }
-                _ => ControlFlow::Continue(()),
-            },
             _ => self.super_.visit(visitor, a, node),
         }
     }

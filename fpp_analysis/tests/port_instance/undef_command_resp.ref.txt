@@ -2,6 +2,8 @@
   |
 3 |   command resp port cmdResponseOut
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot find port `Fw` in scope
+  |
+  = note: the symbol Fw.CmdResponse has an implied use at the point of the error
 
  --> [ local path prefix ]/port_instance/undef_command_resp.fpp:3:3
   |

@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/sizeof_string_size_too_large.fpp:5:33
+  |
+5 | constant c = sizeof(string size 0x80000000)
+  |                                 ^^^^^^^^^^ invalid string size 2147483648
+

@@ -1,7 +1,7 @@
  --> [ local path prefix ]/tlm_channel/negative_id.fpp:3:23
   |
 3 |   telemetry T: U32 id -1
-  |                       ^^ value may not be negative
+  |                       ^^ invalid integer value -1
   |
-  = note: expression evaluated to `-1`
+  = note: value may not be negative
 

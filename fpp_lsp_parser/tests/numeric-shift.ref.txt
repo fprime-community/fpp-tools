@@ -1,0 +1,220 @@
+ROOT@0..209
+  DEF_CONSTANT@0..19
+    CONSTANT_KW@0..8 "constant"
+    WHITESPACE@8..9 " "
+    NAME@9..10
+      IDENT@9..10 "a"
+    WHITESPACE@10..11 " "
+    EQUALS@11..12 "="
+    WHITESPACE@12..13 " "
+    EXPR@13..19
+      EXPR_BINARY@13..19
+        EXPR_LITERAL@13..14
+          LITERAL_INT@13..14 "2"
+        WHITESPACE@14..15 " "
+        BINARY_OP@15..17
+          SHIFT_LEFT@15..17 "<<"
+        WHITESPACE@17..18 " "
+        EXPR_LITERAL@18..19
+          LITERAL_INT@18..19 "3"
+  EOL@19..20 "\n"
+  DEF_CONSTANT@20..39
+    CONSTANT_KW@20..28 "constant"
+    WHITESPACE@28..29 " "
+    NAME@29..30
+      IDENT@29..30 "b"
+    WHITESPACE@30..31 " "
+    EQUALS@31..32 "="
+    WHITESPACE@32..33 " "
+    EXPR@33..39
+      EXPR_BINARY@33..39
+        EXPR_LITERAL@33..34
+          LITERAL_INT@33..34 "8"
+        WHITESPACE@34..35 " "
+        BINARY_OP@35..37
+          SHIFT_RIGHT@35..37 ">>"
+        WHITESPACE@37..38 " "
+        EXPR_LITERAL@38..39
+          LITERAL_INT@38..39 "1"
+  EOL@39..40 "\n"
+  DEF_CONSTANT@40..64
+    CONSTANT_KW@40..48 "constant"
+    WHITESPACE@48..49 " "
+    NAME@49..50
+      IDENT@49..50 "c"
+    WHITESPACE@50..51 " "
+    EQUALS@51..52 "="
+    WHITESPACE@52..53 " "
+    EXPR@53..64
+      EXPR_BINARY@53..64
+        EXPR_BINARY@53..59
+          EXPR_LITERAL@53..54
+            LITERAL_INT@53..54 "1"
+          WHITESPACE@54..55 " "
+          BINARY_OP@55..57
+            SHIFT_LEFT@55..57 "<<"
+          WHITESPACE@57..58 " "
+          EXPR_LITERAL@58..59
+            LITERAL_INT@58..59 "2"
+        WHITESPACE@59..60 " "
+        BINARY_OP@60..62
+          SHIFT_LEFT@60..62 "<<"
+        WHITESPACE@62..63 " "
+        EXPR_LITERAL@63..64
+          LITERAL_INT@63..64 "3"
+  EOL@64..65 "\n"
+  DEF_CONSTANT@65..88
+    CONSTANT_KW@65..73 "constant"
+    WHITESPACE@73..74 " "
+    NAME@74..75
+      IDENT@74..75 "d"
+    WHITESPACE@75..76 " "
+    EQUALS@76..77 "="
+    WHITESPACE@77..78 " "
+    EXPR@78..88
+      EXPR_BINARY@78..88
+        EXPR_BINARY@78..83
+          EXPR_LITERAL@78..79
+            LITERAL_INT@78..79 "1"
+          WHITESPACE@79..80 " "
+          BINARY_OP@80..82
+            PLUS@80..81 "+"
+            WHITESPACE@81..82 " "
+          EXPR_LITERAL@82..83
+            LITERAL_INT@82..83 "2"
+        WHITESPACE@83..84 " "
+        BINARY_OP@84..86
+          SHIFT_LEFT@84..86 "<<"
+        WHITESPACE@86..87 " "
+        EXPR_LITERAL@87..88
+          LITERAL_INT@87..88 "3"
+  EOL@88..89 "\n"
+  DEF_CONSTANT@89..112
+    CONSTANT_KW@89..97 "constant"
+    WHITESPACE@97..98 " "
+    NAME@98..99
+      IDENT@98..99 "e"
+    WHITESPACE@99..100 " "
+    EQUALS@100..101 "="
+    WHITESPACE@101..102 " "
+    EXPR@102..112
+      EXPR_BINARY@102..112
+        EXPR_LITERAL@102..103
+          LITERAL_INT@102..103 "1"
+        WHITESPACE@103..104 " "
+        BINARY_OP@104..106
+          SHIFT_LEFT@104..106 "<<"
+        WHITESPACE@106..107 " "
+        EXPR_BINARY@107..112
+          EXPR_LITERAL@107..108
+            LITERAL_INT@107..108 "2"
+          WHITESPACE@108..109 " "
+          BINARY_OP@109..111
+            PLUS@109..110 "+"
+            WHITESPACE@110..111 " "
+          EXPR_LITERAL@111..112
+            LITERAL_INT@111..112 "3"
+  EOL@112..113 "\n"
+  DEF_CONSTANT@113..136
+    CONSTANT_KW@113..121 "constant"
+    WHITESPACE@121..122 " "
+    NAME@122..123
+      IDENT@122..123 "f"
+    WHITESPACE@123..124 " "
+    EQUALS@124..125 "="
+    WHITESPACE@125..126 " "
+    EXPR@126..136
+      EXPR_BINARY@126..136
+        EXPR_BINARY@126..131
+          EXPR_LITERAL@126..127
+            LITERAL_INT@126..127 "1"
+          WHITESPACE@127..128 " "
+          BINARY_OP@128..130
+            STAR@128..129 "*"
+            WHITESPACE@129..130 " "
+          EXPR_LITERAL@130..131
+            LITERAL_INT@130..131 "2"
+        WHITESPACE@131..132 " "
+        BINARY_OP@132..134
+          SHIFT_LEFT@132..134 "<<"
+        WHITESPACE@134..135 " "
+        EXPR_LITERAL@135..136
+          LITERAL_INT@135..136 "3"
+  EOL@136..137 "\n"
+  DEF_CONSTANT@137..162
+    CONSTANT_KW@137..145 "constant"
+    WHITESPACE@145..146 " "
+    NAME@146..147
+      IDENT@146..147 "g"
+    WHITESPACE@147..148 " "
+    EQUALS@148..149 "="
+    WHITESPACE@149..150 " "
+    EXPR@150..162
+      EXPR_BINARY@150..162
+        EXPR@150..158
+          LEFT_PAREN@150..151 "("
+          EXPR@151..157
+            EXPR_BINARY@151..157
+              EXPR_LITERAL@151..152
+                LITERAL_INT@151..152 "1"
+              WHITESPACE@152..153 " "
+              BINARY_OP@153..155
+                SHIFT_LEFT@153..155 "<<"
+              WHITESPACE@155..156 " "
+              EXPR_LITERAL@156..157
+                LITERAL_INT@156..157 "2"
+          RIGHT_PAREN@157..158 ")"
+        WHITESPACE@158..159 " "
+        BINARY_OP@159..161
+          PLUS@159..160 "+"
+          WHITESPACE@160..161 " "
+        EXPR_LITERAL@161..162
+          LITERAL_INT@161..162 "3"
+  EOL@162..163 "\n"
+  DEF_CONSTANT@163..183
+    CONSTANT_KW@163..171 "constant"
+    WHITESPACE@171..172 " "
+    NAME@172..173
+      IDENT@172..173 "h"
+    WHITESPACE@173..174 " "
+    EQUALS@174..175 "="
+    WHITESPACE@175..176 " "
+    EXPR@176..183
+      EXPR_BINARY@176..183
+        EXPR_UNARY@176..178
+          MINUS@176..177 "-"
+          EXPR_LITERAL@177..178
+            LITERAL_INT@177..178 "1"
+        WHITESPACE@178..179 " "
+        BINARY_OP@179..181
+          SHIFT_LEFT@179..181 "<<"
+        WHITESPACE@181..182 " "
+        EXPR_LITERAL@182..183
+          LITERAL_INT@182..183 "2"
+  EOL@183..184 "\n"
+  DEF_CONSTANT@184..208
+    CONSTANT_KW@184..192 "constant"
+    WHITESPACE@192..193 " "
+    NAME@193..194
+      IDENT@193..194 "i"
+    WHITESPACE@194..195 " "
+    EQUALS@195..196 "="
+    WHITESPACE@196..197 " "
+    EXPR@197..208
+      EXPR_BINARY@197..208
+        EXPR_BINARY@197..203
+          EXPR_LITERAL@197..198
+            LITERAL_INT@197..198 "1"
+          WHITESPACE@198..199 " "
+          BINARY_OP@199..201
+            SHIFT_LEFT@199..201 "<<"
+          WHITESPACE@201..202 " "
+          EXPR_LITERAL@202..203
+            LITERAL_INT@202..203 "2"
+        WHITESPACE@203..204 " "
+        BINARY_OP@204..206
+          SHIFT_RIGHT@204..206 ">>"
+        WHITESPACE@206..207 " "
+        EXPR_LITERAL@207..208
+          LITERAL_INT@207..208 "3"
+  EOL@208..209 "\n"

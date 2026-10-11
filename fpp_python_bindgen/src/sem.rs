@@ -400,8 +400,8 @@ fn insert_shorter(best: &mut BTreeMap<u32, Vec<String>>, id: u32, p: Vec<String>
 ///
 /// Load-bearing filter: rustdoc lists an impl under `Struct::impls` / `Enum::impls`
 /// whenever the type appears anywhere in the impl's *trait* generic arguments, so
-/// `Analysis`'s `impls` list carries the methods of every
-/// `impl UseAnalysisPass<'ast, Analysis> for CheckUses<'ast>`-shaped pass.
+/// `Analysis`'s `impls` list would carry the methods of every
+/// `impl SomeTrait<'ast, Analysis> for SomePass<'ast>`-shaped impl.
 /// Reflecting one of those emits a call to a method `Analysis` does not have — a
 /// hard compile break in the generated crate. Every `X::impls` walk in this module
 /// therefore goes through here.
@@ -475,7 +475,14 @@ fn path_type_args(args: &Option<Box<GenericArgs>>) -> Vec<&Type> {
 }
 
 const WRAPPERS: &[&str] = &["Box", "Arc", "Rc"];
-const LISTS: &[&str] = &["Vec", "VecDeque", "HashSet", "BTreeSet", "FxHashSet"];
+const LISTS: &[&str] = &[
+    "Vec",
+    "VecDeque",
+    "HashSet",
+    "BTreeSet",
+    "FxHashSet",
+    "IndexSet",
+];
 const MAPS: &[&str] = &["HashMap", "BTreeMap", "FxHashMap", "IndexMap"];
 
 /// The reflection-root struct in `fpp_analysis`: the entry point of the transitive

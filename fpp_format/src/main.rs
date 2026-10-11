@@ -45,8 +45,8 @@ struct Args {
     line_length: Option<usize>,
 
     /// Parser entrypoint / grammar rule for the input. One of: module (default),
-    /// component, topology, tlm-packet, tlm-packet-set. Needed when formatting a
-    /// bare `.fppi` fragment directly.
+    /// component, topology, tlm-packet, tlm-packet-set, state-machine, state.
+    /// Needed when formatting a bare `.fppi` fragment directly.
     #[arg(long, value_name = "RULE", value_parser = parse_entry)]
     entry: Option<TopEntryPoint>,
 }

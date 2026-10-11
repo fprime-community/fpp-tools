@@ -1,15 +1,13 @@
  --> [ local path prefix ]/state_machine/types/array_format_not_numeric.fpp:6:27
   |
 6 |   array A = [3] S format "{.3f}"
-  |                           ^^^^^ Fixed format replacement cannot be used for type `S`
-  |
- ::: [ local path prefix ]/state_machine/types/array_format_not_numeric.fpp:6:17
-  |
-6 |   array A = [3] S format "{.3f}"
-  |                 - type defined here
+  |                           ^^^^^ invalid format string: struct S is not a floating-point type
 
- --> [ local path prefix ]/state_machine/types/array_format_not_numeric.fpp:4:15
+ --> [ local path prefix ]/state_machine/types/array_format_not_numeric.fpp:4:1
   |
-4 | state machine SM {
-  |               ^^ state machine must have initial transition
+4 | / state machine SM {
+5 | |   struct S { x: U32, y: string }
+6 | |   array A = [3] S format "{.3f}"
+7 | | }
+  | |_^ state machine must have initial transition
 

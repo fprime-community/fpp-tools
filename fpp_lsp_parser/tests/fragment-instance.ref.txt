@@ -1,0 +1,11 @@
+ROOT@0..52
+  PRE_ANNOTATION@0..19 "@ Included instance"
+  EOL@19..20 "\n"
+  SPEC_INSTANCE@20..30
+    INSTANCE_KW@20..28 "instance"
+    WHITESPACE@28..29 " "
+    QUAL_IDENT@29..30
+      IDENT@29..30 "x"
+  EOL@30..31 "\n"
+  POST_ANNOTATION@31..51 "@< Included instance"
+  EOL@51..52 "\n"

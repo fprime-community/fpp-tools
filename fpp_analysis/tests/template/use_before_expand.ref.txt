@@ -1,12 +1,7 @@
  --> [ local path prefix ]/template/use_before_expand.fpp:9:38
   |
 9 | array UsesConstant = [k] U32 default [1, 2, 3]
-  |                                      ^^^^^^^^^ cannot convert value to array type due to mismatched sizes
+  |                                      ^^^^^^^^^ cannot convert [3] Integer to array UsesConstant
   |
-  = note: value size `3`
-  |
- ::: [ local path prefix ]/template/use_before_expand.fpp:9:23
-  |
-9 | array UsesConstant = [k] U32 default [1, 2, 3]
-  |                       - array size `4`
+  = note: array sizes do not match 3 != 4
 

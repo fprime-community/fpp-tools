@@ -1,0 +1,34 @@
+TransUnit(
+    [
+        DefInterface {
+            name: Name {
+                data: "I",
+                node_id: Span {
+                    start: [ local path prefix ]/implements-newline.fpp:1:11,
+                    end: [ local path prefix ]/implements-newline.fpp:1:12,
+                },
+            },
+            members: [],
+            node_id: Span {
+                start: [ local path prefix ]/implements-newline.fpp:1:1,
+                end: [ local path prefix ]/implements-newline.fpp:1:15,
+            },
+        },
+        DefTopology {
+            is_deployment: false,
+            name: Name {
+                data: "T",
+                node_id: Span {
+                    start: [ local path prefix ]/implements-newline.fpp:4:10,
+                    end: [ local path prefix ]/implements-newline.fpp:4:11,
+                },
+            },
+            members: [],
+            implements: [],
+            node_id: Span {
+                start: [ local path prefix ]/implements-newline.fpp:4:1,
+                end: [ local path prefix ]/implements-newline.fpp:6:2,
+            },
+        },
+    ],
+)

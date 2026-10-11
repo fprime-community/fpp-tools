@@ -1,4 +1,4 @@
-use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor};
+use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor, state_analyzer};
 use crate::semantics::state_machine::{
     StateMachineAnalysis, StateMachineNameGroup, StateMachineScope, StateMachineSymbol,
 };
@@ -10,27 +10,12 @@ use std::sync::Arc;
 pub struct EnterStateMachineSymbols;
 
 impl EnterStateMachineSymbols {
-    fn update_map(sma: &mut StateMachineAnalysis, s: &StateMachineSymbol) {
-        if let Some(ps) = &sma.parent_state {
-            sma.parent_state_map.insert(s.clone(), ps.clone());
-        }
-    }
-
-    fn visit_node(
-        &self,
+    /// Analyze a state machine definition
+    pub fn def_state_machine(
         sma: &mut StateMachineAnalysis,
-        symbol: StateMachineSymbol,
-        name_groups: &[StateMachineNameGroup],
+        node: &fpp_ast::DefStateMachine,
     ) -> SmResult {
-        for ng in name_groups {
-            // A duplicate-symbol error is non-blocking: the name still resolves
-            // to a binding, so emit and keep going.
-            if let Err(err) = sma.nested_scope.put(*ng, symbol.clone()) {
-                err.emit();
-            }
-        }
-        Self::update_map(sma, &symbol);
-        ControlFlow::Continue(())
+        StateMachineAnalysisVisitor::def_state_machine(&EnterStateMachineSymbols, sma, node)
     }
 }
 
@@ -61,9 +46,9 @@ impl StateMachineAnalysisVisitor for EnterStateMachineSymbols {
         // Enter the state symbol into the enclosing scope
         self.visit_node(sma, symbol.clone(), &[StateMachineNameGroup::State])?;
         // Push a new scope for the state members and set the parent state
-        sma.nested_scope.push(StateMachineScope::new());
+        sma.nested_scope.push(StateMachineScope::empty());
         sma.parent_state = Some(symbol.clone());
-        self.state_analyzer_def_state(sma, node)?;
+        state_analyzer::def_state(self, sma, node)?;
         // Save the state scope and pop it off the stack
         let scope = sma.nested_scope.pop();
         sma.symbol_scope_map.insert(symbol, scope);
@@ -73,11 +58,26 @@ impl StateMachineAnalysisVisitor for EnterStateMachineSymbols {
 }
 
 impl EnterStateMachineSymbols {
-    /// Analyze a state machine definition
-    pub fn def_state_machine(
+    fn update_map(sma: &mut StateMachineAnalysis, s: &StateMachineSymbol) {
+        if let Some(ps) = &sma.parent_state {
+            sma.parent_state_map.insert(s.clone(), ps.clone());
+        }
+    }
+
+    fn visit_node(
+        &self,
         sma: &mut StateMachineAnalysis,
-        node: &fpp_ast::DefStateMachine,
+        symbol: StateMachineSymbol,
+        name_groups: &[StateMachineNameGroup],
     ) -> SmResult {
-        StateMachineAnalysisVisitor::def_state_machine(&EnterStateMachineSymbols, sma, node)
+        for ng in name_groups {
+            // A duplicate-symbol error is non-blocking: the name still resolves
+            // to a binding, so emit and keep going.
+            if let Err(err) = sma.nested_scope.put(*ng, symbol.clone()) {
+                err.emit();
+            }
+        }
+        Self::update_map(sma, &symbol);
+        ControlFlow::Continue(())
     }
 }

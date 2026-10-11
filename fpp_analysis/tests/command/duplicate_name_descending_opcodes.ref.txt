@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/command/duplicate_name_descending_opcodes.fpp:5:3
+  |
+5 |   sync command A opcode 1
+  |   ^^^^^^^^^^^^^^^^^^^^^^^ duplicate command name A
+  |
+ ::: [ local path prefix ]/command/duplicate_name_descending_opcodes.fpp:3:3
+  |
+3 |   sync command A opcode 5
+  |   ----------------------- previous occurrence is here
+

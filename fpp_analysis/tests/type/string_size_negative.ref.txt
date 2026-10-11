@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/type/string_size_negative.fpp:3:27
+  |
+3 | array A = [3] string size -1
+  |                           ^^ invalid string size -1
+

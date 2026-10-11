@@ -137,7 +137,7 @@ def test_throws_raises_diagnostic_error(m, nodes, a_span):
     neg = next(e for e in of_kind(nodes, "Expr") if m.analysis.get_int_value(e) == -2)
     with pytest.raises(f.DiagnosticError) as excinfo:
         m.analysis.get_nonnegative_int_value(neg, a_span)
-    assert "may not be negative" in excinfo.value.diagnostic.message
+    assert "invalid integer value -2" in excinfo.value.diagnostic.message
 
 
 def test_throws_unit_ok_returns_none(m):

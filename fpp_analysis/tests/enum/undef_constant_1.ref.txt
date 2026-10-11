@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/enum/undef_constant_1.fpp:1:14
+  |
+1 | enum E { X = a }
+  |              ^ cannot find constant `a` in scope
+

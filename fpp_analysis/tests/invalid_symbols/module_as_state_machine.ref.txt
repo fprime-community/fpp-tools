@@ -1,10 +1,10 @@
  --> [ local path prefix ]/invalid_symbols/module_as_state_machine.fpp:4:32
   |
 4 |     state machine instance s1: M 
-  |                                ^ not a state machine symbol
+  |                                ^ invalid use of symbol M: not a state machine symbol
   |
- ::: [ local path prefix ]/invalid_symbols/module_as_state_machine.fpp:1:8
+ ::: [ local path prefix ]/invalid_symbols/module_as_state_machine.fpp:1:1
   |
 1 | module M {}
-  |        - M defined here
+  | ----------- symbol is defined here
 

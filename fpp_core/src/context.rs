@@ -15,6 +15,7 @@ pub struct SpanData {
     pub file: Weak<SourceFileData>,
     pub start: BytePos,
     pub length: BytePos,
+    /// Location where this location is included
     pub include_span: Option<Box<SpanData>>,
     /// Span of the template expansion specifier that copied this span here
     pub expand_span: Option<Box<SpanData>>,
@@ -152,11 +153,39 @@ impl SourceFileData {
             }
         }
 
+        // Collect the full chain of include and template expansion locations:
+        // each including location followed by the locations that include and
+        // expand it, then each expanding location followed by the locations that
+        // include and expand it
+        fn collect_includes_expands(
+            include_loc: &Option<Box<SpanData>>,
+            expand_loc: &Option<Box<SpanData>>,
+            out: &mut Vec<DiagnosticDataChainLocation>,
+        ) {
+            if let Some(loc) = include_loc {
+                out.push(DiagnosticDataChainLocation {
+                    kind: DiagnosticDataChainKind::Included,
+                    loc: loc.file.upgrade().unwrap().include_loc(loc),
+                });
+                collect_includes_expands(&loc.include_span, &loc.expand_span, out);
+            }
+            if let Some(loc) = expand_loc {
+                out.push(DiagnosticDataChainLocation {
+                    kind: DiagnosticDataChainKind::Expanded,
+                    loc: loc.file.upgrade().unwrap().include_loc(loc),
+                });
+                collect_includes_expands(&loc.include_span, &loc.expand_span, out);
+            }
+        }
+
         let mut include_spans = vec![];
         collect_include_locs(&span.include_span, &mut include_spans);
 
         let mut expand_spans = vec![];
         collect_expand_locs(&span.expand_span, &mut expand_spans);
+
+        let mut includes_expands = vec![];
+        collect_includes_expands(&span.include_span, &span.expand_span, &mut includes_expands);
 
         DiagnosticDataSnippet {
             start: span.start - first,
@@ -166,6 +195,7 @@ impl SourceFileData {
             file_content: self.content[full_range.start().into()..full_range.end().into()].into(),
             include_spans,
             expand_spans,
+            includes_expands,
         }
     }
 }
@@ -178,6 +208,7 @@ impl From<&SourceFileData> for SourceFile {
     }
 }
 
+/// The span and the annotations of an AST node
 pub struct NodeData {
     pub span_handle: usize,
     pub pre_annotation: Vec<String>,
@@ -191,6 +222,23 @@ pub struct DiagnosticDataIncludeLocation {
     pub uri: String,
 }
 
+/// How a location in the chain of a span brought the span to where it is
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticDataChainKind {
+    /// An include specifier spliced the source in at this location
+    Included,
+    /// A template expansion specifier copied the source here at this location
+    Expanded,
+}
+
+/// One location in the chain of include and template expansion locations of a
+/// span
+#[derive(Clone, Debug)]
+pub struct DiagnosticDataChainLocation {
+    pub kind: DiagnosticDataChainKind,
+    pub loc: DiagnosticDataIncludeLocation,
+}
+
 #[derive(Clone, Debug)]
 pub struct DiagnosticDataSnippet {
     pub start: BytePos,
@@ -201,6 +249,9 @@ pub struct DiagnosticDataSnippet {
     pub include_spans: Vec<DiagnosticDataIncludeLocation>,
     /// The chain of template expansion specifiers that copied this span here
     pub expand_spans: Vec<DiagnosticDataIncludeLocation>,
+    /// Every location that includes or expands this span, followed in turn by
+    /// the locations that include or expand it: the chain a diagnostic reports
+    pub includes_expands: Vec<DiagnosticDataChainLocation>,
 }
 
 #[derive(Debug)]
@@ -225,6 +276,7 @@ pub trait DiagnosticEmitter {
 pub struct CompilerContext<E: DiagnosticEmitter> {
     spans: IdMap<SpanData>,
     files: IdMap<Arc<SourceFileData>>,
+    /// Manage spans and annotations of AST nodes
     nodes: IdMap<NodeData>,
     emitter: E,
 
@@ -285,6 +337,7 @@ impl<E: DiagnosticEmitter> CompilerContext<E> {
         self.files.iter().map(|f| f.deref())
     }
 
+    /// Create a new AST node with a fresh identifier, located at `span`
     pub(crate) fn node_add(&mut self, span: &Span) -> Node {
         let handle = self.nodes.push(NodeData {
             span_handle: span.handle,
@@ -322,6 +375,8 @@ impl<E: DiagnosticEmitter> CompilerContext<E> {
         Span { handle }
     }
 
+    /// Get the data of an AST node: its location and annotations. Panics if
+    /// the node is not in the context.
     pub fn node_get(&self, node: &Node) -> &NodeData {
         self.nodes.get(node.handle)
     }
@@ -339,6 +394,8 @@ impl<E: DiagnosticEmitter> CompilerContext<E> {
         self.nodes.get_mut(node.handle)
     }
 
+    /// Get the location of an AST node. Panics if the node is not in the
+    /// context.
     pub fn node_get_span(&self, node: &Node) -> Span {
         Span {
             handle: self.nodes.get(node.handle).span_handle,

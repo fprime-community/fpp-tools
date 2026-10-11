@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/component/passive_async_command_order.fpp:3:3
+  |
+3 |   async command Z opcode 9
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^ passive component may not have async input
+

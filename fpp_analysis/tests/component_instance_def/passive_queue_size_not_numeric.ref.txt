@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/component_instance_def/passive_queue_size_not_numeric.fpp:3:36
+  |
+3 | instance c: C base id 0 queue size "x"
+  |                                    ^^^ invalid component instance definition c: passive component may not have queue size
+

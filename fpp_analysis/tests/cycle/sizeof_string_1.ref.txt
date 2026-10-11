@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/cycle/sizeof_string_1.fpp:2:1
+  |
+2 | type T = string size sizeof(T)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycle/sizeof_string_1.fpp:2:29
+  |
+2 | type T = string size sizeof(T)
+  |                             - use T refers to definition T
+

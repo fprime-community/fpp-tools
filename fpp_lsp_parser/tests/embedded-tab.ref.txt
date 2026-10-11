@@ -1,5 +1,6 @@
 ROOT@0..2
-  ERROR@0..1
-    UNKNOWN@0..1 "\t"
+  UNKNOWN@0..1 "\t"
   EOL@1..2 "\n"
-error 0..0: module member expected
+error 0..1: invalid token: unicode value 9, hex 0x9
+note: embedded tab characters are not allowed in FPP source files
+try configuring your editor to convert tabs to spaces

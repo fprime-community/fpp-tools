@@ -1,0 +1,14 @@
+ --> [ local path prefix ]/invalid_symbols/module_as_component_instance.fpp:5:14
+  |
+5 |       instance M
+  |                ^ invalid use of symbol M: not a component instance or topology symbol
+  |
+ ::: [ local path prefix ]/invalid_symbols/module_as_component_instance.fpp:1:1
+  |
+1 | / module M {
+2 | |
+3 | |   topology T {
+... |
+9 | | }
+  | |_- symbol is defined here
+

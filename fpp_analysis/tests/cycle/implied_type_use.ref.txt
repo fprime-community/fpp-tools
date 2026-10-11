@@ -1,0 +1,13 @@
+ --> [ local path prefix ]/cycle/implied_type_use.fpp:2:1
+  |
+2 | type FwSizeStoreType = string
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycle/implied_type_use.fpp:2:24
+  |
+2 | type FwSizeStoreType = string
+  |                        ------ use FwSizeStoreType refers to definition FwSizeStoreType
+  |
+  = note: the symbol FwSizeStoreType has an implied use at the point of the error
+  = note: use of a string type requires this definition
+

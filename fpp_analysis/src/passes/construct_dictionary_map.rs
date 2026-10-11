@@ -1,104 +1,139 @@
 use crate::Analysis;
+use crate::analyzers::module_analyzer::visit_expansion;
 use crate::errors::SemanticResult;
 use crate::semantics::{
-    Dictionary, DictionaryEntries, DictionaryUsedSymbols, Symbol, SymbolInterface, TlmPacket,
-    TlmPacketSet, Topology, cmp_span,
+    Dictionary, DictionaryEntries, DictionaryUsedSymbols, TlmPacket, TlmPacketSet,
 };
-use fpp_ast::{SpecTlmPacketSet, TlmPacketSetMember, TopologyMember};
+use fpp_ast::{
+    DefModule, DefTopology, SpecTemplateExpand, SpecTlmPacket, SpecTlmPacketSet, Visitable,
+    Visitor, Walkable,
+};
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 /// Construct the dictionary map
 pub struct ConstructDictionaryMap;
 
 impl ConstructDictionaryMap {
-    pub fn construct(a: &mut Analysis) {
-        // Visit the topologies in source order, for stable diagnostics.
-        let mut symbols: Vec<Symbol> = a
-            .topology_map
-            .keys()
-            .filter(|s| matches!(s, Symbol::Topology(def) if def.is_deployment))
-            .cloned()
-            .collect();
-        symbols.sort_by(|x, y| cmp_span(&x.get_loc(), &y.get_loc()));
-        for symbol in symbols {
-            let Symbol::Topology(def) = symbol.clone() else {
-                continue;
-            };
-            let Some(t) = a.topology_map.get(&symbol).cloned() else {
-                continue;
-            };
+    /// Construct a telemetry packet and add it to the packet set under
+    /// construction
+    fn add_packet(a: &mut Analysis, node: &SpecTlmPacket) -> SemanticResult {
+        let id_opt = a.get_nonnegative_big_int_value_opt(&node.id)?;
+        let packet = TlmPacket::from_spec_tlm_packet(
+            a,
+            a.dictionary
+                .as_ref()
+                .expect("dictionary under construction"),
+            a.topology.as_ref().expect("topology under construction"),
+            node,
+        )?;
+        a.tlm_packet_set
+            .as_mut()
+            .expect("packet set under construction")
+            .add_packet(id_opt, packet)
+    }
+
+    /// Complete the packet set under construction and add it to the dictionary
+    /// under construction
+    fn add_packet_set(a: &mut Analysis, tpg: TlmPacketSet) -> SemanticResult {
+        let tpg = tpg.complete(
+            a,
+            a.dictionary
+                .as_ref()
+                .expect("dictionary under construction"),
+            a.topology.as_ref().expect("topology under construction"),
+        )?;
+        a.dictionary
+            .as_mut()
+            .expect("dictionary under construction")
+            .add_tlm_packet_set(tpg)
+    }
+}
+
+impl<'ast> Visitor<'ast> for ConstructDictionaryMap {
+    type Break = ();
+    type State = Analysis;
+
+    fn visit_def_module(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefModule,
+    ) -> ControlFlow<Self::Break> {
+        node.walk(a, self)
+    }
+
+    fn visit_spec_template_expand(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecTemplateExpand,
+    ) -> ControlFlow<Self::Break> {
+        visit_expansion(self, a, node)
+    }
+
+    fn visit_def_topology(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefTopology,
+    ) -> ControlFlow<Self::Break> {
+        if !node.is_deployment {
+            return ControlFlow::Continue(());
+        }
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
+        // A topology that failed to resolve has no entry
+        let Some(t) = a.topology_map.get(&symbol).cloned() else {
+            return ControlFlow::Continue(());
+        };
+        let d = {
             let mut d = Dictionary::default();
             DictionaryUsedSymbols::new(&t).update_used_symbols(a, &mut d);
             DictionaryEntries::new(a, &t).update_entries(&mut d);
-
-            a.topology = Some(t.clone());
-            a.dictionary = Some(d);
-            for member in &def.members {
-                let TopologyMember::SpecTlmPacketSet(node) = member else {
-                    continue;
-                };
-                Self::add_packet_set(a, &t, node);
-            }
-            let d = a.dictionary.take().expect("dictionary under construction");
-            a.topology = None;
-            a.dictionary_map.insert(symbol, d);
-        }
-    }
-
-    /// Construct a telemetry packet set and add it to the dictionary under
-    /// construction.
-    fn add_packet_set(a: &mut Analysis, t: &Topology, node: &SpecTlmPacketSet) {
-        let mut d = a.dictionary.take().expect("dictionary under construction");
-        match construct_packet_set(a, &d, t, node) {
-            Ok(set) => {
-                if let Err(err) = d.add_tlm_packet_set(set) {
-                    err.emit();
-                }
-            }
-            Err(err) => err.emit(),
-        }
-        a.dictionary = Some(d);
-    }
-}
-
-/// Construct a telemetry packet set from its specifier.
-fn construct_packet_set(
-    a: &mut Analysis,
-    d: &Dictionary,
-    t: &Topology,
-    node: &SpecTlmPacketSet,
-) -> SemanticResult<TlmPacketSet> {
-    a.tlm_packet_set = Some(TlmPacketSet::new(Arc::new(node.clone())));
-    let result = add_packets(a, d, t, node);
-    let set = a
-        .tlm_packet_set
-        .take()
-        .expect("packet set under construction");
-    result?;
-    set.complete(a, d, t)
-}
-
-/// Add every packet of a packet set specifier to the packet set under
-/// construction.
-fn add_packets(
-    a: &mut Analysis,
-    d: &Dictionary,
-    t: &Topology,
-    node: &SpecTlmPacketSet,
-) -> SemanticResult {
-    for member in &node.members {
-        let TlmPacketSetMember::SpecTlmPacket(packet_node) = member else {
-            continue;
+            d
         };
-        let id = a.get_nonnegative_big_int_value_opt(&packet_node.id)?;
-        let packet = TlmPacket::from_spec_tlm_packet(a, d, t, packet_node)?;
-        let mut set = a
+        a.topology = Some(t);
+        a.dictionary = Some(d);
+        let result = node.walk(a, self);
+        let d = a.dictionary.take().expect("dictionary under construction");
+        a.topology = None;
+        result?;
+        a.dictionary_map.insert(symbol, d);
+        ControlFlow::Continue(())
+    }
+
+    fn visit_spec_tlm_packet_set(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecTlmPacketSet,
+    ) -> ControlFlow<Self::Break> {
+        a.tlm_packet_set = Some(TlmPacketSet::new(Arc::new(node.clone())));
+        // A packet that fails to construct stops the construction of its set.
+        // Its error is already reported, and construction goes on with the
+        // next set.
+        let members = node.members.visit(a, self);
+        let tpg = a
             .tlm_packet_set
             .take()
             .expect("packet set under construction");
-        let added = set.add_packet(id, packet);
-        a.tlm_packet_set = Some(set);
-        added?;
+        if members.is_continue()
+            && let Err(err) = Self::add_packet_set(a, tpg)
+        {
+            err.emit();
+        }
+        ControlFlow::Continue(())
     }
-    Ok(())
+
+    fn visit_spec_tlm_packet(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecTlmPacket,
+    ) -> ControlFlow<Self::Break> {
+        match Self::add_packet(a, node) {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
+        }
+    }
 }

@@ -2,6 +2,8 @@
   |
 3 |   telemetry port tlmOut
   |   ^^^^^^^^^^^^^^^^^^^^^ cannot find port `Fw` in scope
+  |
+  = note: the symbol Fw.Tlm has an implied use at the point of the error
 
  --> [ local path prefix ]/port_instance/undef_telemetry.fpp:3:3
   |

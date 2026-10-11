@@ -1,5 +1,5 @@
- --> [ local path prefix ]/expr/binop_numeric_error.fpp:1:14
+ --> [ local path prefix ]/expr/binop_numeric_error.fpp:1:19
   |
 1 | constant a = true - false
-  |              ^^^^^^^^^^^^ cannot convert boolean to a numeric type
+  |                   ^^^^^^^ cannot convert bool to a numeric type
 

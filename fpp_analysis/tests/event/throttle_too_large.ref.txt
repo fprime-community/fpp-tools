@@ -1,7 +1,7 @@
  --> [ local path prefix ]/event/throttle_too_large.fpp:3:52
   |
 3 |   event E severity activity low format "" throttle 0x80000000
-  |                                                    ^^^^^^^^^^ value out of range
+  |                                                    ^^^^^^^^^^ invalid integer value 2147483648
   |
-  = note: expression evaluated to `2147483648`
+  = note: value out of range
 

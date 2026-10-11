@@ -1,10 +1,14 @@
  --> [ local path prefix ]/invalid_symbols/module_as_port.fpp:5:20
   |
-5 |     output port p: M
-  |                    ^ not a port symbol
+5 |       output port p: M
+  |                      ^ invalid use of symbol M: not a port symbol
   |
- ::: [ local path prefix ]/invalid_symbols/module_as_port.fpp:1:8
+ ::: [ local path prefix ]/invalid_symbols/module_as_port.fpp:1:1
   |
-1 | module M {
-  |        - M defined here
+1 | / module M {
+2 | |
+3 | |   passive component C {
+... |
+9 | | }
+  | |_- symbol is defined here
 

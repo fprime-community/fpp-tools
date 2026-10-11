@@ -40,6 +40,9 @@ fn main() {
             None,
         );
 
+        // Several specifiers locate definitions in one file, which is one
+        // translation unit, as the server's set of locs files has it.
+        let mut seen = std::collections::HashSet::new();
         let files: Vec<String> = locs_tu
             .into_iter()
             .filter_map(|m| match m {
@@ -48,6 +51,7 @@ fn main() {
                 }
                 _ => None,
             })
+            .filter(|file| seen.insert(file.clone()))
             .collect();
 
         eprintln!("discovered {} translation units", files.len());
@@ -85,8 +89,9 @@ fn main() {
             let mut analysis = Analysis::new();
             let mut asts = asts.clone();
             let start = Instant::now();
-            let _ = fpp_analysis::resolve_templates(&mut analysis, &mut asts);
-            let _ = fpp_analysis::check_semantics(&mut analysis, asts.iter().collect());
+            if fpp_analysis::resolve_templates(&mut analysis, &mut asts).is_continue() {
+                let _ = fpp_analysis::check_semantics(&mut analysis, asts.iter().collect());
+            }
             eprintln!(
                 "iter {i}: check_semantics total = {:.3}s",
                 start.elapsed().as_secs_f64()

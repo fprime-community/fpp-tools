@@ -1,8 +1,10 @@
 use crate::Analysis;
+use crate::analyzers::analyzer::Analyzer;
+use crate::analyzers::type_expression_analyzer::TypeExpressionAnalyzer;
 use crate::semantics::{ImpliedUse, ImpliedUseKind, ImpliedUseSet, QualifiedName, Symbol};
 use fpp_ast::{
-    DefStateMachine, DefTopology, MoveWalkable, Node, SpecSpecialPortInstance,
-    SpecialPortInstanceKind, TypeName, TypeNameKind, Visitor, Walkable,
+    DefModuleTemplate, DefStateMachine, DefTopology, Node, SpecSpecialPortInstance,
+    SpecialPortInstanceKind, TypeName, TypeNameKind, Visitable, Visitor,
 };
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -10,32 +12,23 @@ use std::sync::Arc;
 /// Construct the implied use map
 pub struct ConstructImpliedUseMap;
 
-/// The name of the framework port implied by a special port instance
-pub fn special_port_implied_use_name(kind: &SpecialPortInstanceKind) -> &'static str {
-    match kind {
-        SpecialPortInstanceKind::CommandRecv => "Cmd",
-        SpecialPortInstanceKind::CommandReg => "CmdReg",
-        SpecialPortInstanceKind::CommandResp => "CmdResponse",
-        SpecialPortInstanceKind::Event => "Log",
-        SpecialPortInstanceKind::ParamGet => "PrmGet",
-        SpecialPortInstanceKind::ParamSet => "PrmSet",
-        SpecialPortInstanceKind::ProductGet => "DpGet",
-        SpecialPortInstanceKind::ProductRecv => "DpResponse",
-        SpecialPortInstanceKind::ProductRequest => "DpRequest",
-        SpecialPortInstanceKind::ProductSend => "DpSend",
-        SpecialPortInstanceKind::Telemetry => "Tlm",
-        SpecialPortInstanceKind::TextEvent => "LogText",
-        SpecialPortInstanceKind::TimeGet => "Time",
-    }
-}
-
 impl<'ast> Visitor<'ast> for ConstructImpliedUseMap {
     type Break = ();
     type State = Analysis;
 
-    /// Descend into every container so all type names in the model are reached.
     fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
-        node.walk(a, self)
+        TypeExpressionAnalyzer::new().visit(self, a, node)
+    }
+
+    /// The implied uses in the body of a template are constructed at the
+    /// definition, whether or not the template is expanded
+    fn visit_def_module_template(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefModuleTemplate,
+    ) -> ControlFlow<Self::Break> {
+        self.super_visit(a, Node::DefModuleTemplate(node))?;
+        node.members.visit(a, self)
     }
 
     fn visit_spec_special_port_instance(
@@ -44,10 +37,22 @@ impl<'ast> Visitor<'ast> for ConstructImpliedUseMap {
         node: &'ast SpecSpecialPortInstance,
     ) -> ControlFlow<Self::Break> {
         // Construct the port use implied by the special port instance
-        let ident_list = vec![
-            "Fw".to_string(),
-            special_port_implied_use_name(&node.kind).to_string(),
-        ];
+        let name = match node.kind {
+            SpecialPortInstanceKind::CommandRecv => "Cmd",
+            SpecialPortInstanceKind::CommandReg => "CmdReg",
+            SpecialPortInstanceKind::CommandResp => "CmdResponse",
+            SpecialPortInstanceKind::Event => "Log",
+            SpecialPortInstanceKind::ParamGet => "PrmGet",
+            SpecialPortInstanceKind::ParamSet => "PrmSet",
+            SpecialPortInstanceKind::ProductGet => "DpGet",
+            SpecialPortInstanceKind::ProductRecv => "DpResponse",
+            SpecialPortInstanceKind::ProductRequest => "DpRequest",
+            SpecialPortInstanceKind::ProductSend => "DpSend",
+            SpecialPortInstanceKind::Telemetry => "Tlm",
+            SpecialPortInstanceKind::TextEvent => "LogText",
+            SpecialPortInstanceKind::TimeGet => "Time",
+        };
+        let ident_list = vec!["Fw".to_string(), name.to_string()];
         let mut set = ImpliedUseSet::default();
         set.ports.push(ImpliedUse::from_ident_list_and_id(
             ident_list,
@@ -67,12 +72,9 @@ impl<'ast> Visitor<'ast> for ConstructImpliedUseMap {
             let symbol = a
                 .get_symbol(node)
                 .unwrap_or_else(|| Symbol::StateMachine(Arc::new(node.clone())));
-            let mut idents: Vec<String> = a
-                .get_qualified_name(&symbol)
-                .split('.')
-                .map(str::to_string)
-                .collect();
-            idents.push("State".to_string());
+            let mut idents = Analysis::get_qualified_name_from_map(&a.parent_symbol_map, &symbol)
+                .to_ident_list();
+            idents.push_back("State".to_string());
             let name: QualifiedName = idents.into();
             let mut set = ImpliedUseSet::default();
             set.types
@@ -108,7 +110,7 @@ impl<'ast> Visitor<'ast> for ConstructImpliedUseMap {
             );
         }
         a.implied_use_map.insert(node.node_id, set);
-        node.walk(a, self)
+        self.super_visit(a, Node::DefTopology(node))
     }
 
     fn visit_type_name(&self, a: &mut Analysis, node: &'ast TypeName) -> ControlFlow<Self::Break> {

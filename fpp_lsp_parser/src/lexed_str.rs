@@ -23,13 +23,45 @@ impl<'a> LexedStr<'a> {
     pub fn new(text: &'a str) -> LexedStr<'a> {
         let mut conv = Converter::new(text);
 
-        let lexer = fpp_lexer::Lexer::new(text);
-        for token in lexer {
-            let token_text = &text[conv.offset..][..token.len];
-            conv.push(token.kind.into(), token_text.len(), vec![]);
+        let mut lexer = fpp_lexer::Lexer::new(text);
+        for token in lexer.by_ref() {
+            conv.push(token.kind.into(), token.len);
         }
 
-        conv.finalize_with_eof()
+        let mut res = conv.finalize_with_eof();
+        for err in lexer.errors() {
+            let fpp_lexer::LexerError::InvalidToken {
+                pos,
+                len,
+                msg,
+                notes,
+            } = err;
+            let token = res.token_at_error(*pos, *len);
+            let mut msg = format!("invalid token: {}", msg);
+            if !notes.is_empty() {
+                msg.push_str("\nnote: ");
+                msg.push_str(&notes.join("\n"));
+            }
+            res.error.push(LexError {
+                msg,
+                token: token as u32,
+            });
+        }
+        res.error.sort_by_key(|e| e.token);
+        res
+    }
+
+    /// The index of the token that was being lexed when the lexer reported an
+    /// error at byte offset `pos` covering `len` bytes. A zero-length error
+    /// sits at the end of the token that reported it.
+    fn token_at_error(&self, pos: usize, len: usize) -> usize {
+        let n = self.len();
+        let after = if len == 0 {
+            self.start[..n].partition_point(|&s| (s as usize) < pos)
+        } else {
+            self.start[..n].partition_point(|&s| (s as usize) <= pos)
+        };
+        after.saturating_sub(1).min(n.saturating_sub(1))
     }
 
     pub fn as_str(&self) -> &str {
@@ -121,18 +153,9 @@ impl<'a> Converter<'a> {
         self.res
     }
 
-    fn push(&mut self, kind: SyntaxKind, len: usize, errors: Vec<String>) {
+    fn push(&mut self, kind: SyntaxKind, len: usize) {
         self.res.push(kind, self.offset);
         self.offset += len;
-
-        for msg in errors {
-            if !msg.is_empty() {
-                self.res.error.push(LexError {
-                    msg,
-                    token: self.res.len() as u32,
-                });
-            }
-        }
     }
 }
 
@@ -289,6 +312,57 @@ impl From<TokenKind> for SyntaxKind {
             TokenKind::Star => STAR,
             TokenKind::ShiftLeft => SHIFT_LEFT,
             TokenKind::ShiftRight => SHIFT_RIGHT,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LexedStr;
+    use crate::SyntaxKind::UNKNOWN;
+
+    /// Each error of the lexer is reported once, on the token it was reported
+    /// for, including the characters that cannot begin a token
+    #[test]
+    fn each_lexer_error_is_reported_once() {
+        let text = "\t $ \u{2122}\u{2122} < > % 1.5x \"abc\n";
+        let mut lexer = fpp_lexer::Lexer::new(text);
+        lexer.by_ref().for_each(drop);
+        // Each error of this input starts where the token it is reported on
+        // starts
+        let expected: Vec<(usize, String)> = lexer
+            .errors()
+            .map(|e| {
+                let fpp_lexer::LexerError::InvalidToken {
+                    pos, msg, notes, ..
+                } = e;
+                let mut msg = format!("invalid token: {}", msg);
+                if !notes.is_empty() {
+                    msg.push_str("\nnote: ");
+                    msg.push_str(&notes.join("\n"));
+                }
+                (*pos, msg)
+            })
+            .collect();
+
+        let lexed = LexedStr::new(text);
+        let errors: Vec<(usize, String)> = lexed
+            .errors()
+            .map(|(token, msg)| (lexed.text_start(token), msg.to_string()))
+            .collect();
+        assert_eq!(errors, expected);
+
+        let unknown: Vec<usize> = (0..lexed.len())
+            .filter(|&i| lexed.kind(i) == UNKNOWN)
+            .collect();
+        assert_eq!(unknown.len(), 7);
+        for i in unknown {
+            assert_eq!(
+                lexed.errors().filter(|&(token, _)| token == i).count(),
+                1,
+                "{:?}",
+                lexed.text(i)
+            );
         }
     }
 }

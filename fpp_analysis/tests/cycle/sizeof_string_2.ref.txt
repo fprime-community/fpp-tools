@@ -1,0 +1,13 @@
+ --> [ local path prefix ]/cycle/sizeof_string_2.fpp:2:1
+  |
+2 | constant FW_FIXED_LENGTH_STRING_SIZE = sizeof(string)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycle/sizeof_string_2.fpp:2:47
+  |
+2 | constant FW_FIXED_LENGTH_STRING_SIZE = sizeof(string)
+  |                                               ------ use FW_FIXED_LENGTH_STRING_SIZE refers to definition FW_FIXED_LENGTH_STRING_SIZE
+  |
+  = note: the symbol FW_FIXED_LENGTH_STRING_SIZE has an implied use at the point of the error
+  = note: use of a string type with default size requires this definition
+

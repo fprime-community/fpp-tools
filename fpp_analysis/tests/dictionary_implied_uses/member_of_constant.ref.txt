@@ -1,0 +1,25 @@
+  --> [ local path prefix ]/dictionary_implied_uses/member_of_constant.fpp:27:1
+   |
+27 | / deployment topology T {
+28 | |   
+29 | | }
+   | |_^ invalid use of symbol Fw.DpCfg: it has Fw.DpCfg.CONTAINER_USER_DATA_SIZE as a member
+   |
+  ::: [ local path prefix ]/dictionary_implied_uses/member_of_constant.fpp:19:5
+   |
+19 |       constant DpCfg = { CONTAINER_USER_DATA_SIZE = 10 }
+   |       -------------------------------------------------- symbol is defined here
+   |
+   = note: the symbol Fw.DpCfg.CONTAINER_USER_DATA_SIZE has an implied use at the point of the error
+   = note: this implied use occurs when constructing a dictionary
+
+  --> [ local path prefix ]/dictionary_implied_uses/member_of_constant.fpp:27:1
+   |
+27 | / deployment topology T {
+28 | |   
+29 | | }
+   | |_^ cannot find type `DpCfg` in scope
+   |
+   = note: the symbol Fw.DpCfg.ProcType has an implied use at the point of the error
+   = note: this implied use occurs when constructing a dictionary
+

@@ -1,15 +1,18 @@
- --> [ local path prefix ]/state_machine/redef/guard.fpp:3:9
+ --> [ local path prefix ]/state_machine/redef/guard.fpp:3:3
   |
 3 |   guard g
-  |         ^ redefinition of symbol g
+  |   ^^^^^^^ redefinition of symbol g
   |
  ::: [ local path prefix ]/state_machine/redef/guard.fpp:2:3
   |
 2 |   guard g
   |   ------- previous definition is here
 
- --> [ local path prefix ]/state_machine/redef/guard.fpp:1:15
+ --> [ local path prefix ]/state_machine/redef/guard.fpp:1:1
   |
-1 | state machine M {
-  |               ^ state machine must have initial transition
+1 | / state machine M {
+2 | |   guard g
+3 | |   guard g
+4 | | }
+  | |_^ state machine must have initial transition
 

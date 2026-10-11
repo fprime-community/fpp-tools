@@ -1,7 +1,7 @@
  --> [ local path prefix ]/constant/array_index_out_of_bounds.fpp:1:26
   |
 1 | constant f = [ 1, 2, 3 ][3]
-  |                          ^ index value is not in the range [0, 2]
+  |                          ^ invalid integer value 3
   |
-  = note: expression evaluated to `3`
+  = note: index value is not in the range [0, 2]
 

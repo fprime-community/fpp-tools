@@ -372,6 +372,7 @@ dependencies = [
  "fpp_macros",
  "fpp_parser",
  "fpp_util",
+ "indexmap",
  "pretty_assertions",
  "rustc-hash 2.1.1",
 ]
@@ -390,6 +391,7 @@ name = "fpp_core"
 version = "0.0.0"
 dependencies = [
  "line-index",
+ "percent-encoding",
  "rustc-hash 2.1.1",
  "scoped-tls",
 ]
@@ -425,8 +427,12 @@ name = "fpp_format"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "fpp_core",
+ "fpp_errors",
  "fpp_lsp_parser",
+ "fpp_parser",
  "pretty_assertions",
+ "serde_json",
 ]
 
 [[package]]
@@ -440,7 +446,6 @@ dependencies = [
 name = "fpp_lexer"
 version = "0.0.0"
 dependencies = [
- "memchr",
  "pretty_assertions",
  "unicode-ident",
 ]

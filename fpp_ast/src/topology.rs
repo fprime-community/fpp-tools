@@ -58,6 +58,7 @@ pub struct Connection {
     pub to_index: Option<Expr>,
 }
 
+/// Connection pattern kind
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum ConnectionPatternKind {
     Command,
@@ -69,7 +70,22 @@ pub enum ConnectionPatternKind {
     Time,
 }
 
-/// Connection graph specifier
+/// Writes the pattern kind as it is spelled in a pattern connection graph
+impl std::fmt::Display for ConnectionPatternKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            ConnectionPatternKind::Command => "command",
+            ConnectionPatternKind::Event => "event",
+            ConnectionPatternKind::Health => "health",
+            ConnectionPatternKind::Param => "param",
+            ConnectionPatternKind::Telemetry => "telemetry",
+            ConnectionPatternKind::TextEvent => "text event",
+            ConnectionPatternKind::Time => "time",
+        })
+    }
+}
+
+/// Direct connection graph specifier
 #[ast]
 #[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecDirectConnectionGraph {
@@ -77,7 +93,7 @@ pub struct SpecDirectConnectionGraph {
     pub connections: Vec<Connection>,
 }
 
-/// Connection graph specifier
+/// Pattern connection graph specifier
 #[ast]
 #[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecPatternConnectionGraph {

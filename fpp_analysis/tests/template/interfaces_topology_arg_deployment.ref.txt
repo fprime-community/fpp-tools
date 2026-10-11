@@ -9,5 +9,5 @@
   |
 4 | / deployment topology Dep {
 5 | | }
-  | |_- i defined here
+  | |_- symbol is defined here
 

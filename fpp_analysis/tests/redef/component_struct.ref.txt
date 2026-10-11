@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/component_struct.fpp:3:8
+ --> [ local path prefix ]/redef/component_struct.fpp:3:1
   |
 3 | struct C { }
-  |        ^ redefinition of symbol C
+  | ^^^^^^^^^^^^ redefinition of symbol C
   |
  ::: [ local path prefix ]/redef/component_struct.fpp:1:1
   |

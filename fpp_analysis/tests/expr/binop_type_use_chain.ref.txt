@@ -1,5 +1,5 @@
- --> [ local path prefix ]/expr/binop_type_use_chain.fpp:3:14
+ --> [ local path prefix ]/expr/binop_type_use_chain.fpp:3:16
   |
 3 | constant z = 1 + true
-  |              ^^^^^^^^ invalid binary operation between Integer and boolean
+  |                ^^^^^^ cannot compute common type of Integer and bool
 

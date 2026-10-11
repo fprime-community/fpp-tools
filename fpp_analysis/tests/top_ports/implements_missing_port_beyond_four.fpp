@@ -1,3 +1,8 @@
+# The interface has more than four ports. A port interface keeps its ports in
+# the order they were added, so the first missing port reported is the first one
+# the interface declares (p5), however many ports the interface has, and not
+# the first in the order of the port names or sizes.
+
 port P()
 
 interface I {

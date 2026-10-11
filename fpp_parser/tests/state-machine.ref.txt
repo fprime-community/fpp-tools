@@ -1,27 +1,336 @@
 TransUnit(
     [
+        DefAliasType {
+            name: Name {
+                data: "FwSizeStoreType",
+                node_id: Span {
+                    start: [ local path prefix ]/state-machine.fpp:1:6,
+                    end: [ local path prefix ]/state-machine.fpp:1:21,
+                },
+            },
+            type_name: TypeName {
+                kind: Integer(
+                    U16,
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/state-machine.fpp:1:24,
+                    end: [ local path prefix ]/state-machine.fpp:1:27,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/state-machine.fpp:1:1,
+                end: [ local path prefix ]/state-machine.fpp:1:27,
+            },
+        },
+        DefConstant {
+            name: Name {
+                data: "FW_FIXED_LENGTH_STRING_SIZE",
+                node_id: Span {
+                    start: [ local path prefix ]/state-machine.fpp:2:10,
+                    end: [ local path prefix ]/state-machine.fpp:2:37,
+                },
+            },
+            value: Expr {
+                kind: LiteralInt(
+                    "256",
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/state-machine.fpp:2:40,
+                    end: [ local path prefix ]/state-machine.fpp:2:43,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/state-machine.fpp:2:1,
+                end: [ local path prefix ]/state-machine.fpp:2:43,
+            },
+        },
         DefStateMachine {
             name: Name {
                 data: "M",
                 node_id: Span {
-                    start: [ local path prefix ]/state-machine.fpp:2:15,
-                    end: [ local path prefix ]/state-machine.fpp:2:16,
+                    start: [ local path prefix ]/state-machine.fpp:5:15,
+                    end: [ local path prefix ]/state-machine.fpp:5:16,
                 },
             },
             members: Some(
                 [
+                    DefArray {
+                        name: Name {
+                            data: "A",
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:7:9,
+                                end: [ local path prefix ]/state-machine.fpp:7:10,
+                            },
+                        },
+                        size: Expr {
+                            kind: LiteralInt(
+                                "3",
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:7:14,
+                                end: [ local path prefix ]/state-machine.fpp:7:15,
+                            },
+                        },
+                        elt_type: TypeName {
+                            kind: Integer(
+                                U32,
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:7:17,
+                                end: [ local path prefix ]/state-machine.fpp:7:20,
+                            },
+                        },
+                        default: None,
+                        format: None,
+                        is_dictionary_def: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/state-machine.fpp:7:3,
+                            end: [ local path prefix ]/state-machine.fpp:7:20,
+                        },
+                    },
+                    DefConstant {
+                        name: Name {
+                            data: "c",
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:8:12,
+                                end: [ local path prefix ]/state-machine.fpp:8:13,
+                            },
+                        },
+                        value: Expr {
+                            kind: LiteralInt(
+                                "0",
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:8:16,
+                                end: [ local path prefix ]/state-machine.fpp:8:17,
+                            },
+                        },
+                        is_dictionary_def: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/state-machine.fpp:8:3,
+                            end: [ local path prefix ]/state-machine.fpp:8:17,
+                        },
+                    },
+                    DefEnum {
+                        name: Name {
+                            data: "E",
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:9:8,
+                                end: [ local path prefix ]/state-machine.fpp:9:9,
+                            },
+                        },
+                        type_name: None,
+                        constants: [
+                            DefEnumConstant {
+                                name: Name {
+                                    data: "X",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:9:12,
+                                        end: [ local path prefix ]/state-machine.fpp:9:13,
+                                    },
+                                },
+                                value: None,
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:9:12,
+                                    end: [ local path prefix ]/state-machine.fpp:9:13,
+                                },
+                            },
+                            DefEnumConstant {
+                                name: Name {
+                                    data: "Y",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:9:15,
+                                        end: [ local path prefix ]/state-machine.fpp:9:16,
+                                    },
+                                },
+                                value: None,
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:9:15,
+                                    end: [ local path prefix ]/state-machine.fpp:9:16,
+                                },
+                            },
+                            DefEnumConstant {
+                                name: Name {
+                                    data: "Z",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:9:18,
+                                        end: [ local path prefix ]/state-machine.fpp:9:19,
+                                    },
+                                },
+                                value: None,
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:9:18,
+                                    end: [ local path prefix ]/state-machine.fpp:9:19,
+                                },
+                            },
+                        ],
+                        default: Some(
+                            Expr {
+                                kind: Ident {
+                                    value: "X",
+                                    is_absolute: false,
+                                },
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:9:30,
+                                    end: [ local path prefix ]/state-machine.fpp:9:31,
+                                },
+                            },
+                        ),
+                        is_dictionary_def: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/state-machine.fpp:9:3,
+                            end: [ local path prefix ]/state-machine.fpp:9:31,
+                        },
+                    },
+                    DefStruct {
+                        name: Name {
+                            data: "S",
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:10:10,
+                                end: [ local path prefix ]/state-machine.fpp:10:11,
+                            },
+                        },
+                        members: [
+                            StructTypeMember {
+                                name: Name {
+                                    data: "x",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:10:14,
+                                        end: [ local path prefix ]/state-machine.fpp:10:15,
+                                    },
+                                },
+                                size: Some(
+                                    Expr {
+                                        kind: LiteralInt(
+                                            "3",
+                                        ),
+                                        node_id: Span {
+                                            start: [ local path prefix ]/state-machine.fpp:10:18,
+                                            end: [ local path prefix ]/state-machine.fpp:10:19,
+                                        },
+                                    },
+                                ),
+                                type_name: TypeName {
+                                    kind: Integer(
+                                        U32,
+                                    ),
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:10:21,
+                                        end: [ local path prefix ]/state-machine.fpp:10:24,
+                                    },
+                                },
+                                format: None,
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:10:14,
+                                    end: [ local path prefix ]/state-machine.fpp:10:24,
+                                },
+                            },
+                            StructTypeMember {
+                                name: Name {
+                                    data: "y",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:10:26,
+                                        end: [ local path prefix ]/state-machine.fpp:10:27,
+                                    },
+                                },
+                                size: None,
+                                type_name: TypeName {
+                                    kind: Floating(
+                                        F32,
+                                    ),
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:10:29,
+                                        end: [ local path prefix ]/state-machine.fpp:10:32,
+                                    },
+                                },
+                                format: None,
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:10:26,
+                                    end: [ local path prefix ]/state-machine.fpp:10:32,
+                                },
+                            },
+                            StructTypeMember {
+                                name: Name {
+                                    data: "z",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:10:34,
+                                        end: [ local path prefix ]/state-machine.fpp:10:35,
+                                    },
+                                },
+                                size: None,
+                                type_name: TypeName {
+                                    kind: String(
+                                        None,
+                                    ),
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:10:37,
+                                        end: [ local path prefix ]/state-machine.fpp:10:43,
+                                    },
+                                },
+                                format: None,
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:10:34,
+                                    end: [ local path prefix ]/state-machine.fpp:10:43,
+                                },
+                            },
+                        ],
+                        default: None,
+                        is_dictionary_def: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/state-machine.fpp:10:3,
+                            end: [ local path prefix ]/state-machine.fpp:10:45,
+                        },
+                    },
+                    DefAbsType {
+                        name: Name {
+                            data: "T",
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:11:8,
+                                end: [ local path prefix ]/state-machine.fpp:11:9,
+                            },
+                        },
+                        node_id: Span {
+                            start: [ local path prefix ]/state-machine.fpp:11:3,
+                            end: [ local path prefix ]/state-machine.fpp:11:9,
+                        },
+                    },
+                    DefAliasType {
+                        name: Name {
+                            data: "X",
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:12:8,
+                                end: [ local path prefix ]/state-machine.fpp:12:9,
+                            },
+                        },
+                        type_name: TypeName {
+                            kind: Integer(
+                                U32,
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/state-machine.fpp:12:12,
+                                end: [ local path prefix ]/state-machine.fpp:12:15,
+                            },
+                        },
+                        is_dictionary_def: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/state-machine.fpp:12:3,
+                            end: [ local path prefix ]/state-machine.fpp:12:15,
+                        },
+                    },
                     DefAction {
                         name: Name {
                             data: "a1",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:5:10,
-                                end: [ local path prefix ]/state-machine.fpp:5:12,
+                                start: [ local path prefix ]/state-machine.fpp:15:10,
+                                end: [ local path prefix ]/state-machine.fpp:15:12,
                             },
                         },
                         type_name: None,
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:5:3,
-                            end: [ local path prefix ]/state-machine.fpp:5:12,
+                            start: [ local path prefix ]/state-machine.fpp:15:3,
+                            end: [ local path prefix ]/state-machine.fpp:15:12,
                         },
                         pre_annotation: [
                             "Action a1",
@@ -31,14 +340,14 @@ TransUnit(
                         name: Name {
                             data: "a2",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:8:10,
-                                end: [ local path prefix ]/state-machine.fpp:8:12,
+                                start: [ local path prefix ]/state-machine.fpp:18:10,
+                                end: [ local path prefix ]/state-machine.fpp:18:12,
                             },
                         },
                         type_name: None,
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:8:3,
-                            end: [ local path prefix ]/state-machine.fpp:8:12,
+                            start: [ local path prefix ]/state-machine.fpp:18:3,
+                            end: [ local path prefix ]/state-machine.fpp:18:12,
                         },
                         pre_annotation: [
                             "Action a2",
@@ -48,14 +357,14 @@ TransUnit(
                         name: Name {
                             data: "a3",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:11:10,
-                                end: [ local path prefix ]/state-machine.fpp:11:12,
+                                start: [ local path prefix ]/state-machine.fpp:21:10,
+                                end: [ local path prefix ]/state-machine.fpp:21:12,
                             },
                         },
                         type_name: None,
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:11:3,
-                            end: [ local path prefix ]/state-machine.fpp:11:12,
+                            start: [ local path prefix ]/state-machine.fpp:21:3,
+                            end: [ local path prefix ]/state-machine.fpp:21:12,
                         },
                         pre_annotation: [
                             "Action a3",
@@ -65,8 +374,8 @@ TransUnit(
                         name: Name {
                             data: "a4",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:14:10,
-                                end: [ local path prefix ]/state-machine.fpp:14:12,
+                                start: [ local path prefix ]/state-machine.fpp:24:10,
+                                end: [ local path prefix ]/state-machine.fpp:24:12,
                             },
                         },
                         type_name: Some(
@@ -75,14 +384,14 @@ TransUnit(
                                     U32,
                                 ),
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:14:14,
-                                    end: [ local path prefix ]/state-machine.fpp:14:17,
+                                    start: [ local path prefix ]/state-machine.fpp:24:14,
+                                    end: [ local path prefix ]/state-machine.fpp:24:17,
                                 },
                             },
                         ),
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:14:3,
-                            end: [ local path prefix ]/state-machine.fpp:14:17,
+                            start: [ local path prefix ]/state-machine.fpp:24:3,
+                            end: [ local path prefix ]/state-machine.fpp:24:17,
                         },
                         pre_annotation: [
                             "Action a4",
@@ -92,14 +401,14 @@ TransUnit(
                         name: Name {
                             data: "g1",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:17:9,
-                                end: [ local path prefix ]/state-machine.fpp:17:11,
+                                start: [ local path prefix ]/state-machine.fpp:27:9,
+                                end: [ local path prefix ]/state-machine.fpp:27:11,
                             },
                         },
                         type_name: None,
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:17:3,
-                            end: [ local path prefix ]/state-machine.fpp:17:11,
+                            start: [ local path prefix ]/state-machine.fpp:27:3,
+                            end: [ local path prefix ]/state-machine.fpp:27:11,
                         },
                         pre_annotation: [
                             "Guard g1",
@@ -109,8 +418,8 @@ TransUnit(
                         name: Name {
                             data: "g2",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:20:9,
-                                end: [ local path prefix ]/state-machine.fpp:20:11,
+                                start: [ local path prefix ]/state-machine.fpp:30:9,
+                                end: [ local path prefix ]/state-machine.fpp:30:11,
                             },
                         },
                         type_name: Some(
@@ -119,14 +428,14 @@ TransUnit(
                                     U32,
                                 ),
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:20:13,
-                                    end: [ local path prefix ]/state-machine.fpp:20:16,
+                                    start: [ local path prefix ]/state-machine.fpp:30:13,
+                                    end: [ local path prefix ]/state-machine.fpp:30:16,
                                 },
                             },
                         ),
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:20:3,
-                            end: [ local path prefix ]/state-machine.fpp:20:16,
+                            start: [ local path prefix ]/state-machine.fpp:30:3,
+                            end: [ local path prefix ]/state-machine.fpp:30:16,
                         },
                         pre_annotation: [
                             "Guard g2",
@@ -136,8 +445,8 @@ TransUnit(
                         name: Name {
                             data: "s1",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:23:10,
-                                end: [ local path prefix ]/state-machine.fpp:23:12,
+                                start: [ local path prefix ]/state-machine.fpp:33:10,
+                                end: [ local path prefix ]/state-machine.fpp:33:12,
                             },
                         },
                         type_name: Some(
@@ -146,14 +455,14 @@ TransUnit(
                                     U32,
                                 ),
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:23:14,
-                                    end: [ local path prefix ]/state-machine.fpp:23:17,
+                                    start: [ local path prefix ]/state-machine.fpp:33:14,
+                                    end: [ local path prefix ]/state-machine.fpp:33:17,
                                 },
                             },
                         ),
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:23:3,
-                            end: [ local path prefix ]/state-machine.fpp:23:17,
+                            start: [ local path prefix ]/state-machine.fpp:33:3,
+                            end: [ local path prefix ]/state-machine.fpp:33:17,
                         },
                         pre_annotation: [
                             "Signal s1",
@@ -163,14 +472,14 @@ TransUnit(
                         name: Name {
                             data: "s2",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:26:10,
-                                end: [ local path prefix ]/state-machine.fpp:26:12,
+                                start: [ local path prefix ]/state-machine.fpp:36:10,
+                                end: [ local path prefix ]/state-machine.fpp:36:12,
                             },
                         },
                         type_name: None,
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:26:3,
-                            end: [ local path prefix ]/state-machine.fpp:26:12,
+                            start: [ local path prefix ]/state-machine.fpp:36:3,
+                            end: [ local path prefix ]/state-machine.fpp:36:12,
                         },
                         pre_annotation: [
                             "Signal s2",
@@ -180,14 +489,14 @@ TransUnit(
                         name: Name {
                             data: "s3",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:29:10,
-                                end: [ local path prefix ]/state-machine.fpp:29:12,
+                                start: [ local path prefix ]/state-machine.fpp:39:10,
+                                end: [ local path prefix ]/state-machine.fpp:39:12,
                             },
                         },
                         type_name: None,
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:29:3,
-                            end: [ local path prefix ]/state-machine.fpp:29:12,
+                            start: [ local path prefix ]/state-machine.fpp:39:3,
+                            end: [ local path prefix ]/state-machine.fpp:39:12,
                         },
                         pre_annotation: [
                             "Signal s3",
@@ -197,14 +506,14 @@ TransUnit(
                         name: Name {
                             data: "s4",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:32:10,
-                                end: [ local path prefix ]/state-machine.fpp:32:12,
+                                start: [ local path prefix ]/state-machine.fpp:42:10,
+                                end: [ local path prefix ]/state-machine.fpp:42:12,
                             },
                         },
                         type_name: None,
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:32:3,
-                            end: [ local path prefix ]/state-machine.fpp:32:12,
+                            start: [ local path prefix ]/state-machine.fpp:42:3,
+                            end: [ local path prefix ]/state-machine.fpp:42:12,
                         },
                         pre_annotation: [
                             "Signal s4",
@@ -214,14 +523,14 @@ TransUnit(
                         name: Name {
                             data: "s5",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:35:10,
-                                end: [ local path prefix ]/state-machine.fpp:35:12,
+                                start: [ local path prefix ]/state-machine.fpp:45:10,
+                                end: [ local path prefix ]/state-machine.fpp:45:12,
                             },
                         },
                         type_name: None,
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:35:3,
-                            end: [ local path prefix ]/state-machine.fpp:35:12,
+                            start: [ local path prefix ]/state-machine.fpp:45:3,
+                            end: [ local path prefix ]/state-machine.fpp:45:12,
                         },
                         pre_annotation: [
                             "Signal s5",
@@ -231,14 +540,14 @@ TransUnit(
                         name: Name {
                             data: "s6",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:38:10,
-                                end: [ local path prefix ]/state-machine.fpp:38:12,
+                                start: [ local path prefix ]/state-machine.fpp:48:10,
+                                end: [ local path prefix ]/state-machine.fpp:48:12,
                             },
                         },
                         type_name: None,
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:38:3,
-                            end: [ local path prefix ]/state-machine.fpp:38:12,
+                            start: [ local path prefix ]/state-machine.fpp:48:3,
+                            end: [ local path prefix ]/state-machine.fpp:48:12,
                         },
                         pre_annotation: [
                             "Signal s6",
@@ -252,32 +561,39 @@ TransUnit(
                                         Ident {
                                             data: "a1",
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:41:16,
-                                                end: [ local path prefix ]/state-machine.fpp:41:18,
+                                                start: [ local path prefix ]/state-machine.fpp:51:16,
+                                                end: [ local path prefix ]/state-machine.fpp:51:18,
                                             },
                                         },
                                     ],
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:41:11,
-                                        end: [ local path prefix ]/state-machine.fpp:41:20,
+                                        start: [ local path prefix ]/state-machine.fpp:51:11,
+                                        end: [ local path prefix ]/state-machine.fpp:51:20,
                                     },
                                 },
                             ),
-                            target: Ident {
-                                data: "C",
+                            target: Unqualified {
+                                name: Ident {
+                                    data: "C",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:51:27,
+                                        end: [ local path prefix ]/state-machine.fpp:51:28,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:41:27,
-                                    end: [ local path prefix ]/state-machine.fpp:41:28,
+                                    start: [ local path prefix ]/state-machine.fpp:51:27,
+                                    end: [ local path prefix ]/state-machine.fpp:51:28,
                                 },
                             },
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:41:11,
-                                end: [ local path prefix ]/state-machine.fpp:41:28,
+                                start: [ local path prefix ]/state-machine.fpp:51:11,
+                                end: [ local path prefix ]/state-machine.fpp:51:28,
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:41:3,
-                            end: [ local path prefix ]/state-machine.fpp:41:28,
+                            start: [ local path prefix ]/state-machine.fpp:51:3,
+                            end: [ local path prefix ]/state-machine.fpp:51:28,
                         },
                         pre_annotation: [
                             "Initial transition",
@@ -287,48 +603,62 @@ TransUnit(
                         name: Name {
                             data: "C",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:44:10,
-                                end: [ local path prefix ]/state-machine.fpp:44:11,
+                                start: [ local path prefix ]/state-machine.fpp:54:10,
+                                end: [ local path prefix ]/state-machine.fpp:54:11,
                             },
                         },
                         guard: Ident {
                             data: "g1",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:44:17,
-                                end: [ local path prefix ]/state-machine.fpp:44:19,
+                                start: [ local path prefix ]/state-machine.fpp:54:17,
+                                end: [ local path prefix ]/state-machine.fpp:54:19,
                             },
                         },
                         if_transition: TransitionExpr {
                             actions: None,
-                            target: Ident {
-                                data: "S1",
+                            target: Unqualified {
+                                name: Ident {
+                                    data: "S1",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:54:26,
+                                        end: [ local path prefix ]/state-machine.fpp:54:28,
+                                    },
+                                },
+                                is_absolute: false,
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:44:26,
-                                    end: [ local path prefix ]/state-machine.fpp:44:28,
+                                    start: [ local path prefix ]/state-machine.fpp:54:26,
+                                    end: [ local path prefix ]/state-machine.fpp:54:28,
                                 },
                             },
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:44:20,
-                                end: [ local path prefix ]/state-machine.fpp:44:28,
+                                start: [ local path prefix ]/state-machine.fpp:54:20,
+                                end: [ local path prefix ]/state-machine.fpp:54:28,
                             },
                         },
                         else_transition: TransitionExpr {
                             actions: None,
-                            target: Ident {
-                                data: "S2",
+                            target: Unqualified {
+                                name: Ident {
+                                    data: "S2",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:54:41,
+                                        end: [ local path prefix ]/state-machine.fpp:54:43,
+                                    },
+                                },
+                                is_absolute: true,
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:44:40,
-                                    end: [ local path prefix ]/state-machine.fpp:44:42,
+                                    start: [ local path prefix ]/state-machine.fpp:54:40,
+                                    end: [ local path prefix ]/state-machine.fpp:54:43,
                                 },
                             },
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:44:34,
-                                end: [ local path prefix ]/state-machine.fpp:44:42,
+                                start: [ local path prefix ]/state-machine.fpp:54:34,
+                                end: [ local path prefix ]/state-machine.fpp:54:43,
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:44:3,
-                            end: [ local path prefix ]/state-machine.fpp:44:44,
+                            start: [ local path prefix ]/state-machine.fpp:54:3,
+                            end: [ local path prefix ]/state-machine.fpp:54:45,
                         },
                         pre_annotation: [
                             "Choice C",
@@ -338,14 +668,14 @@ TransUnit(
                         name: Name {
                             data: "S1",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:47:9,
-                                end: [ local path prefix ]/state-machine.fpp:47:11,
+                                start: [ local path prefix ]/state-machine.fpp:57:9,
+                                end: [ local path prefix ]/state-machine.fpp:57:11,
                             },
                         },
                         members: [],
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:47:3,
-                            end: [ local path prefix ]/state-machine.fpp:47:11,
+                            start: [ local path prefix ]/state-machine.fpp:57:3,
+                            end: [ local path prefix ]/state-machine.fpp:57:11,
                         },
                         pre_annotation: [
                             "State S1",
@@ -355,8 +685,8 @@ TransUnit(
                         name: Name {
                             data: "S2",
                             node_id: Span {
-                                start: [ local path prefix ]/state-machine.fpp:50:9,
-                                end: [ local path prefix ]/state-machine.fpp:50:11,
+                                start: [ local path prefix ]/state-machine.fpp:60:9,
+                                end: [ local path prefix ]/state-machine.fpp:60:11,
                             },
                         },
                         members: [
@@ -366,26 +696,26 @@ TransUnit(
                                         Ident {
                                             data: "a1",
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:52:16,
-                                                end: [ local path prefix ]/state-machine.fpp:52:18,
+                                                start: [ local path prefix ]/state-machine.fpp:62:16,
+                                                end: [ local path prefix ]/state-machine.fpp:62:18,
                                             },
                                         },
                                         Ident {
                                             data: "a2",
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:52:20,
-                                                end: [ local path prefix ]/state-machine.fpp:52:22,
+                                                start: [ local path prefix ]/state-machine.fpp:62:20,
+                                                end: [ local path prefix ]/state-machine.fpp:62:22,
                                             },
                                         },
                                     ],
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:52:11,
-                                        end: [ local path prefix ]/state-machine.fpp:52:24,
+                                        start: [ local path prefix ]/state-machine.fpp:62:11,
+                                        end: [ local path prefix ]/state-machine.fpp:62:24,
                                     },
                                 },
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:52:5,
-                                    end: [ local path prefix ]/state-machine.fpp:52:24,
+                                    start: [ local path prefix ]/state-machine.fpp:62:5,
+                                    end: [ local path prefix ]/state-machine.fpp:62:24,
                                 },
                             },
                             SpecStateExit {
@@ -394,26 +724,26 @@ TransUnit(
                                         Ident {
                                             data: "a1",
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:53:15,
-                                                end: [ local path prefix ]/state-machine.fpp:53:17,
+                                                start: [ local path prefix ]/state-machine.fpp:63:15,
+                                                end: [ local path prefix ]/state-machine.fpp:63:17,
                                             },
                                         },
                                         Ident {
                                             data: "a2",
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:53:19,
-                                                end: [ local path prefix ]/state-machine.fpp:53:21,
+                                                start: [ local path prefix ]/state-machine.fpp:63:19,
+                                                end: [ local path prefix ]/state-machine.fpp:63:21,
                                             },
                                         },
                                     ],
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:53:10,
-                                        end: [ local path prefix ]/state-machine.fpp:53:23,
+                                        start: [ local path prefix ]/state-machine.fpp:63:10,
+                                        end: [ local path prefix ]/state-machine.fpp:63:23,
                                     },
                                 },
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:53:5,
-                                    end: [ local path prefix ]/state-machine.fpp:53:23,
+                                    start: [ local path prefix ]/state-machine.fpp:63:5,
+                                    end: [ local path prefix ]/state-machine.fpp:63:23,
                                 },
                             },
                             SpecInitialTransition {
@@ -424,39 +754,46 @@ TransUnit(
                                                 Ident {
                                                     data: "a1",
                                                     node_id: Span {
-                                                        start: [ local path prefix ]/state-machine.fpp:56:18,
-                                                        end: [ local path prefix ]/state-machine.fpp:56:20,
+                                                        start: [ local path prefix ]/state-machine.fpp:66:18,
+                                                        end: [ local path prefix ]/state-machine.fpp:66:20,
                                                     },
                                                 },
                                                 Ident {
                                                     data: "a2",
                                                     node_id: Span {
-                                                        start: [ local path prefix ]/state-machine.fpp:56:22,
-                                                        end: [ local path prefix ]/state-machine.fpp:56:24,
+                                                        start: [ local path prefix ]/state-machine.fpp:66:22,
+                                                        end: [ local path prefix ]/state-machine.fpp:66:24,
                                                     },
                                                 },
                                             ],
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:56:13,
-                                                end: [ local path prefix ]/state-machine.fpp:56:26,
+                                                start: [ local path prefix ]/state-machine.fpp:66:13,
+                                                end: [ local path prefix ]/state-machine.fpp:66:26,
                                             },
                                         },
                                     ),
-                                    target: Ident {
-                                        data: "S3",
+                                    target: Unqualified {
+                                        name: Ident {
+                                            data: "S3",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/state-machine.fpp:66:33,
+                                                end: [ local path prefix ]/state-machine.fpp:66:35,
+                                            },
+                                        },
+                                        is_absolute: false,
                                         node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:56:33,
-                                            end: [ local path prefix ]/state-machine.fpp:56:35,
+                                            start: [ local path prefix ]/state-machine.fpp:66:33,
+                                            end: [ local path prefix ]/state-machine.fpp:66:35,
                                         },
                                     },
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:56:13,
-                                        end: [ local path prefix ]/state-machine.fpp:56:35,
+                                        start: [ local path prefix ]/state-machine.fpp:66:13,
+                                        end: [ local path prefix ]/state-machine.fpp:66:35,
                                     },
                                 },
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:56:5,
-                                    end: [ local path prefix ]/state-machine.fpp:56:35,
+                                    start: [ local path prefix ]/state-machine.fpp:66:5,
+                                    end: [ local path prefix ]/state-machine.fpp:66:35,
                                 },
                                 pre_annotation: [
                                     "Initial transition",
@@ -466,15 +803,15 @@ TransUnit(
                                 name: Name {
                                     data: "C",
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:59:12,
-                                        end: [ local path prefix ]/state-machine.fpp:59:13,
+                                        start: [ local path prefix ]/state-machine.fpp:69:12,
+                                        end: [ local path prefix ]/state-machine.fpp:69:13,
                                     },
                                 },
                                 guard: Ident {
                                     data: "g1",
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:59:19,
-                                        end: [ local path prefix ]/state-machine.fpp:59:21,
+                                        start: [ local path prefix ]/state-machine.fpp:69:19,
+                                        end: [ local path prefix ]/state-machine.fpp:69:21,
                                     },
                                 },
                                 if_transition: TransitionExpr {
@@ -484,34 +821,41 @@ TransUnit(
                                                 Ident {
                                                     data: "a1",
                                                     node_id: Span {
-                                                        start: [ local path prefix ]/state-machine.fpp:59:27,
-                                                        end: [ local path prefix ]/state-machine.fpp:59:29,
+                                                        start: [ local path prefix ]/state-machine.fpp:69:27,
+                                                        end: [ local path prefix ]/state-machine.fpp:69:29,
                                                     },
                                                 },
                                                 Ident {
                                                     data: "a2",
                                                     node_id: Span {
-                                                        start: [ local path prefix ]/state-machine.fpp:59:31,
-                                                        end: [ local path prefix ]/state-machine.fpp:59:33,
+                                                        start: [ local path prefix ]/state-machine.fpp:69:31,
+                                                        end: [ local path prefix ]/state-machine.fpp:69:33,
                                                     },
                                                 },
                                             ],
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:59:22,
-                                                end: [ local path prefix ]/state-machine.fpp:59:35,
+                                                start: [ local path prefix ]/state-machine.fpp:69:22,
+                                                end: [ local path prefix ]/state-machine.fpp:69:35,
                                             },
                                         },
                                     ),
-                                    target: Ident {
-                                        data: "S1",
+                                    target: Unqualified {
+                                        name: Ident {
+                                            data: "S1",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/state-machine.fpp:69:42,
+                                                end: [ local path prefix ]/state-machine.fpp:69:44,
+                                            },
+                                        },
+                                        is_absolute: false,
                                         node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:59:42,
-                                            end: [ local path prefix ]/state-machine.fpp:59:44,
+                                            start: [ local path prefix ]/state-machine.fpp:69:42,
+                                            end: [ local path prefix ]/state-machine.fpp:69:44,
                                         },
                                     },
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:59:22,
-                                        end: [ local path prefix ]/state-machine.fpp:59:44,
+                                        start: [ local path prefix ]/state-machine.fpp:69:22,
+                                        end: [ local path prefix ]/state-machine.fpp:69:44,
                                     },
                                 },
                                 else_transition: TransitionExpr {
@@ -521,52 +865,59 @@ TransUnit(
                                                 Ident {
                                                     data: "a2",
                                                     node_id: Span {
-                                                        start: [ local path prefix ]/state-machine.fpp:59:55,
-                                                        end: [ local path prefix ]/state-machine.fpp:59:57,
+                                                        start: [ local path prefix ]/state-machine.fpp:69:55,
+                                                        end: [ local path prefix ]/state-machine.fpp:69:57,
                                                     },
                                                 },
                                                 Ident {
                                                     data: "a3",
                                                     node_id: Span {
-                                                        start: [ local path prefix ]/state-machine.fpp:59:59,
-                                                        end: [ local path prefix ]/state-machine.fpp:59:61,
+                                                        start: [ local path prefix ]/state-machine.fpp:69:59,
+                                                        end: [ local path prefix ]/state-machine.fpp:69:61,
                                                     },
                                                 },
                                             ],
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:59:50,
-                                                end: [ local path prefix ]/state-machine.fpp:59:63,
+                                                start: [ local path prefix ]/state-machine.fpp:69:50,
+                                                end: [ local path prefix ]/state-machine.fpp:69:63,
                                             },
                                         },
                                     ),
                                     target: Qualified {
-                                        qualifier: Ident {
-                                            data: "S2",
+                                        qualifier: Unqualified {
+                                            name: Ident {
+                                                data: "S2",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/state-machine.fpp:69:71,
+                                                    end: [ local path prefix ]/state-machine.fpp:69:73,
+                                                },
+                                            },
+                                            is_absolute: true,
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:59:70,
-                                                end: [ local path prefix ]/state-machine.fpp:59:72,
+                                                start: [ local path prefix ]/state-machine.fpp:69:71,
+                                                end: [ local path prefix ]/state-machine.fpp:69:73,
                                             },
                                         },
                                         name: Ident {
                                             data: "S3",
                                             node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:59:73,
-                                                end: [ local path prefix ]/state-machine.fpp:59:75,
+                                                start: [ local path prefix ]/state-machine.fpp:69:74,
+                                                end: [ local path prefix ]/state-machine.fpp:69:76,
                                             },
                                         },
                                         node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:59:70,
-                                            end: [ local path prefix ]/state-machine.fpp:59:75,
+                                            start: [ local path prefix ]/state-machine.fpp:69:70,
+                                            end: [ local path prefix ]/state-machine.fpp:69:76,
                                         },
                                     },
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:59:50,
-                                        end: [ local path prefix ]/state-machine.fpp:59:75,
+                                        start: [ local path prefix ]/state-machine.fpp:69:50,
+                                        end: [ local path prefix ]/state-machine.fpp:69:76,
                                     },
                                 },
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:59:5,
-                                    end: [ local path prefix ]/state-machine.fpp:59:77,
+                                    start: [ local path prefix ]/state-machine.fpp:69:5,
+                                    end: [ local path prefix ]/state-machine.fpp:69:78,
                                 },
                                 pre_annotation: [
                                     "Choice C",
@@ -576,14 +927,14 @@ TransUnit(
                                 name: Name {
                                     data: "S3",
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:62:11,
-                                        end: [ local path prefix ]/state-machine.fpp:62:13,
+                                        start: [ local path prefix ]/state-machine.fpp:72:11,
+                                        end: [ local path prefix ]/state-machine.fpp:72:13,
                                     },
                                 },
                                 members: [],
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:62:5,
-                                    end: [ local path prefix ]/state-machine.fpp:62:13,
+                                    start: [ local path prefix ]/state-machine.fpp:72:5,
+                                    end: [ local path prefix ]/state-machine.fpp:72:13,
                                 },
                                 pre_annotation: [
                                     "State S3",
@@ -592,175 +943,6 @@ TransUnit(
                             SpecStateTransition {
                                 signal: Ident {
                                     data: "s1",
-                                    node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:65:8,
-                                        end: [ local path prefix ]/state-machine.fpp:65:10,
-                                    },
-                                },
-                                guard: Some(
-                                    Ident {
-                                        data: "g1",
-                                        node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:65:14,
-                                            end: [ local path prefix ]/state-machine.fpp:65:16,
-                                        },
-                                    },
-                                ),
-                                transition_or_do: Transition(
-                                    TransitionExpr {
-                                        actions: Some(
-                                            DoExpr {
-                                                actions: [
-                                                    Ident {
-                                                        data: "a1",
-                                                        node_id: Span {
-                                                            start: [ local path prefix ]/state-machine.fpp:65:22,
-                                                            end: [ local path prefix ]/state-machine.fpp:65:24,
-                                                        },
-                                                    },
-                                                ],
-                                                node_id: Span {
-                                                    start: [ local path prefix ]/state-machine.fpp:65:17,
-                                                    end: [ local path prefix ]/state-machine.fpp:65:26,
-                                                },
-                                            },
-                                        ),
-                                        target: Ident {
-                                            data: "C",
-                                            node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:65:33,
-                                                end: [ local path prefix ]/state-machine.fpp:65:34,
-                                            },
-                                        },
-                                        node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:65:17,
-                                            end: [ local path prefix ]/state-machine.fpp:65:34,
-                                        },
-                                    },
-                                ),
-                                node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:65:5,
-                                    end: [ local path prefix ]/state-machine.fpp:65:34,
-                                },
-                                pre_annotation: [
-                                    "Transition to S1",
-                                ],
-                            },
-                            SpecStateTransition {
-                                signal: Ident {
-                                    data: "s2",
-                                    node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:66:8,
-                                        end: [ local path prefix ]/state-machine.fpp:66:10,
-                                    },
-                                },
-                                guard: Some(
-                                    Ident {
-                                        data: "g1",
-                                        node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:66:14,
-                                            end: [ local path prefix ]/state-machine.fpp:66:16,
-                                        },
-                                    },
-                                ),
-                                transition_or_do: Transition(
-                                    TransitionExpr {
-                                        actions: None,
-                                        target: Ident {
-                                            data: "S1",
-                                            node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:66:23,
-                                                end: [ local path prefix ]/state-machine.fpp:66:25,
-                                            },
-                                        },
-                                        node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:66:17,
-                                            end: [ local path prefix ]/state-machine.fpp:66:25,
-                                        },
-                                    },
-                                ),
-                                node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:66:5,
-                                    end: [ local path prefix ]/state-machine.fpp:66:25,
-                                },
-                            },
-                            SpecStateTransition {
-                                signal: Ident {
-                                    data: "s3",
-                                    node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:69:8,
-                                        end: [ local path prefix ]/state-machine.fpp:69:10,
-                                    },
-                                },
-                                guard: Some(
-                                    Ident {
-                                        data: "g1",
-                                        node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:69:14,
-                                            end: [ local path prefix ]/state-machine.fpp:69:16,
-                                        },
-                                    },
-                                ),
-                                transition_or_do: Transition(
-                                    TransitionExpr {
-                                        actions: None,
-                                        target: Ident {
-                                            data: "S1",
-                                            node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:69:23,
-                                                end: [ local path prefix ]/state-machine.fpp:69:25,
-                                            },
-                                        },
-                                        node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:69:17,
-                                            end: [ local path prefix ]/state-machine.fpp:69:25,
-                                        },
-                                    },
-                                ),
-                                node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:69:5,
-                                    end: [ local path prefix ]/state-machine.fpp:69:25,
-                                },
-                                pre_annotation: [
-                                    "Transition to S1",
-                                ],
-                            },
-                            SpecStateTransition {
-                                signal: Ident {
-                                    data: "s4",
-                                    node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:72:8,
-                                        end: [ local path prefix ]/state-machine.fpp:72:10,
-                                    },
-                                },
-                                guard: None,
-                                transition_or_do: Transition(
-                                    TransitionExpr {
-                                        actions: None,
-                                        target: Ident {
-                                            data: "S1",
-                                            node_id: Span {
-                                                start: [ local path prefix ]/state-machine.fpp:72:17,
-                                                end: [ local path prefix ]/state-machine.fpp:72:19,
-                                            },
-                                        },
-                                        node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:72:11,
-                                            end: [ local path prefix ]/state-machine.fpp:72:19,
-                                        },
-                                    },
-                                ),
-                                node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:72:5,
-                                    end: [ local path prefix ]/state-machine.fpp:72:19,
-                                },
-                                pre_annotation: [
-                                    "Transition to S1",
-                                ],
-                            },
-                            SpecStateTransition {
-                                signal: Ident {
-                                    data: "s5",
                                     node_id: Span {
                                         start: [ local path prefix ]/state-machine.fpp:75:8,
                                         end: [ local path prefix ]/state-machine.fpp:75:10,
@@ -775,26 +957,223 @@ TransUnit(
                                         },
                                     },
                                 ),
+                                transition_or_do: Transition(
+                                    TransitionExpr {
+                                        actions: Some(
+                                            DoExpr {
+                                                actions: [
+                                                    Ident {
+                                                        data: "a1",
+                                                        node_id: Span {
+                                                            start: [ local path prefix ]/state-machine.fpp:75:22,
+                                                            end: [ local path prefix ]/state-machine.fpp:75:24,
+                                                        },
+                                                    },
+                                                ],
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/state-machine.fpp:75:17,
+                                                    end: [ local path prefix ]/state-machine.fpp:75:26,
+                                                },
+                                            },
+                                        ),
+                                        target: Unqualified {
+                                            name: Ident {
+                                                data: "C",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/state-machine.fpp:75:33,
+                                                    end: [ local path prefix ]/state-machine.fpp:75:34,
+                                                },
+                                            },
+                                            is_absolute: false,
+                                            node_id: Span {
+                                                start: [ local path prefix ]/state-machine.fpp:75:33,
+                                                end: [ local path prefix ]/state-machine.fpp:75:34,
+                                            },
+                                        },
+                                        node_id: Span {
+                                            start: [ local path prefix ]/state-machine.fpp:75:17,
+                                            end: [ local path prefix ]/state-machine.fpp:75:34,
+                                        },
+                                    },
+                                ),
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:75:5,
+                                    end: [ local path prefix ]/state-machine.fpp:75:34,
+                                },
+                                pre_annotation: [
+                                    "Transition to S1",
+                                ],
+                            },
+                            SpecStateTransition {
+                                signal: Ident {
+                                    data: "s2",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:76:8,
+                                        end: [ local path prefix ]/state-machine.fpp:76:10,
+                                    },
+                                },
+                                guard: Some(
+                                    Ident {
+                                        data: "g1",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/state-machine.fpp:76:14,
+                                            end: [ local path prefix ]/state-machine.fpp:76:16,
+                                        },
+                                    },
+                                ),
+                                transition_or_do: Transition(
+                                    TransitionExpr {
+                                        actions: None,
+                                        target: Unqualified {
+                                            name: Ident {
+                                                data: "S1",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/state-machine.fpp:76:23,
+                                                    end: [ local path prefix ]/state-machine.fpp:76:25,
+                                                },
+                                            },
+                                            is_absolute: false,
+                                            node_id: Span {
+                                                start: [ local path prefix ]/state-machine.fpp:76:23,
+                                                end: [ local path prefix ]/state-machine.fpp:76:25,
+                                            },
+                                        },
+                                        node_id: Span {
+                                            start: [ local path prefix ]/state-machine.fpp:76:17,
+                                            end: [ local path prefix ]/state-machine.fpp:76:25,
+                                        },
+                                    },
+                                ),
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:76:5,
+                                    end: [ local path prefix ]/state-machine.fpp:76:25,
+                                },
+                            },
+                            SpecStateTransition {
+                                signal: Ident {
+                                    data: "s3",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:79:8,
+                                        end: [ local path prefix ]/state-machine.fpp:79:10,
+                                    },
+                                },
+                                guard: Some(
+                                    Ident {
+                                        data: "g1",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/state-machine.fpp:79:14,
+                                            end: [ local path prefix ]/state-machine.fpp:79:16,
+                                        },
+                                    },
+                                ),
+                                transition_or_do: Transition(
+                                    TransitionExpr {
+                                        actions: None,
+                                        target: Unqualified {
+                                            name: Ident {
+                                                data: "S1",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/state-machine.fpp:79:23,
+                                                    end: [ local path prefix ]/state-machine.fpp:79:25,
+                                                },
+                                            },
+                                            is_absolute: false,
+                                            node_id: Span {
+                                                start: [ local path prefix ]/state-machine.fpp:79:23,
+                                                end: [ local path prefix ]/state-machine.fpp:79:25,
+                                            },
+                                        },
+                                        node_id: Span {
+                                            start: [ local path prefix ]/state-machine.fpp:79:17,
+                                            end: [ local path prefix ]/state-machine.fpp:79:25,
+                                        },
+                                    },
+                                ),
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:79:5,
+                                    end: [ local path prefix ]/state-machine.fpp:79:25,
+                                },
+                                pre_annotation: [
+                                    "Transition to S1",
+                                ],
+                            },
+                            SpecStateTransition {
+                                signal: Ident {
+                                    data: "s4",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:82:8,
+                                        end: [ local path prefix ]/state-machine.fpp:82:10,
+                                    },
+                                },
+                                guard: None,
+                                transition_or_do: Transition(
+                                    TransitionExpr {
+                                        actions: None,
+                                        target: Unqualified {
+                                            name: Ident {
+                                                data: "S1",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/state-machine.fpp:82:17,
+                                                    end: [ local path prefix ]/state-machine.fpp:82:19,
+                                                },
+                                            },
+                                            is_absolute: false,
+                                            node_id: Span {
+                                                start: [ local path prefix ]/state-machine.fpp:82:17,
+                                                end: [ local path prefix ]/state-machine.fpp:82:19,
+                                            },
+                                        },
+                                        node_id: Span {
+                                            start: [ local path prefix ]/state-machine.fpp:82:11,
+                                            end: [ local path prefix ]/state-machine.fpp:82:19,
+                                        },
+                                    },
+                                ),
+                                node_id: Span {
+                                    start: [ local path prefix ]/state-machine.fpp:82:5,
+                                    end: [ local path prefix ]/state-machine.fpp:82:19,
+                                },
+                                pre_annotation: [
+                                    "Transition to S1",
+                                ],
+                            },
+                            SpecStateTransition {
+                                signal: Ident {
+                                    data: "s5",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/state-machine.fpp:85:8,
+                                        end: [ local path prefix ]/state-machine.fpp:85:10,
+                                    },
+                                },
+                                guard: Some(
+                                    Ident {
+                                        data: "g1",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/state-machine.fpp:85:14,
+                                            end: [ local path prefix ]/state-machine.fpp:85:16,
+                                        },
+                                    },
+                                ),
                                 transition_or_do: Do(
                                     DoExpr {
                                         actions: [
                                             Ident {
                                                 data: "a1",
                                                 node_id: Span {
-                                                    start: [ local path prefix ]/state-machine.fpp:75:22,
-                                                    end: [ local path prefix ]/state-machine.fpp:75:24,
+                                                    start: [ local path prefix ]/state-machine.fpp:85:22,
+                                                    end: [ local path prefix ]/state-machine.fpp:85:24,
                                                 },
                                             },
                                         ],
                                         node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:75:17,
-                                            end: [ local path prefix ]/state-machine.fpp:75:26,
+                                            start: [ local path prefix ]/state-machine.fpp:85:17,
+                                            end: [ local path prefix ]/state-machine.fpp:85:26,
                                         },
                                     },
                                 ),
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:75:5,
-                                    end: [ local path prefix ]/state-machine.fpp:75:26,
+                                    start: [ local path prefix ]/state-machine.fpp:85:5,
+                                    end: [ local path prefix ]/state-machine.fpp:85:26,
                                 },
                                 pre_annotation: [
                                     "Internal transition",
@@ -804,8 +1183,8 @@ TransUnit(
                                 signal: Ident {
                                     data: "s6",
                                     node_id: Span {
-                                        start: [ local path prefix ]/state-machine.fpp:78:8,
-                                        end: [ local path prefix ]/state-machine.fpp:78:10,
+                                        start: [ local path prefix ]/state-machine.fpp:88:8,
+                                        end: [ local path prefix ]/state-machine.fpp:88:10,
                                     },
                                 },
                                 guard: None,
@@ -815,20 +1194,20 @@ TransUnit(
                                             Ident {
                                                 data: "a1",
                                                 node_id: Span {
-                                                    start: [ local path prefix ]/state-machine.fpp:78:16,
-                                                    end: [ local path prefix ]/state-machine.fpp:78:18,
+                                                    start: [ local path prefix ]/state-machine.fpp:88:16,
+                                                    end: [ local path prefix ]/state-machine.fpp:88:18,
                                                 },
                                             },
                                         ],
                                         node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:78:11,
-                                            end: [ local path prefix ]/state-machine.fpp:78:20,
+                                            start: [ local path prefix ]/state-machine.fpp:88:11,
+                                            end: [ local path prefix ]/state-machine.fpp:88:20,
                                         },
                                     },
                                 ),
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:78:5,
-                                    end: [ local path prefix ]/state-machine.fpp:78:20,
+                                    start: [ local path prefix ]/state-machine.fpp:88:5,
+                                    end: [ local path prefix ]/state-machine.fpp:88:20,
                                 },
                                 pre_annotation: [
                                     "Internal transition",
@@ -836,8 +1215,8 @@ TransUnit(
                             },
                         ],
                         node_id: Span {
-                            start: [ local path prefix ]/state-machine.fpp:50:3,
-                            end: [ local path prefix ]/state-machine.fpp:80:4,
+                            start: [ local path prefix ]/state-machine.fpp:60:3,
+                            end: [ local path prefix ]/state-machine.fpp:90:4,
                         },
                         pre_annotation: [
                             "State S2",
@@ -846,8 +1225,8 @@ TransUnit(
                 ],
             ),
             node_id: Span {
-                start: [ local path prefix ]/state-machine.fpp:2:1,
-                end: [ local path prefix ]/state-machine.fpp:82:2,
+                start: [ local path prefix ]/state-machine.fpp:5:1,
+                end: [ local path prefix ]/state-machine.fpp:92:2,
             },
             pre_annotation: [
                 "State machine M",

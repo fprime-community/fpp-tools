@@ -3,9 +3,9 @@
  4 |     async input port P: P
    |     ^^^^^^^^^^^^^^^^^^^^^ passive component may not have async input
    |
-  ::: [ local path prefix ]/interface/async_port_in_passive.fpp:8:5
+  ::: [ local path prefix ]/interface/async_port_in_passive.fpp:16:5
    |
- 8 |     import I
+16 |     import K
    |     -------- port instance was imported from here
    |
   ::: [ local path prefix ]/interface/async_port_in_passive.fpp:12:5
@@ -13,8 +13,8 @@
 12 |     import J
    |     -------- port instance was imported from here
    |
-  ::: [ local path prefix ]/interface/async_port_in_passive.fpp:16:5
+  ::: [ local path prefix ]/interface/async_port_in_passive.fpp:8:5
    |
-16 |     import K
+ 8 |     import I
    |     -------- port instance was imported from here
 

@@ -8,10 +8,6 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[features]
-
-disabled-tests = []
-
 [dependencies]
 fpp_ast = { path = "../fpp_ast", version = "=0.0.0" }
 fpp_core = { path = "../fpp_core", version = "=0.0.0" }
@@ -19,6 +15,7 @@ fpp_util = { path = "../fpp_util", version = "=0.0.0" }
 fpp_macros = { path = "../fpp_macros", version = "=0.0.0" }
 fpp_parser = { path = "../fpp_parser", version = "=0.0.0" }
 rustc-hash = "2.1.1"
+indexmap = "2.14.0"
 
 [dev-dependencies]
 fpp_errors = { path = "../fpp_errors" }

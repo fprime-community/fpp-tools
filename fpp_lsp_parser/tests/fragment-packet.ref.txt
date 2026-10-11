@@ -1,0 +1,42 @@
+ROOT@0..97
+  PRE_ANNOTATION@0..17 "@ Included packet"
+  EOL@17..18 "\n"
+  SPEC_TLM_PACKET@18..77
+    PACKET_KW@18..24 "packet"
+    WHITESPACE@24..25 " "
+    NAME@25..27
+      IDENT@25..27 "P2"
+    WHITESPACE@27..28 " "
+    ID@28..32
+      ID_KW@28..30 "id"
+      WHITESPACE@30..31 " "
+      EXPR@31..32
+        EXPR_LITERAL@31..32
+          LITERAL_INT@31..32 "1"
+    WHITESPACE@32..33 " "
+    GROUP@33..40
+      GROUP_KW@33..38 "group"
+      WHITESPACE@38..39 " "
+      EXPR@39..40
+        EXPR_LITERAL@39..40
+          LITERAL_INT@39..40 "1"
+    WHITESPACE@40..41 " "
+    TLM_PACKET_MEMBER_LIST@41..77
+      LEFT_CURLY@41..42 "{"
+      EOL@42..43 "\n"
+      WHITESPACE@43..45 "  "
+      TLM_CHANNEL_IDENTIFIER@45..50
+        IDENT@45..47 "i4"
+        DOT@47..48 "."
+        IDENT@48..50 "c4"
+      EOL@50..51 "\n"
+      WHITESPACE@51..53 "  "
+      SPEC_INCLUDE@53..75
+        INCLUDE_KW@53..60 "include"
+        WHITESPACE@60..61 " "
+        LITERAL_STRING@61..75 "\"channel.fppi\""
+      EOL@75..76 "\n"
+      RIGHT_CURLY@76..77 "}"
+  EOL@77..78 "\n"
+  POST_ANNOTATION@78..96 "@< Included packet"
+  EOL@96..97 "\n"

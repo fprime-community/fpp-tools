@@ -1,7 +1,7 @@
- --> [ local path prefix ]/template-error-def.fpp:2:8
+ --> [ local path prefix ]/template-error-def.fpp:2:17
   |
 2 | module template {}
-  |        ^^^^^^^^ syntax error: unexpected token
+  |                 ^ syntax error: unexpected token
   |
   = note: expected identifier
   = note: got {

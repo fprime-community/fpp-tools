@@ -1,0 +1,13 @@
+ --> [ local path prefix ]/type/string_implied_constant_unop_order.fpp:6:40
+  |
+6 | constant FW_FIXED_LENGTH_STRING_SIZE = -false
+  |                                        ^^^^^^ cannot convert bool to a numeric type
+  |
+  = note: the symbol FW_FIXED_LENGTH_STRING_SIZE has an implied use at the point of the error
+  = note: use of a string type with default size requires this definition
+
+ --> [ local path prefix ]/type/string_implied_constant_unop_order.fpp:5:14
+  |
+5 | constant x = -true
+  |              ^^^^^ cannot convert bool to a numeric type
+

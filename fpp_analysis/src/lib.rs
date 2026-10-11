@@ -1,19 +1,25 @@
+//! Semantic analysis of FPP models.
+//!
+//! # Collections
+//!
+//! Where the Scala compiler keeps an analysis result in an immutable `Map` or
+//! `Set` and the order in which the collection is iterated is observable (it
+//! orders diagnostics, dictionary entries or any other output), this crate keeps
+//! it in an insertion-ordered [`indexmap::IndexMap`] or [`indexmap::IndexSet`].
+//! Scala's immutable `Map` and `Set` iterate in insertion order up to four
+//! entries and in hash order beyond that, so the two orders agree exactly up to
+//! four entries; beyond four, the order here is still the deterministic insertion
+//! order, not Scala's hash order. A collection whose iteration order is not
+//! observable may be a hash map or set.
+
 mod analysis;
 mod errors;
 pub mod used_symbols;
 pub use used_symbols::UsedSymbols;
 
-use crate::passes::{
-    BuildSpecLocMap, CheckComponentDefs, CheckComponentInstanceDefs, CheckDictionaryDefs,
-    CheckExprTypes, CheckFrameworkConstantValues, CheckFrameworkDefs, CheckInterfaceDefs,
-    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs,
-    CheckTemplateInterfaceArgs, CheckTemplateUses, CheckTopologyDefs, CheckTopologyInstances,
-    CheckTypeUses, CheckUseDefCycles, CheckUses, ConstructDictionaryMap, ConstructImpliedUseMap,
-    EnterSymbols, EnterTemplateSymbols, EvalConstantExprs, EvalImpliedEnumConsts,
-    FinalizeConstantExprs, FinalizeTypeDefs,
-};
+pub use crate::passes::{CheckSemantics, ExpandSyntaxAndEnterSymbols};
 pub use analysis::*;
-use fpp_ast::{MutVisitor, Visitor};
+use fpp_ast::MutVisitor;
 use fpp_core::FileReader;
 use std::ops::ControlFlow;
 
@@ -24,8 +30,32 @@ pub mod analyzers {
     pub mod basic_use_analyzer;
     pub use basic_use_analyzer::*;
 
-    pub mod nested_analyzer;
-    pub use nested_analyzer::*;
+    pub mod component_analyzer;
+    pub use component_analyzer::*;
+
+    pub mod enum_analyzer;
+    pub use enum_analyzer::*;
+
+    pub mod interface_analyzer;
+    pub use interface_analyzer::*;
+
+    pub mod module_analyzer;
+    pub use module_analyzer::*;
+
+    pub mod state_machine_analyzer;
+    pub use state_machine_analyzer::*;
+
+    pub mod template_expand_analyzer;
+    pub use template_expand_analyzer::*;
+
+    pub mod tlm_packet_set_analyzer;
+    pub use tlm_packet_set_analyzer::*;
+
+    pub mod topology_analyzer;
+    pub use topology_analyzer::*;
+
+    pub mod type_expression_analyzer;
+    pub use type_expression_analyzer::*;
 
     pub mod use_analyzer;
     pub use use_analyzer::*;
@@ -34,6 +64,14 @@ pub mod analyzers {
 }
 
 pub mod passes {
+    mod expand_syntax_and_enter_symbols;
+    pub use expand_syntax_and_enter_symbols::*;
+
+    mod check_semantics;
+    pub use check_semantics::*;
+
+    mod enter_module_symbols;
+
     mod enter_symbols;
     pub use enter_symbols::*;
 
@@ -51,14 +89,17 @@ pub mod passes {
     pub(crate) mod check_uses;
     pub use check_uses::*;
 
+    mod check_uses_helpers;
+    pub use check_uses_helpers::*;
+
     mod check_template_uses;
     pub use check_template_uses::*;
 
     mod check_template_interface_args;
     pub use check_template_interface_args::*;
 
-    mod enter_template_symbols;
-    pub use enter_template_symbols::*;
+    mod enter_template_expansion_symbols;
+    pub use enter_template_expansion_symbols::*;
 
     mod check_use_def_cycles;
     pub use check_use_def_cycles::*;
@@ -111,9 +152,6 @@ pub mod passes {
     pub(crate) mod check_spec_locs;
     pub use check_spec_locs::*;
 
-    mod build_spec_loc_map;
-    pub use build_spec_loc_map::*;
-
     mod check_system_defs;
     pub use check_system_defs::*;
 
@@ -123,6 +161,7 @@ pub mod passes {
 
 pub mod transform {
     pub use fpp_parser::add_state_enums;
+    pub use fpp_parser::{IncludeParentKind, ResolveIncludes};
 
     mod expand_templates;
     pub use expand_templates::*;
@@ -142,20 +181,56 @@ pub mod semantics {
     mod framework_definitions;
     pub use framework_definitions::*;
 
+    mod port_instance;
+    pub use port_instance::*;
+
+    mod port_interface;
+    pub use port_interface::*;
+
     mod interface;
     pub use interface::*;
+
+    mod command;
+    pub use command::*;
+
+    mod container;
+    pub use container::*;
+
+    mod event;
+    pub use event::*;
+
+    mod param;
+    pub use param::*;
+
+    mod record;
+    pub use record::*;
+
+    mod tlm_channel;
+    pub use tlm_channel::*;
 
     mod component;
     pub use component::*;
 
+    mod init_specifier;
+    pub use init_specifier::*;
+
     mod component_instance;
     pub use component_instance::*;
+
+    mod interface_instance;
+    pub use interface_instance::*;
 
     mod topology;
     pub use topology::*;
 
-    mod system;
-    pub use system::*;
+    mod topology_port;
+    pub use topology_port::*;
+
+    mod connection_pattern;
+    pub use connection_pattern::*;
+
+    mod fpp_system;
+    pub use fpp_system::*;
 
     mod tlm_channel_identifier;
     pub use tlm_channel_identifier::*;
@@ -173,25 +248,36 @@ pub mod semantics {
     pub use construct_dictionary::*;
 
     pub mod resolve_topology;
-    pub use resolve_topology::*;
 
     mod connection;
     pub use connection::*;
 
+    mod port_instance_identifier;
+    pub use port_instance_identifier::*;
+
     mod scope;
     pub use scope::*;
+
+    mod nested_scope;
+    pub use nested_scope::*;
+
+    mod name_symbol_map;
+    pub use name_symbol_map::*;
 
     mod template_expansion;
     pub use template_expansion::*;
 
-    mod name_groups;
-    pub use name_groups::*;
+    mod name_group;
+    pub use name_group::*;
 
     mod use_def_matching;
     pub use use_def_matching::*;
 
     mod types;
     pub use types::*;
+
+    mod type_visitor;
+    pub(crate) use type_visitor::*;
 
     mod value;
     pub use value::*;
@@ -205,20 +291,27 @@ pub mod semantics {
     pub mod interned_def;
     pub use interned_def::*;
 
-    mod generic_name_symbol_map;
-    mod generic_nested_scope;
     mod generic_scope;
+    pub(crate) use generic_scope::{GenericNameSymbolMap, GenericNestedScope, GenericScope};
 
     #[cfg(test)]
     mod format_spec;
     #[cfg(test)]
-    pub(crate) mod test_helpers;
+    pub(crate) mod spec;
+    #[cfg(test)]
+    mod type_option_spec;
     #[cfg(test)]
     mod type_spec;
     #[cfg(test)]
     mod value_spec;
 }
 
+/// Resolve the include specifiers of a translation unit, reading the included
+/// files with `reader`.
+///
+/// The files included so far are recorded in `a.include_context_map`, with
+/// the kind of member list each one is spliced into, and in
+/// `a.included_file_set`.
 pub fn resolve_includes<Reader: FileReader>(
     a: &mut Analysis,
     reader: Reader,
@@ -234,56 +327,29 @@ pub fn resolve_includes<Reader: FileReader>(
     result
 }
 
-/// Expand template expansion specifiers and enter the symbols they produce.
+/// Enter the symbols of a model and expand its templates: the steps of
+/// [`ExpandSyntaxAndEnterSymbols::tu_list`] that follow include resolution and
+/// the synthesis of the state enums (see
+/// [`ExpandSyntaxAndEnterSymbols::enter_symbols_and_expand_templates`]).
 ///
-/// This runs before [`check_semantics`], on the same analysis: it performs the
-/// symbol entering that the rest of the analysis relies on, and it rewrites the
+/// This is a lower-level entry point than [`CheckSemantics::tu_list`], for a
+/// driver that resolves the includes and adds the state enums of each
+/// translation unit itself ([`resolve_includes`], [`add_state_enums`]). It
+/// runs before [`check_semantics`], on the same analysis, and it rewrites the
 /// translation units, replacing each template expansion specifier with the
-/// expanded template.
-///
-/// A model whose templates do not expand cannot be analyzed, so a `Break` result
-/// means the caller must not go on to [`check_semantics`].
-pub fn resolve_templates(a: &mut Analysis, ast: &mut [fpp_ast::TransUnit]) -> ControlFlow<()> {
-    EnterSymbols.visit_trans_units(a, ast.iter())?;
-    CheckTemplateUses::new().visit_trans_units(a, ast.iter())?;
-    if let Err(err) = ExpandTemplates::transform(a, ast) {
-        err.emit();
-        return ControlFlow::Break(());
-    }
-    EnterTemplateSymbols.visit_trans_units(a, ast.iter())?;
-    ControlFlow::Continue(())
+/// expanded template. A `Break` result means the caller must not go on to
+/// [`check_semantics`].
+pub fn resolve_templates(a: &mut Analysis, tul: &mut [fpp_ast::TransUnit]) -> ControlFlow<()> {
+    ExpandSyntaxAndEnterSymbols::enter_symbols_and_expand_templates(a, tul)
 }
 
-/// Check the semantics of a list of translation units.
+/// Check the semantics of a list of translation units: the steps of
+/// [`CheckSemantics::tu_list`] that follow
+/// [`ExpandSyntaxAndEnterSymbols::tu_list`].
 ///
+/// This is a lower-level entry point than [`CheckSemantics::tu_list`].
 /// [`resolve_templates`] must have run on the same analysis first: it enters the
 /// symbols of the model.
-pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> ControlFlow<()> {
-    ConstructImpliedUseMap.visit_trans_units(a, ast.iter().cloned())?;
-    CheckUses::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckUseDefCycles::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckTypeUses::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckExprTypes::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckFrameworkDefs.visit_trans_units(a, ast.iter().cloned())?;
-    EvalImpliedEnumConsts::new().visit_trans_units(a, ast.iter().cloned())?;
-    EvalConstantExprs::new().visit_trans_units(a, ast.iter().cloned())?;
-    FinalizeTypeDefs::new().visit_trans_units(a, ast.iter().cloned())?;
-    FinalizeConstantExprs::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckFrameworkConstantValues.check(a);
-    CheckPortDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckInterfaceDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckComponentDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckComponentInstanceDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckComponentInstanceDefs::check_id_ranges(a);
-    CheckStateMachineDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckTopologyInstances.visit_trans_units(a, ast.iter().cloned())?;
-    CheckTopologyDefs.resolve_all(a);
-    CheckTemplateInterfaceArgs.check(a);
-    BuildSpecLocMap.visit_trans_units(a, ast.iter().cloned())?;
-    CheckSpecLocs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckDictionaryDefs.visit_trans_units(a, ast.iter().cloned())?;
-    ConstructDictionaryMap::construct(a);
-    CheckSystemDefs.visit_trans_units(a, ast.iter().cloned())?;
-
-    ControlFlow::Continue(())
+pub fn check_semantics(a: &mut Analysis, tul: Vec<&fpp_ast::TransUnit>) -> ControlFlow<()> {
+    CheckSemantics::check_expanded_tu_list(a, &tul)
 }

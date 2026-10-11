@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/component.fpp:2:19
+ --> [ local path prefix ]/redef/component.fpp:2:1
   |
 2 | passive component C { }
-  |                   ^ redefinition of symbol C
+  | ^^^^^^^^^^^^^^^^^^^^^^^ redefinition of symbol C
   |
  ::: [ local path prefix ]/redef/component.fpp:1:1
   |

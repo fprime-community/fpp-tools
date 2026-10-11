@@ -3,8 +3,10 @@
 2 |   array A = [3] T
   |                 ^ cannot find type `T` in scope
 
- --> [ local path prefix ]/state_machine/types/array_undef_type.fpp:1:15
+ --> [ local path prefix ]/state_machine/types/array_undef_type.fpp:1:1
   |
-1 | state machine SM {
-  |               ^^ state machine must have initial transition
+1 | / state machine SM {
+2 | |   array A = [3] T
+3 | | }
+  | |_^ state machine must have initial transition
 

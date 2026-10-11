@@ -1,0 +1,128 @@
+ROOT@0..173
+  DEF_ALIAS_TYPE@0..23
+    DICTIONARY_KW@0..10 "dictionary"
+    WHITESPACE@10..11 " "
+    TYPE_KW@11..15 "type"
+    WHITESPACE@15..16 " "
+    NAME@16..17
+      IDENT@16..17 "T"
+    WHITESPACE@17..18 " "
+    EQUALS@18..19 "="
+    WHITESPACE@19..20 " "
+    TYPE_NAME@20..23
+      U32_KW@20..23 "U32"
+  EOL@23..24 "\n"
+  DEF_ARRAY@24..52
+    DICTIONARY_KW@24..34 "dictionary"
+    WHITESPACE@34..35 " "
+    ARRAY_KW@35..40 "array"
+    WHITESPACE@40..41 " "
+    NAME@41..42
+      IDENT@41..42 "A"
+    WHITESPACE@42..43 " "
+    EQUALS@43..44 "="
+    WHITESPACE@44..45 " "
+    INDEX_OR_SIZE@45..48
+      LEFT_SQUARE@45..46 "["
+      EXPR@46..47
+        EXPR_LITERAL@46..47
+          LITERAL_INT@46..47 "2"
+      RIGHT_SQUARE@47..48 "]"
+    WHITESPACE@48..49 " "
+    TYPE_NAME@49..52
+      F32_KW@49..52 "F32"
+  EOL@52..53 "\n"
+  DEF_STRUCT@53..106
+    DICTIONARY_KW@53..63 "dictionary"
+    WHITESPACE@63..64 " "
+    STRUCT_KW@64..70 "struct"
+    WHITESPACE@70..71 " "
+    NAME@71..72
+      IDENT@71..72 "S"
+    WHITESPACE@72..73 " "
+    STRUCT_MEMBER_LIST@73..106
+      LEFT_CURLY@73..74 "{"
+      WHITESPACE@74..75 " "
+      STRUCT_MEMBER@75..85
+        NAME@75..76
+          IDENT@75..76 "x"
+        COLON@76..77 ":"
+        WHITESPACE@77..78 " "
+        INDEX_OR_SIZE@78..81
+          LEFT_SQUARE@78..79 "["
+          EXPR@79..80
+            EXPR_LITERAL@79..80
+              LITERAL_INT@79..80 "3"
+          RIGHT_SQUARE@80..81 "]"
+        WHITESPACE@81..82 " "
+        TYPE_NAME@82..85
+          U32_KW@82..85 "U32"
+      COMMA@85..86 ","
+      WHITESPACE@86..87 " "
+      STRUCT_MEMBER@87..93
+        NAME@87..88
+          IDENT@87..88 "y"
+        COLON@88..89 ":"
+        WHITESPACE@89..90 " "
+        TYPE_NAME@90..93
+          F32_KW@90..93 "F32"
+      COMMA@93..94 ","
+      WHITESPACE@94..95 " "
+      STRUCT_MEMBER@95..104
+        NAME@95..96
+          IDENT@95..96 "z"
+        COLON@96..97 ":"
+        WHITESPACE@97..98 " "
+        TYPE_NAME@98..104
+          STRING_KW@98..104 "string"
+      WHITESPACE@104..105 " "
+      RIGHT_CURLY@105..106 "}"
+  EOL@106..107 "\n"
+  DEF_ENUM@107..146
+    DICTIONARY_KW@107..117 "dictionary"
+    WHITESPACE@117..118 " "
+    ENUM_KW@118..122 "enum"
+    WHITESPACE@122..123 " "
+    NAME@123..124
+      IDENT@123..124 "E"
+    WHITESPACE@124..125 " "
+    ENUM_MEMBER_LIST@125..136
+      LEFT_CURLY@125..126 "{"
+      WHITESPACE@126..127 " "
+      DEF_ENUM_CONSTANT@127..128
+        NAME@127..128
+          IDENT@127..128 "X"
+      COMMA@128..129 ","
+      WHITESPACE@129..130 " "
+      DEF_ENUM_CONSTANT@130..131
+        NAME@130..131
+          IDENT@130..131 "Y"
+      COMMA@131..132 ","
+      WHITESPACE@132..133 " "
+      DEF_ENUM_CONSTANT@133..134
+        NAME@133..134
+          IDENT@133..134 "Z"
+      WHITESPACE@134..135 " "
+      RIGHT_CURLY@135..136 "}"
+    WHITESPACE@136..137 " "
+    DEFAULT@137..146
+      DEFAULT_KW@137..144 "default"
+      WHITESPACE@144..145 " "
+      EXPR@145..146
+        EXPR_IDENT@145..146
+          IDENT@145..146 "X"
+  EOL@146..147 "\n"
+  DEF_CONSTANT@147..172
+    DICTIONARY_KW@147..157 "dictionary"
+    WHITESPACE@157..158 " "
+    CONSTANT_KW@158..166 "constant"
+    WHITESPACE@166..167 " "
+    NAME@167..168
+      IDENT@167..168 "C"
+    WHITESPACE@168..169 " "
+    EQUALS@169..170 "="
+    WHITESPACE@170..171 " "
+    EXPR@171..172
+      EXPR_LITERAL@171..172
+        LITERAL_INT@171..172 "1"
+  EOL@172..173 "\n"

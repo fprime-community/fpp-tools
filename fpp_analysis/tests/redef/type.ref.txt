@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/type.fpp:2:6
+ --> [ local path prefix ]/redef/type.fpp:2:1
   |
 2 | type T
-  |      ^ redefinition of symbol T
+  | ^^^^^^ redefinition of symbol T
   |
  ::: [ local path prefix ]/redef/type.fpp:1:1
   |

@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/include-self.fpp:1:9
+  |
+1 | include "./include-self.fpp"
+  |         ^^^^^^^^^^^^^^^^^^^^ include cycle:
+  |
+  = note: [ local path prefix ]/include-self.fpp includes
+  = note: [ local path prefix ]/include-self.fpp
+

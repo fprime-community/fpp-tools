@@ -1,7 +1,12 @@
-  --> [ local path prefix ]/interface/diamond_import.fpp:4:5
+  --> [ local path prefix ]/interface/diamond_import.fpp:17:5
+   |
+17 |     import C
+   |     ^^^^^^^^ failed to import interface
+   |
+  ::: [ local path prefix ]/interface/diamond_import.fpp:4:5
    |
  4 |     output port pOut: P
-   |     ^^^^^^^^^^^^^^^^^^^ duplicate port instance pOut
+   |     ------------------- duplicate port instance pOut
    |
   ::: [ local path prefix ]/interface/diamond_import.fpp:12:5
    |
@@ -27,9 +32,4 @@
    |
  8 |     import A
    |     -------- previous instance imported from here
-   |
-  ::: [ local path prefix ]/interface/diamond_import.fpp:17:5
-   |
-17 |     import C
-   |     -------- failed to import interface here
 

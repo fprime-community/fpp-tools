@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/command/opcode_overflow.fpp:19:3
+   |
+19 |   sync command A opcode 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the default opcode after 170141183460469231731687303715884105727 is out of range
+

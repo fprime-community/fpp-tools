@@ -1,7 +1,0 @@
- --> [ local path prefix ]/types/string_size_too_large.fpp:3:27
-  |
-3 | array A = [3] string size 0x80000000
-  |                           ^^^^^^^^^^ string size must in range [0, 2^31)
-  |
-  = note: expression evaluated to `2147483648`
-

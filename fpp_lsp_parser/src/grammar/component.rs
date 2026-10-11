@@ -10,10 +10,7 @@ pub(super) fn def_component(p: &mut Parser) {
     }
 
     p.expect(COMPONENT_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
 
     if p.at(LEFT_CURLY) {
         member_list(
@@ -23,18 +20,16 @@ pub(super) fn def_component(p: &mut Parser) {
             component_member,
             SEMI,
             COMPONENT_MEMBER_LIST,
-            "expected component member",
+            "component member expected",
         );
     } else {
-        p.error("expected `{`");
+        p.error("{ expected");
     }
 
     m.complete(p, DEF_COMPONENT);
 }
 
 pub(super) fn component_member(p: &mut Parser) {
-    p.eat(DICTIONARY_KW);
-
     match p.current() {
         DICTIONARY_KW if p.nth_at(1, TYPE_KW) => types::type_alias_or_abstract(p),
         TYPE_KW => types::type_alias_or_abstract(p),
@@ -48,7 +43,10 @@ pub(super) fn component_member(p: &mut Parser) {
         STRUCT_KW => types::def_struct(p),
         STATE_KW if p.nth_at(2, INSTANCE_KW) => spec_state_machine_instance(p),
         STATE_KW => state_machine::def_state_machine(p),
-        ASYNC_KW | GUARDED_KW | SYNC_KW if p.nth_at(1, COMMAND_KW) => {
+        // `sync command recv port` is a special port instance with an input kind
+        ASYNC_KW | GUARDED_KW | SYNC_KW
+            if p.nth_at(1, COMMAND_KW) && !matches!(p.nth(2), RECV_KW | REG_KW | RESP_KW) =>
+        {
             spec_command(p);
         }
         ASYNC_KW | GUARDED_KW | SYNC_KW | OUTPUT_KW | COMMAND_KW | TEXT_KW | TIME_KW => {
@@ -63,7 +61,8 @@ pub(super) fn component_member(p: &mut Parser) {
         INTERNAL_KW => spec_internal_port(p),
         MATCH_KW => spec_port_matching(p),
         PARAM_KW if p.nth_at(1, GET_KW) || p.nth_at(1, SET_KW) => spec_port_instance(p),
-        EXTERNAL_KW | PARAM_KW => spec_param(p),
+        EXTERNAL_KW if p.nth_at(1, PARAM_KW) => spec_param(p),
+        PARAM_KW => spec_param(p),
         TELEMETRY_KW if p.nth_at(1, PORT_KW) => spec_port_instance(p),
         TELEMETRY_KW => spec_telemetry(p),
         IMPORT_KW => module::spec_import_interface(p),
@@ -176,7 +175,7 @@ fn spec_port_instance_special(p: &mut Parser) {
             }
             _ => {
                 m.abandon(p);
-                p.err_recover("expected `get` or `set`", MEMBER_RECOVERY_SET);
+                p.err_recover("recv, reg or resp expected", MEMBER_RECOVERY_SET);
                 return;
             }
         }
@@ -187,7 +186,7 @@ fn spec_port_instance_special(p: &mut Parser) {
             }
             _ => {
                 m.abandon(p);
-                p.err_recover("expected `get` or `set`", MEMBER_RECOVERY_SET);
+                p.err_recover("get or set expected", MEMBER_RECOVERY_SET);
                 return;
             }
         }
@@ -198,10 +197,7 @@ fn spec_port_instance_special(p: &mut Parser) {
             }
             _ => {
                 m.abandon(p);
-                p.err_recover(
-                    "expected `get`, `recv`, `request`, or `send`",
-                    MEMBER_RECOVERY_SET,
-                );
+                p.err_recover("get, recv, request or send expected", MEMBER_RECOVERY_SET);
                 return;
             }
         }
@@ -216,7 +212,7 @@ fn spec_port_instance_special(p: &mut Parser) {
             }
             _ => {
                 m.abandon(p);
-                p.err_recover("expected special port instance", MEMBER_RECOVERY_SET);
+                p.err_recover("component member expected", MEMBER_RECOVERY_SET);
                 return;
             }
         }
@@ -308,7 +304,7 @@ fn spec_event(p: &mut Parser) {
                     HIGH_KW | LOW_KW => {
                         p.bump_any();
                     }
-                    _ => p.err_and_bump("expected `high` or `low`"),
+                    _ => p.err_and_bump("high or low expected"),
                 }
             }
             COMMAND_KW | DIAGNOSTIC_KW | FATAL_KW => p.bump_any(),
@@ -387,7 +383,7 @@ fn spec_telemetry(p: &mut Parser) {
         if p.eat(ON_KW) {
             p.expect(CHANGE_KW);
         } else if !p.eat(ALWAYS_KW) {
-            p.error("expected `on change` or `always`");
+            p.error("update kind expected");
         }
     }
 
@@ -413,10 +409,10 @@ fn limit_sequence(p: &mut Parser) {
             limit,
             COMMA,
             LIMIT_SEQUENCE,
-            "expected limit",
+            "limit expected",
         );
     } else {
-        p.error("expected '{' for limit sequence");
+        p.error("{ expected");
     }
 }
 
@@ -426,7 +422,7 @@ fn limit(p: &mut Parser) {
         ORANGE_KW | RED_KW | YELLOW_KW => {
             p.bump_any();
         }
-        _ => p.error("expected telemetry channel limit `orange`, `red` or `yellow`"),
+        _ => p.error("orange, red or yellow expected"),
     }
 
     expr::expr(p);

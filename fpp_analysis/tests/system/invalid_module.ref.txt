@@ -6,5 +6,5 @@
  ::: [ local path prefix ]/system/invalid_module.fpp:1:1
   |
 1 | module M {}
-  | ----------- M defined here
+  | ----------- symbol is defined here
 

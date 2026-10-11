@@ -8,5 +8,5 @@
  5 | /   module B {
  6 | |     constant x = 1
  7 | |   }
-   | |___- B defined here
+   | |___- symbol is defined here
 

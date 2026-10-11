@@ -1,0 +1,566 @@
+TransUnit(
+    [
+        DefStateMachine {
+            name: Name {
+                data: "M",
+                node_id: Span {
+                    start: [ local path prefix ]/include-state-machine.fpp:1:15,
+                    end: [ local path prefix ]/include-state-machine.fpp:1:16,
+                },
+            },
+            members: Some(
+                [
+                    DefAction {
+                        name: Name {
+                            data: "a1",
+                            node_id: Span {
+                                start: [ local path prefix ]/include-state-machine.fpp:2:10,
+                                end: [ local path prefix ]/include-state-machine.fpp:2:12,
+                            },
+                        },
+                        type_name: None,
+                        node_id: Span {
+                            start: [ local path prefix ]/include-state-machine.fpp:2:3,
+                            end: [ local path prefix ]/include-state-machine.fpp:2:12,
+                        },
+                        pre_annotation: [
+                            "Action a1",
+                        ],
+                    },
+                    DefAction {
+                        name: Name {
+                            data: "a2",
+                            node_id: Span {
+                                start: [ local path prefix ]/include-state-machine.fpp:5:10,
+                                end: [ local path prefix ]/include-state-machine.fpp:5:12,
+                            },
+                        },
+                        type_name: None,
+                        node_id: Span {
+                            start: [ local path prefix ]/include-state-machine.fpp:5:3,
+                            end: [ local path prefix ]/include-state-machine.fpp:5:12,
+                        },
+                        pre_annotation: [
+                            "Action a2",
+                        ],
+                    },
+                    DefState {
+                        name: Name {
+                            data: "S1",
+                            node_id: Span {
+                                start: [ local path prefix ]/subdir/state.fppi:1:7,
+                                end: [ local path prefix ]/subdir/state.fppi:1:9,
+                            },
+                        },
+                        members: [
+                            SpecStateEntry {
+                                actions: DoExpr {
+                                    actions: [
+                                        Ident {
+                                            data: "a1",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:2:16,
+                                                end: [ local path prefix ]/subdir/state.fppi:2:18,
+                                            },
+                                        },
+                                        Ident {
+                                            data: "a2",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:2:20,
+                                                end: [ local path prefix ]/subdir/state.fppi:2:22,
+                                            },
+                                        },
+                                    ],
+                                    node_id: Span {
+                                        start: [ local path prefix ]/subdir/state.fppi:2:11,
+                                        end: [ local path prefix ]/subdir/state.fppi:2:24,
+                                    },
+                                },
+                                node_id: Span {
+                                    start: [ local path prefix ]/subdir/state.fppi:2:5,
+                                    end: [ local path prefix ]/subdir/state.fppi:2:24,
+                                },
+                            },
+                            SpecStateExit {
+                                actions: DoExpr {
+                                    actions: [
+                                        Ident {
+                                            data: "a1",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:3:15,
+                                                end: [ local path prefix ]/subdir/state.fppi:3:17,
+                                            },
+                                        },
+                                        Ident {
+                                            data: "a2",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:3:19,
+                                                end: [ local path prefix ]/subdir/state.fppi:3:21,
+                                            },
+                                        },
+                                    ],
+                                    node_id: Span {
+                                        start: [ local path prefix ]/subdir/state.fppi:3:10,
+                                        end: [ local path prefix ]/subdir/state.fppi:3:23,
+                                    },
+                                },
+                                node_id: Span {
+                                    start: [ local path prefix ]/subdir/state.fppi:3:5,
+                                    end: [ local path prefix ]/subdir/state.fppi:3:23,
+                                },
+                            },
+                            SpecInitialTransition {
+                                transition: TransitionExpr {
+                                    actions: Some(
+                                        DoExpr {
+                                            actions: [
+                                                Ident {
+                                                    data: "a1",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:6:18,
+                                                        end: [ local path prefix ]/subdir/state.fppi:6:20,
+                                                    },
+                                                },
+                                                Ident {
+                                                    data: "a2",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:6:22,
+                                                        end: [ local path prefix ]/subdir/state.fppi:6:24,
+                                                    },
+                                                },
+                                            ],
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:6:13,
+                                                end: [ local path prefix ]/subdir/state.fppi:6:26,
+                                            },
+                                        },
+                                    ),
+                                    target: Unqualified {
+                                        name: Ident {
+                                            data: "S3",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:6:33,
+                                                end: [ local path prefix ]/subdir/state.fppi:6:35,
+                                            },
+                                        },
+                                        is_absolute: false,
+                                        node_id: Span {
+                                            start: [ local path prefix ]/subdir/state.fppi:6:33,
+                                            end: [ local path prefix ]/subdir/state.fppi:6:35,
+                                        },
+                                    },
+                                    node_id: Span {
+                                        start: [ local path prefix ]/subdir/state.fppi:6:13,
+                                        end: [ local path prefix ]/subdir/state.fppi:6:35,
+                                    },
+                                },
+                                node_id: Span {
+                                    start: [ local path prefix ]/subdir/state.fppi:6:5,
+                                    end: [ local path prefix ]/subdir/state.fppi:6:35,
+                                },
+                                pre_annotation: [
+                                    "Initial transition",
+                                ],
+                            },
+                            DefChoice {
+                                name: Name {
+                                    data: "C",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/subdir/state.fppi:9:12,
+                                        end: [ local path prefix ]/subdir/state.fppi:9:13,
+                                    },
+                                },
+                                guard: Ident {
+                                    data: "g1",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/subdir/state.fppi:9:19,
+                                        end: [ local path prefix ]/subdir/state.fppi:9:21,
+                                    },
+                                },
+                                if_transition: TransitionExpr {
+                                    actions: Some(
+                                        DoExpr {
+                                            actions: [
+                                                Ident {
+                                                    data: "a1",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:9:27,
+                                                        end: [ local path prefix ]/subdir/state.fppi:9:29,
+                                                    },
+                                                },
+                                                Ident {
+                                                    data: "a2",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:9:31,
+                                                        end: [ local path prefix ]/subdir/state.fppi:9:33,
+                                                    },
+                                                },
+                                            ],
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:9:22,
+                                                end: [ local path prefix ]/subdir/state.fppi:9:35,
+                                            },
+                                        },
+                                    ),
+                                    target: Unqualified {
+                                        name: Ident {
+                                            data: "S1",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:9:42,
+                                                end: [ local path prefix ]/subdir/state.fppi:9:44,
+                                            },
+                                        },
+                                        is_absolute: false,
+                                        node_id: Span {
+                                            start: [ local path prefix ]/subdir/state.fppi:9:42,
+                                            end: [ local path prefix ]/subdir/state.fppi:9:44,
+                                        },
+                                    },
+                                    node_id: Span {
+                                        start: [ local path prefix ]/subdir/state.fppi:9:22,
+                                        end: [ local path prefix ]/subdir/state.fppi:9:44,
+                                    },
+                                },
+                                else_transition: TransitionExpr {
+                                    actions: Some(
+                                        DoExpr {
+                                            actions: [
+                                                Ident {
+                                                    data: "a2",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:9:55,
+                                                        end: [ local path prefix ]/subdir/state.fppi:9:57,
+                                                    },
+                                                },
+                                                Ident {
+                                                    data: "a3",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:9:59,
+                                                        end: [ local path prefix ]/subdir/state.fppi:9:61,
+                                                    },
+                                                },
+                                            ],
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:9:50,
+                                                end: [ local path prefix ]/subdir/state.fppi:9:63,
+                                            },
+                                        },
+                                    ),
+                                    target: Qualified {
+                                        qualifier: Unqualified {
+                                            name: Ident {
+                                                data: "S2",
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/subdir/state.fppi:9:70,
+                                                    end: [ local path prefix ]/subdir/state.fppi:9:72,
+                                                },
+                                            },
+                                            is_absolute: false,
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:9:70,
+                                                end: [ local path prefix ]/subdir/state.fppi:9:72,
+                                            },
+                                        },
+                                        name: Ident {
+                                            data: "S3",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:9:73,
+                                                end: [ local path prefix ]/subdir/state.fppi:9:75,
+                                            },
+                                        },
+                                        node_id: Span {
+                                            start: [ local path prefix ]/subdir/state.fppi:9:70,
+                                            end: [ local path prefix ]/subdir/state.fppi:9:75,
+                                        },
+                                    },
+                                    node_id: Span {
+                                        start: [ local path prefix ]/subdir/state.fppi:9:50,
+                                        end: [ local path prefix ]/subdir/state.fppi:9:75,
+                                    },
+                                },
+                                node_id: Span {
+                                    start: [ local path prefix ]/subdir/state.fppi:9:5,
+                                    end: [ local path prefix ]/subdir/state.fppi:9:77,
+                                },
+                                pre_annotation: [
+                                    "Choice C",
+                                ],
+                            },
+                        ],
+                        node_id: Span {
+                            start: [ local path prefix ]/subdir/state.fppi:1:1,
+                            end: [ local path prefix ]/subdir/state.fppi:10:2,
+                        },
+                    },
+                    DefState {
+                        name: Name {
+                            data: "S2",
+                            node_id: Span {
+                                start: [ local path prefix ]/include-state-machine.fpp:9:9,
+                                end: [ local path prefix ]/include-state-machine.fpp:9:11,
+                            },
+                        },
+                        members: [
+                            DefState {
+                                name: Name {
+                                    data: "S1",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/subdir/state.fppi:1:7,
+                                        end: [ local path prefix ]/subdir/state.fppi:1:9,
+                                    },
+                                },
+                                members: [
+                                    SpecStateEntry {
+                                        actions: DoExpr {
+                                            actions: [
+                                                Ident {
+                                                    data: "a1",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:2:16,
+                                                        end: [ local path prefix ]/subdir/state.fppi:2:18,
+                                                    },
+                                                },
+                                                Ident {
+                                                    data: "a2",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:2:20,
+                                                        end: [ local path prefix ]/subdir/state.fppi:2:22,
+                                                    },
+                                                },
+                                            ],
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:2:11,
+                                                end: [ local path prefix ]/subdir/state.fppi:2:24,
+                                            },
+                                        },
+                                        node_id: Span {
+                                            start: [ local path prefix ]/subdir/state.fppi:2:5,
+                                            end: [ local path prefix ]/subdir/state.fppi:2:24,
+                                        },
+                                    },
+                                    SpecStateExit {
+                                        actions: DoExpr {
+                                            actions: [
+                                                Ident {
+                                                    data: "a1",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:3:15,
+                                                        end: [ local path prefix ]/subdir/state.fppi:3:17,
+                                                    },
+                                                },
+                                                Ident {
+                                                    data: "a2",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:3:19,
+                                                        end: [ local path prefix ]/subdir/state.fppi:3:21,
+                                                    },
+                                                },
+                                            ],
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:3:10,
+                                                end: [ local path prefix ]/subdir/state.fppi:3:23,
+                                            },
+                                        },
+                                        node_id: Span {
+                                            start: [ local path prefix ]/subdir/state.fppi:3:5,
+                                            end: [ local path prefix ]/subdir/state.fppi:3:23,
+                                        },
+                                    },
+                                    SpecInitialTransition {
+                                        transition: TransitionExpr {
+                                            actions: Some(
+                                                DoExpr {
+                                                    actions: [
+                                                        Ident {
+                                                            data: "a1",
+                                                            node_id: Span {
+                                                                start: [ local path prefix ]/subdir/state.fppi:6:18,
+                                                                end: [ local path prefix ]/subdir/state.fppi:6:20,
+                                                            },
+                                                        },
+                                                        Ident {
+                                                            data: "a2",
+                                                            node_id: Span {
+                                                                start: [ local path prefix ]/subdir/state.fppi:6:22,
+                                                                end: [ local path prefix ]/subdir/state.fppi:6:24,
+                                                            },
+                                                        },
+                                                    ],
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:6:13,
+                                                        end: [ local path prefix ]/subdir/state.fppi:6:26,
+                                                    },
+                                                },
+                                            ),
+                                            target: Unqualified {
+                                                name: Ident {
+                                                    data: "S3",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:6:33,
+                                                        end: [ local path prefix ]/subdir/state.fppi:6:35,
+                                                    },
+                                                },
+                                                is_absolute: false,
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/subdir/state.fppi:6:33,
+                                                    end: [ local path prefix ]/subdir/state.fppi:6:35,
+                                                },
+                                            },
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:6:13,
+                                                end: [ local path prefix ]/subdir/state.fppi:6:35,
+                                            },
+                                        },
+                                        node_id: Span {
+                                            start: [ local path prefix ]/subdir/state.fppi:6:5,
+                                            end: [ local path prefix ]/subdir/state.fppi:6:35,
+                                        },
+                                        pre_annotation: [
+                                            "Initial transition",
+                                        ],
+                                    },
+                                    DefChoice {
+                                        name: Name {
+                                            data: "C",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:9:12,
+                                                end: [ local path prefix ]/subdir/state.fppi:9:13,
+                                            },
+                                        },
+                                        guard: Ident {
+                                            data: "g1",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:9:19,
+                                                end: [ local path prefix ]/subdir/state.fppi:9:21,
+                                            },
+                                        },
+                                        if_transition: TransitionExpr {
+                                            actions: Some(
+                                                DoExpr {
+                                                    actions: [
+                                                        Ident {
+                                                            data: "a1",
+                                                            node_id: Span {
+                                                                start: [ local path prefix ]/subdir/state.fppi:9:27,
+                                                                end: [ local path prefix ]/subdir/state.fppi:9:29,
+                                                            },
+                                                        },
+                                                        Ident {
+                                                            data: "a2",
+                                                            node_id: Span {
+                                                                start: [ local path prefix ]/subdir/state.fppi:9:31,
+                                                                end: [ local path prefix ]/subdir/state.fppi:9:33,
+                                                            },
+                                                        },
+                                                    ],
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:9:22,
+                                                        end: [ local path prefix ]/subdir/state.fppi:9:35,
+                                                    },
+                                                },
+                                            ),
+                                            target: Unqualified {
+                                                name: Ident {
+                                                    data: "S1",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:9:42,
+                                                        end: [ local path prefix ]/subdir/state.fppi:9:44,
+                                                    },
+                                                },
+                                                is_absolute: false,
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/subdir/state.fppi:9:42,
+                                                    end: [ local path prefix ]/subdir/state.fppi:9:44,
+                                                },
+                                            },
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:9:22,
+                                                end: [ local path prefix ]/subdir/state.fppi:9:44,
+                                            },
+                                        },
+                                        else_transition: TransitionExpr {
+                                            actions: Some(
+                                                DoExpr {
+                                                    actions: [
+                                                        Ident {
+                                                            data: "a2",
+                                                            node_id: Span {
+                                                                start: [ local path prefix ]/subdir/state.fppi:9:55,
+                                                                end: [ local path prefix ]/subdir/state.fppi:9:57,
+                                                            },
+                                                        },
+                                                        Ident {
+                                                            data: "a3",
+                                                            node_id: Span {
+                                                                start: [ local path prefix ]/subdir/state.fppi:9:59,
+                                                                end: [ local path prefix ]/subdir/state.fppi:9:61,
+                                                            },
+                                                        },
+                                                    ],
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:9:50,
+                                                        end: [ local path prefix ]/subdir/state.fppi:9:63,
+                                                    },
+                                                },
+                                            ),
+                                            target: Qualified {
+                                                qualifier: Unqualified {
+                                                    name: Ident {
+                                                        data: "S2",
+                                                        node_id: Span {
+                                                            start: [ local path prefix ]/subdir/state.fppi:9:70,
+                                                            end: [ local path prefix ]/subdir/state.fppi:9:72,
+                                                        },
+                                                    },
+                                                    is_absolute: false,
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:9:70,
+                                                        end: [ local path prefix ]/subdir/state.fppi:9:72,
+                                                    },
+                                                },
+                                                name: Ident {
+                                                    data: "S3",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/subdir/state.fppi:9:73,
+                                                        end: [ local path prefix ]/subdir/state.fppi:9:75,
+                                                    },
+                                                },
+                                                node_id: Span {
+                                                    start: [ local path prefix ]/subdir/state.fppi:9:70,
+                                                    end: [ local path prefix ]/subdir/state.fppi:9:75,
+                                                },
+                                            },
+                                            node_id: Span {
+                                                start: [ local path prefix ]/subdir/state.fppi:9:50,
+                                                end: [ local path prefix ]/subdir/state.fppi:9:75,
+                                            },
+                                        },
+                                        node_id: Span {
+                                            start: [ local path prefix ]/subdir/state.fppi:9:5,
+                                            end: [ local path prefix ]/subdir/state.fppi:9:77,
+                                        },
+                                        pre_annotation: [
+                                            "Choice C",
+                                        ],
+                                    },
+                                ],
+                                node_id: Span {
+                                    start: [ local path prefix ]/subdir/state.fppi:1:1,
+                                    end: [ local path prefix ]/subdir/state.fppi:10:2,
+                                },
+                            },
+                        ],
+                        node_id: Span {
+                            start: [ local path prefix ]/include-state-machine.fpp:9:3,
+                            end: [ local path prefix ]/include-state-machine.fpp:11:4,
+                        },
+                    },
+                ],
+            ),
+            node_id: Span {
+                start: [ local path prefix ]/include-state-machine.fpp:1:1,
+                end: [ local path prefix ]/include-state-machine.fpp:12:2,
+            },
+        },
+    ],
+)

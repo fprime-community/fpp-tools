@@ -6,7 +6,7 @@ use fpp_analysis::semantics::{
     SymbolInterface, Type,
 };
 use fpp_ast::{
-    AstNode, FormalParam, FormalParamKind, MoveWalkable, Name, Node, TemplateParam,
+    AstNode, Expr, ExprKind, FormalParam, FormalParamKind, MoveWalkable, Name, Node, TemplateParam,
     TemplateParamInterface, Visitor,
 };
 use fpp_core::{BytePos, CompilerContext, LineCol, SourceFile};
@@ -55,6 +55,14 @@ impl<'ast> Visitor<'ast> for FindPositionVisitor<'ast> {
 
                 a.push(node);
                 out
+            } else if let Node::Expr(Expr {
+                kind: ExprKind::Binop { .. },
+                ..
+            }) = node
+            {
+                // A binary expression is located at its operator, so its left
+                // operand lies before its span
+                node.walk(a, self)
             } else {
                 // This node does not span the range
                 // We don't need to walk it since it's children won't span it either
@@ -947,7 +955,8 @@ pub(crate) fn port_instance_at_position<'a>(
     // compiler context is set on this thread).
     let interface_instance = state
         .analysis
-        .get_interface_instance(pii.interface_instance.id())?;
+        .get_interface_instance(pii.interface_instance.id())
+        .ok()??;
     let port_instance = interface_instance
         .lookup_port_instance(&state.analysis, &pii.port_name)
         .ok()?;
@@ -966,7 +975,7 @@ pub(crate) fn port_instance_at_position<'a>(
 /// signature + annotation format used by the port completion items.
 pub fn hover_for_port_instance(state: &GlobalState, hover_node: Node, pi: &PortInstance) -> Hover {
     let direction = Direction::show(&pi.get_direction());
-    let port_ty = PortInstanceType::show(&pi.get_type());
+    let port_ty = PortInstanceType::show(&state.analysis, &pi.get_type());
     let signature = port_signature(state, pi).unwrap_or_default();
 
     let node_data = state.context.node_get(&pi.get_node_id());
@@ -1425,7 +1434,7 @@ fn completion_items_for_ports(
         })
         .map(|pi| {
             let direction = Direction::show(&pi.get_direction());
-            let port_ty = PortInstanceType::show(&pi.get_type());
+            let port_ty = PortInstanceType::show(&state.analysis, &pi.get_type());
             let signature = port_signature(state, pi);
 
             // The annotation on the port instance definition, if any.

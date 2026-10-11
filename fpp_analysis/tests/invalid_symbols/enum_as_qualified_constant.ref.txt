@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/invalid_symbols/enum_as_qualified_constant.fpp:2:14
+  |
+2 | constant c = M.E
+  |              ^^^ invalid use of symbol E: not a constant symbol
+  |
+ ::: [ local path prefix ]/invalid_symbols/enum_as_qualified_constant.fpp:1:12
+  |
+1 | module M { enum E { A } }
+  |            ------------ symbol is defined here
+

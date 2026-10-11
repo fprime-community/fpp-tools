@@ -1,0 +1,18 @@
+ --> [ local path prefix ]/tlm_packets/not_deployment_after_instance_error.fpp:7:3
+  |
+7 |   instance c
+  |   ^^^^^^^^^^ duplicate instance c
+  |
+ ::: [ local path prefix ]/tlm_packets/not_deployment_after_instance_error.fpp:6:3
+  |
+6 |   instance c
+  |   ---------- previous instance is here
+
+ --> [ local path prefix ]/tlm_packets/not_deployment_after_instance_error.fpp:4:3
+  |
+4 | /   telemetry packets P {
+5 | |   }
+  | |___^ invalid telemetry packet set P
+  |
+  = note: only a deployment topology may specify a telemetry packet set
+

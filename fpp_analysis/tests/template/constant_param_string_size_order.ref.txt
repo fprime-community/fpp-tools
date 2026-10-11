@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/template/constant_param_string_size_order.fpp:5:43
+  |
+5 | module template M(constant s: string size -1) {
+  |                                           ^^ invalid string size -1
+

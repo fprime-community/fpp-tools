@@ -210,8 +210,15 @@ TransUnit(
                                 type_name: Some(
                                     TypeName {
                                         kind: QualIdent(
-                                            Ident {
-                                                data: "E",
+                                            Unqualified {
+                                                name: Ident {
+                                                    data: "E",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/state-machine-defs.fpp:10:17,
+                                                        end: [ local path prefix ]/state-machine-defs.fpp:10:18,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/state-machine-defs.fpp:10:17,
                                                     end: [ local path prefix ]/state-machine-defs.fpp:10:18,
@@ -240,8 +247,15 @@ TransUnit(
                                 type_name: Some(
                                     TypeName {
                                         kind: QualIdent(
-                                            Ident {
-                                                data: "Arr",
+                                            Unqualified {
+                                                name: Ident {
+                                                    data: "Arr",
+                                                    node_id: Span {
+                                                        start: [ local path prefix ]/state-machine-defs.fpp:11:17,
+                                                        end: [ local path prefix ]/state-machine-defs.fpp:11:20,
+                                                    },
+                                                },
+                                                is_absolute: false,
                                                 node_id: Span {
                                                     start: [ local path prefix ]/state-machine-defs.fpp:11:17,
                                                     end: [ local path prefix ]/state-machine-defs.fpp:11:20,
@@ -276,8 +290,15 @@ TransUnit(
                             SpecInitialTransition {
                                 transition: TransitionExpr {
                                     actions: None,
-                                    target: Ident {
-                                        data: "Idle",
+                                    target: Unqualified {
+                                        name: Ident {
+                                            data: "Idle",
+                                            node_id: Span {
+                                                start: [ local path prefix ]/state-machine-defs.fpp:14:19,
+                                                end: [ local path prefix ]/state-machine-defs.fpp:14:23,
+                                            },
+                                        },
+                                        is_absolute: false,
                                         node_id: Span {
                                             start: [ local path prefix ]/state-machine-defs.fpp:14:19,
                                             end: [ local path prefix ]/state-machine-defs.fpp:14:23,
@@ -314,8 +335,15 @@ TransUnit(
                                         transition_or_do: Transition(
                                             TransitionExpr {
                                                 actions: None,
-                                                target: Ident {
-                                                    data: "Run",
+                                                target: Unqualified {
+                                                    name: Ident {
+                                                        data: "Run",
+                                                        node_id: Span {
+                                                            start: [ local path prefix ]/state-machine-defs.fpp:17:20,
+                                                            end: [ local path prefix ]/state-machine-defs.fpp:17:23,
+                                                        },
+                                                    },
+                                                    is_absolute: false,
                                                     node_id: Span {
                                                         start: [ local path prefix ]/state-machine-defs.fpp:17:20,
                                                         end: [ local path prefix ]/state-machine-defs.fpp:17:23,

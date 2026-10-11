@@ -46,12 +46,17 @@ pub enum StrStep<'a> {
 }
 
 impl LexedStr<'_> {
-    /// Eat newlines comments and whitespace given a starting token index
-    /// Return the token index of the next non-whitespace token
+    /// Eat newlines, comments and whitespace given a starting token index.
+    /// Return the token index of the next other token.
+    ///
+    /// This mirrors the Scala lexer's `eatNewlines`, which stops at an
+    /// annotation and at a line continuation.
     fn eat_newlines(&self, i: usize) -> usize {
         for ii in i..self.len() {
             match self.kind(ii) {
-                EOL | COMMENT | WHITESPACE | PRE_ANNOTATION | POST_ANNOTATION => (),
+                // A line continuation is lexed as whitespace
+                WHITESPACE if self.text(ii).starts_with('\\') => return ii,
+                EOL | COMMENT | WHITESPACE => (),
                 _ => return ii,
             }
         }
@@ -59,35 +64,38 @@ impl LexedStr<'_> {
         self.len()
     }
 
-    /// Like eat_newlines but stops at annotations instead of consuming them
-    fn eat_newlines_without_annotations(&self, i: usize) -> usize {
-        for ii in i..self.len() {
-            match self.kind(ii) {
-                EOL | COMMENT | WHITESPACE => (),
-                _ => return ii, // Stop at annotations or any other token
-            }
-        }
-
-        self.len()
-    }
-
-    /// Compute the number of trivias at a point 'i'.
-    /// Some trivias may be reduced into a 'psuedo' token, return the psuedo token
-    /// as the second option in the tuple.
+    /// Compute the trivia region at a point 'i': how the raw tokens starting
+    /// there map to parser tokens.
+    ///
+    /// The rules are those of the Scala lexer:
+    ///   * A newline or a comment, with the newlines, comments and whitespace
+    ///     after it up to a line continuation, is one end-of-line token, which
+    ///     is dropped before `)`, `]` or `}`.
+    ///   * An annotation and the symbols `*`, `/`, `-`, `->`, `+`, `=`, `;`,
+    ///     `:`, `,`, `(`, `{` and `[` absorb the newlines after them, up to a
+    ///     line continuation.
+    ///   * Whitespace and characters that cannot begin a token are skipped.
     fn as_trivia(&self, i: usize) -> TriviaRegion {
         assert!(i < self.len(), "{} < {}", i, self.len());
 
         let mut skip = 0;
         while skip + i < self.len() {
             match self.kind(i + skip) {
-                WHITESPACE => {
+                // A character that cannot begin a token is reported by the
+                // lexer and skipped like whitespace.
+                WHITESPACE | UNKNOWN => {
                     skip += 1;
                 }
-                EOL | COMMENT | PRE_ANNOTATION | POST_ANNOTATION => {
+                EOL | COMMENT => {
                     let after = self.eat_newlines(i + skip + 1);
-                    return match self.kind(i) {
+                    let next = if after < self.len() {
+                        self.kind(after)
+                    } else {
+                        EOF
+                    };
+                    return match next {
                         RIGHT_PAREN | RIGHT_CURLY | RIGHT_SQUARE => {
-                            // Whitespace behind these closing tokens are dropped
+                            // Newlines before these closing tokens are dropped
                             TriviaRegion::Remove(after - i)
                         }
                         _ => {
@@ -98,21 +106,15 @@ impl LexedStr<'_> {
                 }
 
                 // Tokens that eat newlines after them.
-                STAR | SLASH | MINUS | PLUS | EQUALS | SEMI | COMMA | COLON | LEFT_PAREN
-                | LEFT_CURLY | LEFT_SQUARE => {
+                k @ (PRE_ANNOTATION | POST_ANNOTATION | STAR | SLASH | MINUS | RIGHT_ARROW
+                | PLUS | EQUALS | SEMI | COMMA | COLON | LEFT_PAREN | LEFT_CURLY
+                | LEFT_SQUARE) => {
                     if skip > 0 {
                         return TriviaRegion::Remove(skip);
                     }
 
                     let after = self.eat_newlines(i + 1);
-                    // For LEFT_CURLY, don't include annotations in RemoveAfter
-                    // They should be attached to the definitions inside, not to the brace
-                    let after = if self.kind(i) == LEFT_CURLY {
-                        self.eat_newlines_without_annotations(i + 1)
-                    } else {
-                        after
-                    };
-                    return TriviaRegion::RemoveAfter(after - i - 1, self.kind(i));
+                    return TriviaRegion::RemoveAfter(after - i - 1, k);
                 }
 
                 k if skip == 0 => return TriviaRegion::Keep(k),
@@ -174,10 +176,14 @@ impl LexedStr<'_> {
                 Step::Enter { kind } => builder.enter(kind),
                 Step::Exit => builder.exit(),
                 Step::Error { msg } => {
+                    // An error is reported at the next token
+                    builder.flush_pending_exit();
+                    builder.eat_whitespace_outer();
                     let text_pos = builder.lexed.text_start(builder.pos);
                     (builder.sink)(StrStep::Error { msg, pos: text_pos });
                 }
                 Step::Expected { kind } => {
+                    builder.flush_pending_exit();
                     let start = builder.lexed.text_start(builder.pos);
                     builder.eat_whitespace_outer();
                     let end = builder.lexed.text_start(builder.pos);
@@ -269,11 +275,15 @@ impl Builder<'_, '_> {
 
         self.eat_whitespace_outer();
         (self.sink)(StrStep::Enter { kind });
+    }
 
-        // Don't emit annotations when entering member list nodes
-        // They should be attached to the individual member definitions instead
-        let emit_annotations = !Self::is_member_list(kind);
-        self.eat_whitespace_inner(emit_annotations);
+    /// Finish a node whose exit is pending, so that what follows lies
+    /// outside it.
+    fn flush_pending_exit(&mut self) {
+        if let State::PendingExit = self.state {
+            self.state = State::Normal;
+            (self.sink)(StrStep::Exit);
+        }
     }
 
     fn exit(&mut self) {
@@ -306,55 +316,13 @@ impl Builder<'_, '_> {
             for _ in 0..n {
                 let kind = self.lexed.kind(self.pos);
                 match kind {
-                    WHITESPACE | COMMENT => {
+                    WHITESPACE | COMMENT | UNKNOWN => {
                         self.do_token(kind, 1);
                     }
                     _ => break,
                 }
             }
         }
-    }
-
-    fn eat_whitespace_inner(&mut self, emit_annotations: bool) {
-        if self.pos >= self.lexed.len() {
-            return;
-        }
-
-        if let TriviaRegion::Remove(n) = self.lexed.as_trivia(self.pos) {
-            for _ in 0..n {
-                let kind = self.lexed.kind(self.pos);
-                match kind {
-                    WHITESPACE => {
-                        self.do_token(kind, 1);
-                    }
-                    PRE_ANNOTATION | POST_ANNOTATION => {
-                        if emit_annotations {
-                            self.do_token(kind, 1);
-                        } else {
-                            // Don't emit, will be attached to next definition
-                            break;
-                        }
-                    }
-                    _ => break,
-                }
-            }
-        }
-    }
-
-    fn is_member_list(kind: SyntaxKind) -> bool {
-        matches!(
-            kind,
-            MODULE_MEMBER_LIST
-                | COMPONENT_MEMBER_LIST
-                | INTERFACE_MEMBER_LIST
-                | STRUCT_MEMBER_LIST
-                | ENUM_MEMBER_LIST
-                | STATE_MACHINE_MEMBER_LIST
-                | STATE_MEMBER_LIST
-                | TOPOLOGY_MEMBER_LIST
-                | TLM_PACKET_SET_MEMBER_LIST
-                | TLM_PACKET_MEMBER_LIST
-        )
     }
 
     fn do_token(&mut self, kind: SyntaxKind, n_tokens: usize) {

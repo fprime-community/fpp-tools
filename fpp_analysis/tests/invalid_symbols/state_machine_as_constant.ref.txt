@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/invalid_symbols/state_machine_as_constant.fpp:4:14
+  |
+4 |   constant c = M.S
+  |                ^^^ invalid use of symbol S: not a constant symbol
+  |
+ ::: [ local path prefix ]/invalid_symbols/state_machine_as_constant.fpp:2:12
+  |
+2 |   module M { state machine S { initial enter A
+  |  ____________-
+3 | |   state A } }
+  | |___________- symbol is defined here
+

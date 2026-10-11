@@ -1,10 +1,10 @@
  --> [ local path prefix ]/invalid_symbols/module_hides_constant.fpp:6:16
   |
 6 |   constant b = a
-  |                ^ not a constant symbol
+  |                ^ invalid use of symbol a: not a constant symbol
   |
- ::: [ local path prefix ]/invalid_symbols/module_hides_constant.fpp:7:10
+ ::: [ local path prefix ]/invalid_symbols/module_hides_constant.fpp:7:3
   |
 7 |   module a { }
-  |          - a defined here
+  |   ------------ symbol is defined here
 

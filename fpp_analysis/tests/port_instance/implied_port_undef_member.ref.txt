@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/port_instance/implied_port_undef_member.fpp:2:23
+  |
+2 | passive component C { time get port timeGetOut }
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^ cannot find port `Time` in scope
+  |
+  = note: the symbol Fw.Time has an implied use at the point of the error
+
+ --> [ local path prefix ]/port_instance/implied_port_undef_member.fpp:2:23
+  |
+2 | passive component C { time get port timeGetOut }
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^ not a port symbol
+

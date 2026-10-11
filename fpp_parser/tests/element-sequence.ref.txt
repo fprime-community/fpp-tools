@@ -1,0 +1,274 @@
+TransUnit(
+    [
+        DefConstant {
+            name: Name {
+                data: "a",
+                node_id: Span {
+                    start: [ local path prefix ]/element-sequence.fpp:3:10,
+                    end: [ local path prefix ]/element-sequence.fpp:3:11,
+                },
+            },
+            value: Expr {
+                kind: Array(
+                    [],
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/element-sequence.fpp:3:14,
+                    end: [ local path prefix ]/element-sequence.fpp:3:17,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/element-sequence.fpp:3:1,
+                end: [ local path prefix ]/element-sequence.fpp:3:17,
+            },
+        },
+        DefConstant {
+            name: Name {
+                data: "b",
+                node_id: Span {
+                    start: [ local path prefix ]/element-sequence.fpp:4:10,
+                    end: [ local path prefix ]/element-sequence.fpp:4:11,
+                },
+            },
+            value: Expr {
+                kind: Struct(
+                    [],
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/element-sequence.fpp:4:14,
+                    end: [ local path prefix ]/element-sequence.fpp:4:17,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/element-sequence.fpp:4:1,
+                end: [ local path prefix ]/element-sequence.fpp:4:17,
+            },
+        },
+        SpecTemplateExpand {
+            template: Unqualified {
+                name: Ident {
+                    data: "T",
+                    node_id: Span {
+                        start: [ local path prefix ]/element-sequence.fpp:5:8,
+                        end: [ local path prefix ]/element-sequence.fpp:5:9,
+                    },
+                },
+                is_absolute: false,
+                node_id: Span {
+                    start: [ local path prefix ]/element-sequence.fpp:5:8,
+                    end: [ local path prefix ]/element-sequence.fpp:5:9,
+                },
+            },
+            args: [],
+            members: None,
+            node_id: Span {
+                start: [ local path prefix ]/element-sequence.fpp:5:1,
+                end: [ local path prefix ]/element-sequence.fpp:5:12,
+            },
+        },
+        DefStateMachine {
+            name: Name {
+                data: "S",
+                node_id: Span {
+                    start: [ local path prefix ]/element-sequence.fpp:6:15,
+                    end: [ local path prefix ]/element-sequence.fpp:6:16,
+                },
+            },
+            members: Some(
+                [
+                    SpecInitialTransition {
+                        transition: TransitionExpr {
+                            actions: Some(
+                                DoExpr {
+                                    actions: [],
+                                    node_id: Span {
+                                        start: [ local path prefix ]/element-sequence.fpp:7:11,
+                                        end: [ local path prefix ]/element-sequence.fpp:7:19,
+                                    },
+                                },
+                            ),
+                            target: Unqualified {
+                                name: Ident {
+                                    data: "A",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/element-sequence.fpp:7:26,
+                                        end: [ local path prefix ]/element-sequence.fpp:7:27,
+                                    },
+                                },
+                                is_absolute: false,
+                                node_id: Span {
+                                    start: [ local path prefix ]/element-sequence.fpp:7:26,
+                                    end: [ local path prefix ]/element-sequence.fpp:7:27,
+                                },
+                            },
+                            node_id: Span {
+                                start: [ local path prefix ]/element-sequence.fpp:7:11,
+                                end: [ local path prefix ]/element-sequence.fpp:7:27,
+                            },
+                        },
+                        node_id: Span {
+                            start: [ local path prefix ]/element-sequence.fpp:7:3,
+                            end: [ local path prefix ]/element-sequence.fpp:7:27,
+                        },
+                    },
+                    DefState {
+                        name: Name {
+                            data: "A",
+                            node_id: Span {
+                                start: [ local path prefix ]/element-sequence.fpp:8:9,
+                                end: [ local path prefix ]/element-sequence.fpp:8:10,
+                            },
+                        },
+                        members: [],
+                        node_id: Span {
+                            start: [ local path prefix ]/element-sequence.fpp:8:3,
+                            end: [ local path prefix ]/element-sequence.fpp:8:10,
+                        },
+                    },
+                ],
+            ),
+            node_id: Span {
+                start: [ local path prefix ]/element-sequence.fpp:6:1,
+                end: [ local path prefix ]/element-sequence.fpp:9:2,
+            },
+        },
+        DefTopology {
+            is_deployment: false,
+            name: Name {
+                data: "T",
+                node_id: Span {
+                    start: [ local path prefix ]/element-sequence.fpp:10:10,
+                    end: [ local path prefix ]/element-sequence.fpp:10:11,
+                },
+            },
+            members: [
+                SpecDirectConnectionGraph {
+                    name: Name {
+                        data: "C",
+                        node_id: Span {
+                            start: [ local path prefix ]/element-sequence.fpp:11:15,
+                            end: [ local path prefix ]/element-sequence.fpp:11:16,
+                        },
+                    },
+                    connections: [],
+                    node_id: Span {
+                        start: [ local path prefix ]/element-sequence.fpp:11:3,
+                        end: [ local path prefix ]/element-sequence.fpp:11:22,
+                    },
+                },
+                SpecPatternConnectionGraph {
+                    kind: Command,
+                    source: Unqualified {
+                        name: Ident {
+                            data: "a",
+                            node_id: Span {
+                                start: [ local path prefix ]/element-sequence.fpp:12:32,
+                                end: [ local path prefix ]/element-sequence.fpp:12:33,
+                            },
+                        },
+                        is_absolute: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/element-sequence.fpp:12:32,
+                            end: [ local path prefix ]/element-sequence.fpp:12:33,
+                        },
+                    },
+                    targets: [],
+                    node_id: Span {
+                        start: [ local path prefix ]/element-sequence.fpp:12:3,
+                        end: [ local path prefix ]/element-sequence.fpp:12:39,
+                    },
+                },
+                SpecTlmPacketSet {
+                    name: Name {
+                        data: "P",
+                        node_id: Span {
+                            start: [ local path prefix ]/element-sequence.fpp:13:21,
+                            end: [ local path prefix ]/element-sequence.fpp:13:22,
+                        },
+                    },
+                    members: [
+                        SpecTlmPacket {
+                            name: Name {
+                                data: "A",
+                                node_id: Span {
+                                    start: [ local path prefix ]/element-sequence.fpp:14:12,
+                                    end: [ local path prefix ]/element-sequence.fpp:14:13,
+                                },
+                            },
+                            id: None,
+                            group: Expr {
+                                kind: LiteralInt(
+                                    "0",
+                                ),
+                                node_id: Span {
+                                    start: [ local path prefix ]/element-sequence.fpp:14:20,
+                                    end: [ local path prefix ]/element-sequence.fpp:14:21,
+                                },
+                            },
+                            members: [],
+                            node_id: Span {
+                                start: [ local path prefix ]/element-sequence.fpp:14:5,
+                                end: [ local path prefix ]/element-sequence.fpp:14:27,
+                            },
+                        },
+                    ],
+                    omitted: [],
+                    node_id: Span {
+                        start: [ local path prefix ]/element-sequence.fpp:13:3,
+                        end: [ local path prefix ]/element-sequence.fpp:15:15,
+                    },
+                },
+            ],
+            implements: [],
+            node_id: Span {
+                start: [ local path prefix ]/element-sequence.fpp:10:1,
+                end: [ local path prefix ]/element-sequence.fpp:16:2,
+            },
+        },
+        DefComponent {
+            kind: Passive,
+            name: Name {
+                data: "C",
+                node_id: Span {
+                    start: [ local path prefix ]/element-sequence.fpp:17:19,
+                    end: [ local path prefix ]/element-sequence.fpp:17:20,
+                },
+            },
+            members: [
+                SpecTlmChannel {
+                    name: Name {
+                        data: "T",
+                        node_id: Span {
+                            start: [ local path prefix ]/element-sequence.fpp:18:13,
+                            end: [ local path prefix ]/element-sequence.fpp:18:14,
+                        },
+                    },
+                    type_name: TypeName {
+                        kind: Integer(
+                            U32,
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/element-sequence.fpp:18:16,
+                            end: [ local path prefix ]/element-sequence.fpp:18:19,
+                        },
+                    },
+                    id: None,
+                    update: None,
+                    format: None,
+                    low: [],
+                    high: [],
+                    node_id: Span {
+                        start: [ local path prefix ]/element-sequence.fpp:18:3,
+                        end: [ local path prefix ]/element-sequence.fpp:18:29,
+                    },
+                },
+            ],
+            node_id: Span {
+                start: [ local path prefix ]/element-sequence.fpp:17:1,
+                end: [ local path prefix ]/element-sequence.fpp:19:2,
+            },
+        },
+    ],
+)

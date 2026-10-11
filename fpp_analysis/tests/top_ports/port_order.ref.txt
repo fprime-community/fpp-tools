@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/top_ports/port_order.fpp:10:12
+   |
+10 |   port d = c2.pOut
+   |            ^^^^^^^ instance c2 is not a member of topology T
+

@@ -1,10 +1,13 @@
 use crate::Analysis;
 use crate::errors::SemanticResult;
-use crate::semantics::{Dictionary, TlmChannelIdentifier, Topology};
+use crate::semantics::{Dictionary, TlmChannelId, TlmChannelIdentifier, Topology};
 use fpp_ast::{SpecTlmPacket, TlmPacketMember};
 use fpp_core::{Span, Spanned};
 use rustc_hash::FxHashMap as HashMap;
 use std::sync::Arc;
+
+/// A telemetry packet ID
+pub type TlmPacketId = i128;
 
 /// An FPP telemetry packet
 #[derive(Debug, Clone)]
@@ -14,11 +17,11 @@ pub struct TlmPacket {
     /// The packet group
     pub group: i32,
     /// The identifiers for the member channels
-    pub member_id_list: Vec<i128>,
+    pub member_id_list: Vec<TlmChannelId>,
     /// The map from each member ID to a location where a member with that ID is
     /// specified. If more than one member has this ID, the map contains the
     /// last location.
-    pub member_location_map: HashMap<i128, Span>,
+    pub member_location_map: HashMap<TlmChannelId, Span>,
 }
 
 impl TlmPacket {

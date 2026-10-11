@@ -1,8 +1,8 @@
  --> [ local path prefix ]/template/nested_scope_resolution.fpp:7:18
   |
 7 |       array A = [n] U32
-  |                  ^ array size must be greater than zero
+  |                  ^ invalid array size 0
   |
   = note: expanded at [ local path prefix ]/template/nested_scope_resolution.fpp:16:3
-  = note: expression evaluated to `0`
+  = note: size must be greater than zero
 

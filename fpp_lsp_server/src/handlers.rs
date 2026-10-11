@@ -231,6 +231,8 @@ pub fn handle_dump_syntax_tree(state: &mut GlobalState, param: UriRequest) -> Re
         fpp_parser::IncludeParentKind::TlmPacket => fpp_lsp_parser::TopEntryPoint::TlmPacket,
         fpp_parser::IncludeParentKind::TlmPacketSet => fpp_lsp_parser::TopEntryPoint::TlmPacketSet,
         fpp_parser::IncludeParentKind::Topology => fpp_lsp_parser::TopEntryPoint::Topology,
+        fpp_parser::IncludeParentKind::StateMachine => fpp_lsp_parser::TopEntryPoint::StateMachine,
+        fpp_parser::IncludeParentKind::State => fpp_lsp_parser::TopEntryPoint::State,
     };
 
     eprintln!(
@@ -263,6 +265,8 @@ fn parse_text_document(
         fpp_parser::IncludeParentKind::TlmPacket => fpp_lsp_parser::TopEntryPoint::TlmPacket,
         fpp_parser::IncludeParentKind::TlmPacketSet => fpp_lsp_parser::TopEntryPoint::TlmPacketSet,
         fpp_parser::IncludeParentKind::Topology => fpp_lsp_parser::TopEntryPoint::Topology,
+        fpp_parser::IncludeParentKind::StateMachine => fpp_lsp_parser::TopEntryPoint::StateMachine,
+        fpp_parser::IncludeParentKind::State => fpp_lsp_parser::TopEntryPoint::State,
     };
 
     let parse = fpp_lsp_parser::parse(&text, entry_kind);
@@ -694,21 +698,31 @@ pub fn handle_references(
         };
 
         if let Some(symbol) = symbol {
-            // Look for all use-def resolutions that map to this symbol
-            Ok(Some(
-                state
-                    .analysis
-                    .use_def_map
-                    .iter()
-                    .filter_map(|(node, i_symbol)| {
-                        if symbol.node() == i_symbol.node() {
-                            Some(node_to_location(state, *node))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect(),
-            ))
+            // Look for all use-def resolutions that map to this symbol. One use
+            // can be recorded under several nodes with the same span (a type
+            // name, its qualified identifier and the identifier's name), so the
+            // locations are sorted and each is reported once.
+            let mut locations: Vec<Location> = state
+                .analysis
+                .use_def_map
+                .iter()
+                .filter_map(|(node, i_symbol)| {
+                    if symbol.node() == i_symbol.node() {
+                        Some(node_to_location(state, *node))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            locations.sort_by(|l1, l2| {
+                (l1.uri.as_str(), l1.range.start, l1.range.end).cmp(&(
+                    l2.uri.as_str(),
+                    l2.range.start,
+                    l2.range.end,
+                ))
+            });
+            locations.dedup();
+            Ok(Some(locations))
         } else {
             Ok(None)
         }
@@ -820,6 +834,21 @@ fn state_machine_completion_kind(
     None
 }
 
+/// Whether the cursor starts a name of the implements clause of a topology: the
+/// token to its left is the `implements` keyword or a comma between the port
+/// interface names of the clause.
+///
+/// The list of names may be empty, so a missing name there is no syntax error
+/// and the error-driven completion does not reach it.
+fn starts_implements_clause_name(left_token: &SyntaxToken) -> bool {
+    matches!(
+        left_token.kind(),
+        SyntaxKind::IMPLEMENTS_KW | SyntaxKind::COMMA
+    ) && left_token
+        .parent()
+        .is_some_and(|p| p.kind() == SyntaxKind::IMPLEMENTS_CLAUSE)
+}
+
 pub fn handle_completion(
     state: &GlobalState,
     request: CompletionParams,
@@ -859,6 +888,8 @@ pub fn handle_completion(
         fpp_parser::IncludeParentKind::TlmPacket => fpp_lsp_parser::TopEntryPoint::TlmPacket,
         fpp_parser::IncludeParentKind::TlmPacketSet => fpp_lsp_parser::TopEntryPoint::TlmPacketSet,
         fpp_parser::IncludeParentKind::Topology => fpp_lsp_parser::TopEntryPoint::Topology,
+        fpp_parser::IncludeParentKind::StateMachine => fpp_lsp_parser::TopEntryPoint::StateMachine,
+        fpp_parser::IncludeParentKind::State => fpp_lsp_parser::TopEntryPoint::State,
     };
 
     let parse = fpp_lsp_parser::parse(&text, entry_kind);
@@ -1139,6 +1170,19 @@ pub fn handle_completion(
         Ok(
             completion_items_for_sm(state, &uri, cursor_pos.into(), sm_kind)
                 .map(CompletionResponse::Array),
+        )
+    } else if starts_implements_clause_name(&left_token) {
+        // A port interface name of a topology's implements clause. An
+        // implements clause is never inside a template parameter list.
+        Ok(
+            completion_items_in_name_group(
+                state,
+                cursor_pos,
+                NameGroup::PortInterface,
+                &uri,
+                false,
+            )
+            .map(CompletionResponse::Array),
         )
     } else {
         // Check for parsing errors to extract the next expected token

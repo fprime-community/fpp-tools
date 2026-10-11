@@ -16,4 +16,8 @@ fpp_lsp_parser = { path = "../fpp_lsp_parser", version = "=0.0.0" }
 clap = { version = "4.5.60", features = ["derive"] }
 
 [dev-dependencies]
+fpp_core = { path = "../fpp_core" }
+fpp_errors = { path = "../fpp_errors" }
+fpp_parser = { path = "../fpp_parser" }
 pretty_assertions = "1.4"
+serde_json = "1.0.145"

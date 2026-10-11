@@ -1,5 +1,15 @@
+type FwSizeStoreType = U16
+constant FW_FIXED_LENGTH_STRING_SIZE = 256
+
 @ State machine M
 state machine M {
+
+  array A = [3] U32
+  constant c = 0
+  enum E { X, Y, Z } default X
+  struct S { x: [3] U32, y: F32, z: string }
+  type T
+  type X = U32
 
   @ Action a1
   action a1
@@ -41,7 +51,7 @@ state machine M {
   initial do { a1 } enter C
 
   @ Choice C
-  choice C { if g1 enter S1 else enter S2 }
+  choice C { if g1 enter S1 else enter .S2 }
 
   @ State S1
   state S1
@@ -56,7 +66,7 @@ state machine M {
     initial do { a1, a2 } enter S3
 
     @ Choice C
-    choice C { if g1 do { a1, a2 } enter S1 else do { a2, a3 } enter S2.S3 }
+    choice C { if g1 do { a1, a2 } enter S1 else do { a2, a3 } enter .S2.S3 }
 
     @ State S3
     state S3

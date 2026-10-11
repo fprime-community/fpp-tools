@@ -1,15 +1,20 @@
- --> [ local path prefix ]/state_machine/initial_transitions/state_multiple_transitions.fpp:3:9
+ --> [ local path prefix ]/state_machine/initial_transitions/state_multiple_transitions.fpp:3:3
   |
-3 |   state S {
-  |         ^ state with substates has 2 initial transitions; only one is allowed
+3 | /   state S {
+4 | |     initial enter T
+5 | |     initial enter U
+6 | |     state T
+7 | |     state U
+8 | |   }
+  | |___^ state with substates has 2 initial transitions; only one is allowed
   |
  ::: [ local path prefix ]/state_machine/initial_transitions/state_multiple_transitions.fpp:4:5
   |
-4 |     initial enter T
-  |     --------------- initial transition defined here
+4 |       initial enter T
+  |       --------------- initial transition defined here
   |
  ::: [ local path prefix ]/state_machine/initial_transitions/state_multiple_transitions.fpp:5:5
   |
-5 |     initial enter U
-  |     --------------- initial transition defined here
+5 |       initial enter U
+  |       --------------- initial transition defined here
 

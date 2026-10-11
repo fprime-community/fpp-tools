@@ -1,5 +1,5 @@
- --> [ local path prefix ]/expr/add_error.fpp:1:14
+ --> [ local path prefix ]/expr/add_error.fpp:1:16
   |
 1 | constant a = 1 + "abc"
-  |              ^^^^^^^^^ invalid binary operation between Integer and string
+  |                ^^^^^^^ cannot compute common type of Integer and string
 

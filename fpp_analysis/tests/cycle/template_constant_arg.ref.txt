@@ -1,0 +1,22 @@
+ --> [ local path prefix ]/cycle/template_constant_arg.fpp:1:1
+  |
+1 | constant y = cOut
+  | ^^^^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycle/template_constant_arg.fpp:1:14
+  |
+1 | constant y = cOut
+  |              ---- use cOut refers to definition cOut
+  |
+ ::: [ local path prefix ]/cycle/template_constant_arg.fpp:3:21
+  |
+3 |     constant cOut = p + 2
+  |                     - use p refers to definition p
+  |
+  = note: expanded at [ local path prefix ]/cycle/template_constant_arg.fpp:6:1
+  |
+ ::: [ local path prefix ]/cycle/template_constant_arg.fpp:6:19
+  |
+6 | expand T(constant y)
+  |                   - use y refers to definition y
+

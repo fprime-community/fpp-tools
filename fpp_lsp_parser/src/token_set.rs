@@ -7,9 +7,8 @@ use crate::SyntaxKind;
 pub(crate) struct TokenSet([u64; 3]);
 
 /// `TokenSet`s should only include token `SyntaxKind`s, so the discriminant of any passed/included
-/// `SyntaxKind` must *not* be greater than that of the last token `SyntaxKind`.
-/// See #17037.
-const LAST_TOKEN_KIND_DISCRIMINANT: usize = SyntaxKind::STAR as usize;
+/// `SyntaxKind` must *not* be greater than that of the last token `SyntaxKind`, `SHIFT_RIGHT`.
+const LAST_TOKEN_KIND_DISCRIMINANT: usize = SyntaxKind::SHIFT_RIGHT as usize;
 
 impl TokenSet {
     pub(crate) const EMPTY: TokenSet = TokenSet([0; 3]);
@@ -53,8 +52,23 @@ impl TokenSet {
 #[test]
 fn token_set_works_for_tokens() {
     use crate::SyntaxKind::*;
-    let ts = TokenSet::new(&[EOF, STAR]);
+    let ts = TokenSet::new(&[EOF, STAR, SHIFT_RIGHT]);
     assert!(ts.contains(EOF));
     assert!(ts.contains(STAR));
+    assert!(ts.contains(SHIFT_RIGHT));
     assert!(!ts.contains(PLUS));
+    assert!(!ts.contains(SHIFT_LEFT));
+}
+
+#[test]
+fn token_set_covers_every_token_kind() {
+    // Every kind up to the last token kind can be tested for membership, and
+    // the kind right after it is the first non-token kind.
+    for d in 0..=LAST_TOKEN_KIND_DISCRIMINANT as u16 {
+        TokenSet::EMPTY.contains(SyntaxKind::from(d));
+    }
+    assert_eq!(
+        SyntaxKind::from(LAST_TOKEN_KIND_DISCRIMINANT as u16 + 1),
+        SyntaxKind::WHITESPACE
+    );
 }

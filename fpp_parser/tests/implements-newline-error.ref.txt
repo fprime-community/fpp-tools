@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/implements-newline-error.fpp:3:3
+  |
+3 |   I {
+  |   ^ syntax error: unexpected token
+  |
+  = note: expected {
+  = note: got identifier
+

@@ -2,20 +2,20 @@ use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::basic_use_analyzer::{UseAnalysisPass, visit_template_arg};
 use crate::analyzers::use_analyzer::UseAnalyzer;
-use crate::errors::SemanticError;
+use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
     AnonArrayType, AnonStructType, QualifiedName, Symbol, SymbolInterface, Type,
-    TypeConversionResult,
 };
 use fpp_ast::{
-    DefAliasType, DefArray, DefConstant, DefEnum, DefEnumConstant, DefStruct, Expr, ExprKind,
-    FloatKind, IntegerKind, Node, SpecCommand, SpecContainer, SpecEvent, SpecGeneralPortInstance,
-    SpecInit, SpecInternalPort, SpecParam, SpecRecord, SpecSpecialPortInstance,
-    SpecStateMachineInstance, SpecTlmChannel, SpecTlmPacket, StructTypeMember, TypeName,
-    TypeNameKind, Visitable, Visitor,
+    Binop, DefAliasType, DefArray, DefConstant, DefEnum, DefEnumConstant, DefStruct, EventThrottle,
+    Expr, ExprKind, FloatKind, Ident, IntegerKind, Node, SpecCommand, SpecContainer, SpecEvent,
+    SpecGeneralPortInstance, SpecInit, SpecInternalPort, SpecParam, SpecRecord,
+    SpecSpecialPortInstance, SpecStateMachineInstance, SpecTlmChannel, SpecTlmPacket,
+    StructExprMember, StructTypeMember, TypeName, TypeNameKind, Visitable, Visitor,
 };
-use fpp_core::Spanned;
-use rustc_hash::FxHashMap as HashMap;
+use fpp_core::{Span, Spanned};
+use rustc_hash::FxHashSet as HashSet;
+use std::cell::RefCell;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
@@ -23,6 +23,10 @@ use std::sync::Arc;
 /// and default values
 pub struct CheckExprTypes<'ast> {
     super_: UseAnalyzer<'ast, Self>,
+    /// The constant definitions and template constant arguments visited so
+    /// far. One whose value fails to type check gets no type, so the type map
+    /// does not record that it was visited.
+    visited: RefCell<HashSet<fpp_core::Node>>,
 }
 
 impl<'ast> Default for CheckExprTypes<'ast> {
@@ -35,82 +39,78 @@ impl<'ast> CheckExprTypes<'ast> {
     pub fn new() -> CheckExprTypes<'ast> {
         Self {
             super_: UseAnalyzer::new(),
+            visited: RefCell::default(),
         }
     }
+}
 
-    fn convert_type(
+impl<'ast> UseAnalysisPass<'ast> for CheckExprTypes<'ast> {
+    fn constant_use(
         &self,
-        a: &Analysis,
-        expr: &'ast Expr,
-        to_ty: &Arc<Type>,
-    ) -> TypeConversionResult {
-        let from_ty = match a.type_map.get(&expr.node_id) {
-            None => return Ok(()),
-            Some(ty) => ty,
+        a: &mut Analysis,
+        node: &Expr,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        let symbol = match a.use_def_map.get(&node.node_id) {
+            None => return ControlFlow::Break(()),
+            Some(symbol) => symbol.clone(),
         };
-
-        Type::convert(from_ty, to_ty)
+        self.constant_use_symbol(a, node, symbol)
     }
 
-    fn check_type_is_numerical(&self, a: &Analysis, expr: &'ast Expr) {
-        match self.convert_type(a, expr, &Arc::new(Type::Integer)) {
-            Ok(_) => {}
-            Err(err) => {
-                SemanticError::TypeConversion {
-                    loc: expr.span(),
-                    msg: "cannot convert expression to integer".to_string(),
-                    err: Box::new(err),
-                }
-                .emit();
-            }
-        }
-    }
-
-    /// For shifting operations make sure value is integer or enum
-    fn check_integer_or_enum_type(&self, a: &Analysis, expr: &'ast Expr) {
-        if let Some(ty) = a.type_map.get(&expr.node_id) {
-            let ok = ty.is_int() || matches!(Type::underlying_type(ty).deref(), Type::Enum(_));
-            if !ok {
-                SemanticError::InvalidType {
-                    loc: expr.span(),
-                    msg: format!("{} is not an integer or enum type", ty),
-                    notes: vec![],
-                }
-                .emit();
-            }
-        }
-    }
-
-    fn check_type_is_numerical_opt(&self, a: &Analysis, expr: &'ast Option<Expr>) {
-        match expr {
-            None => {}
-            Some(expr) => self.check_type_is_numerical(a, expr),
-        }
-    }
-
-    fn check_expr_matches_node(&self, a: &Analysis, expr: &'ast Expr, node: &fpp_core::Node) {
-        if let Some(ty) = a.type_map.get(node) {
-            match self.convert_type(a, expr, ty) {
-                Ok(_) => {}
-                Err(err) => SemanticError::TypeConversion {
-                    loc: expr.span(),
-                    msg: format!("default value cannot be converted to {}", ty),
-                    err: Box::new(err),
-                }
-                .emit(),
-            }
-        }
-    }
-
-    fn check_expr_opt_matches_node(
+    fn implied_constant_use(
         &self,
-        a: &Analysis,
-        expr: &'ast Option<Expr>,
-        node: &fpp_core::Node,
-    ) {
-        if let Some(expr) = &expr {
-            self.check_expr_matches_node(a, expr, node)
+        a: &mut Analysis,
+        node: &Expr,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        // An implied use that does not resolve has no use-def entry
+        match a.use_def_map.get(&node.node_id).cloned() {
+            Some(symbol) => self.constant_use_symbol(a, node, symbol),
+            None => ControlFlow::Continue(()),
         }
+    }
+
+    /// The type of a bound constant parameter is the type declared in the
+    /// parameter, so the argument must be convertible to it.
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let Symbol::TemplateConstantArg { param_def, value } = arg else {
+            return ControlFlow::Continue(());
+        };
+        let param_def = param_def.clone();
+        let value = value.clone();
+        if !self.visited.borrow_mut().insert(value.node_id) {
+            return ControlFlow::Continue(());
+        }
+
+        // Visit the literal value
+        visit_template_arg(self, a, arg)?;
+
+        // Make sure the value can be converted into the type in the template
+        let (Some(value_ty), Some(param_ty)) = (
+            a.type_map.get(&value.node_id),
+            a.type_map.get(&param_def.type_name.node_id),
+        ) else {
+            return ControlFlow::Continue(());
+        };
+        match Analysis::convert_types(value.span(), value_ty, param_ty) {
+            Ok(ty) => {
+                a.assign_type(value.node_id, ty);
+                ControlFlow::Continue(())
+            }
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+
+    fn template_interface_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
     }
 }
 
@@ -128,8 +128,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast DefArray,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::DefArray(node))?;
-        self.check_type_is_numerical(a, &node.size);
-        self.check_expr_opt_matches_node(a, &node.default, &node.node_id);
+        Self::emit_error(Self::convert_node_to_numeric(a, &node.size));
+        Self::emit_error(Self::convert_default(a, &node.default, node.node_id));
 
         ControlFlow::Continue(())
     }
@@ -139,16 +139,14 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         a: &mut Self::State,
         node: &'ast DefConstant,
     ) -> ControlFlow<Self::Break> {
-        if a.type_map.contains_key(&node.node_id) {
+        if a.type_map.contains_key(&node.node_id) || !self.visited.borrow_mut().insert(node.node_id)
+        {
             return ControlFlow::Continue(());
         }
 
         self.super_visit(a, Node::DefConstant(node))?;
-        match a.type_map.get(&node.value.node_id) {
-            None => {}
-            Some(ty) => {
-                a.type_map.insert(node.node_id, ty.clone());
-            }
+        if let Some(t) = a.type_map.get(&node.value.node_id).cloned() {
+            a.assign_type(node.node_id, t);
         }
 
         ControlFlow::Continue(())
@@ -159,20 +157,21 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         a: &mut Self::State,
         node: &'ast DefAliasType,
     ) -> ControlFlow<Self::Break> {
-        if a.type_map.contains_key(&node.node_id) {
-            return ControlFlow::Continue(());
-        }
-
+        // CheckTypeUses has given the definition its type, but the type name
+        // is still visited, so that the size of a string type is checked
         self.super_visit(a, Node::DefAliasType(node))?;
-        let ty = a.type_map.get(&node.type_name.node_id).unwrap().clone();
-        a.type_map.insert(node.node_id, ty);
+        if !a.type_map.contains_key(&node.node_id)
+            && let Some(t) = a.type_map.get(&node.type_name.node_id).cloned()
+        {
+            a.assign_type(node.node_id, t);
+        }
 
         ControlFlow::Continue(())
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::DefEnum(node))?;
-        self.check_expr_opt_matches_node(a, &node.default, &node.node_id);
+        Self::emit_error(Self::convert_default(a, &node.default, node.node_id));
 
         ControlFlow::Continue(())
     }
@@ -186,10 +185,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
 
         // Just check that the type of the value expression is convertible to numeric
         // The enum type of the enum constant node is already in the type map
-        match &node.value {
-            None => {}
-            Some(value) => self.check_type_is_numerical(a, value),
-        }
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.value));
 
         ControlFlow::Continue(())
     }
@@ -200,281 +196,28 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast DefStruct,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::DefStruct(node))?;
-        self.check_expr_opt_matches_node(a, &node.default, &node.node_id);
+        Self::emit_error(Self::convert_default(a, &node.default, node.node_id));
 
         ControlFlow::Continue(())
     }
 
     fn visit_expr(&self, a: &mut Self::State, node: &'ast Expr) -> ControlFlow<Self::Break> {
-        self.super_visit(a, Node::Expr(node))?;
-
         match &node.kind {
-            ExprKind::Array(array) => {
-                let first_node = match array.first() {
-                    None => {
-                        SemanticError::EmptyArray { loc: node.span() }.emit();
-                        return ControlFlow::Break(());
-                    }
-                    Some(first) => first,
-                };
-
-                let first_ty = match a.type_map.get(&first_node.node_id) {
-                    Some(first_ty) => first_ty.clone(),
-                    // Node doesn't have a type
-                    None => return ControlFlow::Continue(()),
-                };
-
-                #[allow(clippy::manual_try_fold)]
-                let common = array.iter().skip(1).fold(Ok(first_ty), |common, next| {
-                    match (common, a.type_map.get(&next.node_id)) {
-                        (Ok(common), Some(next_type)) => {
-                            match Type::common_type(&common, next_type) {
-                                None => Err(SemanticError::InvalidType {
-                                    loc: next.span(),
-                                    msg: format!(
-                                        "cannot find common type between {} and {}",
-                                        next_type.as_ref(),
-                                        common.as_ref()
-                                    ),
-                                    notes: vec![],
-                                }),
-                                Some(new_ty) => Ok(new_ty),
-                            }
-                        }
-                        (Ok(common), None) => {
-                            // Node does not have a type
-                            Ok(common)
-                        }
-                        (Err(err), _) => Err(err),
-                    }
-                });
-
-                match common {
-                    Ok(common) => {
-                        // A common type was found across all the elements
-                        // Assign the full expression to an array of the proper size
-                        a.type_map.insert(
-                            node.node_id,
-                            Arc::new(Type::AnonArray(AnonArrayType {
-                                elt_type: common,
-                                size: Some(array.len()),
-                            })),
-                        );
-                    }
-                    Err(err) => {
-                        err.emit();
-                        return ControlFlow::Break(());
-                    }
-                }
-            }
-            ExprKind::ArraySubscript { e1, e2 } => {
-                // Resolve the element type of e1 (and report "not an array type"
-                // on e1) before checking that e2 is numeric.
-                let arr_ty = match a.type_map.get(&e1.node_id) {
-                    None => return ControlFlow::Continue(()),
-                    Some(arr_ty) => Type::underlying_type(arr_ty),
-                };
-
-                let elt_ty = match arr_ty.as_anon_array() {
-                    Some(anon_array) => anon_array.elt_type.clone(),
-                    None => {
-                        let ty = arr_ty.deref();
-                        SemanticError::InvalidType {
-                            loc: e1.span(),
-                            msg: format!("{} is not an array type", ty),
-                            notes: vec![],
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    }
-                };
-
-                self.check_type_is_numerical(a, e2);
-
-                a.type_map.insert(node.node_id, elt_ty);
-            }
-            ExprKind::Binop { left, right, op } => match op {
-                fpp_ast::Binop::LShift | fpp_ast::Binop::RShift => {
-                    // Shift operation is special, for this we independently check
-                    // for both operands to be integer
-                    self.check_integer_or_enum_type(a, left);
-                    self.check_integer_or_enum_type(a, right);
-                    a.type_map.insert(node.node_id, Arc::new(Type::Integer));
-                }
-                _ => {
-                    let ty = match (
-                        a.type_map.get(&left.node_id),
-                        a.type_map.get(&right.node_id),
-                    ) {
-                        (Some(lty), Some(rty)) => match Type::common_type(lty, rty) {
-                            None => {
-                                SemanticError::InvalidType {
-                                    loc: node.span(),
-                                    msg: format!(
-                                        "invalid binary operation between {} and {}",
-                                        lty, rty
-                                    ),
-                                    notes: vec![],
-                                }
-                                .emit();
-                                return ControlFlow::Break(());
-                            }
-                            Some(ty) => ty,
-                        },
-                        _ => {
-                            // One of the sides of the binary operation does not have a type
-                            return ControlFlow::Continue(());
-                        }
-                    };
-
-                    match op {
-                        // Addition allows numeric or string operands (string
-                        // concatenation). The check is on the common type.
-                        fpp_ast::Binop::Add => {
-                            if !(ty.is_convertible_to_numeric()
-                                || matches!(ty.deref(), Type::String(_)))
-                            {
-                                SemanticError::InvalidType {
-                                    loc: node.span(),
-                                    msg: format!(
-                                        "cannot convert {} to a numeric or string type",
-                                        ty
-                                    ),
-                                    notes: vec![],
-                                }
-                                .emit();
-                            }
-                        }
-                        _ => {
-                            // The other operations check the common type once at
-                            // the binop node: the type is fine if it is numeric
-                            // or convertible to Integer.
-                            let numeric = ty.is_numeric()
-                                || Type::convert(&ty, &Arc::new(Type::Integer)).is_ok();
-                            if !numeric {
-                                SemanticError::InvalidType {
-                                    loc: node.span(),
-                                    msg: format!("cannot convert {} to a numeric type", ty),
-                                    notes: vec![],
-                                }
-                                .emit();
-                            }
-                        }
-                    }
-                    a.type_map.insert(node.node_id, ty);
-                }
-            },
-            ExprKind::SizeOf(type_name) => {
-                let ty = a.type_map.get(&type_name.node_id).unwrap();
-                if !ty.is_displayable() {
-                    SemanticError::InvalidType {
-                        loc: node.span(),
-                        msg: format!("size of type {} is not known in the model", ty),
-                        notes: vec![],
-                    }
-                    .emit();
-                }
-                a.type_map.insert(node.node_id, Arc::new(Type::Integer));
-            }
-            ExprKind::Dot { e, id } => {
-                if a.type_map.contains_key(&node.node_id) {
-                    // Type for this entire dot expression is already resolved
-                    // This means it's actually a _use_ of some sort of symbol (constant/enum constant)
-                    // We can just use the type that was already resolved
-                    return ControlFlow::Continue(());
-                }
-
-                // This is some member selection of a struct/anon struct
-                let e_ty = match a.type_map.get(&e.node_id) {
-                    Some(e_ty) => Type::underlying_type(e_ty),
-                    None => return ControlFlow::Continue(()),
-                };
-
-                match e_ty.as_anon_struct() {
-                    Some(anon_struct) => match anon_struct.get_member(&id.data) {
-                        None => {
-                            SemanticError::InvalidType {
-                                loc: id.span(),
-                                msg: format!("{} has no member `{}`", e_ty, id.data),
-                                notes: vec![],
-                            }
-                            .emit();
-                            return ControlFlow::Break(());
-                        }
-                        Some(member_ty) => {
-                            a.type_map.insert(node.node_id, member_ty.clone());
-                        }
-                    },
-                    None => {
-                        SemanticError::InvalidType {
-                            loc: e.span(),
-                            msg: format!("{} does not have members", e_ty),
-                            notes: vec![],
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    }
-                }
-            }
-            ExprKind::Ident(_) => {} // already handled by constant_use
-            ExprKind::LiteralBool(_) => {
-                a.type_map.insert(node.node_id, Arc::new(Type::Boolean));
-            }
-            ExprKind::LiteralInt(_) => {
-                a.type_map.insert(node.node_id, Arc::new(Type::Integer));
-            }
-            ExprKind::LiteralFloat(_) => {
-                a.type_map
-                    .insert(node.node_id, Arc::new(Type::Float(FloatKind::F64)));
-            }
-            ExprKind::LiteralString(_) => {
-                a.type_map
-                    .insert(node.node_id, Arc::new(Type::String(None)));
-            }
-            ExprKind::Paren(e) => {
-                if let Some(ty) = a.type_map.get(&e.node_id) {
-                    a.type_map.insert(node.node_id, ty.clone());
-                }
-            }
-            ExprKind::Struct(struct_expr) => {
-                let mut members_out = Vec::default();
-                let mut member_locs = HashMap::default();
-
-                for member in struct_expr {
-                    match a.type_map.get(&member.value.node_id) {
-                        Some(member_ty) => {
-                            members_out.push((member.name.data.clone(), member_ty.clone()));
-                            if let Some(old_member) =
-                                member_locs.insert(member.name.data.clone(), member.value.span())
-                            {
-                                SemanticError::DuplicateStructMember {
-                                    name: member.name.data.clone(),
-                                    loc: member.span(),
-                                    prev_loc: old_member,
-                                }
-                                .emit();
-                            }
-                        }
-                        _ => return ControlFlow::Continue(()),
-                    }
-                }
-
-                a.type_map.insert(
-                    node.node_id,
-                    Arc::new(Type::AnonStruct(AnonStructType {
-                        members: members_out,
-                    })),
-                );
-            }
-            ExprKind::Unop { e, .. } => {
-                self.check_type_is_numerical(a, e);
-                if let Some(ty) = a.type_map.get(&e.node_id) {
-                    a.type_map.insert(node.node_id, ty.clone());
-                }
-            }
+            ExprKind::Array(elts) => self.expr_array_node(a, node, elts),
+            ExprKind::ArraySubscript { e1, e2 } => self.expr_array_subscript_node(a, node, e1, e2),
+            ExprKind::Binop { left, op, right } => self.expr_binop_node(a, node, left, op, right),
+            ExprKind::Dot { e, id } => self.expr_dot_node(a, node, e, id),
+            // An identifier is a constant use, typed by constant_use
+            ExprKind::Ident { .. } => self.super_visit(a, Node::Expr(node)),
+            ExprKind::LiteralBool(_) => self.expr_literal_bool_node(a, node),
+            ExprKind::LiteralFloat(_) => self.expr_literal_float_node(a, node),
+            ExprKind::LiteralInt(_) => self.expr_literal_int_node(a, node),
+            ExprKind::LiteralString(_) => self.expr_literal_string_node(a, node),
+            ExprKind::Paren(e) => self.expr_paren_node(a, node, e),
+            ExprKind::SizeOf(type_name) => self.expr_size_of_node(a, node, type_name),
+            ExprKind::Struct(members) => self.expr_struct_node(a, node, members),
+            ExprKind::Unop { e, .. } => self.expr_unop_node(a, node, e),
         }
-
-        ControlFlow::Continue(())
     }
 
     fn visit_spec_command(
@@ -483,8 +226,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecCommand,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecCommand(node))?;
-        self.check_type_is_numerical_opt(a, &node.opcode);
-        self.check_type_is_numerical_opt(a, &node.priority);
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.opcode));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.priority));
 
         ControlFlow::Continue(())
     }
@@ -495,8 +238,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecContainer,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecContainer(node))?;
-        self.check_type_is_numerical_opt(a, &node.id);
-        self.check_type_is_numerical_opt(a, &node.default_priority);
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.default_priority));
 
         ControlFlow::Continue(())
     }
@@ -507,40 +250,9 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecEvent,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecEvent(node))?;
-        self.check_type_is_numerical_opt(a, &node.id);
-
-        // Check that the throttle count/every are valid
-        match &node.throttle {
-            None => {}
-            Some(throttle) => {
-                self.check_type_is_numerical(a, &throttle.count);
-                if let Some(every) = &throttle.every
-                    && let Err(err) = self.convert_type(
-                        a,
-                        every,
-                        &Arc::new(Type::AnonStruct(AnonStructType {
-                            members: vec![
-                                (
-                                    "seconds".to_string(),
-                                    Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
-                                ),
-                                (
-                                    "useconds".to_string(),
-                                    Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
-                                ),
-                            ],
-                        })),
-                    )
-                {
-                    SemanticError::TypeConversion {
-                        loc: every.span(),
-                        msg: "event throttle every must be convertable to a time interval"
-                            .to_string(),
-                        err: Box::new(err),
-                    }
-                    .emit()
-                }
-            }
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
+        if let Some(throttle) = &node.throttle {
+            Self::check_throttle(a, throttle);
         }
 
         ControlFlow::Continue(())
@@ -552,7 +264,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecInit,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecInit(node))?;
-        self.check_type_is_numerical(a, &node.phase);
+        Self::emit_error(Self::convert_node_to_numeric(a, &node.phase));
+
         ControlFlow::Continue(())
     }
 
@@ -562,7 +275,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecInternalPort,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecInternalPort(node))?;
-        self.check_type_is_numerical_opt(a, &node.priority);
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.priority));
+
         ControlFlow::Continue(())
     }
 
@@ -572,11 +286,14 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecParam,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecParam(node))?;
-
-        self.check_expr_opt_matches_node(a, &node.default, &node.type_name.node_id);
-        self.check_type_is_numerical_opt(a, &node.id);
-        self.check_type_is_numerical_opt(a, &node.set_opcode);
-        self.check_type_is_numerical_opt(a, &node.save_opcode);
+        Self::emit_error(Self::convert_default(
+            a,
+            &node.default,
+            node.type_name.node_id,
+        ));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.set_opcode));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.save_opcode));
 
         ControlFlow::Continue(())
     }
@@ -587,9 +304,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecGeneralPortInstance,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecGeneralPortInstance(node))?;
-
-        self.check_type_is_numerical_opt(a, &node.size);
-        self.check_type_is_numerical_opt(a, &node.priority);
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.size));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.priority));
 
         ControlFlow::Continue(())
     }
@@ -600,7 +316,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecSpecialPortInstance,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecSpecialPortInstance(node))?;
-        self.check_type_is_numerical_opt(a, &node.priority);
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.priority));
+
         ControlFlow::Continue(())
     }
 
@@ -610,7 +327,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecRecord,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecRecord(node))?;
-        self.check_type_is_numerical_opt(a, &node.id);
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
+
         ControlFlow::Continue(())
     }
 
@@ -620,7 +338,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecStateMachineInstance,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecStateMachineInstance(node))?;
-        self.check_type_is_numerical_opt(a, &node.priority);
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.priority));
+
         ControlFlow::Continue(())
     }
 
@@ -630,15 +349,13 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecTlmChannel,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecTlmChannel(node))?;
-        self.check_type_is_numerical_opt(a, &node.id);
-        for limit in &node.low {
-            self.check_type_is_numerical(a, &limit.value);
-            self.check_expr_matches_node(a, &limit.value, &node.type_name.node_id)
-        }
-
-        for limit in &node.high {
-            self.check_type_is_numerical(a, &limit.value);
-            self.check_expr_matches_node(a, &limit.value, &node.type_name.node_id)
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
+        for limit in node.low.iter().chain(&node.high) {
+            Self::emit_error(Self::check_limit_expr(
+                a,
+                &limit.value,
+                node.type_name.node_id,
+            ));
         }
 
         ControlFlow::Continue(())
@@ -650,8 +367,9 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast SpecTlmPacket,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::SpecTlmPacket(node))?;
-        self.check_type_is_numerical_opt(a, &node.id);
-        self.check_type_is_numerical(a, &node.group);
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
+        Self::emit_error(Self::convert_node_to_numeric(a, &node.group));
+
         ControlFlow::Continue(())
     }
 
@@ -661,7 +379,8 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         node: &'ast StructTypeMember,
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::StructTypeMember(node))?;
-        self.check_type_is_numerical_opt(a, &node.size);
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.size));
+
         ControlFlow::Continue(())
     }
 
@@ -672,25 +391,21 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
     ) -> ControlFlow<Self::Break> {
         self.super_visit(a, Node::TypeName(node))?;
         if let TypeNameKind::String(size) = &node.kind {
-            self.check_type_is_numerical_opt(a, size);
+            Self::emit_error(Self::convert_node_to_numeric_opt(a, size));
         }
 
         ControlFlow::Continue(())
     }
 }
 
-impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
-    fn constant_use(
+impl<'ast> CheckExprTypes<'ast> {
+    /// Type a constant use, given the symbol that it refers to
+    fn constant_use_symbol(
         &self,
         a: &mut Analysis,
-        node: &'ast Expr,
-        _: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let symbol = match a.use_def_map.get(&node.node_id) {
-            None => return ControlFlow::Break(()),
-            Some(symbol) => symbol.clone(),
-        };
-
+        node: &Expr,
+        symbol: Symbol,
+    ) -> ControlFlow<()> {
         match &symbol {
             // Constant symbol: visit the constant definition
             // to ensure it has a type
@@ -700,8 +415,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
             // Enum symbol: if this is in scope, then we are in
             // the enum definition, so it already has a type
             Symbol::EnumConstant(_) => {}
-            // Bound constant parameter: compute the type of the argument bound
-            // to it
+            // Template constant argument symbol
             Symbol::TemplateConstantArg { value, .. } => {
                 if !a.type_map.contains_key(&value.node_id) {
                     self.template_constant_arg(a, &symbol)?;
@@ -709,61 +423,432 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
             }
             // Invalid use of a symbol in an expression
             _ => {
-                SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
-                    msg: "not a constant symbol".to_string(),
-                    loc: node.span(),
-                    def_loc: symbol.name().span(),
-                }
-                .emit();
+                Analysis::invalid_symbol(&symbol, node.node_id, "not a constant symbol").emit();
                 return ControlFlow::Break(());
             }
         }
 
-        match a.type_map.get(&symbol.node()) {
-            None => {}
-            Some(ty) => {
-                a.type_map.insert(node.node_id, ty.clone());
-            }
+        if let Some(t) = a.type_map.get(&symbol.node()).cloned() {
+            a.assign_type(node.node_id, t);
         }
         ControlFlow::Continue(())
     }
 
-    /// The type of a bound constant parameter is the type declared in the
-    /// parameter, so the argument must be convertible to it.
-    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
-        let Symbol::TemplateConstantArg { param_def, value } = arg else {
+    fn expr_array_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        elts: &'ast [Expr],
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        // An element with no type failed to type check
+        if elts.iter().any(|e| !a.type_map.contains_key(&e.node_id)) {
+            return ControlFlow::Continue(());
+        }
+        let empty_list_error = SemanticError::EmptyArray { loc: node.span() };
+        let ids: Vec<fpp_core::Node> = elts.iter().map(|e| e.node_id).collect();
+        match a.common_type_of_nodes(&ids, empty_list_error) {
+            Ok(t) => {
+                a.assign_type(
+                    node.node_id,
+                    Arc::new(Type::AnonArray(AnonArrayType {
+                        size: Some(elts.len()),
+                        elt_type: t,
+                    })),
+                );
+                ControlFlow::Continue(())
+            }
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    fn expr_array_subscript_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e1: &'ast Expr,
+        e2: &'ast Expr,
+    ) -> ControlFlow<()> {
+        // Visit e1 and check that it is an array before visiting e2
+        e1.visit(a, self)?;
+        let Some(t1) = a.type_map.get(&e1.node_id) else {
             return ControlFlow::Continue(());
         };
-        let param_def = param_def.clone();
-        let value = value.clone();
-
-        // Compute the type of the argument
-        visit_template_arg(self, a, arg)?;
-
-        let Some(param_ty) = a.type_map.get(&param_def.type_name.node_id).cloned() else {
-            return ControlFlow::Continue(());
+        let elt_type = match Type::underlying_type(t1).as_anon_array() {
+            Some(anon_array) => anon_array.elt_type.clone(),
+            None => {
+                SemanticError::InvalidType {
+                    loc: e1.span(),
+                    msg: format!("{} is not an array type", Type::underlying_type(t1)),
+                    notes: vec![],
+                }
+                .emit();
+                return ControlFlow::Break(());
+            }
         };
-        if let Some(value_ty) = a.type_map.get(&value.node_id).cloned()
-            && let Err(err) = Type::convert(&value_ty, &param_ty)
+
+        e2.visit(a, self)?;
+        if !a.type_map.contains_key(&e2.node_id) {
+            return ControlFlow::Continue(());
+        }
+        if Self::emit_error(Self::convert_node_to_numeric(a, e2)).is_some() {
+            a.assign_type(node.node_id, elt_type);
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn expr_binop_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e1: &'ast Expr,
+        op: &Binop,
+        e2: &'ast Expr,
+    ) -> ControlFlow<()> {
+        let loc = node.span();
+        self.super_visit(a, Node::Expr(node))?;
+        // An operand with no type failed to type check
+        if !a.type_map.contains_key(&e1.node_id) || !a.type_map.contains_key(&e2.node_id) {
+            return ControlFlow::Continue(());
+        }
+        let t = match op {
+            Binop::LShift | Binop::RShift => {
+                // Shift operation is special, for this we independently check
+                // for both operands to be integer
+                let ok1 = Self::emit_error(Self::check_integer_or_enum_type(a, e1));
+                let ok2 = Self::emit_error(Self::check_integer_or_enum_type(a, e2));
+                match (ok1, ok2) {
+                    (Some(()), Some(())) => Some(Arc::new(Type::Integer)),
+                    _ => None,
+                }
+            }
+            _ => {
+                let t = match a.common_type_of_node_pair(e1.node_id, e2.node_id, loc) {
+                    Ok(t) => t,
+                    Err(err) => {
+                        err.emit();
+                        return ControlFlow::Break(());
+                    }
+                };
+                // The type of the expression is the numeric type, or for
+                // addition the string type, that the common type converts to
+                // (spec, Type Checking, Arithmetic and Concatenation)
+                Self::emit_error(match op {
+                    Binop::Add => Self::convert_to_numeric_or_string(loc, &t),
+                    _ => Self::convert_to_numeric(loc, &t),
+                })
+            }
+        };
+        if let Some(t) = t {
+            a.assign_type(node.node_id, t);
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn expr_literal_bool_node(&self, a: &mut Analysis, node: &'ast Expr) -> ControlFlow<()> {
+        a.assign_type(node.node_id, Arc::new(Type::Boolean));
+        ControlFlow::Continue(())
+    }
+
+    fn expr_literal_float_node(&self, a: &mut Analysis, node: &'ast Expr) -> ControlFlow<()> {
+        a.assign_type(node.node_id, Arc::new(Type::Float(FloatKind::F64)));
+        ControlFlow::Continue(())
+    }
+
+    fn expr_literal_int_node(&self, a: &mut Analysis, node: &'ast Expr) -> ControlFlow<()> {
+        a.assign_type(node.node_id, Arc::new(Type::Integer));
+        ControlFlow::Continue(())
+    }
+
+    fn expr_literal_string_node(&self, a: &mut Analysis, node: &'ast Expr) -> ControlFlow<()> {
+        a.assign_type(node.node_id, Arc::new(Type::String(None)));
+        ControlFlow::Continue(())
+    }
+
+    fn expr_paren_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e: &'ast Expr,
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        if let Some(t) = a.type_map.get(&e.node_id).cloned() {
+            a.assign_type(node.node_id, t);
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn expr_size_of_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        type_name: &'ast TypeName,
+    ) -> ControlFlow<()> {
+        if let Some(t) = a.type_map.get(&type_name.node_id) {
+            let msg = format!("size of type {} is not known in the model", t);
+            let result = a.check_displayable_type(type_name.node_id, type_name.span(), &msg);
+            if Self::emit_error(result).is_none() {
+                return ControlFlow::Continue(());
+            }
+        }
+        self.super_visit(a, Node::Expr(node))?;
+        a.assign_type(node.node_id, Arc::new(Type::Integer));
+        ControlFlow::Continue(())
+    }
+
+    fn expr_struct_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        members: &'ast [StructExprMember],
+    ) -> ControlFlow<()> {
+        fn get_name(member: &StructExprMember) -> &str {
+            &member.name.data
+        }
+        let no_duplicates = Self::emit_error(Analysis::check_for_duplicate_struct_member(
+            get_name, members,
+        ));
+        self.super_visit(a, Node::Expr(node))?;
+        if no_duplicates.is_none() {
+            return ControlFlow::Continue(());
+        }
+        let mut struct_members = Vec::with_capacity(members.len());
+        for member in members {
+            match a.type_map.get(&member.value.node_id) {
+                Some(t) => struct_members.push((member.name.data.clone(), t.clone())),
+                // A member with no type failed to type check
+                None => return ControlFlow::Continue(()),
+            }
+        }
+        a.assign_type(
+            node.node_id,
+            Arc::new(Type::AnonStruct(AnonStructType {
+                members: struct_members,
+            })),
+        );
+        ControlFlow::Continue(())
+    }
+
+    fn expr_unop_node(&self, a: &mut Analysis, node: &'ast Expr, e: &'ast Expr) -> ControlFlow<()> {
+        let loc = node.span();
+        self.super_visit(a, Node::Expr(node))?;
+        if let Some(t1) = a.type_map.get(&e.node_id)
+            && let Some(t) = Self::emit_error(Self::convert_to_numeric(loc, t1))
         {
-            SemanticError::TypeConversion {
-                loc: value.span(),
-                msg: format!("template argument cannot be converted to {}", param_ty),
-                err: Box::new(err),
-            }
-            .emit();
-            return ControlFlow::Break(());
+            a.assign_type(node.node_id, t);
         }
-        a.type_map.insert(value.node_id, param_ty);
         ControlFlow::Continue(())
     }
 
-    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
-        visit_template_arg(self, a, arg)
+    fn expr_dot_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e: &'ast Expr,
+        id: &'ast Ident,
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+
+        // Type for this entire dot expression is already resolved
+        // This means it's actually a _use_ of some sort of symbol (constant/enum constant)
+        // We can just use the type that was already resolved
+        if a.type_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
+
+        // A dot expression that is a use is a constant use, which
+        // constant_use has typed; one with no type is a use of a constant
+        // whose definition failed to type check
+        if a.use_def_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
+
+        // The type was not resolved, this is some sort of member selection
+        // Look at the left-hand side of the dot expression to determine the type
+        let Some(e_type) = a.type_map.get(&e.node_id) else {
+            return ControlFlow::Continue(());
+        };
+        let result = match Type::underlying_type(e_type).deref() {
+            Type::Struct(struct_type) => match struct_type.anon_struct.get_member(&id.data) {
+                Some(t) => Ok(t.clone()),
+                None => Err(SemanticError::InvalidStructMember {
+                    member_name: id.data.clone(),
+                    loc: id.span(),
+                    struct_type_name: struct_type.node.name.data.clone(),
+                    def_loc: struct_type.node.span(),
+                }),
+            },
+            Type::AnonStruct(anon_struct) => match anon_struct.get_member(&id.data) {
+                Some(t) => Ok(t.clone()),
+                None => Err(SemanticError::InvalidAnonStructMember {
+                    member_name: id.data.clone(),
+                    loc: id.span(),
+                    def_loc: a.use_def_map.get(&e.node_id).map(|s| s.node().span()),
+                }),
+            },
+            t => Err(SemanticError::InvalidTypeForMemberSelection {
+                member_name: id.data.clone(),
+                loc: id.span(),
+                type_name: t.to_string(),
+            }),
+        };
+        match result {
+            Ok(t) => {
+                a.assign_type(node.node_id, t);
+                ControlFlow::Continue(())
+            }
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
+        }
     }
 
-    fn template_interface_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
-        visit_template_arg(self, a, arg)
+    /// Check that the type of a default value may be converted to the type
+    /// of the node that it is the default for
+    fn convert_default(
+        a: &Analysis,
+        default: &Option<Expr>,
+        node: fpp_core::Node,
+    ) -> SemanticResult {
+        match default {
+            Some(default_node) => {
+                match (a.type_map.get(&default_node.node_id), a.type_map.get(&node)) {
+                    (Some(default_type), Some(t)) => {
+                        let loc = default_node.span();
+                        Analysis::convert_types(loc, default_type, t).map(|_| ())
+                    }
+                    // A default with no type failed to type check
+                    _ => Ok(()),
+                }
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// Check the interval of an event throttle
+    fn check_throttle_interval(a: &Analysis, every: &Expr) -> SemanticResult {
+        match a.type_map.get(&every.node_id) {
+            Some(t) => {
+                let loc = every.span();
+                let interval_type = Arc::new(Type::AnonStruct(AnonStructType {
+                    members: vec![
+                        (
+                            "seconds".to_string(),
+                            Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
+                        ),
+                        (
+                            "useconds".to_string(),
+                            Arc::new(Type::PrimitiveInt(IntegerKind::U32)),
+                        ),
+                    ],
+                }));
+                Analysis::convert_types(loc, t, &interval_type).map(|_| ())
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// Check an event throttle
+    ///
+    /// The count and the interval are separate expressions, so each one is
+    /// checked even when the other fails.
+    fn check_throttle(a: &Analysis, throttle: &EventThrottle) {
+        Self::emit_error(Self::convert_node_to_numeric(a, &throttle.count));
+        if let Some(every) = &throttle.every {
+            Self::emit_error(Self::check_throttle_interval(a, every));
+        }
+    }
+
+    /// Check a telemetry limit expression against the channel type
+    fn check_limit_expr(
+        a: &Analysis,
+        e: &Expr,
+        channel_type_node: fpp_core::Node,
+    ) -> SemanticResult {
+        Self::convert_node_to_numeric(a, e)?;
+        match (
+            a.type_map.get(&e.node_id),
+            a.type_map.get(&channel_type_node),
+        ) {
+            (Some(limit_type), Some(channel_type)) => {
+                let loc = e.span();
+                Analysis::convert_types(loc, limit_type, channel_type).map(|_| ())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Check that the type of a node may be converted to a numeric type. A node
+    /// with no type failed to type check, and that error is already reported.
+    fn convert_node_to_numeric(a: &Analysis, node: &Expr) -> SemanticResult {
+        match a.type_map.get(&node.node_id) {
+            Some(t) => Self::convert_to_numeric(node.span(), t).map(|_| ()),
+            None => Ok(()),
+        }
+    }
+
+    fn convert_node_to_numeric_opt(a: &Analysis, node_opt: &Option<Expr>) -> SemanticResult {
+        match node_opt {
+            Some(node) => Self::convert_node_to_numeric(a, node),
+            None => Ok(()),
+        }
+    }
+
+    /// The numeric type that a type converts to: the type itself if it is
+    /// numeric, otherwise Integer if the type may be converted to Integer
+    fn convert_to_numeric(loc: Span, t: &Arc<Type>) -> SemanticResult<Arc<Type>> {
+        if t.is_numeric() {
+            Ok(t.clone())
+        } else if Type::convert(t, &Arc::new(Type::Integer)).is_ok() {
+            Ok(Arc::new(Type::Integer))
+        } else {
+            Err(SemanticError::InvalidType {
+                loc,
+                msg: format!("cannot convert {} to a numeric type", t),
+                notes: vec![],
+            })
+        }
+    }
+
+    fn convert_to_numeric_or_string(loc: Span, t: &Arc<Type>) -> SemanticResult<Arc<Type>> {
+        match (t.deref(), Self::convert_to_numeric(loc, t)) {
+            (_, Ok(t1)) => Ok(t1),
+            (Type::String(_), _) => Ok(t.clone()),
+            _ => Err(SemanticError::InvalidType {
+                loc,
+                msg: format!("cannot convert {} to a numeric or string type", t),
+                notes: vec![],
+            }),
+        }
+    }
+
+    /// For shifting operations make sure value is integer or enum
+    fn check_integer_or_enum_type(a: &Analysis, node: &Expr) -> SemanticResult {
+        match a.type_map.get(&node.node_id) {
+            Some(t) if !(t.is_int() || matches!(t.deref(), Type::Enum(_))) => {
+                Err(SemanticError::InvalidType {
+                    loc: node.span(),
+                    msg: format!("{} is not an integer or enum type", t),
+                    notes: vec![],
+                })
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Report the error of a failed check. The analysis goes on with the
+    /// remaining checks.
+    fn emit_error<T>(result: SemanticResult<T>) -> Option<T> {
+        match result {
+            Ok(t) => Some(t),
+            Err(err) => {
+                err.emit();
+                None
+            }
+        }
     }
 }

@@ -1,12 +1,17 @@
  --> [ local path prefix ]/state_machine/types/struct_default_error.fpp:5:13
   |
 5 |     default { x = 0, e = E.X, a = [ 1, 2, 3 ], b = 5 }
-  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ default value cannot be converted to S
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot convert { x: Integer, e: enum E, a: [3] Integer, b: Integer } to struct S
   |
-  = note: struct missing member `b`
+  = note: no member `b` in the struct type
 
- --> [ local path prefix ]/state_machine/types/struct_default_error.fpp:1:15
+ --> [ local path prefix ]/state_machine/types/struct_default_error.fpp:1:1
   |
-1 | state machine SM {
-  |               ^^ state machine must have initial transition
+1 | / state machine SM {
+2 | |   array A = [3] U32
+3 | |   enum E { X }
+4 | |   struct S { x: U32, e: E, a: A } \
+5 | |     default { x = 0, e = E.X, a = [ 1, 2, 3 ], b = 5 }
+6 | | }
+  | |_^ state machine must have initial transition
 

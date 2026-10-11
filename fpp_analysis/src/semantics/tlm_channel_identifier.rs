@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::errors::SemanticResult;
-use crate::semantics::{ComponentInstance, Dictionary, TlmChannel, Topology};
+use crate::semantics::{ComponentInstance, Dictionary, TlmChannel, TlmChannelId, Topology};
 use fpp_ast::{self as ast, AstNode};
 use fpp_core::{Span, Spanned};
 use std::sync::Arc;
@@ -46,38 +46,40 @@ impl TlmChannelIdentifier {
         )
     }
 
-    /// Gets a numeric channel identifier from an AST node. Returns `None` if
-    /// the component instance is unresolved (already reported by CheckUses).
-    pub fn get_numeric_id_for_node(
-        a: &Analysis,
-        d: &Dictionary,
-        t: &Topology,
-        node: &ast::TlmChannelIdentifier,
-    ) -> SemanticResult<Option<i128>> {
-        let Some(channel_id) = TlmChannelIdentifier::from_node(a, node)? else {
-            return Ok(None);
-        };
-        d.find_numeric_id_for_channel(t, &channel_id).map(Some)
-    }
-
     /// Creates a telemetry channel identifier from an AST node. Returns `None`
-    /// if the component instance is unresolved (already reported by CheckUses).
+    /// if the component instance use is unresolved, or names an instance whose
+    /// definition failed to check (both already reported).
     pub fn from_node(
         a: &Analysis,
         node: &ast::TlmChannelIdentifier,
     ) -> SemanticResult<Option<TlmChannelIdentifier>> {
-        let Some(component_instance) = a.get_component_instance(node.component_instance.id())?
+        let Some(component_instance) =
+            a.get_represented_component_instance(node.component_instance.id())?
         else {
             return Ok(None);
         };
-        let Some(component) = component_instance.get_component(a) else {
-            return Ok(None);
-        };
-        let tlm_channel = component.get_tlm_channel_by_name(&node.channel_name)?;
+        let tlm_channel = component_instance
+            .component(a)
+            .get_tlm_channel_by_name(&node.channel_name)?;
         Ok(Some(TlmChannelIdentifier {
             node: Arc::new(node.clone()),
             component_instance,
             tlm_channel,
         }))
+    }
+
+    /// Gets a numeric channel identifier from an AST node. Returns `None` if
+    /// the component instance use is unresolved, or names an instance whose
+    /// definition failed to check (both already reported).
+    pub fn get_numeric_id_for_node(
+        a: &Analysis,
+        d: &Dictionary,
+        t: &Topology,
+        node: &ast::TlmChannelIdentifier,
+    ) -> SemanticResult<Option<TlmChannelId>> {
+        let Some(channel_id) = TlmChannelIdentifier::from_node(a, node)? else {
+            return Ok(None);
+        };
+        d.find_numeric_id_for_channel(t, &channel_id).map(Some)
     }
 }

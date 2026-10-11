@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/locate-state-eof.fpp:1:8
+  |
+1 | locate state
+  |        ^^^^^ syntax error: unexpected end of input in location kind
+

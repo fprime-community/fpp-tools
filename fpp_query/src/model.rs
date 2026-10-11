@@ -1,10 +1,5 @@
-use crate::Diagnosed;
-use fpp_ast::{
-    DefModuleTemplate, ModuleMember, MoveWalkable, MutVisitor, Node, QualIdent, Replicator,
-    TransUnit, Visitor,
-};
+use fpp_ast::{DefModuleTemplate, ModuleMember, MutVisitor, QualIdent, Replicator, TransUnit};
 use fpp_core::{SourceFile, Spanned};
-use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 
 pub struct Input {
@@ -131,26 +126,20 @@ fn collect_templates(units: &[TransUnit]) -> Vec<(Vec<String>, DefModuleTemplate
 }
 
 /// Look up a template by the name a specifier writes, trying the innermost
-/// enclosing scope first
+/// enclosing scope first. An absolute name is looked up in the global scope only.
 fn look_up<'t>(
     templates: &'t [(Vec<String>, DefModuleTemplate)],
     scope: &[String],
     name: &QualIdent,
 ) -> Option<&'t DefModuleTemplate> {
-    let mut parts: Vec<&str> = Vec::new();
-    name.write_parts(&mut parts);
-    for prefix_len in (0..=scope.len()).rev() {
-        let candidate: Vec<&str> = scope[..prefix_len]
+    let ident_list = name.to_ident_list();
+    let innermost = if name.is_absolute() { 0 } else { scope.len() };
+    for prefix_len in (0..=innermost).rev() {
+        let candidate = scope[..prefix_len].iter().chain(&ident_list);
+        if let Some((_, def)) = templates
             .iter()
-            .map(String::as_str)
-            .chain(parts.iter().copied())
-            .collect();
-        if let Some((_, def)) = templates.iter().find(|(qualified, _)| {
-            qualified
-                .iter()
-                .map(String::as_str)
-                .eq(candidate.iter().copied())
-        }) {
+            .find(|(qualified, _)| qualified.iter().eq(candidate.clone()))
+        {
             return Some(def);
         }
     }
@@ -181,42 +170,4 @@ fn expand_member(
         }
         _ => {}
     }
-}
-
-/// Fail if any `include` specifier survived resolution, which means definitions in
-/// the model are invisible to this tool.
-///
-/// `fpp_parser::ResolveIncludes` handles `include` inside a module, component,
-/// topology, telemetry packet, and telemetry packet set. It does not handle
-/// `state machine` or `state` bodies, so those are what this catches.
-pub fn check_unresolved_includes(units: &[TransUnit]) -> Result<(), Diagnosed> {
-    struct FindInclude;
-    impl<'ast> Visitor<'ast> for FindInclude {
-        type Break = ();
-        type State = bool;
-
-        fn super_visit(&self, found: &mut bool, node: Node<'ast>) -> ControlFlow<()> {
-            if let Node::SpecInclude(spec) = node {
-                spec.span()
-                    .error(
-                        "this `include` was not resolved, so definitions inside it are invisible",
-                    )
-                    .note(format!(
-                        "cannot read the members of `{}` here",
-                        spec.file.data
-                    ))
-                    .note(
-                        "`include` inside a `state machine` or `state` body is not yet supported; \
-                         move those definitions into the file that needs them",
-                    )
-                    .emit();
-                *found = true;
-            }
-            node.walk(found, self)
-        }
-    }
-
-    let mut found = false;
-    let _ = FindInclude.visit_trans_units(&mut found, units.iter());
-    if found { Err(Diagnosed) } else { Ok(()) }
 }
