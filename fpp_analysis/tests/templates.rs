@@ -8,7 +8,8 @@
 use fpp_analysis::semantics::{Connection, Symbol, Topology, Type};
 use fpp_analysis::{Analysis, CheckSemantics, ExpandSyntaxAndEnterSymbols};
 use fpp_ast::{
-    DefAliasType, DefConstant, ModuleMember, MoveWalkable, Node, TransUnit, Visitable, Visitor,
+    DefAliasType, DefConstant, DefModule, ModuleMember, MoveWalkable, Node, TransUnit, Visitable,
+    Visitor,
 };
 use fpp_core::{FileReader, SourceFile};
 use fpp_fs::FsReader;
@@ -338,6 +339,53 @@ module M {
         let names = qualified_names(a);
         assert!(names.contains("M.Inner.k"));
         assert!(names.contains("M.Inner.c"));
+    });
+}
+
+/// A module defined by an expansion and merged with a same-named module at the
+/// expansion site is that module, so a module nested in it has the module at the
+/// expansion site as its parent.
+#[test]
+fn a_module_nested_in_a_merged_module_has_the_module_at_the_expansion_site_as_parent() {
+    let src = "\
+module template T() {
+    module Inner {
+        module Deep {
+            constant k = 1
+        }
+    }
+}
+
+module M {
+    module Inner {
+        constant c = 0
+    }
+
+    expand T()
+}
+";
+    fn modules_named<'a>(members: Vec<&'a ModuleMember>, name: &str) -> Vec<&'a DefModule> {
+        members
+            .into_iter()
+            .filter_map(|m| match m {
+                ModuleMember::DefModule(def) if def.name.data == name => Some(def),
+                _ => None,
+            })
+            .collect()
+    }
+    with_analysis(src, |a, ast| {
+        // The module Inner written at the expansion site comes before the one
+        // the expansion introduced
+        let [site_inner, _] = modules_named(members_at(ast, &["M"]), "Inner")[..] else {
+            panic!("M should hold two modules named Inner");
+        };
+        let [deep] = modules_named(members_at(ast, &["M", "Inner"]), "Deep")[..] else {
+            panic!("M.Inner should hold one module named Deep");
+        };
+        let site_inner = a.get_symbol(site_inner).expect("M.Inner has a symbol");
+        let deep = a.get_symbol(deep).expect("M.Inner.Deep has a symbol");
+        assert_eq!(a.parent_symbol_map.get(&deep), Some(&site_inner));
+        assert_eq!(a.get_qualified_name(&deep).to_string(), "M.Inner.Deep");
     });
 }
 
