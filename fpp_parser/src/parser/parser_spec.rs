@@ -1040,6 +1040,83 @@ fn trans_unit_all_input_error() {
     );
 }
 
+/// The line and column of the first error that parsing `s` as a translation
+/// unit reports, if it reports one
+fn first_error_location(s: &str) -> Option<(u32, u32)> {
+    let mut diagnostics = vec![];
+    let mut ctx = fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
+    fpp_core::run(&mut ctx, || {
+        let source_file = SourceFile::new("input.fpp", s.to_string());
+        super::parse(source_file, |p| p.trans_unit(), None);
+    });
+    drop(ctx);
+
+    let diagnostics = String::from_utf8_lossy(&diagnostics).into_owned();
+    let location = diagnostics
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("--> "))?;
+    let mut parts = location.rsplit(':');
+    let column = parts.next()?.parse().ok()?;
+    let line = parts.next()?.parse().ok()?;
+    Some((line, column))
+}
+
+// Rust-only: when the input ends inside a member, the first error is where
+// the Scala parser reports it, at the furthest failure of the alternatives
+// of the member
+#[test]
+fn trans_unit_end_of_input_error() {
+    let cases = [
+        // A module template definition fails at the name of a module
+        ("@ M\nmodule M {", (2, 8)),
+        // A module definition expects a name where `template` is
+        ("module template T(", (1, 8)),
+        ("passive component C {\n  param get port", (2, 9)),
+        // The members that share the keyword of the member fail after it
+        (
+            "passive component C {\n  @ c\n  product container C id",
+            (3, 11),
+        ),
+        (
+            "passive component C {\n  @ e\n  event E(a: U32) severity",
+            (3, 9),
+        ),
+        (
+            "passive component C {\n  @ t\n  telemetry T: U32 id",
+            (3, 13),
+        ),
+        ("passive component C {\n  @ c\n  async command", (3, 9)),
+        (
+            "passive component C {\n  @ c\n  async command C(a: U32",
+            (3, 17),
+        ),
+        (
+            "passive component C {\n  @ p\n  sync input port p: T priority",
+            (3, 8),
+        ),
+        ("passive component C {\n  @ s\n  state machine S {", (3, 17)),
+        (
+            "passive component C {\n  @ s\n  state machine instance s: S priority",
+            (3, 17),
+        ),
+        (
+            "passive component C {\n  @ p\n  param p: U32 default",
+            (3, 9),
+        ),
+        ("topology T {\n  @ p\n  telemetry packets P {", (3, 13)),
+        (
+            "topology T {\n  @ p\n  telemetry connections instance a {",
+            (3, 13),
+        ),
+        ("@ d\ndictionary constant c = 1 +", (2, 12)),
+        // Without a pre-annotation, the member ends the sequence before it
+        ("module M {\n  module N {", (2, 3)),
+    ];
+    for (s, location) in cases {
+        assert_eq!(first_error_location(s), Some(location), "{s}");
+    }
+}
+
 #[test]
 fn type_name_error() {
     parse_all_error(|p| p.type_name(), &["a.", "1+3"]);

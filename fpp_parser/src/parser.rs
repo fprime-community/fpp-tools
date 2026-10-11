@@ -13,10 +13,11 @@
 //! except when the input ends inside an element. There the Scala parser reports
 //! the failure that got furthest among every alternative it tried, a failure at
 //! the end of the input counting as the least far. This parser makes that
-//! choice only between the alternatives of an element sequence, taking the
-//! failure of the others to be at the start of the element. So when the input
-//! ends inside an expression, a type name, or a member whose first keywords
-//! other members share, the first error can be at another token of the line.
+//! choice only between the alternatives of an element sequence, such as the
+//! members of a module, from the keywords they start with (see
+//! [ElementState]). So when the input ends inside an expression, a type name,
+//! a transition or another part of an element that has alternatives of its
+//! own, the first error can be at another token of the line.
 
 use crate::cursor::Cursor;
 use crate::error::{ParseError, ParseResult};
@@ -59,9 +60,18 @@ struct ElementState {
     backtrack: Option<(fpp_core::Span, TokenKind)>,
     /// Whether an error at the end of the input inside the element survives
     /// the alternatives of the element, which it does when the element is the
-    /// first alternative. Otherwise the alternatives before it fail at the
-    /// start of the element, and that failure is reported instead.
+    /// first alternative. Otherwise the furthest failure of the other
+    /// alternatives, at the start of the element or at
+    /// `alternatives_fail_at`, is reported instead.
     eof_error_survives: bool,
+    /// The token past the start of the element at which the alternatives this
+    /// parser does not try fail, when they start with the keyword the element
+    /// starts with
+    alternatives_fail_at: Option<(fpp_core::Span, TokenKind)>,
+    /// The error of a later alternative that commits on the keyword the
+    /// element starts with, which is the failure of the element if the
+    /// element fails at the end of the input
+    alternative_error: Option<Box<ParseError>>,
 }
 
 /// A type, array, constant, enum or struct definition: the definitions that
@@ -143,6 +153,11 @@ impl<'a> Parser<'a> {
                 Ok(into_member!(self.type_or_constant_def()?, ComponentMember))
             }
             Keyword(State) => {
+                if self.peek(1) == Keyword(Machine) {
+                    // A state machine definition and a state machine instance
+                    // specifier each fail at the third token of the other
+                    self.alternatives_fail_at(2);
+                }
                 if self.peek(2) == Keyword(Instance) {
                     Ok(ComponentMember::SpecStateMachineInstance(
                         self.spec_state_machine_instance()?,
@@ -155,12 +170,32 @@ impl<'a> Parser<'a> {
                 if self.peek(1) == Keyword(Command)
                     && !matches!(self.peek(2), Keyword(Recv | Reg | Resp)) =>
             {
+                // A special port instance fails at the command name, or at
+                // `command` if the input ends there
+                match self.peek(2) {
+                    EOF => self.alternatives_fail_at(1),
+                    _ => self.alternatives_fail_at(2),
+                }
                 Ok(ComponentMember::SpecCommand(self.spec_command()?))
             }
-            Keyword(Async | Guarded | Sync | Output | Command | Text | Time) => Ok(
-                ComponentMember::SpecPortInstance(self.spec_port_instance()?),
-            ),
+            Keyword(Async | Guarded | Sync) => {
+                // A command fails at a special port kind that follows
+                // `command`; the other alternatives fail at the second token
+                match self.peek(1) {
+                    Keyword(Command) => self.alternatives_fail_at(2),
+                    _ => self.alternatives_fail_at(1),
+                }
+                Ok(ComponentMember::SpecPortInstance(
+                    self.spec_port_instance()?,
+                ))
+            }
+            Keyword(Output | Command | Text | Time) => Ok(ComponentMember::SpecPortInstance(
+                self.spec_port_instance()?,
+            )),
             Keyword(Product) => {
+                // A container, a record and a special port instance each fail
+                // at the second token of the others
+                self.alternatives_fail_at(1);
                 if self.peek(1) == Keyword(Container) {
                     Ok(ComponentMember::SpecContainer(self.spec_container()?))
                 } else if self.peek(1) == Keyword(Record) {
@@ -173,6 +208,9 @@ impl<'a> Parser<'a> {
                 }
             }
             Keyword(Event) => {
+                // An event specifier and an event port instance each fail at
+                // the second token of the other
+                self.alternatives_fail_at(1);
                 if self.peek(1) == Keyword(Port) {
                     Ok(ComponentMember::SpecPortInstance(
                         self.spec_port_instance()?,
@@ -188,14 +226,32 @@ impl<'a> Parser<'a> {
             Keyword(Match) => Ok(ComponentMember::SpecPortMatching(
                 self.spec_port_matching()?,
             )),
-            Keyword(Param) if self.peek(1) == Keyword(Get) || self.peek(1) == Keyword(Set) => Ok(
-                ComponentMember::SpecPortInstance(self.spec_port_instance()?),
-            ),
-            Keyword(Param | External) => Ok(ComponentMember::SpecParam(self.spec_param()?)),
-            Keyword(Telemetry) if self.peek(1) == Keyword(Port) => Ok(
-                ComponentMember::SpecPortInstance(self.spec_port_instance()?),
-            ),
-            Keyword(Telemetry) => Ok(ComponentMember::SpecTlmChannel(self.spec_tlm_channel()?)),
+            Keyword(Param) if self.peek(1) == Keyword(Get) || self.peek(1) == Keyword(Set) => {
+                // A parameter specifier, a later alternative, commits after
+                // `param` and expects a name where `get` or `set` is
+                self.alternative_expects_identifier_at(1);
+                Ok(ComponentMember::SpecPortInstance(
+                    self.spec_port_instance()?,
+                ))
+            }
+            Keyword(Param) => {
+                // A parameter port instance fails at the second token
+                self.alternatives_fail_at(1);
+                Ok(ComponentMember::SpecParam(self.spec_param()?))
+            }
+            Keyword(External) => Ok(ComponentMember::SpecParam(self.spec_param()?)),
+            Keyword(Telemetry) => {
+                // A telemetry channel specifier and a telemetry port instance
+                // each fail at the second token of the other
+                self.alternatives_fail_at(1);
+                if self.peek(1) == Keyword(Port) {
+                    Ok(ComponentMember::SpecPortInstance(
+                        self.spec_port_instance()?,
+                    ))
+                } else {
+                    Ok(ComponentMember::SpecTlmChannel(self.spec_tlm_channel()?))
+                }
+            }
             Keyword(Import) => Ok(ComponentMember::SpecInterfaceImport(self.spec_import()?)),
             _ => Err(self.cursor.err_expected_one_of(
                 "component member expected",
@@ -233,7 +289,11 @@ impl<'a> Parser<'a> {
     /// `array`, `constant`, `enum` or `struct`.
     fn type_or_constant_def(&mut self) -> ParseResult<TypeOrConstantDef> {
         let kind = match self.peek(0) {
-            Keyword(Dictionary) => self.peek(1),
+            Keyword(Dictionary) => {
+                // The other dictionary definitions fail after `dictionary`
+                self.alternatives_fail_at(1);
+                self.peek(1)
+            }
             kind => kind,
         };
         match kind {
@@ -513,6 +573,9 @@ impl<'a> Parser<'a> {
                     // A general port instance is the first alternative of a
                     // member
                     self.first_alternative();
+                } else if matches!(self.peek(0), Keyword(Async | Guarded | Sync)) {
+                    // A general port instance fails at the second token
+                    self.alternatives_fail_at(1);
                 }
                 Ok(InterfaceMember::SpecPortInstance(
                     self.spec_port_instance()?,
@@ -1225,9 +1288,16 @@ impl<'a> Parser<'a> {
             Keyword(Interface) => Ok(ModuleMember::DefInterface(self.def_interface()?)),
             Keyword(Module) => match self.peek(1) {
                 Keyword(Template) => {
+                    // A module definition, a later alternative, commits after
+                    // `module` and expects a name where `template` is
+                    self.alternative_expects_identifier_at(1);
                     Ok(ModuleMember::DefModuleTemplate(self.def_module_template()?))
                 }
-                _ => Ok(ModuleMember::DefModule(self.def_module()?)),
+                _ => {
+                    // A module template definition fails at the second token
+                    self.alternatives_fail_at(1);
+                    Ok(ModuleMember::DefModule(self.def_module()?))
+                }
             },
             Keyword(Port) => Ok(ModuleMember::DefPort(self.def_port()?)),
             Keyword(State) => Ok(ModuleMember::DefStateMachine(self.def_state_machine()?)),
@@ -2535,10 +2605,19 @@ impl<'a> Parser<'a> {
             }
             Keyword(Include) => Ok(TopologyMember::SpecInclude(self.spec_include()?)),
             Keyword(Port) => Ok(TopologyMember::SpecTopPort(self.spec_top_port()?)),
-            Keyword(Telemetry) if self.peek(1) == Keyword(Packets) => Ok(
-                TopologyMember::SpecTlmPacketSet(self.spec_tlm_packet_set()?),
-            ),
-            Keyword(Connections | Command | Event | Health | Param | Telemetry | Text | Time) => {
+            Keyword(Telemetry) => {
+                // A telemetry pattern graph and a telemetry packet set each
+                // fail at the second token of the other
+                self.alternatives_fail_at(1);
+                if self.peek(1) == Keyword(Packets) {
+                    Ok(TopologyMember::SpecTlmPacketSet(
+                        self.spec_tlm_packet_set()?,
+                    ))
+                } else {
+                    self.spec_connection_graph()
+                }
+            }
+            Keyword(Connections | Command | Event | Health | Param | Text | Time) => {
                 self.spec_connection_graph()
             }
             _ => Err(self.cursor.err_expected_one_of(
@@ -2863,6 +2942,26 @@ impl<'a> Parser<'a> {
         self.element.eof_error_survives = true;
     }
 
+    /// Record that the alternatives of the element being parsed that this
+    /// parser does not try fail at the token `n` tokens ahead
+    fn alternatives_fail_at(&mut self, n: usize) {
+        self.element.alternatives_fail_at = self.peek_token_at(n);
+    }
+
+    /// Record that a later alternative of the element being parsed commits on
+    /// its first keyword and then expects an identifier at the token `n`
+    /// tokens ahead
+    fn alternative_expects_identifier_at(&mut self, n: usize) {
+        self.element.alternative_error = self.peek_token_at(n).map(|(last, got)| {
+            Box::new(ParseError::ExpectedToken {
+                expected: Identifier,
+                got,
+                last,
+                msg: "unexpected token",
+            })
+        });
+    }
+
     /// The token that ends the innermost element sequence
     fn sequence_end(&self) -> TokenKind {
         self.ends.last().copied().unwrap_or(EOF)
@@ -2892,8 +2991,13 @@ impl<'a> Parser<'a> {
 
     /// The span and kind of the next token, if any
     fn peek_token(&mut self) -> Option<(fpp_core::Span, TokenKind)> {
-        let span = self.peek_span(0)?;
-        Some((span, self.peek(0)))
+        self.peek_token_at(0)
+    }
+
+    /// The span and kind of the token `n` tokens ahead, if any
+    fn peek_token_at(&mut self, n: usize) -> Option<(fpp_core::Span, TokenKind)> {
+        let span = self.peek_span(n)?;
+        Some((span, self.peek(n)))
     }
 
     /// The error for an unexpected next token
@@ -2947,13 +3051,24 @@ impl<'a> Parser<'a> {
     /// pre-annotations, if there is one. Returns whether the sequence goes on.
     fn element_failed(
         &mut self,
-        err: ParseError,
-        state: ElementState,
+        mut err: ParseError,
+        mut state: ElementState,
         annotation_start: Option<(fpp_core::Span, TokenKind)>,
         element_start: Option<(fpp_core::Span, TokenKind)>,
         punct: TokenKind,
     ) -> bool {
-        let at_eof = self.peek(0) == EOF;
+        let mut at_eof = self.peek(0) == EOF;
+        if at_eof
+            && !(state.committed && state.eof_error_survives)
+            && let Some(alternative_error) = state.alternative_error.take()
+        {
+            // The later alternative fails before the end of the input, so
+            // its error is the failure of the element
+            err = *alternative_error;
+            state.committed = true;
+            at_eof = false;
+            self.eof_error = None;
+        }
         let file_level = self.sequence_end() == EOF;
         // An error at the end of the input is the lowest-placed failure, so
         // unless the element is the first alternative, the failure of an
@@ -2975,12 +3090,11 @@ impl<'a> Parser<'a> {
             self.sequence_ended_at_stop(err, stop, dropped)
         } else if let (Some(_), Some(element_start)) = (annotation_start, element_start) {
             // The pre-annotations commit to the element, which fails where it
-            // stops, or at its start if it stops at the end of the input
+            // stops, or, if it stops at the end of the input, where the other
+            // alternatives fail
             if at_eof {
-                ParseError::UnexpectedToken {
-                    got_kind: element_start.1,
-                    got_span: element_start.0,
-                }
+                let (got_span, got_kind) = state.alternatives_fail_at.unwrap_or(element_start);
+                ParseError::UnexpectedToken { got_kind, got_span }
             } else {
                 err
             }
