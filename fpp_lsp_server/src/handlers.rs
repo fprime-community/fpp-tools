@@ -824,6 +824,21 @@ fn state_machine_completion_kind(
     None
 }
 
+/// Whether the cursor starts a name of the implements clause of a topology: the
+/// token to its left is the `implements` keyword or a comma between the port
+/// interface names of the clause.
+///
+/// The list of names may be empty, so a missing name there is no syntax error
+/// and the error-driven completion does not reach it.
+fn starts_implements_clause_name(left_token: &SyntaxToken) -> bool {
+    matches!(
+        left_token.kind(),
+        SyntaxKind::IMPLEMENTS_KW | SyntaxKind::COMMA
+    ) && left_token
+        .parent()
+        .is_some_and(|p| p.kind() == SyntaxKind::IMPLEMENTS_CLAUSE)
+}
+
 pub fn handle_completion(
     state: &GlobalState,
     request: CompletionParams,
@@ -1145,6 +1160,19 @@ pub fn handle_completion(
         Ok(
             completion_items_for_sm(state, &uri, cursor_pos.into(), sm_kind)
                 .map(CompletionResponse::Array),
+        )
+    } else if starts_implements_clause_name(&left_token) {
+        // A port interface name of a topology's implements clause. An
+        // implements clause is never inside a template parameter list.
+        Ok(
+            completion_items_in_name_group(
+                state,
+                cursor_pos,
+                NameGroup::PortInterface,
+                &uri,
+                false,
+            )
+            .map(CompletionResponse::Array),
         )
     } else {
         // Check for parsing errors to extract the next expected token

@@ -20,7 +20,8 @@ use fpp_core::{Annotated, Span, Spanned};
 /// A source-order sort key for a span: `(file, byte offset)`. Ordering diagram
 /// elements by this makes the layout follow the order things appear in the FPP
 /// source, so reordering states in the source reorders them in the diagram.
-/// Mirrors `fpp_analysis`'s `cmp_span`.
+/// It orders spans as [`Span::compare`] does, by file and then position, without
+/// the include and expansion locations that [`Span::compare`] goes on to compare.
 type SpanKey = (String, u32);
 
 fn span_key(span: Span) -> SpanKey {
@@ -67,10 +68,10 @@ pub fn lower_state_machine(
         });
     }
 
-    // All transitions. `arc_map` iterates in the order the transition graph was
-    // built, which is not source order, so build every edge keyed by its source
-    // location, sort by that, then assign sequential ids. Ordering by span makes
-    // transitions lay out in source order.
+    // All transitions. `arc_map` groups the arcs by their start node, so it does
+    // not iterate them in source order. Build every edge keyed by its source
+    // location, sort by that, then assign sequential ids, so the transitions lay
+    // out in source order.
     let mut arc_edges: Vec<(SpanKey, SmEdge)> = sma
         .transition_graph
         .arc_map
@@ -103,10 +104,11 @@ pub fn lower_state_machine(
 
 /// Build a node for every state and choice in the transition graph.
 ///
-/// `arc_map` iterates in the order the transition graph was built, which is not
-/// source order, so we sort the resulting nodes by their definition's source
-/// location: states lay out in the order they appear in the FPP source, so
-/// reordering the source reorders the diagram.
+/// The nodes are sorted by the source location of their definitions: states lay
+/// out in the order they appear in the FPP source, so reordering the source
+/// reorders the diagram. `arc_map` holds the nodes in the order the transition
+/// graph added them, which is the order of the definitions once the includes
+/// are resolved; the sort keeps the layout independent of that order.
 fn state_and_choice_nodes(sma: &StateMachineAnalysis) -> Vec<SmNode> {
     let mut nodes: Vec<(SpanKey, SmNode)> = sma
         .transition_graph

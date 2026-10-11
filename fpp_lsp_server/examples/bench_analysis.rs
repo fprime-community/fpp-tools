@@ -40,6 +40,9 @@ fn main() {
             None,
         );
 
+        // Several specifiers locate definitions in one file, which is one
+        // translation unit, as the server's set of locs files has it.
+        let mut seen = std::collections::HashSet::new();
         let files: Vec<String> = locs_tu
             .into_iter()
             .filter_map(|m| match m {
@@ -48,6 +51,7 @@ fn main() {
                 }
                 _ => None,
             })
+            .filter(|file| seen.insert(file.clone()))
             .collect();
 
         eprintln!("discovered {} translation units", files.len());

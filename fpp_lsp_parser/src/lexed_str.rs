@@ -41,7 +41,6 @@ impl<'a> LexedStr<'a> {
                 token: token as u32,
             });
         }
-        res.add_unknown_token_errors();
         res.error.sort_by_key(|e| e.token);
         res
     }
@@ -57,29 +56,6 @@ impl<'a> LexedStr<'a> {
             self.start[..n].partition_point(|&s| (s as usize) <= pos)
         };
         after.saturating_sub(1).min(n.saturating_sub(1))
-    }
-
-    /// Report the characters of an `UNKNOWN` token that the lexer did not
-    /// already report. These are the characters that cannot begin any token;
-    /// the parser skips them, as the Scala lexer does after reporting them.
-    fn add_unknown_token_errors(&mut self) {
-        for i in 0..self.len() {
-            if self.kind[i] != UNKNOWN || self.error.iter().any(|e| e.token as usize == i) {
-                continue;
-            }
-            let text = self.text(i);
-            let msgs = match text {
-                "$" => vec!["invalid usage of '$', expected identifier".to_string()],
-                "<" | ">" => vec![format!("'{text}'")],
-                _ => text.chars().map(invalid_character_message).collect(),
-            };
-            for msg in msgs {
-                self.error.push(LexError {
-                    msg: format!("invalid token: {msg}"),
-                    token: i as u32,
-                });
-            }
-        }
     }
 
     pub fn as_str(&self) -> &str {
@@ -174,22 +150,6 @@ impl<'a> Converter<'a> {
     fn push(&mut self, kind: SyntaxKind, len: usize) {
         self.res.push(kind, self.offset);
         self.offset += len;
-    }
-}
-
-/// The message for a character that cannot begin a token: its unicode value,
-/// in case the console cannot display it, with a note for a tab character.
-fn invalid_character_message(ch: char) -> String {
-    let prefix = format!("unicode value {}, hex 0x{:x}", ch as u32, ch as u32);
-    if ch == '\t' {
-        [
-            prefix.as_str(),
-            "note: embedded tab characters are not allowed in FPP source files",
-            "try configuring your editor to convert tabs to spaces",
-        ]
-        .join("\n")
-    } else {
-        prefix
     }
 }
 
@@ -346,6 +306,54 @@ impl From<TokenKind> for SyntaxKind {
             TokenKind::Star => STAR,
             TokenKind::ShiftLeft => SHIFT_LEFT,
             TokenKind::ShiftRight => SHIFT_RIGHT,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LexedStr;
+    use crate::SyntaxKind::UNKNOWN;
+
+    /// Each error of the lexer is reported once, on the token it was reported
+    /// for, including the characters that cannot begin a token
+    #[test]
+    fn each_lexer_error_is_reported_once() {
+        let text = "\t $ \u{2122}\u{2122} < > % 1.5x \"abc\n";
+        let mut lexer = fpp_lexer::Lexer::new(text);
+        lexer.by_ref().for_each(drop);
+        // Each error of this input starts where the token it is reported on
+        // starts
+        let expected: Vec<(usize, String)> = lexer
+            .errors()
+            .map(|e| {
+                let mut msg = format!("invalid token: {}", e.msg);
+                if !e.notes.is_empty() {
+                    msg.push_str("\nnote: ");
+                    msg.push_str(&e.notes.join("\n"));
+                }
+                (e.pos, msg)
+            })
+            .collect();
+
+        let lexed = LexedStr::new(text);
+        let errors: Vec<(usize, String)> = lexed
+            .errors()
+            .map(|(token, msg)| (lexed.text_start(token), msg.to_string()))
+            .collect();
+        assert_eq!(errors, expected);
+
+        let unknown: Vec<usize> = (0..lexed.len())
+            .filter(|&i| lexed.kind(i) == UNKNOWN)
+            .collect();
+        assert_eq!(unknown.len(), 7);
+        for i in unknown {
+            assert_eq!(
+                lexed.errors().filter(|&(token, _)| token == i).count(),
+                1,
+                "{:?}",
+                lexed.text(i)
+            );
         }
     }
 }

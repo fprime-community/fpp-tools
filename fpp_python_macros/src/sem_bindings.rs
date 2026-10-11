@@ -1897,9 +1897,9 @@ fn py_getter_ident(name: &Ident) -> Ident {
 /// `get_node_id` native, whose `get_` PyO3 strips — and every `.node` is an object
 /// (`Component.node`, `Event.node`). So a member literally named `node` that hands
 /// back an `int` reads as the one thing it is not, and the failure surfaces far from
-/// the read. The three members this catches (`Symbol.node`,
-/// `StateMachineSymbol.node`, `UseDefMatching.node`) each have the node object one
-/// hop away, as `definition` / `symbol.definition`.
+/// the read. The two members this catches (`Symbol.node` and
+/// `StateMachineSymbol.node`) each have the node object one hop away, as
+/// `definition`.
 ///
 /// The old name is *removed*, not aliased: an alias that returns an `int` under a
 /// name the rest of the API uses for an object would preserve exactly the confusion
@@ -2750,8 +2750,9 @@ fn emit_entity_clone(e: &EntityDecl, field: &Ident, reg: &Registry) -> (TokenStr
     let push_field = |getters: &mut Vec<TokenStream>, f: &FieldDecl, access: TokenStream| {
         let expr = f.shape.expr(&access, &model, &data, reg);
         // A `node`-shaped FIELD named `node` is an AST node id just as the method of
-        // that name is, so it is renamed the same way (see `renames_to_node_id`) —
-        // otherwise the trap survives one class over, on `UseDefMatching`.
+        // that name is, so it is renamed the same way (see `renames_to_node_id`).
+        // No entity of the DSL declares such a field; the rename keeps one that
+        // does from bringing the trap back as a field.
         let name = if renames_to_node_id(&f.name, true, &f.shape) {
             format_ident!("node_id")
         } else {

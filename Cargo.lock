@@ -391,6 +391,7 @@ name = "fpp_core"
 version = "0.0.0"
 dependencies = [
  "line-index",
+ "percent-encoding",
  "rustc-hash 2.1.1",
  "scoped-tls",
 ]
