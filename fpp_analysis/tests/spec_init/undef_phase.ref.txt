@@ -1,5 +1,7 @@
  --> [ local path prefix ]/spec_init/undef_phase.fpp:7:9
   |
 7 |   phase P "c phase P"
-  |         ^ cannot find constant `P` in scope
+  |         ^ symbol P is not defined
+  |
+  = note: looking for a constant here
 

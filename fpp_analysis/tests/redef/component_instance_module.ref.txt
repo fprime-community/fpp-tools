@@ -11,5 +11,7 @@
  --> [ local path prefix ]/redef/component_instance_module.fpp:1:13
   |
 1 | instance M: m base id 0
-  |             ^ cannot find component `m` in scope
+  |             ^ symbol m is not defined
+  |
+  = note: looking for a component here
 

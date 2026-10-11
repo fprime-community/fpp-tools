@@ -1,5 +1,7 @@
  --> [ local path prefix ]/state_machine/undef/qualified_target.fpp:6:19
   |
 6 |   initial enter S.Missing
-  |                   ^^^^^^^ cannot find state `Missing` in scope
+  |                   ^^^^^^^ symbol Missing is not defined
+  |
+  = note: looking for a state here
 

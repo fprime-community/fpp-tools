@@ -1,5 +1,7 @@
  --> [ local path prefix ]/state_machine/undef/state_error.fpp:2:17
   |
 2 |   initial enter S
-  |                 ^ cannot find state `S` in scope
+  |                 ^ symbol S is not defined
+  |
+  = note: looking for a state here
 

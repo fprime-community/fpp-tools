@@ -1,10 +1,14 @@
  --> [ local path prefix ]/connection_direct/undef_instance.fpp:3:5
   |
 3 |     c.out -> c.in
-  |     ^ cannot find component instance or topology `c` in scope
+  |     ^ symbol c is not defined
+  |
+  = note: looking for a component instance or topology here
 
  --> [ local path prefix ]/connection_direct/undef_instance.fpp:3:14
   |
 3 |     c.out -> c.in
-  |              ^ cannot find component instance or topology `c` in scope
+  |              ^ symbol c is not defined
+  |
+  = note: looking for a component instance or topology here
 

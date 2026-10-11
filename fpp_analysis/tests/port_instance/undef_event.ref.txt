@@ -1,8 +1,9 @@
  --> [ local path prefix ]/port_instance/undef_event.fpp:3:3
   |
 3 |   event port eventOut
-  |   ^^^^^^^^^^^^^^^^^^^ cannot find port `Fw` in scope
+  |   ^^^^^^^^^^^^^^^^^^^ symbol Fw is not defined
   |
+  = note: looking for a port here
   = note: the symbol Fw.Log has an implied use at the point of the error
 
  --> [ local path prefix ]/port_instance/undef_event.fpp:3:3

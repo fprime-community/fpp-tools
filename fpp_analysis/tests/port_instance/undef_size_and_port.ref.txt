@@ -1,15 +1,21 @@
  --> [ local path prefix ]/port_instance/undef_size_and_port.fpp:2:23
   |
 2 |   sync input port p: [undefSize] UndefPort priority undefPriority
-  |                       ^^^^^^^^^ cannot find constant `undefSize` in scope
+  |                       ^^^^^^^^^ symbol undefSize is not defined
+  |
+  = note: looking for a constant here
 
  --> [ local path prefix ]/port_instance/undef_size_and_port.fpp:2:34
   |
 2 |   sync input port p: [undefSize] UndefPort priority undefPriority
-  |                                  ^^^^^^^^^ cannot find port `UndefPort` in scope
+  |                                  ^^^^^^^^^ symbol UndefPort is not defined
+  |
+  = note: looking for a port here
 
  --> [ local path prefix ]/port_instance/undef_size_and_port.fpp:2:53
   |
 2 |   sync input port p: [undefSize] UndefPort priority undefPriority
-  |                                                     ^^^^^^^^^^^^^ cannot find constant `undefPriority` in scope
+  |                                                     ^^^^^^^^^^^^^ symbol undefPriority is not defined
+  |
+  = note: looking for a constant here
 

@@ -1,7 +1,9 @@
  --> [ local path prefix ]/enum/rep_type_string_size_scope.fpp:2:22
   |
 2 | enum E : string size A { A = 1 }
-  |                      ^ cannot find constant `A` in scope
+  |                      ^ symbol A is not defined
+  |
+  = note: looking for a constant here
 
  --> [ local path prefix ]/enum/rep_type_string_size_scope.fpp:2:10
   |

@@ -1,5 +1,7 @@
  --> [ local path prefix ]/port_instance/undef_general.fpp:3:22
   |
 3 |   sync input port p: P
-  |                      ^ cannot find port `P` in scope
+  |                      ^ symbol P is not defined
+  |
+  = note: looking for a port here
 

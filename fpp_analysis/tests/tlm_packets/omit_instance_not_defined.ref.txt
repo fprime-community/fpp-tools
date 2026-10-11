@@ -1,5 +1,7 @@
  --> [ local path prefix ]/tlm_packets/omit_instance_not_defined.fpp:6:5
   |
 6 |     u.T
-  |     ^ cannot find component instance or topology `u` in scope
+  |     ^ symbol u is not defined
+  |
+  = note: looking for a component instance or topology here
 

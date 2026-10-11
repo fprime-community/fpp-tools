@@ -1,5 +1,7 @@
  --> [ local path prefix ]/state_machine/undef/nested_action_error.fpp:4:18
   |
 4 |     initial do { a } enter T
-  |                  ^ cannot find action `a` in scope
+  |                  ^ symbol a is not defined
+  |
+  = note: looking for a action here
 

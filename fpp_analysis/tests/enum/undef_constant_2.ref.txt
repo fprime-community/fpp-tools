@@ -1,7 +1,9 @@
  --> [ local path prefix ]/enum/undef_constant_2.fpp:2:16
   |
 2 | constant a = E.X
-  |                ^ cannot find constant `X` in scope
+  |                ^ symbol X is not defined
+  |
+  = note: looking for a constant here
 
  --> [ local path prefix ]/enum/undef_constant_2.fpp:1:1
   |

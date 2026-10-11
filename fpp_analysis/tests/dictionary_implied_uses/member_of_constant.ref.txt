@@ -18,8 +18,9 @@
 27 | / deployment topology T {
 28 | |   
 29 | | }
-   | |_^ cannot find type `DpCfg` in scope
+   | |_^ symbol DpCfg is not defined
    |
+   = note: looking for a type here
    = note: the symbol Fw.DpCfg.ProcType has an implied use at the point of the error
    = note: this implied use occurs when constructing a dictionary
 

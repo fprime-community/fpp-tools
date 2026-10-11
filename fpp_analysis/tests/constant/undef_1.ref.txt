@@ -1,5 +1,7 @@
  --> [ local path prefix ]/constant/undef_1.fpp:1:14
   |
 1 | constant b = a
-  |              ^ cannot find constant `a` in scope
+  |              ^ symbol a is not defined
+  |
+  = note: looking for a constant here
 

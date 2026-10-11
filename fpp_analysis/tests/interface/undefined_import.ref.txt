@@ -1,5 +1,7 @@
  --> [ local path prefix ]/interface/undefined_import.fpp:2:12
   |
 2 |     import Nope
-  |            ^^^^ cannot find interface `Nope` in scope
+  |            ^^^^ symbol Nope is not defined
+  |
+  = note: looking for a interface here
 

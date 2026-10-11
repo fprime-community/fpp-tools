@@ -1,5 +1,7 @@
  --> [ local path prefix ]/template/expand_absolute_undefined.fpp:4:10
   |
 4 |   expand .T
-  |          ^^ cannot find template `T` in scope
+  |          ^^ symbol T is not defined
+  |
+  = note: looking for a template here
 

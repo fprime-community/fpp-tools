@@ -1,10 +1,14 @@
  --> [ local path prefix ]/connection_pattern/undef_source_and_target.fpp:2:32
   |
 2 |   command connections instance undefSource { undefTarget }
-  |                                ^^^^^^^^^^^ cannot find component instance or topology `undefSource` in scope
+  |                                ^^^^^^^^^^^ symbol undefSource is not defined
+  |
+  = note: looking for a component instance or topology here
 
  --> [ local path prefix ]/connection_pattern/undef_source_and_target.fpp:2:46
   |
 2 |   command connections instance undefSource { undefTarget }
-  |                                              ^^^^^^^^^^^ cannot find component instance or topology `undefTarget` in scope
+  |                                              ^^^^^^^^^^^ symbol undefTarget is not defined
+  |
+  = note: looking for a component instance or topology here
 

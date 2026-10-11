@@ -532,7 +532,7 @@ class Diagnostic:
     def display(self) -> builtins.str:
         r"""
         This diagnostic as a one-line compiler message:
-        `"path/to/file.fpp:12:5: error: cannot find type `Nope` in scope"`, or
+        `"path/to/file.fpp:12:5: error: symbol Nope is not defined"`, or
         `"error: <message>"` when there is no location.
 
         The children are not part of it — see `render` for the full rendering.

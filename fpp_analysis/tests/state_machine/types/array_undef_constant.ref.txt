@@ -1,5 +1,7 @@
  --> [ local path prefix ]/state_machine/types/array_undef_constant.fpp:2:29
   |
 2 |   array A = [3] U32 default a
-  |                             ^ cannot find constant `a` in scope
+  |                             ^ symbol a is not defined
+  |
+  = note: looking for a constant here
 

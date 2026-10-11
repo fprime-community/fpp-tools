@@ -1,12 +1,15 @@
  --> [ local path prefix ]/port_instance/undef_priority_and_implied_port.fpp:2:50
   |
 2 |   async product recv port productRecvIn priority undefPriority
-  |                                                  ^^^^^^^^^^^^^ cannot find constant `undefPriority` in scope
+  |                                                  ^^^^^^^^^^^^^ symbol undefPriority is not defined
+  |
+  = note: looking for a constant here
 
  --> [ local path prefix ]/port_instance/undef_priority_and_implied_port.fpp:2:3
   |
 2 |   async product recv port productRecvIn priority undefPriority
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot find port `Fw` in scope
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ symbol Fw is not defined
   |
+  = note: looking for a port here
   = note: the symbol Fw.DpResponse has an implied use at the point of the error
 

@@ -1,5 +1,7 @@
  --> [ local path prefix ]/state_machine/types/struct_undef_constant.fpp:2:37
   |
 2 |   struct S { x: U32 } default { x = a }
-  |                                     ^ cannot find constant `a` in scope
+  |                                     ^ symbol a is not defined
+  |
+  = note: looking for a constant here
 

@@ -1,25 +1,35 @@
  --> [ local path prefix ]/state_machine/undef/stress_multi.fpp:3:8
   |
 3 |     on sig1 enter Bogus
-  |        ^^^^ cannot find signal `sig1` in scope
+  |        ^^^^ symbol sig1 is not defined
+  |
+  = note: looking for a signal here
 
  --> [ local path prefix ]/state_machine/undef/stress_multi.fpp:3:19
   |
 3 |     on sig1 enter Bogus
-  |                   ^^^^^ cannot find state `Bogus` in scope
+  |                   ^^^^^ symbol Bogus is not defined
+  |
+  = note: looking for a state here
 
  --> [ local path prefix ]/state_machine/undef/stress_multi.fpp:4:8
   |
 4 |     on sig2 do { badAction } enter S
-  |        ^^^^ cannot find signal `sig2` in scope
+  |        ^^^^ symbol sig2 is not defined
+  |
+  = note: looking for a signal here
 
  --> [ local path prefix ]/state_machine/undef/stress_multi.fpp:4:18
   |
 4 |     on sig2 do { badAction } enter S
-  |                  ^^^^^^^^^ cannot find action `badAction` in scope
+  |                  ^^^^^^^^^ symbol badAction is not defined
+  |
+  = note: looking for a action here
 
  --> [ local path prefix ]/state_machine/undef/stress_multi.fpp:6:17
   |
 6 |   initial enter Nowhere
-  |                 ^^^^^^^ cannot find state `Nowhere` in scope
+  |                 ^^^^^^^ symbol Nowhere is not defined
+  |
+  = note: looking for a state here
 

@@ -655,7 +655,7 @@ def test_diagnostic_display_is_one_indexed_and_location_is_zero_indexed():
     assert diagnostic.location.line == 0
     assert diagnostic.location.column == 27
     assert diagnostic.display == (
-        "<string>:1:28: error: cannot find type `Nope` in scope"
+        "<string>:1:28: error: symbol Nope is not defined"
     )
     assert repr(diagnostic) == f"<Diagnostic {diagnostic.display}>"
 
@@ -668,7 +668,9 @@ def test_diagnostic_str_is_the_console_rendering():
         " --> <string>:1:28\n"
         "  |\n"
         "1 | module Bad { struct S { x: Nope } }\n"
-        "  |                            ^^^^ cannot find type `Nope` in scope"
+        "  |                            ^^^^ symbol Nope is not defined\n"
+        "  |\n"
+        "  = note: looking for a type here"
     )
 
 
@@ -801,7 +803,7 @@ def test_a_diagnostic_error_carries_a_diagnostic_or_nothing_at_all():
 def test_model_diagnostics_are_freshly_built_on_each_read():
     bad = f.analyze(source="module Bad { struct S { x: Nope } }")
     bad.diagnostics[0].message = "rewritten"
-    assert bad.diagnostics[0].message == "cannot find type `Nope` in scope"
+    assert bad.diagnostics[0].message == "symbol Nope is not defined"
 
 
 def test_a_diagnostics_level_and_kind_are_enums_not_strings():

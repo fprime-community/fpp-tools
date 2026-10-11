@@ -1,5 +1,7 @@
  --> [ local path prefix ]/component_instance_def/undef_component.fpp:1:13
   |
 1 | instance c: C base id 0x100
-  |             ^ cannot find component `C` in scope
+  |             ^ symbol C is not defined
+  |
+  = note: looking for a component here
 

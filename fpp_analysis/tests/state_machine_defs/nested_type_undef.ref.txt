@@ -1,7 +1,9 @@
  --> [ local path prefix ]/state_machine_defs/nested_type_undef.fpp:2:15
   |
 2 |   signal sig: Undefined
-  |               ^^^^^^^^^ cannot find type `Undefined` in scope
+  |               ^^^^^^^^^ symbol Undefined is not defined
+  |
+  = note: looking for a type here
 
  --> [ local path prefix ]/state_machine_defs/nested_type_undef.fpp:1:1
   |

@@ -1,7 +1,9 @@
  --> [ local path prefix ]/state_machine_instance/undef_state_machine.fpp:3:30
   |
 3 |   state machine instance s1: S
-  |                              ^ cannot find state machine `S` in scope
+  |                              ^ symbol S is not defined
+  |
+  = note: looking for a state machine here
 
  --> [ local path prefix ]/state_machine_instance/undef_state_machine.fpp:1:1
   |

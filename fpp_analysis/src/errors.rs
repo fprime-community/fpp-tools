@@ -1382,11 +1382,8 @@ impl From<SemanticError> for Diagnostic {
                 name,
                 symbol_kind,
                 loc,
-            } => Diagnostic::new(
-                loc,
-                Level::Error,
-                format!("cannot find {} `{}` in scope", symbol_kind, name),
-            ),
+            } => Diagnostic::new(loc, Level::Error, format!("symbol {} is not defined", name))
+                .note(format!("looking for a {} here", symbol_kind)),
             SemanticError::UseDefCycle {
                 loc,
                 use_def_matching_list,
