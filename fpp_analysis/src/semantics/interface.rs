@@ -2,7 +2,7 @@ use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{Symbol, SymbolInterface};
 use fpp_ast::{
-    AstNode, GeneralPortInstanceKind, Ident, InputPortKind, QueueFull, SpecGeneralPortInstance,
+    AstNode, Expr, GeneralPortInstanceKind, Ident, InputPortKind, QueueFull, SpecGeneralPortInstance,
     SpecInterfaceImport, SpecInternalPort, SpecSpecialPortInstance, SpecTopPort,
     SpecialPortInstanceKind,
 };
@@ -263,7 +263,7 @@ impl GeneralPortInstance {
         }
 
         // Get the size
-        let size = a.get_array_size_opt(&specifier.size)?;
+        let size = get_array_size(a, &specifier.size)?;
         // Get the priority
         let priority = a.get_big_int_value_opt(&specifier.priority);
 
@@ -710,6 +710,14 @@ impl PortInstance {
         Ok(PortInstance::Internal(InternalPortInstance::from_spec(
             a, specifier,
         )?))
+    }
+}
+
+/// Gets an array size from an AST node
+fn get_array_size(a: &Analysis, size_opt: &Option<Expr>) -> SemanticResult<i128> {
+    match size_opt {
+        Some(size) => a.get_array_size(size.node_id, size.span()),
+        None => Ok(1),
     }
 }
 
