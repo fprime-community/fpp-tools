@@ -31,5 +31,15 @@ impl From<Option<Symbol>> for ScopeOwner {
 /// A stack of scopes
 pub type NestedScope = GenericNestedScope<ScopeOwner>;
 
+impl NestedScope {
+    /// Create an empty NestedScope
+    pub fn empty() -> NestedScope {
+        NestedScope::new(ScopeOwner::Global)
+    }
+}
+
+/// A local mapping of unqualified names to symbols
+pub type NameSymbolMap = GenericNameSymbolMap<Symbol>;
+
 /// A collection of name-symbol maps, one for each name group
-pub type Scope = GenericScope<NameGroup, Symbol, NameGroupMap<GenericNameSymbolMap<Symbol>>>;
+pub type Scope = GenericScope<NameGroup, Symbol, NameGroupMap<NameSymbolMap>>;

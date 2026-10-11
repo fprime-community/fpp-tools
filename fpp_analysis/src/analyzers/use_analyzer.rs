@@ -33,8 +33,8 @@ impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Analyzer<'ast, V> for UseAnalyzer
                     ExprKind::Dot { e, .. } => {
                         match a.use_def_map.get(&expr.id()) {
                             // e is a use, so it must be a constant use. A use
-                            // that names some other kind of symbol is still a
-                            // use: the constant use of a pass reports it.
+                            // of a symbol that is not a constant goes to the
+                            // constant use too, whose check rejects it.
                             Some(_) => {
                                 let use_name = QualifiedName::from(
                                     expr.get_ident_list_opt()

@@ -25,6 +25,27 @@ impl<'ast> CheckUseDefCycles<'ast> {
         }
     }
 
+    /// Visit a definition node with the symbol entered for it
+    fn visit_def(
+        &self,
+        a: &mut Analysis,
+        symbol: Option<Symbol>,
+        node: Node<'ast>,
+    ) -> ControlFlow<()> {
+        match symbol {
+            Some(symbol) => self.visit_def_post(a, symbol, |s, a| s.super_visit(a, node)),
+            None => ControlFlow::Continue(()),
+        }
+    }
+
+    fn error(&self, a: &Analysis, symbol: &Symbol) {
+        SemanticError::UseDefCycle {
+            loc: symbol.get_loc(),
+            use_def_matching_list: a.use_def_matching_list.clone(),
+        }
+        .emit();
+    }
+
     fn visit_def_pre(&self, a: &mut Analysis, symbol: Symbol) -> ControlFlow<()> {
         match symbol {
             Symbol::AliasType(node) => node.visit(a, self),
@@ -42,51 +63,13 @@ impl<'ast> CheckUseDefCycles<'ast> {
         }
     }
 
-    fn visit_use(
-        &self,
-        a: &mut Analysis,
-        node: fpp_core::Node,
-        use_name: QualifiedName,
-    ) -> ControlFlow<()> {
-        let symbol = match a.use_def_map.get(&node) {
-            // CheckUses failed in the last pass, don't do any more analysis
-            None => return ControlFlow::Continue(()),
-            Some(symbol) => symbol.clone(),
-        };
-
-        let m = UseDefMatching {
-            node,
-            qualified_name: use_name,
-            symbol: symbol.clone(),
-        };
-
-        // The extended matching list must be scoped to the current use-def
-        // path: push `m`, recurse into the visited subtree, then truncate back
-        // to the saved length on the way out — otherwise the list accretes
-        // entries from every resolved use in the translation unit and pollutes
-        // the `UseDefCycle` diagnostic.
-        let len = a.use_def_matching_list.len();
-        a.use_def_matching_list.push(m);
-        let result = self.visit_def_pre(a, symbol);
-        a.use_def_matching_list.truncate(len);
-        result
-    }
-
-    fn error(&self, a: &Analysis, symbol: &Symbol) {
-        SemanticError::UseDefCycle {
-            loc: symbol.get_loc(),
-            use_def_matching_list: a.use_def_matching_list.clone(),
-        }
-        .emit();
-    }
-
-    /// The use-def graph node for a symbol whose definition is not an AST
-    /// subtree of its own, so `visit` supplies the descent
-    fn visit_def_post_with(
+    /// Visit the definition of `symbol` with `visitor`, unless it is on the
+    /// current use-def path, which closes a cycle, or it has been visited
+    fn visit_def_post(
         &self,
         a: &mut Analysis,
         symbol: Symbol,
-        visit: impl FnOnce(&Self, &mut Analysis) -> ControlFlow<()>,
+        visitor: impl FnOnce(&Self, &mut Analysis) -> ControlFlow<()>,
     ) -> ControlFlow<()> {
         if a.use_def_symbol_set.contains(&symbol) {
             self.error(a, &symbol);
@@ -95,7 +78,7 @@ impl<'ast> CheckUseDefCycles<'ast> {
             ControlFlow::Break(())
         } else if !a.visited_symbol_set.contains(&symbol) {
             a.use_def_symbol_set.insert(symbol.clone());
-            visit(self, a)?;
+            visitor(self, a)?;
             a.use_def_symbol_set.remove(&symbol);
             a.visited_symbol_set.insert(symbol);
             ControlFlow::Continue(())
@@ -104,16 +87,29 @@ impl<'ast> CheckUseDefCycles<'ast> {
         }
     }
 
-    fn visit_def_post(
+    fn visit_use(
         &self,
         a: &mut Analysis,
-        symbol: Option<Symbol>,
-        node: Node<'ast>,
+        node: fpp_core::Node,
+        use_: QualifiedName,
     ) -> ControlFlow<()> {
-        let Some(symbol) = symbol else {
-            return ControlFlow::Continue(());
+        let symbol = match a.use_def_map.get(&node) {
+            // The use did not resolve, which CheckUses reported
+            None => return ControlFlow::Continue(()),
+            Some(symbol) => symbol.clone(),
         };
-        self.visit_def_post_with(a, symbol, |s, a| s.super_visit(a, node))
+
+        // The matching list holds the uses on the current use-def path
+        let m = UseDefMatching {
+            node_id: node,
+            qualified_name: use_,
+            symbol: symbol.clone(),
+        };
+        let len = a.use_def_matching_list.len();
+        a.use_def_matching_list.push(m);
+        let result = self.visit_def_pre(a, symbol);
+        a.use_def_matching_list.truncate(len);
+        result
     }
 }
 
@@ -154,7 +150,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefAliasType,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, Node::DefAliasType(node))
+        self.visit_def(a, symbol, Node::DefAliasType(node))
     }
 
     fn visit_def_array(
@@ -163,7 +159,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefArray,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, Node::DefArray(node))
+        self.visit_def(a, symbol, Node::DefArray(node))
     }
 
     fn visit_def_constant(
@@ -172,12 +168,12 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefConstant,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, Node::DefConstant(node))
+        self.visit_def(a, symbol, Node::DefConstant(node))
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, Node::DefEnum(node))
+        self.visit_def(a, symbol, Node::DefEnum(node))
     }
 
     fn visit_def_enum_constant(
@@ -186,7 +182,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefEnumConstant,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, Node::DefEnumConstant(node))
+        self.visit_def(a, symbol, Node::DefEnumConstant(node))
     }
 
     fn visit_def_struct(
@@ -195,7 +191,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefStruct,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, Node::DefStruct(node))
+        self.visit_def(a, symbol, Node::DefStruct(node))
     }
 
     fn visit_def_topology(
@@ -204,7 +200,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefTopology,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, Node::DefTopology(node))
+        self.visit_def(a, symbol, Node::DefTopology(node))
     }
 
     fn visit_def_interface(
@@ -213,59 +209,59 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefInterface,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, Node::DefInterface(node))
+        self.visit_def(a, symbol, Node::DefInterface(node))
     }
 }
 
 impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUseDefCycles<'ast> {
-    fn interface_instance_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.visit_use(a, node.id(), name)
-    }
-
     fn constant_use(
         &self,
         a: &mut Analysis,
         node: &Expr,
-        name: QualifiedName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        self.visit_use(a, node.id(), name)
+        self.visit_use(a, node.id(), use_)
+    }
+
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let arg = arg.clone();
+        self.visit_def_post(a, arg.clone(), |s, a| visit_template_arg(s, a, &arg))
+    }
+
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let arg = arg.clone();
+        self.visit_def_post(a, arg.clone(), |s, a| visit_template_arg(s, a, &arg))
+    }
+
+    fn template_interface_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let arg = arg.clone();
+        self.visit_def_post(a, arg.clone(), |s, a| visit_template_arg(s, a, &arg))
     }
 
     fn interface_use(
         &self,
         a: &mut Analysis,
         node: &QualIdent,
-        name: QualifiedName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        self.visit_use(a, node.id(), name)
+        self.visit_use(a, node.id(), use_)
+    }
+
+    fn interface_instance_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        use_: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_use(a, node.id(), use_)
     }
 
     fn type_use(
         &self,
         a: &mut Analysis,
         node: &QualIdent,
-        name: QualifiedName,
+        use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        self.visit_use(a, node.id(), name)
-    }
-
-    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
-        let arg = arg.clone();
-        self.visit_def_post_with(a, arg.clone(), |s, a| visit_template_arg(s, a, &arg))
-    }
-
-    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
-        let arg = arg.clone();
-        self.visit_def_post_with(a, arg.clone(), |s, a| visit_template_arg(s, a, &arg))
-    }
-
-    fn template_interface_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
-        let arg = arg.clone();
-        self.visit_def_post_with(a, arg.clone(), |s, a| visit_template_arg(s, a, &arg))
+        self.visit_use(a, node.id(), use_)
     }
 }

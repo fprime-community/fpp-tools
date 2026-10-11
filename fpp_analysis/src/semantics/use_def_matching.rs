@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Clone)]
 pub struct UseDefMatching {
     /// The node Identifier corresponding to the use
-    pub node: fpp_core::Node,
+    pub node_id: fpp_core::Node,
     /// The qualified name appearing in the use
     pub qualified_name: QualifiedName,
     /// The symbol corresponding to the definition

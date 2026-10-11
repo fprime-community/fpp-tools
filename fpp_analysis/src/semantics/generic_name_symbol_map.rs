@@ -4,13 +4,15 @@ use indexmap::IndexMap;
 use rustc_hash::FxBuildHasher;
 
 /// A type-generic local mapping of unqualified names to symbols
-///
-/// The names iterate in the order they were put into the map.
 #[derive(Debug, Clone)]
-pub struct GenericNameSymbolMap<S: SymbolInterface>(IndexMap<String, S, FxBuildHasher>);
+pub struct GenericNameSymbolMap<S: SymbolInterface>(
+    /// The map. The names iterate in the order they were put into it.
+    IndexMap<String, S, FxBuildHasher>,
+);
 
 impl<S: SymbolInterface> GenericNameSymbolMap<S> {
-    pub fn new() -> Self {
+    /// Create an empty map
+    pub fn empty() -> Self {
         Self(IndexMap::default())
     }
 
@@ -35,6 +37,7 @@ impl<S: SymbolInterface> GenericNameSymbolMap<S> {
         }
     }
 
+    /// The names and symbols of the map, in the order they were put into it
     pub fn iter(&self) -> impl Iterator<Item = (&String, &S)> {
         self.0.iter()
     }

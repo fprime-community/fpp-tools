@@ -5,8 +5,12 @@ use fpp_ast::{AstNode, MoveWalkable, Node, Visitable, Visitor};
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
+/// How far a [`NestedAnalyzer`] descends below the definitions with members
 pub enum NestedAnalyzerMode {
+    /// Visit translation unit, module, component and state machine members
+    /// only, as the module, component and state machine analyzers do
     SHALLOW,
+    /// Visit every node, as the analysis of types and expressions does
     DEEP,
 }
 
@@ -68,6 +72,11 @@ impl NestedScopeState for Analysis {
     }
 }
 
+/// Analyze the members of definitions, and in [`NestedAnalyzerMode::DEEP`]
+/// mode types and expressions
+///
+/// The analyzer enters the scope of each component, module and state machine
+/// it visits, which is the scope that use checking resolves names in.
 pub struct NestedAnalyzer<'ast, S: NestedScopeState, V: Visitor<'ast, State = S>> {
     phantom_data: PhantomData<&'ast V>,
     mode: NestedAnalyzerMode,

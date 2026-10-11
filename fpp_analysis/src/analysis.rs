@@ -117,10 +117,10 @@ pub struct Analysis {
     /// The mapping from system symbols to systems
     pub system_map: HashMap<Symbol, FppSystem>,
 
-    /// The shared "unknown" type standing in for a type use that failed to
-    /// resolve. Created lazily on first use so that `CheckTypeUses` can give
+    /// The shared "unknown" type of a type name that does not resolve to a
+    /// type. Created lazily on first use so that `CheckTypeUses` can give
     /// every type name an entry in `type_map`, letting later passes read a
-    /// resolved type without handling the unresolved case.
+    /// type without handling the unresolved case.
     unknown_type: Option<Arc<Type>>,
 }
 
@@ -148,7 +148,7 @@ impl Analysis {
             scope_name_list: Vec::new(),
             dictionary_generation: false,
             include_dictionary_deps: false,
-            nested_scope: NestedScope::new(ScopeOwner::Global),
+            nested_scope: NestedScope::empty(),
             global_scope: Scope::new(),
             parent_symbol: None,
             parent_symbol_map: Default::default(),
@@ -186,13 +186,14 @@ impl Analysis {
 
     /// The shared "unknown" type used when a type use fails to resolve.
     ///
-    /// This is a synthetic abstract type whose name is not valid FPP syntax, so
-    /// it can never collide with a user-defined type. It is created once and
-    /// reused, so every unknown type is [`Type::identical`] to every other,
-    /// which keeps a single unresolved use from cascading into spurious type
-    /// mismatches downstream. The `span` seeds the synthetic definition node the
-    /// first time the type is created; it is never rendered (the type only ever
-    /// surfaces through its name), so any use-site span will do.
+    /// The use has been reported as an error; the unknown type gives its type
+    /// name an entry in the type map so the analysis can go on. This is a
+    /// synthetic abstract type whose name is not valid FPP syntax, so it can
+    /// never collide with a user-defined type. It is created once and reused,
+    /// so every unknown type is [`Type::identical`] to every other. A later
+    /// error about the type of such a use names the type `<unknown>`. The
+    /// `span` seeds the synthetic definition node the first time the type is
+    /// created; no diagnostic points at it, so any use-site span will do.
     pub fn unknown_type(&mut self, span: Span) -> Arc<Type> {
         if let Some(ty) = &self.unknown_type {
             return ty.clone();
@@ -664,8 +665,10 @@ impl Analysis {
         self.get_scope(&symbol.clone().into())
     }
 
-    /// The scope of a symbol for resolving names in it, or `None` if the symbol
-    /// opens no scope
+    /// Gets the scope of a symbol for resolving names, or `None` if the symbol
+    /// opens no scope. Includes symbols defined by a template expansion: inside
+    /// an expansion, a module the expansion defines has the scope of the
+    /// definitions the expansion introduced.
     pub fn lookup_scope(&self, symbol: &Symbol) -> Option<&Scope> {
         self.local_scope(symbol)
             .or_else(|| self.symbol_scope_map.get(symbol))
@@ -683,6 +686,8 @@ impl Analysis {
         }
     }
 
+    /// The scope open at one level of the nested scope stack, for entering
+    /// symbols into it
     pub fn get_scope_mut(&mut self, owner: &ScopeOwner) -> &mut Scope {
         match owner {
             ScopeOwner::Global => &mut self.global_scope,
@@ -714,6 +719,7 @@ impl Analysis {
         self.nested_scope_get(false, name_group, name)
     }
 
+    /// Put a name and symbol into the innermost scope of the nested scope
     pub fn symbol_put(&mut self, name_group: NameGroup, symbol: Symbol) -> SemanticResult {
         let owner = self.nested_scope.current().clone();
         self.get_scope_mut(&owner).put(name_group, symbol)
@@ -744,23 +750,19 @@ impl Analysis {
         expansion.local_scope_map.get(symbol)
     }
 
-    /// The nested scope in effect at the point of a definition, built from the
-    /// chain of definitions enclosing it
+    /// The nested scope in effect at the point of a definition, built from
+    /// scratch: the global scope, with the scope of each enclosing definition
+    /// pushed on top
     pub fn nested_scope_at(&self, symbol: &Symbol) -> NestedScope {
-        let mut levels = Vec::new();
-        self.push_enclosing_scopes(symbol, &mut levels);
-        levels.insert(0, ScopeOwner::Global);
-        NestedScope::from_levels(levels)
-    }
-
-    fn push_enclosing_scopes(&self, symbol: &Symbol, out: &mut Vec<ScopeOwner>) {
-        if let Some(parent) = self.parent_symbol_map.get(symbol) {
-            self.push_enclosing_scopes(parent, out);
-        }
+        let mut nested_scope = match self.parent_symbol_map.get(symbol) {
+            None => self.nested_scope.global_scope(),
+            Some(parent) => self.nested_scope_at(parent),
+        };
         // A definition without a brace-delimited body opens no scope
         if self.symbol_scope_map.contains_key(symbol) {
-            out.push(ScopeOwner::Symbol(symbol.clone()));
+            nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
         }
+        nested_scope
     }
 
     /// Gets a template symbol from the use-def map

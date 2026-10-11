@@ -57,6 +57,7 @@ impl<'ast> UsedSymbols<'ast> {
         out
     }
 
+    // Helper function for recursive resolution
     fn resolve_node(
         &self,
         a: &mut Analysis,
@@ -164,6 +165,15 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for UsedSymbols<'ast> {
         self.add_symbol(a, node.id())
     }
 
+    fn template_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
     fn interface_instance_use(
         &self,
         a: &mut Analysis,
@@ -183,15 +193,6 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for UsedSymbols<'ast> {
     }
 
     fn interface_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn template_use(
         &self,
         a: &mut Analysis,
         node: &QualIdent,

@@ -4,8 +4,8 @@ use crate::analyzers::basic_use_analyzer::{BasicUseAnalyzer, UseAnalysisPass, vi
 use crate::errors::SemanticError;
 use crate::passes::CheckUsesHelpers;
 use crate::semantics::{
-    GenericNameSymbolMap, ImpliedUse, ImpliedUseKind, NameGroup, NameGroupMap, QualifiedName,
-    ScopeOwner, Symbol, SymbolInterface,
+    ImpliedUse, ImpliedUseKind, NameGroup, NameGroupMap, NameSymbolMap, QualifiedName, ScopeOwner,
+    Symbol, SymbolInterface,
 };
 use fpp_ast::{
     AstNode, DefEnum, Expr, ExprKind, Ident, Node, QualIdent, SpecTemplateExpand, Visitable,
@@ -33,7 +33,7 @@ pub(crate) const HELPERS: CheckUsesHelpers<
     Analysis,
     NameGroup,
     Symbol,
-    NameGroupMap<GenericNameSymbolMap<Symbol>>,
+    NameGroupMap<NameSymbolMap>,
 > = CheckUsesHelpers {
     get_nested_scope_symbol: Analysis::nested_scope_get,
     get_symbol_scope: Analysis::lookup_scope,
@@ -158,8 +158,8 @@ impl<'ast> Visitor<'ast> for CheckUses<'ast> {
         node: &'ast SpecTemplateExpand,
     ) -> ControlFlow<Self::Break> {
         let Some(members) = &node.members else {
-            // This specifier was not expanded: CheckTemplateUses has already
-            // reported why
+            // The template of an expansion that is not expanded did not
+            // resolve, and CheckTemplateUses reported that
             return ControlFlow::Continue(());
         };
         if !a.template_expansion_map.contains_key(&node.node_id) {

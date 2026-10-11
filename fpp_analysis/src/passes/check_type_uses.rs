@@ -32,6 +32,59 @@ impl<'ast> CheckTypeUses<'ast> {
             super_: UseAnalyzer::new(),
         }
     }
+
+    fn visit_use(&self, a: &mut Analysis, node: &QualIdent) -> ControlFlow<()> {
+        let symbol = match a.use_def_map.get(&node.id()) {
+            // The use did not resolve, which CheckUses reported
+            None => return ControlFlow::Continue(()),
+            Some(symbol) => symbol.clone(),
+        };
+
+        match &symbol {
+            Symbol::AbsType(def) => def.visit(a, self)?,
+            Symbol::AliasType(def) => def.visit(a, self)?,
+            Symbol::ArrayType(def) => def.visit(a, self)?,
+            Symbol::EnumType(def) => def.visit(a, self)?,
+            Symbol::StructType(def) => def.visit(a, self)?,
+            // A bound type parameter names the type its argument names, so
+            // compute the type of the argument
+            Symbol::TemplateTypeArg { value, .. } => {
+                if !a.type_map.contains_key(&value.node_id) {
+                    self.template_type_arg(a, &symbol)?;
+                }
+            }
+            _ => {
+                SemanticError::InvalidSymbol {
+                    symbol_name: symbol.unqualified_name().to_string(),
+                    msg: "not a type symbol".to_string(),
+                    loc: node.span(),
+                    def_loc: symbol.get_loc(),
+                }
+                .emit();
+                return ControlFlow::Continue(());
+            }
+        };
+
+        if let Some(ty) = a.type_map.get(&symbol.node()).cloned() {
+            a.assign_type(node.id(), ty);
+        }
+
+        ControlFlow::Continue(())
+    }
+
+    /// Visit a definition with `visitor`, unless the definition has a type
+    fn visit_if_needed(
+        &self,
+        a: &mut Analysis,
+        node: fpp_core::Node,
+        visitor: impl FnOnce(&mut Analysis) -> ControlFlow<()>,
+    ) -> ControlFlow<()> {
+        if !a.type_map.contains_key(&node) {
+            visitor(a)
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
 }
 
 /// Check for duplicate struct members, reporting each duplicate
@@ -62,17 +115,13 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a: &mut Self::State,
         node: &'ast DefAbsType,
     ) -> ControlFlow<Self::Break> {
-        if a.type_map.contains_key(&node.id()) {
-            return ControlFlow::Continue(());
-        }
-
-        a.type_map.insert(
-            node.node_id,
-            Arc::new(Type::Abs(Arc::new(AbsType {
+        self.visit_if_needed(a, node.node_id, |a| {
+            let t = Arc::new(Type::Abs(Arc::new(AbsType {
                 node: a.interned_def(node),
-            }))),
-        );
-        ControlFlow::Continue(())
+            })));
+            a.assign_type(node.node_id, t);
+            ControlFlow::Continue(())
+        })
     }
 
     fn visit_def_alias_type(
@@ -80,23 +129,16 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a: &mut Self::State,
         node: &'ast DefAliasType,
     ) -> ControlFlow<Self::Break> {
-        if a.type_map.contains_key(&node.id()) {
-            return ControlFlow::Continue(());
-        }
-
-        // Make sure the type uses are mapped
-        node.walk(a, self)?;
-
-        let alias_type = a.type_map.get(&node.type_name.node_id).unwrap().clone();
-        a.type_map.insert(
-            node.node_id,
-            Arc::new(Type::Alias(AliasType {
+        self.visit_if_needed(a, node.node_id, |a| {
+            node.walk(a, self)?;
+            let aliased_type = a.type_map.get(&node.type_name.node_id).unwrap().clone();
+            let t = Arc::new(Type::Alias(AliasType {
                 node: a.interned_def(node),
-                alias_type,
-            })),
-        );
-
-        ControlFlow::Continue(())
+                alias_type: aliased_type,
+            }));
+            a.assign_type(node.node_id, t);
+            ControlFlow::Continue(())
+        })
     }
 
     fn visit_def_array(
@@ -104,50 +146,40 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a: &mut Self::State,
         node: &'ast DefArray,
     ) -> ControlFlow<Self::Break> {
-        if a.type_map.contains_key(&node.id()) {
-            return ControlFlow::Continue(());
-        }
-
-        node.walk(a, self)?;
-        let elt_type = a.type_map.get(&node.elt_type.node_id).unwrap().clone();
-
-        a.type_map.insert(
-            node.node_id,
-            Arc::new(Type::Array(Arc::new(ArrayType {
+        self.visit_if_needed(a, node.node_id, |a| {
+            node.walk(a, self)?;
+            let elt_type = a.type_map.get(&node.elt_type.node_id).unwrap().clone();
+            let anon_array = AnonArrayType {
+                size: None,
+                elt_type,
+            };
+            let t = Arc::new(Type::Array(Arc::new(ArrayType {
                 node: a.interned_def(node),
-                anon_array: AnonArrayType {
-                    size: None,
-                    elt_type,
-                },
+                anon_array,
                 default: None,
                 format: None,
-            }))),
-        );
-
-        ControlFlow::Continue(())
+            })));
+            a.assign_type(node.node_id, t);
+            ControlFlow::Continue(())
+        })
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        if a.type_map.contains_key(&node.id()) {
-            return ControlFlow::Continue(());
-        }
-
-        node.walk(a, self)?;
-        if node.constants.is_empty() {
-            SemanticError::InvalidType {
-                loc: node.span(),
-                msg: "enum must define at least one constant".to_string(),
-                notes: vec![],
+        self.visit_if_needed(a, node.node_id, |a| {
+            node.walk(a, self)?;
+            if node.constants.is_empty() {
+                SemanticError::InvalidType {
+                    loc: node.span(),
+                    msg: "enum must define at least one constant".to_string(),
+                    notes: vec![],
+                }
+                .emit();
             }
-            .emit();
-        }
 
-        let rep_type = {
-            match &node.type_name {
-                None => IntegerKind::I32,
+            let rep_type = match &node.type_name {
                 Some(type_name) => {
-                    let ty = a.type_map.get(&type_name.node_id).unwrap();
-                    match Type::underlying_type(ty).deref() {
+                    let rep_type = a.type_map.get(&type_name.node_id).unwrap();
+                    match Type::underlying_type(rep_type).deref() {
                         Type::PrimitiveInt(kind) => *kind,
                         _ => {
                             SemanticError::InvalidType {
@@ -160,23 +192,20 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
                         }
                     }
                 }
+                None => IntegerKind::I32,
+            };
+
+            let t = Arc::new(Type::Enum(Arc::new(EnumType {
+                node: a.interned_def(node),
+                rep_type,
+                default: None,
+            })));
+            a.assign_type(node.node_id, t.clone());
+            for constant in &node.constants {
+                a.assign_type(constant.node_id, t.clone());
             }
-        };
-
-        let ty = Arc::new(Type::Enum(Arc::new(EnumType {
-            node: a.interned_def(node),
-            rep_type,
-            default: None,
-        })));
-
-        a.type_map.insert(node.node_id, ty.clone());
-
-        // Assign types to the constant members
-        for member in &node.constants {
-            a.type_map.insert(member.node_id, ty.clone());
-        }
-
-        ControlFlow::Continue(())
+            ControlFlow::Continue(())
+        })
     }
 
     fn visit_def_struct(
@@ -184,43 +213,34 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a: &mut Self::State,
         node: &'ast DefStruct,
     ) -> ControlFlow<Self::Break> {
-        if a.type_map.contains_key(&node.id()) {
-            return ControlFlow::Continue(());
-        }
+        self.visit_if_needed(a, node.node_id, |a| {
+            // The member names are checked before the member types, which may
+            // reach definitions with errors of their own
+            check_for_duplicate_struct_member(&node.members);
+            node.walk(a, self)?;
 
-        // The member names are checked before the member types, which may
-        // reach definitions with errors of their own
-        check_for_duplicate_struct_member(&node.members);
-
-        // Visit all the members to resolve type info
-        node.walk(a, self)?;
-
-        let mut member_names = HashSet::default();
-        let mut anon_ty = AnonStructType {
-            members: Default::default(),
-        };
-
-        for member in &node.members {
-            // A duplicate member has been reported, and the first member of
-            // the name gives the type
-            if member_names.insert(member.name.data.as_str()) {
-                let member_ty = a.type_map.get(&member.type_name.node_id).unwrap().clone();
-                anon_ty.members.push((member.name.data.clone(), member_ty));
+            let mut member_names = HashSet::default();
+            let mut anon_struct = AnonStructType {
+                members: Default::default(),
+            };
+            for member in &node.members {
+                // A duplicate member has been reported, and the first member of
+                // the name gives the type
+                if member_names.insert(member.name.data.as_str()) {
+                    let t = a.type_map.get(&member.type_name.node_id).unwrap().clone();
+                    anon_struct.members.push((member.name.data.clone(), t));
+                }
             }
-        }
-
-        a.type_map.insert(
-            node.node_id,
-            Arc::new(Type::Struct(Arc::new(StructType {
+            let t = Arc::new(Type::Struct(Arc::new(StructType {
                 node: a.interned_def(node),
-                anon_struct: anon_ty,
+                anon_struct,
                 default: None,
                 sizes: Default::default(),
                 formats: Default::default(),
-            }))),
-        );
-
-        ControlFlow::Continue(())
+            })));
+            a.assign_type(node.node_id, t);
+            ControlFlow::Continue(())
+        })
     }
 
     fn visit_expr(&self, a: &mut Self::State, node: &'ast Expr) -> ControlFlow<Self::Break> {
@@ -236,20 +256,20 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         a: &mut Self::State,
         node: &'ast TypeName,
     ) -> ControlFlow<Self::Break> {
-        let ty = match &node.kind {
+        let t = match &node.kind {
             TypeNameKind::Bool => Type::Boolean,
             TypeNameKind::Floating(kind) => Type::Float(*kind),
             TypeNameKind::Integer(kind) => Type::PrimitiveInt(*kind),
             TypeNameKind::QualIdent(qi) => {
                 self.super_visit(a, Node::TypeName(node))?;
-                let ty = match a.type_map.get(&qi.id()) {
-                    Some(qi_ty) => qi_ty.clone(),
+                let t = match a.type_map.get(&qi.id()) {
+                    Some(t) => t.clone(),
                     // The type use did not resolve. Map it to the shared
                     // unknown type so every type name has an entry and later
                     // passes can read a resolved type unconditionally.
                     None => a.unknown_type(node.span()),
                 };
-                a.type_map.insert(node.node_id, ty);
+                a.assign_type(node.node_id, t);
                 return ControlFlow::Continue(());
             }
             TypeNameKind::String(_) => {
@@ -258,7 +278,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
             }
         };
 
-        a.type_map.insert(node.node_id, Arc::new(ty));
+        a.assign_type(node.node_id, Arc::new(t));
         ControlFlow::Continue(())
     }
 }
@@ -268,47 +288,9 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckTypeUses<'ast> {
         &self,
         a: &mut Analysis,
         node: &QualIdent,
-        _name: QualifiedName,
+        _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        let symbol = match a.use_def_map.get(&node.id()) {
-            // Symbol reference does not exist, give up
-            None => return ControlFlow::Continue(()),
-            Some(symbol) => symbol.clone(),
-        };
-
-        match &symbol {
-            Symbol::AbsType(def) => def.visit(a, self)?,
-            Symbol::AliasType(def) => def.visit(a, self)?,
-            Symbol::ArrayType(def) => def.visit(a, self)?,
-            Symbol::EnumType(def) => def.visit(a, self)?,
-            Symbol::StructType(def) => def.visit(a, self)?,
-            // A bound type parameter names the type its argument names, so
-            // compute the type of the argument
-            Symbol::TemplateTypeArg { value, .. } => {
-                if !a.type_map.contains_key(&value.node_id) {
-                    self.template_type_arg(a, &symbol)?;
-                }
-            }
-            _ => {
-                SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
-                    msg: "not a type symbol".to_string(),
-                    loc: node.span(),
-                    def_loc: symbol.node().span(),
-                }
-                .emit();
-                return ControlFlow::Continue(());
-            }
-        };
-
-        match a.type_map.get(&symbol.node()) {
-            None => {}
-            Some(ty) => {
-                a.type_map.insert(node.id(), ty.clone());
-            }
-        }
-
-        ControlFlow::Continue(())
+        self.visit_use(a, node)
     }
 
     fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {

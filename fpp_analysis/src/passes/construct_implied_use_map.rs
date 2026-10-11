@@ -10,25 +10,6 @@ use std::sync::Arc;
 /// Construct the implied use map
 pub struct ConstructImpliedUseMap;
 
-/// The name of the framework port implied by a special port instance
-pub fn special_port_implied_use_name(kind: &SpecialPortInstanceKind) -> &'static str {
-    match kind {
-        SpecialPortInstanceKind::CommandRecv => "Cmd",
-        SpecialPortInstanceKind::CommandReg => "CmdReg",
-        SpecialPortInstanceKind::CommandResp => "CmdResponse",
-        SpecialPortInstanceKind::Event => "Log",
-        SpecialPortInstanceKind::ParamGet => "PrmGet",
-        SpecialPortInstanceKind::ParamSet => "PrmSet",
-        SpecialPortInstanceKind::ProductGet => "DpGet",
-        SpecialPortInstanceKind::ProductRecv => "DpResponse",
-        SpecialPortInstanceKind::ProductRequest => "DpRequest",
-        SpecialPortInstanceKind::ProductSend => "DpSend",
-        SpecialPortInstanceKind::Telemetry => "Tlm",
-        SpecialPortInstanceKind::TextEvent => "LogText",
-        SpecialPortInstanceKind::TimeGet => "Time",
-    }
-}
-
 impl<'ast> Visitor<'ast> for ConstructImpliedUseMap {
     type Break = ();
     type State = Analysis;
@@ -44,10 +25,22 @@ impl<'ast> Visitor<'ast> for ConstructImpliedUseMap {
         node: &'ast SpecSpecialPortInstance,
     ) -> ControlFlow<Self::Break> {
         // Construct the port use implied by the special port instance
-        let ident_list = vec![
-            "Fw".to_string(),
-            special_port_implied_use_name(&node.kind).to_string(),
-        ];
+        let name = match node.kind {
+            SpecialPortInstanceKind::CommandRecv => "Cmd",
+            SpecialPortInstanceKind::CommandReg => "CmdReg",
+            SpecialPortInstanceKind::CommandResp => "CmdResponse",
+            SpecialPortInstanceKind::Event => "Log",
+            SpecialPortInstanceKind::ParamGet => "PrmGet",
+            SpecialPortInstanceKind::ParamSet => "PrmSet",
+            SpecialPortInstanceKind::ProductGet => "DpGet",
+            SpecialPortInstanceKind::ProductRecv => "DpResponse",
+            SpecialPortInstanceKind::ProductRequest => "DpRequest",
+            SpecialPortInstanceKind::ProductSend => "DpSend",
+            SpecialPortInstanceKind::Telemetry => "Tlm",
+            SpecialPortInstanceKind::TextEvent => "LogText",
+            SpecialPortInstanceKind::TimeGet => "Time",
+        };
+        let ident_list = vec!["Fw".to_string(), name.to_string()];
         let mut set = ImpliedUseSet::default();
         set.ports.push(ImpliedUse::from_ident_list_and_id(
             ident_list,

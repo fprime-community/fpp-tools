@@ -632,7 +632,7 @@ impl From<SemanticError> for Diagnostic {
                 Diagnostic::new(loc, Level::Error, "encountered a use-def cycle"),
                 // Each definition on the path holds the next use, and the last
                 // one is the location of the error, so the notes show the uses
-                |out, m| out.span_note(m.node.span(), m.to_string()),
+                |out, m| out.span_note(m.node_id.span(), m.to_string()),
             ),
             SemanticError::AnnotatedError { error, notes } => notes
                 .into_iter()

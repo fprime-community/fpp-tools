@@ -56,6 +56,7 @@ impl From<String> for QualifiedName {
     }
 }
 
+/// Create a qualified name A.B.C from an identifier list [ A, B, C ]
 impl From<Vec<String>> for QualifiedName {
     fn from(value: Vec<String>) -> Self {
         let inter: VecDeque<String> = value.into();
@@ -66,9 +67,7 @@ impl From<Vec<String>> for QualifiedName {
 /// Create a qualified name A.B.C from an identifier list [ A, B, C ]
 impl From<VecDeque<String>> for QualifiedName {
     fn from(mut value: VecDeque<String>) -> Self {
-        let base = value
-            .pop_back()
-            .expect("qualified name must have at least one token");
+        let base = value.pop_back().expect("empty identifier list");
         QualifiedName {
             base,
             qualifier: value,
@@ -83,6 +82,7 @@ impl From<&fpp_ast::QualIdent> for QualifiedName {
     }
 }
 
+/// A qualified name shows as its text, as in [`Display`]
 impl Debug for QualifiedName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)

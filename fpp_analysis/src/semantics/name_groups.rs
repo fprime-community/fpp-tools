@@ -16,20 +16,18 @@ pub enum NameGroup {
 }
 
 impl NameGroup {
-    /// The name groups of a module. A module is not in the system name group.
-    pub fn groups() -> impl Iterator<Item = NameGroup> {
-        [
-            NameGroup::Component,
-            NameGroup::Port,
-            NameGroup::StateMachine,
-            NameGroup::PortInterfaceInstance,
-            NameGroup::PortInterface,
-            NameGroup::Template,
-            NameGroup::Type,
-            NameGroup::Value,
-        ]
-        .into_iter()
-    }
+    /// The name groups a module symbol is entered into. A module is not in the
+    /// system name group.
+    pub const GROUPS: [NameGroup; 8] = [
+        NameGroup::Component,
+        NameGroup::Port,
+        NameGroup::StateMachine,
+        NameGroup::PortInterfaceInstance,
+        NameGroup::PortInterface,
+        NameGroup::Template,
+        NameGroup::Type,
+        NameGroup::Value,
+    ];
 }
 
 impl Display for NameGroup {
