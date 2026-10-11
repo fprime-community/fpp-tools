@@ -546,6 +546,57 @@ impl Analysis {
             .count()
     }
 
+    /// Compute a format from a format string and a list of types
+    pub fn compute_format(
+        node: &fpp_ast::LitString,
+        ts: &[Arc<Type>],
+    ) -> SemanticResult<crate::semantics::Format> {
+        use crate::semantics::{Field, Parser};
+        let loc = node.span();
+        let format = Parser::parse_node(node)?;
+        // Check the size
+        if format.fields.len() < ts.len() {
+            return Err(SemanticError::InvalidFormatString {
+                loc,
+                msg: "missing replacement field".to_string(),
+                context: None,
+            });
+        }
+        if format.fields.len() > ts.len() {
+            return Err(SemanticError::InvalidFormatString {
+                loc: format.fields[ts.len()].1,
+                msg: "too many replacement fields".to_string(),
+                context: None,
+            });
+        }
+        // Check each numeric field against its type
+        for (t, (field, field_loc, _)) in ts.iter().zip(format.fields.iter()) {
+            let error = |msg: String| SemanticError::InvalidFormatString {
+                loc: *field_loc,
+                msg,
+                context: None,
+            };
+            let u = Type::underlying_type(t);
+            if field.is_integer() && !u.is_int() {
+                return Err(error(format!("{t} is not an integer type")));
+            }
+            if let Field::Rational {
+                precision: Some(precision),
+                ..
+            } = field
+                && Field::exceeds_max_precision(precision)
+            {
+                return Err(error(format!(
+                    "precision value {precision} is out of range"
+                )));
+            }
+            if field.is_rational() && !u.is_float() {
+                return Err(error(format!("{t} is not a floating-point type")));
+            }
+        }
+        Ok(format.into())
+    }
+
     /// Convert one type to another
     pub fn convert_types(loc: Span, from: &Arc<Type>, to: &Arc<Type>) -> SemanticResult<Arc<Type>> {
         match Type::convert(from, to) {
