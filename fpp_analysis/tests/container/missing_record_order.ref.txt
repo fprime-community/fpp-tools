@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/container/missing_record_order.fpp:15:3
+   |
+15 |   product container C1 id 9
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^ component that specifies containers must specify at least one record
+

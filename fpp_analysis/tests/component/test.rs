@@ -109,3 +109,13 @@ fn array_ok() {
 fn import_module() {
     run_test("component/import_module")
 }
+
+#[test]
+fn passive_async_input_order() {
+    run_test("component/passive_async_input_order")
+}
+
+#[test]
+fn passive_async_command_order() {
+    run_test("component/passive_async_command_order")
+}

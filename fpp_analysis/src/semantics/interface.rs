@@ -1,13 +1,14 @@
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
-use crate::semantics::{Symbol, SymbolInterface, cmp_span};
+use crate::semantics::{Symbol, SymbolInterface};
 use fpp_ast::{
     AstNode, GeneralPortInstanceKind, InputPortKind, QueueFull, SpecGeneralPortInstance,
     SpecInterfaceImport, SpecInternalPort, SpecSpecialPortInstance, SpecTopPort,
     SpecialPortInstanceKind,
 };
 use fpp_core::{Node, Span, Spanned};
-use rustc_hash::FxHashMap as HashMap;
+use indexmap::IndexMap;
+use rustc_hash::{FxBuildHasher, FxHashMap as HashMap};
 use std::sync::Arc;
 
 /// A port direction.
@@ -755,51 +756,21 @@ impl std::fmt::Display for PortInstance {
 pub struct PortInterface {
     /// The type of interface instance this port interface represents.
     pub instance_type: String,
-    /// The map from port names to port instances.
-    pub port_map: HashMap<String, PortInstance>,
-    /// The map from special port kinds to special port instances.
-    pub special_port_map: HashMap<SpecialPortInstanceKind, SpecialPortInstance>,
-    /// The keys of `port_map`, in the order they were added.
-    port_order: Vec<String>,
-    /// The keys of `special_port_map`, in the order they were added.
-    special_port_order: Vec<SpecialPortInstanceKind>,
+    /// The map from port names to port instances, in the order the ports were
+    /// added.
+    pub port_map: IndexMap<String, PortInstance, FxBuildHasher>,
+    /// The map from special port kinds to special port instances, in the order
+    /// the ports were added.
+    pub special_port_map: IndexMap<SpecialPortInstanceKind, SpecialPortInstance, FxBuildHasher>,
 }
 
 impl PortInterface {
     pub fn new(instance_type: impl Into<String>) -> PortInterface {
         PortInterface {
             instance_type: instance_type.into(),
-            port_map: HashMap::default(),
-            special_port_map: HashMap::default(),
-            port_order: vec![],
-            special_port_order: vec![],
+            port_map: IndexMap::default(),
+            special_port_map: IndexMap::default(),
         }
-    }
-
-    /// The entries of the port map, in the order they were added.
-    fn ports_in_insertion_order(&self) -> impl Iterator<Item = (&String, &PortInstance)> {
-        Self::in_insertion_order(&self.port_order, &self.port_map)
-    }
-
-    /// The entries of the special port map, in the order they were added. See
-    /// [`PortInterface::ports_in_insertion_order`].
-    fn special_ports_in_insertion_order(
-        &self,
-    ) -> impl Iterator<Item = (&SpecialPortInstanceKind, &SpecialPortInstance)> {
-        Self::in_insertion_order(&self.special_port_order, &self.special_port_map)
-    }
-
-    /// Pair each key of `order` with its value in `map`. Every key added to one
-    /// of the port maps is appended to the matching order list, and no entry is
-    /// ever removed or rekeyed, so the lookup always succeeds.
-    fn in_insertion_order<'a, K: std::hash::Hash + Eq, V>(
-        order: &'a [K],
-        map: &'a HashMap<K, V>,
-    ) -> impl Iterator<Item = (&'a K, &'a V)> {
-        order.iter().map(|key| {
-            let value = map.get(key).expect("a port map holds all its ordered keys");
-            (key, value)
-        })
     }
 
     /// Add a port instance
@@ -824,7 +795,7 @@ impl PortInterface {
         import_node: Node,
     ) -> SemanticResult<PortInterface> {
         let mut result = self.clone();
-        for (_, pi) in interface.port_interface.ports_in_insertion_order() {
+        for pi in interface.port_interface.port_map.values() {
             result = match result.add_port_instance(pi.with_import_specifier(import_node)) {
                 Ok(c) => c,
                 Err(err) => {
@@ -851,7 +822,6 @@ impl PortInterface {
             }),
             None => {
                 let mut result = self.clone();
-                result.port_order.push(name.clone());
                 result.port_map.insert(name, instance);
                 Ok(result)
             }
@@ -862,7 +832,7 @@ impl PortInterface {
     /// in `other` exists in `self` with a matching signature.
     pub fn implements(&self, other: &PortInterface) -> SemanticResult {
         // Check all the ports in `other` to make sure they exist and match `self`
-        for (name, pi) in other.ports_in_insertion_order() {
+        for (name, pi) in &other.port_map {
             match self.port_map.get(name) {
                 Some(found) => {
                     // Port exists, make sure it matches theirs
@@ -878,7 +848,7 @@ impl PortInterface {
                 }
             }
         }
-        for (kind, pi) in other.special_ports_in_insertion_order() {
+        for (kind, pi) in &other.special_port_map {
             match self.special_port_map.get(kind) {
                 Some(found) => {
                     // The port exists, make sure it's the same as theirs
@@ -913,7 +883,6 @@ impl PortInterface {
             }),
             None => {
                 let mut result = self.clone();
-                result.special_port_order.push(kind.clone());
                 result.special_port_map.insert(kind, instance);
                 Ok(result)
             }
@@ -926,8 +895,9 @@ impl PortInterface {
 pub struct Interface {
     /// The AST node defining the interface.
     pub node: Arc<fpp_ast::DefInterface>,
-    /// Imported interfaces: symbol -> (import node, import location).
-    pub import_map: HashMap<Symbol, (Node, Span)>,
+    /// The imported interfaces, in the order of their import specifiers:
+    /// symbol -> (import node, import location).
+    pub import_map: IndexMap<Symbol, (Node, Span), FxBuildHasher>,
     /// The port interface of the component.
     pub port_interface: PortInterface,
 }
@@ -936,7 +906,7 @@ impl Interface {
     pub fn new(node: Arc<fpp_ast::DefInterface>) -> Interface {
         Interface {
             node,
-            import_map: HashMap::default(),
+            import_map: IndexMap::default(),
             port_interface: PortInterface::new("interface"),
         }
     }
@@ -987,15 +957,12 @@ impl Interface {
     }
 
     /// The interfaces imported by this one, as (symbol, import specifier node)
-    /// pairs in source order.
+    /// pairs in the order of the import specifiers.
     pub fn imports_in_source_order(&self) -> Vec<(Symbol, Node)> {
-        let mut imports: Vec<(Symbol, Node)> = self
-            .import_map
+        self.import_map
             .iter()
             .map(|(symbol, (node, _))| (symbol.clone(), *node))
-            .collect();
-        imports.sort_by(|x, y| cmp_span(&x.1.span(), &y.1.span()));
-        imports
+            .collect()
     }
 }
 
@@ -1195,17 +1162,14 @@ module M {
         })
     }
 
-    /// A port interface remembers the order its ports were added in, so the
-    /// checks that walk it report the same port however many ports there are
-    /// and however the hash map happens to lay them out.
+    /// A port interface keeps its ports in the order they were added, which is
+    /// the order Scala's immutable Map iterates them in for up to four entries,
+    /// so the checks that walk it report the port Scala reports.
     #[test]
     fn ports_are_walked_in_insertion_order() {
         with_analysis(|component, _| {
             let pi = &component.port_interface;
-            let names: Vec<&str> = pi
-                .ports_in_insertion_order()
-                .map(|(name, _)| name.as_str())
-                .collect();
+            let names: Vec<&str> = pi.port_map.keys().map(String::as_str).collect();
             // The component declares no imports, so it holds its ports in the
             // order it declares them.
             assert_eq!(
@@ -1219,10 +1183,7 @@ module M {
                     "cmdRespOut"
                 ]
             );
-            let kinds: Vec<SpecialPortInstanceKind> = pi
-                .special_ports_in_insertion_order()
-                .map(|(kind, _)| kind.clone())
-                .collect();
+            let kinds: Vec<SpecialPortInstanceKind> = pi.special_port_map.keys().cloned().collect();
             assert_eq!(
                 kinds,
                 vec![
@@ -1282,9 +1243,8 @@ topology T {
         );
     }
 
-    /// `Interface::imports_in_source_order` orders the imports by the location
-    /// of the import specifier, not by the iteration order of the hash map, so
-    /// `resolve_interface` merges them in source order.
+    /// `Interface::imports_in_source_order` lists the imports in the order of
+    /// the import specifiers, so `resolve_interface` merges them in that order.
     #[test]
     fn imports_are_merged_in_source_order() {
         const IMPORTS: &str = r#"

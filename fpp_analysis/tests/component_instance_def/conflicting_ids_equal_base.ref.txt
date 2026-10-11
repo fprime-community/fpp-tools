@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/component_instance_def/conflicting_ids_equal_base.fpp:16:1
+   |
+16 | instance a: C base id 0x100
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ base ID 256 for instance a lies inside the ID range [256, 256] for instance b
+   |
+  ::: [ local path prefix ]/component_instance_def/conflicting_ids_equal_base.fpp:18:1
+   |
+18 | instance b: C base id 0x100
+   | --------------------------- b is defined here
+

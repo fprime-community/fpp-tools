@@ -99,3 +99,8 @@ fn queued_priority() {
 fn invalid_negative_int() {
     run_test("component_instance_def/invalid_negative_int")
 }
+
+#[test]
+fn conflicting_ids_equal_base() {
+    run_test("component_instance_def/conflicting_ids_equal_base")
+}

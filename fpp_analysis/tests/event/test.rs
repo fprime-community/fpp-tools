@@ -109,3 +109,8 @@ fn not_displayable() {
 fn duplicate_id_explicit() {
     run_test("event/duplicate_id_explicit")
 }
+
+#[test]
+fn duplicate_name_descending_ids() {
+    run_test("event/duplicate_name_descending_ids")
+}

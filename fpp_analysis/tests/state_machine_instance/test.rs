@@ -34,3 +34,8 @@ fn outside_active() {
 fn inside_active() {
     run_test("state_machine_instance/inside_active")
 }
+
+#[test]
+fn passive_order() {
+    run_test("state_machine_instance/passive_order")
+}

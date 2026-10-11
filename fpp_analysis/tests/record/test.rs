@@ -54,3 +54,8 @@ fn not_displayable() {
 fn duplicate_id_explicit() {
     run_test("record/duplicate_id_explicit")
 }
+
+#[test]
+fn missing_container_order() {
+    run_test("record/missing_container_order")
+}

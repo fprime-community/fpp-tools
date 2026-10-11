@@ -8,7 +8,7 @@ use crate::semantics::{
 };
 use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc};
 use fpp_core::{File, SourceFile, Span, Spanned};
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
 /// Whether to keep or omit a component prefix when computing a short name
@@ -83,8 +83,9 @@ pub struct Analysis {
     pub component_map: HashMap<Symbol, Component>,
     /// The component under construction
     pub(crate) component: Option<Component>,
-    /// The map from component instance symbols to component instances
-    pub component_instance_map: HashMap<Symbol, ComponentInstance>,
+    /// The map from component instance symbols to component instances, in
+    /// the order the instances were checked
+    pub component_instance_map: indexmap::IndexMap<Symbol, ComponentInstance, FxBuildHasher>,
     /// The component instance under construction
     pub(crate) component_instance: Option<ComponentInstance>,
     /// The map from interface symbols to interfaces
@@ -568,7 +569,7 @@ impl Analysis {
         get_loc: impl Fn(&T) -> Span,
     ) -> SemanticResult {
         let mut seen: HashMap<String, Span> = HashMap::default();
-        for value in dictionary.values_by_id() {
+        for value in dictionary.values_in_order() {
             let name = get_name(value);
             let loc = get_loc(value);
             if let Some(prev_loc) = seen.insert(name.clone(), loc) {
@@ -828,8 +829,10 @@ impl Analysis {
 pub trait IdMap<T> {
     fn get(&self, id: &i128) -> Option<&T>;
     fn insert(&mut self, id: i128, element: T);
-    /// The values of the map, in id order
-    fn values_by_id(&self) -> Vec<&T>;
+    /// The values of the map in the order [`Analysis::check_dictionary_names`]
+    /// visits them: insertion order for an insertion-ordered map, id order
+    /// otherwise
+    fn values_in_order(&self) -> Vec<&T>;
 }
 
 impl<T> IdMap<T> for HashMap<i128, T> {
@@ -841,10 +844,24 @@ impl<T> IdMap<T> for HashMap<i128, T> {
         HashMap::insert(self, id, element);
     }
 
-    fn values_by_id(&self) -> Vec<&T> {
+    fn values_in_order(&self) -> Vec<&T> {
         let mut ids: Vec<&i128> = self.keys().collect();
         ids.sort();
         ids.into_iter().map(|id| &self[id]).collect()
+    }
+}
+
+impl<T> IdMap<T> for indexmap::IndexMap<i128, T, FxBuildHasher> {
+    fn get(&self, id: &i128) -> Option<&T> {
+        indexmap::IndexMap::get(self, id)
+    }
+
+    fn insert(&mut self, id: i128, element: T) {
+        indexmap::IndexMap::insert(self, id, element);
+    }
+
+    fn values_in_order(&self) -> Vec<&T> {
+        self.values().collect()
     }
 }
 
@@ -857,7 +874,7 @@ impl<T> IdMap<T> for std::collections::BTreeMap<i128, T> {
         std::collections::BTreeMap::insert(self, id, element);
     }
 
-    fn values_by_id(&self) -> Vec<&T> {
+    fn values_in_order(&self) -> Vec<&T> {
         self.values().collect()
     }
 }

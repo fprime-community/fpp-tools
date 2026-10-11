@@ -10,7 +10,8 @@ use fpp_ast::{
     SpecTlmChannel, SpecialPortInstanceKind, TlmChannelLimitKind, TlmChannelUpdate,
 };
 use fpp_core::{Node, Span, Spanned};
-use rustc_hash::FxHashMap as HashMap;
+use indexmap::IndexMap;
+use rustc_hash::{FxBuildHasher, FxHashMap as HashMap};
 use std::sync::Arc;
 
 /// An FPP command.
@@ -559,33 +560,33 @@ pub struct Component {
     /// The port interface of the component.
     pub port_interface: PortInterface,
     /// The map from command opcodes to commands.
-    pub command_map: HashMap<i128, Command>,
+    pub command_map: IndexMap<i128, Command, FxBuildHasher>,
     /// The next default opcode.
     pub default_opcode: i128,
     /// The map from telemetry channel IDs to channels.
-    pub tlm_channel_map: HashMap<i128, TlmChannel>,
+    pub tlm_channel_map: IndexMap<i128, TlmChannel, FxBuildHasher>,
     /// The map from telemetry channel names to channels.
-    pub tlm_channel_name_map: HashMap<String, TlmChannel>,
+    pub tlm_channel_name_map: IndexMap<String, TlmChannel, FxBuildHasher>,
     /// The next default channel ID.
     pub default_tlm_channel_id: i128,
     /// The map from event IDs to events.
-    pub event_map: HashMap<i128, Event>,
+    pub event_map: IndexMap<i128, Event, FxBuildHasher>,
     /// The next default event ID.
     pub default_event_id: i128,
     /// The map from parameter IDs to parameters.
-    pub param_map: HashMap<i128, Param>,
+    pub param_map: IndexMap<i128, Param, FxBuildHasher>,
     /// The next default parameter ID.
     pub default_param_id: i128,
     /// The map from container IDs to containers.
-    pub container_map: HashMap<i128, Container>,
+    pub container_map: IndexMap<i128, Container, FxBuildHasher>,
     /// The next default container ID.
     pub default_container_id: i128,
     /// The map from record IDs to records.
-    pub record_map: HashMap<i128, Record>,
+    pub record_map: IndexMap<i128, Record, FxBuildHasher>,
     /// The next default record ID.
     pub default_record_id: i128,
     /// The map from state machine instance names to state machine instances.
-    pub state_machine_instance_map: HashMap<String, StateMachineInstance>,
+    pub state_machine_instance_map: IndexMap<String, StateMachineInstance, FxBuildHasher>,
     /// The list of port matching specifiers.
     pub spec_port_matching_list: Vec<Arc<SpecPortMatching>>,
     /// The resolved port matchings of this component. Populated with the
@@ -626,32 +627,34 @@ impl Component {
             symbol,
             node,
             port_interface: PortInterface::new("component"),
-            command_map: HashMap::default(),
+            command_map: IndexMap::default(),
             default_opcode: 0,
-            tlm_channel_map: HashMap::default(),
-            tlm_channel_name_map: HashMap::default(),
+            tlm_channel_map: IndexMap::default(),
+            tlm_channel_name_map: IndexMap::default(),
             default_tlm_channel_id: 0,
-            event_map: HashMap::default(),
+            event_map: IndexMap::default(),
             default_event_id: 0,
-            param_map: HashMap::default(),
+            param_map: IndexMap::default(),
             default_param_id: 0,
-            container_map: HashMap::default(),
+            container_map: IndexMap::default(),
             default_container_id: 0,
-            record_map: HashMap::default(),
+            record_map: IndexMap::default(),
             default_record_id: 0,
-            state_machine_instance_map: HashMap::default(),
+            state_machine_instance_map: IndexMap::default(),
             spec_port_matching_list: vec![],
             port_matching_list: vec![],
         }
     }
 
     /// The map from port names to port instances.
-    pub fn port_map(&self) -> &HashMap<String, PortInstance> {
+    pub fn port_map(&self) -> &IndexMap<String, PortInstance, FxBuildHasher> {
         &self.port_interface.port_map
     }
 
     /// The map from special port kinds to special port instances.
-    pub fn special_port_map(&self) -> &HashMap<SpecialPortInstanceKind, SpecialPortInstance> {
+    pub fn special_port_map(
+        &self,
+    ) -> &IndexMap<SpecialPortInstanceKind, SpecialPortInstance, FxBuildHasher> {
         &self.port_interface.special_port_map
     }
 
@@ -718,7 +721,7 @@ impl Component {
 
     /// Gets the max identifier
     pub fn get_max_id(&self) -> i128 {
-        fn max_in_map<T>(map: &HashMap<i128, T>) -> i128 {
+        fn max_in_map<T>(map: &IndexMap<i128, T, FxBuildHasher>) -> i128 {
             map.keys().copied().max().unwrap_or(-1)
         }
         [
