@@ -8,7 +8,7 @@
 use fpp_analysis::semantics::{
     Command, ComponentInstance, NonParamKind, ParamKind, Symbol, SymbolInterface, Type, Value,
 };
-use fpp_analysis::{Analysis, add_state_enums, check_semantics, resolve_templates};
+use fpp_analysis::{Analysis, CheckSemantics};
 use fpp_ast::{QueueFull, TlmChannelLimitKind, TlmChannelUpdate};
 use fpp_core::{SourceFile, Spanned};
 use std::sync::Arc;
@@ -22,9 +22,8 @@ fn with_analysis(src: &str, f: impl FnOnce(&Analysis)) {
         let source = SourceFile::new("semantics_test.fpp", src.to_string());
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = Analysis::new();
-        add_state_enums(&mut ast);
-        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
-        let _ = check_semantics(&mut a, vec![&ast]);
+        let _ =
+            CheckSemantics::tu_list(&mut a, fpp_fs::FsReader {}, std::slice::from_mut(&mut ast));
         f(&a);
     });
     let output = String::from_utf8(diagnostics).expect("diagnostics are UTF-8");

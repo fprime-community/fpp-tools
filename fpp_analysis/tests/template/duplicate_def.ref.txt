@@ -1,7 +1,7 @@
- --> [ local path prefix ]/template/duplicate_def.fpp:3:14
+ --> [ local path prefix ]/template/duplicate_def.fpp:3:5
   |
 3 |     constant cOut2 = p + 2
-  |              ^^^^^ redefinition of symbol cOut2
+  |     ^^^^^^^^^^^^^^^^^^^^^^ redefinition of symbol cOut2
   |
   = note: expanded at [ local path prefix ]/template/duplicate_def.fpp:6:1
   |

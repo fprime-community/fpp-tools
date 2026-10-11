@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/component_instance_module.fpp:2:8
+ --> [ local path prefix ]/redef/component_instance_module.fpp:2:1
   |
 2 | module M { }
-  |        ^ redefinition of symbol M
+  | ^^^^^^^^^^^^ redefinition of symbol M
   |
  ::: [ local path prefix ]/redef/component_instance_module.fpp:1:1
   |

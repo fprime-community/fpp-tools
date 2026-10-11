@@ -1,7 +1,7 @@
- --> [ local path prefix ]/state_machine/redef/action.fpp:3:10
+ --> [ local path prefix ]/state_machine/redef/action.fpp:3:3
   |
 3 |   action a
-  |          ^ redefinition of symbol a
+  |   ^^^^^^^^ redefinition of symbol a
   |
  ::: [ local path prefix ]/state_machine/redef/action.fpp:2:3
   |

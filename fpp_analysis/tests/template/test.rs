@@ -106,6 +106,21 @@ fn duplicate_def() {
 }
 
 #[test]
+fn expand_before_invalid_composition() {
+    run_test("template/expand_before_invalid_composition")
+}
+
+#[test]
+fn expand_before_invalid_nested() {
+    run_test("template/expand_before_invalid_nested")
+}
+
+#[test]
+fn expand_in_include() {
+    run_test("template/expand_in_include")
+}
+
+#[test]
 fn expand_not_a_template() {
     run_test("template/expand_not_a_template")
 }
@@ -233,6 +248,11 @@ fn param_conflict_same_name_group() {
 #[test]
 fn param_same_name_different_groups_ok() {
     run_test("template/param_same_name_different_groups_ok")
+}
+
+#[test]
+fn parameter_shadow_error() {
+    run_test("template/parameter_shadow_error")
 }
 
 #[test]

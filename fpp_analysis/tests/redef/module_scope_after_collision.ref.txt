@@ -1,10 +1,13 @@
- --> [ local path prefix ]/redef/module_scope_after_collision.fpp:4:8
+ --> [ local path prefix ]/redef/module_scope_after_collision.fpp:4:1
   |
-4 | module DpCfg {
-  |        ^^^^^ redefinition of symbol DpCfg
+4 | / module DpCfg {
+5 | |   constant X = 1
+6 | |   constant Y = X
+7 | | }
+  | |_^ redefinition of symbol DpCfg
   |
- ::: [ local path prefix ]/redef/module_scope_after_collision.fpp:3:10
+ ::: [ local path prefix ]/redef/module_scope_after_collision.fpp:3:1
   |
-3 | constant DpCfg = 1
-  |          ----- previous definition is here
+3 |   constant DpCfg = 1
+  |   ------------------ previous definition is here
 

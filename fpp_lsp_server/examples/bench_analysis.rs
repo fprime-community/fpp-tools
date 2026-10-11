@@ -85,8 +85,9 @@ fn main() {
             let mut analysis = Analysis::new();
             let mut asts = asts.clone();
             let start = Instant::now();
-            let _ = fpp_analysis::resolve_templates(&mut analysis, &mut asts);
-            let _ = fpp_analysis::check_semantics(&mut analysis, asts.iter().collect());
+            if fpp_analysis::resolve_templates(&mut analysis, &mut asts).is_continue() {
+                let _ = fpp_analysis::check_semantics(&mut analysis, asts.iter().collect());
+            }
             eprintln!(
                 "iter {i}: check_semantics total = {:.3}s",
                 start.elapsed().as_secs_f64()

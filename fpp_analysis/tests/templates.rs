@@ -6,11 +6,13 @@
 //! that a name in the body resolves at the point of the template definition.
 
 use fpp_analysis::semantics::{Connection, Symbol, Topology, Type};
-use fpp_analysis::{Analysis, add_state_enums, check_semantics, resolve_templates};
+use fpp_analysis::{Analysis, CheckSemantics, ExpandSyntaxAndEnterSymbols};
 use fpp_ast::{
-    DefAliasType, DefConstant, ModuleMember, MoveWalkable, Node, TransUnit, Visitable, Visitor,
+    DefAliasType, DefConstant, DefModule, ModuleMember, MoveWalkable, Node, TransUnit, Visitable,
+    Visitor,
 };
-use fpp_core::SourceFile;
+use fpp_core::{FileReader, SourceFile};
+use fpp_fs::FsReader;
 use rustc_hash::FxHashSet as HashSet;
 use std::ops::ControlFlow;
 use std::path::PathBuf;
@@ -24,9 +26,7 @@ fn with_analysis<R>(src: &str, f: impl FnOnce(&Analysis, &TransUnit) -> R) -> R 
         let source = SourceFile::new("templates_test.fpp", src.to_string());
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = Analysis::new();
-        add_state_enums(&mut ast);
-        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
-        let _ = check_semantics(&mut a, vec![&ast]);
+        let _ = CheckSemantics::tu_list(&mut a, FsReader {}, std::slice::from_mut(&mut ast));
         f(&a, &ast)
     });
     let output = String::from_utf8(diagnostics).expect("diagnostics are UTF-8");
@@ -342,27 +342,73 @@ module M {
     });
 }
 
+/// A module defined by an expansion and merged with a same-named module at the
+/// expansion site is that module, so a module nested in it has the module at the
+/// expansion site as its parent.
+#[test]
+fn a_module_nested_in_a_merged_module_has_the_module_at_the_expansion_site_as_parent() {
+    let src = "\
+module template T() {
+    module Inner {
+        module Deep {
+            constant k = 1
+        }
+    }
+}
+
+module M {
+    module Inner {
+        constant c = 0
+    }
+
+    expand T()
+}
+";
+    fn modules_named<'a>(members: Vec<&'a ModuleMember>, name: &str) -> Vec<&'a DefModule> {
+        members
+            .into_iter()
+            .filter_map(|m| match m {
+                ModuleMember::DefModule(def) if def.name.data == name => Some(def),
+                _ => None,
+            })
+            .collect()
+    }
+    with_analysis(src, |a, ast| {
+        // The module Inner written at the expansion site comes before the one
+        // the expansion introduced
+        let [site_inner, _] = modules_named(members_at(ast, &["M"]), "Inner")[..] else {
+            panic!("M should hold two modules named Inner");
+        };
+        let [deep] = modules_named(members_at(ast, &["M", "Inner"]), "Deep")[..] else {
+            panic!("M.Inner should hold one module named Deep");
+        };
+        let site_inner = a.get_symbol(site_inner).expect("M.Inner has a symbol");
+        let deep = a.get_symbol(deep).expect("M.Inner.Deep has a symbol");
+        assert_eq!(a.parent_symbol_map.get(&deep), Some(&site_inner));
+        assert_eq!(a.get_qualified_name(&deep).to_string(), "M.Inner.Deep");
+    });
+}
+
+/// Expand the templates of the model `src`, read from `path`, and check that
+/// every node in the result has its own identity. Panics if the expansion
+/// produced any diagnostic.
+///
 /// A value of a bound parameter is shared by every use of it, so a copy must not
 /// share a node identity with the syntax it was copied from, or with another
-/// copy. Expand a broad slice of the grammar twice and check that every node in
-/// the result has its own identity.
-#[test]
-fn every_node_of_an_expansion_has_its_own_identity() {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("../fpp_parser/tests/syntax.fpp");
-    let body = std::fs::read_to_string(&path).expect("the syntax fixture");
-    let src = format!(
-        "module template T() {{\n{body}\n}}\n\nmodule M1 {{\n    expand T()\n}}\n\nmodule M2 {{\n    expand T()\n}}\n"
-    );
-
+/// copy. Returns the number of nodes in the expanded model.
+fn check_expand_unique(path: &str, src: String) -> usize {
     let mut diagnostics = vec![];
     let mut ctx = fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
-    fpp_core::run(&mut ctx, || {
-        let source = SourceFile::new("templates_test.fpp", src.clone());
+    let count = fpp_core::run(&mut ctx, || {
+        let source = SourceFile::new(path, src);
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = Analysis::new();
-        add_state_enums(&mut ast);
-        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
+        let result = ExpandSyntaxAndEnterSymbols::tu_list(
+            &mut a,
+            FsReader {},
+            std::slice::from_mut(&mut ast),
+        );
+        assert!(result.is_continue(), "the expansion should succeed");
 
         let mut seen = SeenNodes::default();
         let _ = ast.visit(&mut seen, &CollectNodes);
@@ -371,8 +417,56 @@ fn every_node_of_an_expansion_has_its_own_identity() {
             "{} nodes are shared between the template body and its expansions",
             seen.duplicates.len()
         );
-        assert!(seen.seen.len() > 100, "the fixture should be substantial");
+        seen.seen.len()
     });
+    let output = String::from_utf8(diagnostics).expect("diagnostics are UTF-8");
+    assert_eq!(output, "", "expected no diagnostics");
+    count
+}
+
+/// Three expansions of a template with a string parameter are distinct copies
+#[test]
+fn simple() {
+    let src = r#"
+module template T(constant c: string) {
+    constant f = c
+}
+
+module M1 {
+    expand T(constant "a")
+}
+
+module M2 {
+    expand T(constant "b")
+}
+
+module M3 {
+    expand T(constant "c")
+}
+"#;
+    check_expand_unique("templates_test.fpp", src.to_string());
+}
+
+/// Expand each model in `tests/templates/ok`, and check that every node in the
+/// result has its own identity. The model there includes a broad slice of the
+/// grammar into a template body and expands it twice.
+#[test]
+fn ok() {
+    let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    dir.push("tests/templates/ok");
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .expect("the templates/ok directory")
+        .map(|entry| entry.expect("a directory entry").path())
+        .filter(|path| path.extension().is_some_and(|e| e == "fpp"))
+        .collect();
+    files.sort();
+    assert!(!files.is_empty(), "templates/ok should hold some models");
+    for file in files {
+        let path = file.to_str().expect("a UTF-8 path");
+        let content = FsReader {}.read(path).expect("the model file");
+        let count = check_expand_unique(path, content);
+        assert!(count > 100, "{path} should be substantial");
+    }
 }
 
 /// Two expansions of one template each contribute a connection copied from the

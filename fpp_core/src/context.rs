@@ -152,11 +152,39 @@ impl SourceFileData {
             }
         }
 
+        // Collect the full chain of include and template expansion locations:
+        // each including location followed by the locations that include and
+        // expand it, then each expanding location followed by the locations that
+        // include and expand it
+        fn collect_includes_expands(
+            include_loc: &Option<Box<SpanData>>,
+            expand_loc: &Option<Box<SpanData>>,
+            out: &mut Vec<DiagnosticDataChainLocation>,
+        ) {
+            if let Some(loc) = include_loc {
+                out.push(DiagnosticDataChainLocation {
+                    kind: DiagnosticDataChainKind::Included,
+                    loc: loc.file.upgrade().unwrap().include_loc(loc),
+                });
+                collect_includes_expands(&loc.include_span, &loc.expand_span, out);
+            }
+            if let Some(loc) = expand_loc {
+                out.push(DiagnosticDataChainLocation {
+                    kind: DiagnosticDataChainKind::Expanded,
+                    loc: loc.file.upgrade().unwrap().include_loc(loc),
+                });
+                collect_includes_expands(&loc.include_span, &loc.expand_span, out);
+            }
+        }
+
         let mut include_spans = vec![];
         collect_include_locs(&span.include_span, &mut include_spans);
 
         let mut expand_spans = vec![];
         collect_expand_locs(&span.expand_span, &mut expand_spans);
+
+        let mut includes_expands = vec![];
+        collect_includes_expands(&span.include_span, &span.expand_span, &mut includes_expands);
 
         DiagnosticDataSnippet {
             start: span.start - first,
@@ -166,6 +194,7 @@ impl SourceFileData {
             file_content: self.content[full_range.start().into()..full_range.end().into()].into(),
             include_spans,
             expand_spans,
+            includes_expands,
         }
     }
 }
@@ -191,6 +220,23 @@ pub struct DiagnosticDataIncludeLocation {
     pub uri: String,
 }
 
+/// How a location in the chain of a span brought the span to where it is
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticDataChainKind {
+    /// An include specifier spliced the source in at this location
+    Included,
+    /// A template expansion specifier copied the source here at this location
+    Expanded,
+}
+
+/// One location in the chain of include and template expansion locations of a
+/// span
+#[derive(Clone, Debug)]
+pub struct DiagnosticDataChainLocation {
+    pub kind: DiagnosticDataChainKind,
+    pub loc: DiagnosticDataIncludeLocation,
+}
+
 #[derive(Clone, Debug)]
 pub struct DiagnosticDataSnippet {
     pub start: BytePos,
@@ -201,6 +247,9 @@ pub struct DiagnosticDataSnippet {
     pub include_spans: Vec<DiagnosticDataIncludeLocation>,
     /// The chain of template expansion specifiers that copied this span here
     pub expand_spans: Vec<DiagnosticDataIncludeLocation>,
+    /// Every location that includes or expands this span, followed in turn by
+    /// the locations that include or expand it: the chain a diagnostic reports
+    pub includes_expands: Vec<DiagnosticDataChainLocation>,
 }
 
 #[derive(Debug)]

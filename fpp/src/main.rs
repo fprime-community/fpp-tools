@@ -13,11 +13,11 @@ fn compiler_main() -> String {
     let mut a = fpp_analysis::Analysis::new();
     a.input_file_set.insert(fpp_core::File::StdIn);
 
-    let _ = fpp_analysis::resolve_includes(&mut a, fpp_fs::FsReader {}, &mut ast);
-    fpp_analysis::add_state_enums(&mut ast);
-    if fpp_analysis::resolve_templates(&mut a, std::slice::from_mut(&mut ast)).is_continue() {
-        let _ = fpp_analysis::check_semantics(&mut a, vec![&ast]);
-    }
+    let _ = fpp_analysis::CheckSemantics::tu_list(
+        &mut a,
+        fpp_fs::FsReader {},
+        std::slice::from_mut(&mut ast),
+    );
 
     format!("{:#?}", ast)
 }

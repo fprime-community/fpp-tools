@@ -1,10 +1,16 @@
- --> [ local path prefix ]/redef/module_members_after_collision.fpp:7:8
-  |
-7 | module DpCfg {
-  |        ^^^^^ redefinition of symbol DpCfg
-  |
- ::: [ local path prefix ]/redef/module_members_after_collision.fpp:5:19
-  |
-5 | passive component DpCfg {
-  |                   ----- previous definition is here
+  --> [ local path prefix ]/redef/module_members_after_collision.fpp:7:1
+   |
+ 7 | / module DpCfg {
+ 8 | |   constant X = 1
+ 9 | |   array Arr = [2] U8
+10 | |   struct S { x: U8 }
+...  |
+16 | | }
+   | |_^ redefinition of symbol DpCfg
+   |
+  ::: [ local path prefix ]/redef/module_members_after_collision.fpp:5:1
+   |
+ 5 | / passive component DpCfg {
+ 6 | | }
+   | |_- previous definition is here
 

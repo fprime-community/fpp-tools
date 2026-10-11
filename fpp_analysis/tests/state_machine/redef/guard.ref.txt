@@ -1,7 +1,7 @@
- --> [ local path prefix ]/state_machine/redef/guard.fpp:3:9
+ --> [ local path prefix ]/state_machine/redef/guard.fpp:3:3
   |
 3 |   guard g
-  |         ^ redefinition of symbol g
+  |   ^^^^^^^ redefinition of symbol g
   |
  ::: [ local path prefix ]/state_machine/redef/guard.fpp:2:3
   |

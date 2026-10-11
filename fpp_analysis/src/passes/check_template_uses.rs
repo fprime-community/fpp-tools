@@ -1,9 +1,8 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::basic_use_analyzer::{BasicUseAnalyzer, UseAnalysisPass};
+use crate::analyzers::analyzer::visit_expansion;
 use crate::passes::check_uses::check_qual_ident;
-use crate::semantics::{NameGroup, QualifiedName};
-use fpp_ast::{Node, QualIdent, Visitor};
+use crate::semantics::{NameGroup, ScopeOwner, Symbol};
+use fpp_ast::{DefModule, SpecTemplateExpand, TransUnit, Visitor, Walkable};
 use std::ops::ControlFlow;
 
 /// Match the name in each template expansion specifier to the template
@@ -13,52 +12,42 @@ use std::ops::ControlFlow;
 /// template body to copy. Nothing else in an expansion specifier can be
 /// analyzed yet: the arguments bind to parameters only once the specifier is
 /// matched with its definition.
-pub struct CheckTemplateUses<'ast> {
-    super_: BasicUseAnalyzer<'ast, Analysis, Self>,
-}
+///
+/// An expansion specifier is a module member, so the pass visits only
+/// translation unit members and module members.
+pub struct CheckTemplateUses;
 
-impl<'ast> Default for CheckTemplateUses<'ast> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<'ast> CheckTemplateUses<'ast> {
-    pub fn new() -> CheckTemplateUses<'ast> {
-        Self {
-            super_: BasicUseAnalyzer::new(),
-        }
-    }
-}
-
-impl<'ast> Visitor<'ast> for CheckTemplateUses<'ast> {
+impl<'ast> Visitor<'ast> for CheckTemplateUses {
     type Break = ();
     type State = Analysis;
 
-    fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
-        self.super_.visit(self, a, node)
+    fn visit_trans_unit(&self, a: &mut Analysis, node: &'ast TransUnit) -> ControlFlow<()> {
+        node.walk(a, self)
     }
 
-    /// The parameter list of a template definition is checked by `CheckUses`,
-    /// once the whole model is in scope.
-    fn visit_def_module_template(
-        &self,
-        _a: &mut Analysis,
-        _def: &'ast fpp_ast::DefModuleTemplate,
-    ) -> ControlFlow<Self::Break> {
-        ControlFlow::Continue(())
+    fn visit_def_module(&self, a: &mut Analysis, def: &'ast DefModule) -> ControlFlow<()> {
+        let symbol = match a.symbol_get(NameGroup::Value, &def.name.data) {
+            Some(symbol @ Symbol::Module(_)) => symbol,
+            // The analysis goes on past a redefinition, so the name of a module
+            // can be bound to another definition. EnterSymbols has reported that
+            // and entered a module symbol of its own for the definition.
+            _ => a
+                .get_symbol(def)
+                .expect("EnterSymbols enters a symbol for every module definition"),
+        };
+        a.nested_scope.push(ScopeOwner::Symbol(symbol));
+        let result = def.walk(a, self);
+        a.nested_scope.pop();
+        result
     }
-}
 
-impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckTemplateUses<'ast> {
-    fn template_use(
+    fn visit_spec_template_expand(
         &self,
         a: &mut Analysis,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        let _ = name;
-        check_qual_ident(a, NameGroup::Template, node);
+        node: &'ast SpecTemplateExpand,
+    ) -> ControlFlow<()> {
+        visit_expansion(self, a, node)?;
+        check_qual_ident(a, NameGroup::Template, &node.template);
         ControlFlow::Continue(())
     }
 }
