@@ -6,10 +6,13 @@ use fpp_ast::{
 };
 use std::ops::ControlFlow;
 
-/// Analyze state machine uses.
-///
-/// Each of these methods is called when a corresponding use occurs.
+/// Analyze state machine uses
 pub trait StateMachineUseAnalyzer {
+    // ----------------------------------------------------------------------
+    // Interface methods to override
+    // Each of these methods is called when a corresponding use occurs
+    // ----------------------------------------------------------------------
+
     /// A use of an action definition
     fn action_use(&self, sma: &mut StateMachineAnalysis, _node: &Ident) -> SmResult {
         let _ = sma;
@@ -34,9 +37,9 @@ pub trait StateMachineUseAnalyzer {
         ControlFlow::Continue(())
     }
 
-    // ------------------------------------------------------------------
+    // ----------------------------------------------------------------------
     // Implementation using StateMachineAnalysisVisitor
-    // ------------------------------------------------------------------
+    // ----------------------------------------------------------------------
 
     fn def_choice_uses(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
         self.guard_use(sma, &node.guard)?;

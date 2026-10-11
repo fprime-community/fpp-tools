@@ -52,8 +52,8 @@ impl<'ast> Visitor<'ast> for CheckStateMachineDefs {
         // Errors are emitted in place during analysis. A blocking error stops
         // the later graph/type passes, so the transition graph and flattened
         // maps may be incomplete — but `EnterStateMachineSymbols` and
-        // `CheckStateMachineUses` always run first, so the symbol scopes and
-        // use-def map are populated regardless.
+        // `CheckStateMachineUses` always run first, so the symbol scopes are
+        // always populated and the use-def map holds every use that resolved.
         //
         // We store the state machine either way: editor features (completion,
         // hover, go-to-definition, semantic tokens) rely only on the always-

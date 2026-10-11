@@ -113,10 +113,6 @@ pub struct TransitionGraph {
 }
 
 impl TransitionGraph {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Adds a node to the graph
     pub fn add_node(&self, node: Node) -> TransitionGraph {
         let mut result = self.clone();

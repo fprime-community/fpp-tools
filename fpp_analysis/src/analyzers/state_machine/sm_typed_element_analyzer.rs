@@ -71,6 +71,9 @@ pub trait SmTypedElementAnalyzer {
         self.dispatch_typed_element(sma, te)
     }
 
+    /// The default `visit_typed_element`: call the hook for the kind of the
+    /// typed element. An override of `visit_typed_element` calls it to reach
+    /// the default.
     fn dispatch_typed_element(
         &self,
         sma: &mut StateMachineAnalysis,
