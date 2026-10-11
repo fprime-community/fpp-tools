@@ -119,6 +119,11 @@ fn include_module() {
 }
 
 #[test]
+fn include_packet_comment() {
+    run_test("include-packet-comment")
+}
+
+#[test]
 fn include_parse_error() {
     run_test("include-parse-error")
 }
@@ -131,6 +136,11 @@ fn include_subdir() {
 #[test]
 fn include_topology() {
     run_test("include-topology")
+}
+
+#[test]
+fn implements_newline() {
+    run_test("implements-newline")
 }
 
 #[test]

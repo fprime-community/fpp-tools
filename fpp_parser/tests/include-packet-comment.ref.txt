@@ -1,0 +1,61 @@
+TransUnit(
+    [
+        DefTopology {
+            is_deployment: false,
+            name: Name {
+                data: "T",
+                node_id: Span {
+                    start: [ local path prefix ]/include-packet-comment.fpp:1:10,
+                    end: [ local path prefix ]/include-packet-comment.fpp:1:11,
+                },
+            },
+            members: [
+                SpecTlmPacketSet {
+                    name: Name {
+                        data: "P",
+                        node_id: Span {
+                            start: [ local path prefix ]/include-packet-comment.fpp:2:21,
+                            end: [ local path prefix ]/include-packet-comment.fpp:2:22,
+                        },
+                    },
+                    members: [
+                        SpecTlmPacket {
+                            name: Name {
+                                data: "A",
+                                node_id: Span {
+                                    start: [ local path prefix ]/include-packet-comment.fpp:3:12,
+                                    end: [ local path prefix ]/include-packet-comment.fpp:3:13,
+                                },
+                            },
+                            id: None,
+                            group: Expr {
+                                kind: LiteralInt(
+                                    "0",
+                                ),
+                                node_id: Span {
+                                    start: [ local path prefix ]/include-packet-comment.fpp:3:20,
+                                    end: [ local path prefix ]/include-packet-comment.fpp:3:21,
+                                },
+                            },
+                            members: [],
+                            node_id: Span {
+                                start: [ local path prefix ]/include-packet-comment.fpp:3:5,
+                                end: [ local path prefix ]/include-packet-comment.fpp:5:6,
+                            },
+                        },
+                    ],
+                    omitted: [],
+                    node_id: Span {
+                        start: [ local path prefix ]/include-packet-comment.fpp:2:3,
+                        end: [ local path prefix ]/include-packet-comment.fpp:6:4,
+                    },
+                },
+            ],
+            implements: [],
+            node_id: Span {
+                start: [ local path prefix ]/include-packet-comment.fpp:1:1,
+                end: [ local path prefix ]/include-packet-comment.fpp:7:2,
+            },
+        },
+    ],
+)
