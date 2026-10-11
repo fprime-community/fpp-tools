@@ -842,7 +842,9 @@ fn include_in_state_machine() {
     )
 }
 
+/// The test creates a directory symbolic link, which needs the Unix API
 #[test]
+#[cfg(unix)]
 fn symlink_include() {
     let link = Path::new(env!("CARGO_TARGET_TMPDIR")).join("fpp_depend_link");
     let _ = fs::remove_file(&link);
