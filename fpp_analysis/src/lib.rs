@@ -260,8 +260,8 @@ pub fn resolve_includes<Reader: FileReader>(
 /// translation units, replacing each template expansion specifier with the
 /// expanded template. A `Break` result means the caller must not go on to
 /// [`check_semantics`].
-pub fn resolve_templates(a: &mut Analysis, ast: &mut [fpp_ast::TransUnit]) -> ControlFlow<()> {
-    ExpandSyntaxAndEnterSymbols::enter_symbols_and_expand_templates(a, ast)
+pub fn resolve_templates(a: &mut Analysis, tul: &mut [fpp_ast::TransUnit]) -> ControlFlow<()> {
+    ExpandSyntaxAndEnterSymbols::enter_symbols_and_expand_templates(a, tul)
 }
 
 /// Check the semantics of a list of translation units: the steps of
@@ -271,6 +271,6 @@ pub fn resolve_templates(a: &mut Analysis, ast: &mut [fpp_ast::TransUnit]) -> Co
 /// This is a lower-level entry point than [`CheckSemantics::tu_list`].
 /// [`resolve_templates`] must have run on the same analysis first: it enters the
 /// symbols of the model.
-pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> ControlFlow<()> {
-    CheckSemantics::check_expanded_tu_list(a, &ast)
+pub fn check_semantics(a: &mut Analysis, tul: Vec<&fpp_ast::TransUnit>) -> ControlFlow<()> {
+    CheckSemantics::check_expanded_tu_list(a, &tul)
 }

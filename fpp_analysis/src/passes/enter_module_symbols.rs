@@ -55,7 +55,8 @@ pub(crate) trait EnterModuleSymbols<'ast>:
                 // We did not find a symbol with the same name at the current level.
                 // Create a new module symbol now.
                 //
-                // A module definition resides in all the name groups.
+                // A module definition resides in all the name groups, the system
+                // name group included (FPP spec, Scoping of Names).
                 let module = Symbol::Module(Arc::new(def.into()));
                 a.symbol_scope_map.insert(module.clone(), Scope::new());
                 for ng in NameGroup::all() {
@@ -66,8 +67,10 @@ pub(crate) trait EnterModuleSymbols<'ast>:
                 module
             }
         };
-        // A module definition denotes the module symbol it first opened or
-        // re-opened, whatever later passes re-open
+        // The symbol map records the module symbol that EnterSymbols opened or
+        // re-opened for the definition. A later pass may re-open the merged
+        // module of an expansion under the same name, but the definition still
+        // denotes the module symbol of the expansion.
         a.symbol_map
             .entry(def.node_id)
             .or_insert_with(|| symbol.clone());

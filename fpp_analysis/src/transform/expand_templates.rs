@@ -41,12 +41,12 @@ impl ExpandTemplates {
 
     pub fn trans_unit(a: &Analysis, tu: &mut TransUnit) -> SemanticResult {
         for member in &mut tu.0 {
-            Self::module_member(a, None, member)?;
+            Self::match_module_member(a, None, member)?;
         }
         Ok(())
     }
 
-    fn module_member(
+    fn match_module_member(
         a: &Analysis,
         template_definition: Option<Span>,
         member: &mut ModuleMember,
@@ -81,7 +81,7 @@ impl ExpandTemplates {
         }
         let template_definition = Some(def.span());
         for member in &mut def.members {
-            Self::module_member(a, template_definition, member)?;
+            Self::match_module_member(a, template_definition, member)?;
         }
         Ok(())
     }
@@ -92,7 +92,7 @@ impl ExpandTemplates {
         def: &mut DefModule,
     ) -> SemanticResult {
         for member in &mut def.members {
-            Self::module_member(a, template_definition, member)?;
+            Self::match_module_member(a, template_definition, member)?;
         }
         Ok(())
     }
@@ -124,7 +124,7 @@ impl ExpandTemplates {
         let template_definition = Some(def.span());
         let mut members = def.members.clone();
         for member in &mut members {
-            Self::module_member(a, template_definition, member)?;
+            Self::match_module_member(a, template_definition, member)?;
         }
 
         // Give every cloned node its own identity, recording the expansion node

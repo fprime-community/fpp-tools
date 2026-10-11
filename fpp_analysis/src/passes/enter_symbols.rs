@@ -10,13 +10,12 @@ use std::sync::Arc;
 pub struct EnterSymbols;
 
 impl EnterSymbols {
-    /// Enter a symbol into its own name group
-    fn enter_symbol(&self, a: &mut Analysis, sym: Symbol, ng: NameGroup) -> SemanticResult {
-        let res = a.symbol_put(ng, sym.clone());
+    /// Enter a symbol into a name group of the current scope and, if that
+    /// succeeds, record its parent symbol
+    fn enter_symbol(&self, a: &mut Analysis, symbol: Symbol, ng: NameGroup) -> SemanticResult {
+        let res = a.symbol_put(ng, symbol.clone());
         if res.is_ok() {
-            // We successfully added the symbol to the scope
-            // Update the parent symbol map
-            self.update_map(a, sym.clone());
+            self.update_map(a, symbol);
         }
 
         res
@@ -35,6 +34,10 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         node: &'ast TransUnit,
     ) -> ControlFlow<Self::Break> {
         node.walk(a, self)
+    }
+
+    fn visit_def_module(&self, a: &mut Analysis, def: &'ast DefModule) -> ControlFlow<Self::Break> {
+        self.def_module(a, def)
     }
 
     fn visit_def_abs_type(
@@ -69,18 +72,6 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         ControlFlow::Continue(())
     }
 
-    fn visit_def_component_instance(
-        &self,
-        a: &mut Analysis,
-        def: &'ast DefComponentInstance,
-    ) -> ControlFlow<Self::Break> {
-        let symbol = Symbol::ComponentInstance(Arc::new(def.clone()));
-        a.symbol_map.insert(def.node_id, symbol.clone());
-        self.enter_symbol(a, symbol, NameGroup::PortInterfaceInstance)
-            .unwrap_or_else(|err| err.emit());
-        ControlFlow::Continue(())
-    }
-
     fn visit_def_component(
         &self,
         a: &mut Analysis,
@@ -102,13 +93,25 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         a.symbol_scope_map.insert(symbol.clone(), Scope::new());
         a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
 
-        let save_paren = a.parent_symbol.clone();
+        let parent_symbol = a.parent_symbol.clone();
         a.parent_symbol = Some(symbol);
         let res = def.walk(a, self);
-        a.parent_symbol = save_paren;
+        a.parent_symbol = parent_symbol;
         a.nested_scope.pop();
 
         res
+    }
+
+    fn visit_def_component_instance(
+        &self,
+        a: &mut Analysis,
+        def: &'ast DefComponentInstance,
+    ) -> ControlFlow<Self::Break> {
+        let symbol = Symbol::ComponentInstance(Arc::new(def.clone()));
+        a.symbol_map.insert(def.node_id, symbol.clone());
+        self.enter_symbol(a, symbol, NameGroup::PortInterfaceInstance)
+            .unwrap_or_else(|err| err.emit());
+        ControlFlow::Continue(())
     }
 
     fn visit_def_constant(
@@ -137,10 +140,10 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         a.symbol_scope_map.insert(symbol.clone(), Scope::new());
         a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
 
-        let save_paren = a.parent_symbol.clone();
+        let parent_symbol = a.parent_symbol.clone();
         a.parent_symbol = Some(symbol);
         let res = def.walk(a, self);
-        a.parent_symbol = save_paren;
+        a.parent_symbol = parent_symbol;
         a.nested_scope.pop();
 
         res
@@ -170,10 +173,6 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         ControlFlow::Continue(())
     }
 
-    fn visit_def_module(&self, a: &mut Analysis, def: &'ast DefModule) -> ControlFlow<Self::Break> {
-        self.def_module(a, def)
-    }
-
     /// A module template definition introduces a name in the template name
     /// group. Its body is not entered here: the definitions in the body come
     /// into being only where the template is expanded.
@@ -190,13 +189,21 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
     }
 
     /// A template expansion specifier enters no symbols. The symbols of an
-    /// expansion are entered by [`crate::passes::EnterTemplateExpansionSymbols`], after
-    /// the template body has been copied to the point of the specifier.
+    /// expansion are entered by [`crate::passes::EnterTemplateExpansionSymbols`],
+    /// after the template body has been copied to the point of the specifier.
     fn visit_spec_template_expand(
         &self,
         _a: &mut Analysis,
         _def: &'ast SpecTemplateExpand,
     ) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
+    fn visit_def_port(&self, a: &mut Self::State, def: &'ast DefPort) -> ControlFlow<Self::Break> {
+        let symbol = Symbol::Port(Arc::new(def.clone()));
+        a.symbol_map.insert(def.node_id, symbol.clone());
+        self.enter_symbol(a, symbol, NameGroup::Port)
+            .unwrap_or_else(|err| err.emit());
         ControlFlow::Continue(())
     }
 
@@ -222,10 +229,10 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         a.symbol_scope_map.insert(symbol.clone(), Scope::new());
         a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
 
-        let save_parent = a.parent_symbol.clone();
+        let parent_symbol = a.parent_symbol.clone();
         a.parent_symbol = Some(symbol);
         let res = def.walk(a, self);
-        a.parent_symbol = save_parent;
+        a.parent_symbol = parent_symbol;
         a.nested_scope.pop();
 
         res
@@ -239,18 +246,6 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         ControlFlow::Continue(())
     }
 
-    fn visit_def_topology(
-        &self,
-        a: &mut Analysis,
-        def: &'ast DefTopology,
-    ) -> ControlFlow<Self::Break> {
-        let symbol = Symbol::Topology(Arc::new(def.clone()));
-        a.symbol_map.insert(def.node_id, symbol.clone());
-        self.enter_symbol(a, symbol, NameGroup::PortInterfaceInstance)
-            .unwrap_or_else(|err| err.emit());
-        ControlFlow::Continue(())
-    }
-
     fn visit_def_system(&self, a: &mut Analysis, def: &'ast DefSystem) -> ControlFlow<Self::Break> {
         let symbol = Symbol::System(Arc::new(def.clone()));
         a.symbol_map.insert(def.node_id, symbol.clone());
@@ -259,10 +254,14 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         ControlFlow::Continue(())
     }
 
-    fn visit_def_port(&self, a: &mut Self::State, def: &'ast DefPort) -> ControlFlow<Self::Break> {
-        let symbol = Symbol::Port(Arc::new(def.clone()));
+    fn visit_def_topology(
+        &self,
+        a: &mut Analysis,
+        def: &'ast DefTopology,
+    ) -> ControlFlow<Self::Break> {
+        let symbol = Symbol::Topology(Arc::new(def.clone()));
         a.symbol_map.insert(def.node_id, symbol.clone());
-        self.enter_symbol(a, symbol, NameGroup::Port)
+        self.enter_symbol(a, symbol, NameGroup::PortInterfaceInstance)
             .unwrap_or_else(|err| err.emit());
         ControlFlow::Continue(())
     }
