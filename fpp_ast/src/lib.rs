@@ -20,7 +20,9 @@ pub use template::*;
 pub use topology::*;
 pub use visit::*;
 
+/// An AST node with an identifier
 pub trait AstNode: fpp_core::Spanned + Sized {
+    /// The node identifier
     fn id(&self) -> fpp_core::Node;
 }
 
@@ -28,6 +30,7 @@ pub trait AstNode: fpp_core::Spanned + Sized {
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct TransUnit(pub Vec<ModuleMember>);
 
+/// A string literal
 #[ast]
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct LitString {
@@ -100,6 +103,7 @@ impl std::fmt::Display for IntegerKind {
     }
 }
 
+/// The kinds of type name
 #[derive(Debug, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum TypeNameKind {
     #[visitable(ignore)]
@@ -299,6 +303,7 @@ pub struct StructExprMember {
     pub value: Expr,
 }
 
+/// The kinds of expression
 #[derive(Debug, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum ExprKind {
     Array(Vec<Expr>),

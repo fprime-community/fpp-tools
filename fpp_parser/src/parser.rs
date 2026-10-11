@@ -1026,6 +1026,7 @@ impl<'a> Parser<'a> {
         let first_span = left.span();
         loop {
             match self.peek(0) {
+                // Member/Dot
                 Dot if self.peek(1) == Identifier => {
                     self.next();
                     let id = self.ident().unwrap();
@@ -1037,6 +1038,7 @@ impl<'a> Parser<'a> {
                         },
                     }
                 }
+                // Array subscript
                 LeftSquare => {
                     let bracket = self.peek_token().unwrap();
                     self.next();

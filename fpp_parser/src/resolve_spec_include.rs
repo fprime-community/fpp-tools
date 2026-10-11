@@ -305,6 +305,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
             return;
         }
 
+        // Read the file
         let content = match self.reader.read(&path) {
             Ok(content) => content,
             Err(_) => {
@@ -320,6 +321,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
         let included_file = SourceFile::new_with_parent(&path, content, including_loc.file());
         a.insert(included_file, kind);
 
+        // Parse the file
         let members = parse(included_file, parser, Some(including_loc));
         for member in members {
             transformer(self, a, member, out);

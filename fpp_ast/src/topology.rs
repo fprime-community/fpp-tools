@@ -58,6 +58,7 @@ pub struct Connection {
     pub to_index: Option<Expr>,
 }
 
+/// Connection pattern kind
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum ConnectionPatternKind {
     Command,
@@ -84,7 +85,7 @@ impl std::fmt::Display for ConnectionPatternKind {
     }
 }
 
-/// Connection graph specifier
+/// Direct connection graph specifier
 #[ast]
 #[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecDirectConnectionGraph {
@@ -92,7 +93,7 @@ pub struct SpecDirectConnectionGraph {
     pub connections: Vec<Connection>,
 }
 
-/// Connection graph specifier
+/// Pattern connection graph specifier
 #[ast]
 #[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecPatternConnectionGraph {

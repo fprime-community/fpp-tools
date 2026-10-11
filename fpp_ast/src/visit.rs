@@ -37,6 +37,8 @@ macro_rules! visit_signatures_mut {
     };
 }
 
+/// Visit an AST, carrying state
+///
 /// This trait outlines a standard Visitor pattern for FPP.
 /// It includes a function signature for each of the 'interesting' nodes in the AST.
 /// It also provides generic mechanisms for visiting the AST.
@@ -50,7 +52,8 @@ macro_rules! visit_signatures_mut {
 ///
 /// Shallow traversal is the most common pattern you'll see compiler passes in FPP
 /// implement. They only walk child leaves in the AST when explicitly told to. The default
-/// implementation of [Visitor::visit] is a shallow traversal.
+/// implementation of [Visitor::super_visit] does not visit any children, so by default every
+/// traversal is shallow.
 ///
 /// Here is an example of a shallow pass visiting all the members of a component definition:
 /// > Note: Member function implementations were omitted.
@@ -74,12 +77,12 @@ macro_rules! visit_signatures_mut {
 /// }
 /// ```
 ///
-/// Notice how both [Visitor::visit_def_module] and [Visitor::visit_def_component] were both
-/// implemented to recursive through the nodes.
+/// Notice how [Visitor::visit_def_module] and [Visitor::visit_def_component] were both
+/// implemented to recurse through the nodes.
 ///
 /// ## Deep traversal
 ///
-/// Deep traversal is the inverse of shallow traverse. It walks all child nodes in the AST unless
+/// Deep traversal is the inverse of shallow traversal. It walks all child nodes in the AST unless
 /// explicitly told not to. This is useful if you need to implement a pass that hits the majority
 /// of the AST such as [Visitor::visit_expr] or [Visitor::visit_type_name].
 ///
@@ -223,17 +226,19 @@ pub trait Visitor<'ast>: Sized {
     );
 }
 
+/// Transform an AST, carrying state
+///
 /// This is the mutable variant of [Visitor]. It allows making changes to the AST
 /// during traversal.
 ///
-/// Notice that this visitor does not take a lifetime life [Visitor].
+/// Notice that this visitor does not take a lifetime like [Visitor].
 /// This is because we cannot pass out mutable references to nodes in the AST that live
 /// past the execution of the visitor.
 ///
-/// Generally these visitors should not collect any of the elements AST but rather purely
-/// modify the nodes it needs to.
+/// Generally these visitors should not collect any of the AST elements; they only
+/// modify the nodes they need to.
 ///
-/// For more information of implementing a visitor, see [Visitor]
+/// For more information on implementing a visitor, see [Visitor]
 pub trait MutVisitor: Sized {
     type Break;
     type State;
@@ -340,42 +345,50 @@ pub trait MutVisitor: Sized {
 }
 
 /// Trait to wrap all the nodes that have a structure to them
-/// The walking should recursively call out to its child nodes
-/// [Visitable::visit] delegator which in turn calls out to its own
-/// [Visitor::visit_*].
+/// The walking should recursively call out to its child nodes'
+/// [Visitable::visit] delegator, which in turn calls out to the matching
+/// `Visitor::visit_<type>` hook.
 ///
-/// Walkable is a trait that is automatically implemented by the [Walkable]
-/// derive macro. This macro also implements the [Visitable] trait for that type
-/// so that it may itself be visited.
+/// Walkable is a trait that is automatically implemented by the `VisitorWalkable`
+/// and `DirectWalkable` derive macros. These macros also implement the [Visitable]
+/// trait for that type so that it may itself be visited.
 pub trait Walkable<'a, V: Visitor<'a>> {
     /// Walk all the child nodes of this node
     ///
     /// # Arguments
     ///
+    /// * `a`: the state threaded through the visit
     /// * `visitor`: the visitor that should be called into when visiting nodes
-    /// * `scope`: the scope built up while visiting nodes recursively
     ///
-    /// returns: ControlFlow<<V as Visitor>::Break, ()>
+    /// returns: `ControlFlow<<V as Visitor>::Break, ()>`
     fn walk(&'a self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break>;
 }
 
+/// [Walkable] for a node reference taken by value, such as a [crate::Node]
 pub trait MoveWalkable<'a, V: Visitor<'a>> {
+    /// Walk all the child nodes of this node
     fn walk(self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break>;
 }
 
+/// The mutable variant of [Walkable]
 pub trait MutWalkable<V: MutVisitor> {
+    /// Walk all the child nodes of this node
     fn walk_mut(&mut self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break>;
 }
 
+/// A node that a [Visitor] can visit
 pub trait Visitable<'a, V: Visitor<'a>> {
+    /// Call the visitor's hook for this node, or walk its children if it has none
     fn visit(&'a self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break>;
 }
 
+/// A node that a [MutVisitor] can visit
 pub trait MutVisitable<V: MutVisitor> {
+    /// Call the visitor's hook for this node, or walk its children if it has none
     fn visit_mut(&mut self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break>;
 }
 
-/// Visitable for Option<T>
+/// Visitable for `Option<T>`
 impl<'a, V: Visitor<'a>, T: Visitable<'a, V>> Visitable<'a, V> for Option<T> {
     fn visit(&'a self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break> {
         match self {
@@ -394,7 +407,7 @@ impl<V: MutVisitor, T: MutVisitable<V>> MutVisitable<V> for Option<T> {
     }
 }
 
-/// Walkable for Box<T> by visiting the inner object
+/// Walkable for `Box<T>` by visiting the inner object
 impl<'a, V: Visitor<'a>, T: Visitable<'a, V>> Walkable<'a, V> for Box<T> {
     fn walk(&'a self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break> {
         self.visit(a, visitor)
@@ -407,7 +420,7 @@ impl<V: MutVisitor, T: MutVisitable<V>> MutWalkable<V> for Box<T> {
     }
 }
 
-/// Visitable for Box<T>
+/// Visitable for `Box<T>`
 impl<'a, V: Visitor<'a>, T: Visitable<'a, V>> Visitable<'a, V> for Box<T> {
     fn visit(&'a self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break> {
         self.deref().visit(a, visitor)
@@ -420,7 +433,7 @@ impl<V: MutVisitor, T: MutVisitable<V>> MutVisitable<V> for Box<T> {
     }
 }
 
-/// Walkable for Vec<T> by visiting all the children
+/// Walkable for `Vec<T>` by visiting all the children
 impl<'a, V: Visitor<'a>, T: Visitable<'a, V>> Walkable<'a, V> for Vec<T> {
     fn walk(&'a self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break> {
         for child in self {
@@ -441,7 +454,7 @@ impl<V: MutVisitor, T: MutVisitable<V>> MutWalkable<V> for Vec<T> {
     }
 }
 
-/// Visitable for Vec<T> by walking all the elements in the vec
+/// Visitable for `Vec<T>` by walking all the elements in the vec
 impl<'a, V: Visitor<'a>, T: Visitable<'a, V>> Visitable<'a, V> for Vec<T> {
     fn visit(&'a self, a: &mut V::State, visitor: &V) -> ControlFlow<V::Break> {
         self.walk(a, visitor)

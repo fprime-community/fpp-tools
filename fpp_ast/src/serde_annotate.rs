@@ -1,4 +1,4 @@
-//! Serde glue for serializing an `#[ast]` nodes.
+//! Serde glue for serializing `#[ast]` nodes.
 
 use fpp_core::{Annotated, Node};
 use serde::Serializer;

@@ -25,6 +25,7 @@ pub enum ComponentMember {
     SpecInterfaceImport(SpecInterfaceImport),
 }
 
+/// The kind of a command, or the input kind of a special port instance
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum InputPortKind {
     Async,
@@ -121,6 +122,7 @@ impl std::fmt::Display for EventSeverity {
     }
 }
 
+/// Event throttle clause
 #[ast]
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct EventThrottle {

@@ -61,7 +61,7 @@ pub(crate) fn annotated_struct(input: &ItemStruct) -> TokenStream {
             // Return a compile_error if user applied macro on unsupported struct
             let err = syn::Error::new_spanned(
                 input,
-                "#[ast_node] only supports structs with named fields (braced structs).",
+                "AstAnnotated only supports structs with named fields (braced structs).",
             )
             .to_compile_error();
             return err.into();
