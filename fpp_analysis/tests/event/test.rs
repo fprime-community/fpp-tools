@@ -114,3 +114,8 @@ fn duplicate_id_explicit() {
 fn duplicate_name_descending_ids() {
     run_test("event/duplicate_name_descending_ids")
 }
+
+#[test]
+fn id_overflow() {
+    run_test("event/id_overflow")
+}

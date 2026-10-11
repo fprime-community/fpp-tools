@@ -84,3 +84,13 @@ fn not_displayable() {
 fn duplicate_id_explicit() {
     run_test("param/duplicate_id_explicit")
 }
+
+#[test]
+fn opcode_overflow() {
+    run_test("param/opcode_overflow")
+}
+
+#[test]
+fn default_opcode_after_32_bits() {
+    run_test("param/default_opcode_after_32_bits")
+}

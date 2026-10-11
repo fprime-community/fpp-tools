@@ -89,3 +89,8 @@ fn not_displayable() {
 fn duplicate_name_descending_opcodes() {
     run_test("command/duplicate_name_descending_opcodes")
 }
+
+#[test]
+fn opcode_overflow() {
+    run_test("command/opcode_overflow")
+}

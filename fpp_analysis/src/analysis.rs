@@ -549,14 +549,23 @@ impl Analysis {
         get_loc: impl Fn(&T) -> Span,
     ) -> SemanticResult<i128> {
         match map.get(&id) {
+            // Element already there: report the error
             Some(prev) => Err(SemanticError::DuplicateIdValue {
                 value: Analysis::display_id_value(id),
                 loc: get_loc(&element),
                 prev_loc: get_loc(prev),
             }),
+            // New element: compute the new map and the new default ID
             None => {
+                let next = id
+                    .checked_add(1)
+                    .ok_or_else(|| SemanticError::InvalidIntValue {
+                        loc: get_loc(&element),
+                        v: None,
+                        msg: format!("the default identifier after {} is out of range", id),
+                    })?;
                 map.insert(id, element);
-                Ok(id + 1)
+                Ok(next)
             }
         }
     }

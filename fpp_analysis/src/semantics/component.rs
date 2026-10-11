@@ -308,8 +308,22 @@ impl Param {
             node.type_name.span(),
             "type of parameter is not displayable",
         )?;
-        let (set_opcode, default1) = compute_opcode(set_opcode_opt, default_opcode);
-        let (save_opcode, default2) = compute_opcode(save_opcode_opt, default1);
+        let compute_opcode = |int_opt: Option<i128>, default_opcode: i128| match int_opt {
+            Some(i) => Ok((i, default_opcode)),
+            None => default_opcode
+                .checked_add(1)
+                .map(|next| (default_opcode, next))
+                .ok_or_else(|| SemanticError::InvalidIntValue {
+                    loc: node.span(),
+                    v: None,
+                    msg: format!(
+                        "the default opcode after {} is out of range",
+                        default_opcode
+                    ),
+                }),
+        };
+        let (set_opcode, default1) = compute_opcode(set_opcode_opt, default_opcode)?;
+        let (save_opcode, default2) = compute_opcode(save_opcode_opt, default1)?;
         Ok((
             Param {
                 node: Arc::new(node.clone()),
@@ -321,13 +335,6 @@ impl Param {
             },
             default2,
         ))
-    }
-}
-
-fn compute_opcode(int_opt: Option<i128>, default_opcode: i128) -> (i128, i128) {
-    match int_opt {
-        Some(i) => (i, default_opcode),
-        None => (default_opcode, default_opcode + 1),
     }
 }
 
@@ -747,8 +754,16 @@ impl Component {
                 prev_loc: prev.get_loc(),
             });
         }
+        let default_opcode =
+            opcode
+                .checked_add(1)
+                .ok_or_else(|| SemanticError::InvalidIntValue {
+                    loc: command.get_loc(),
+                    v: None,
+                    msg: format!("the default opcode after {} is out of range", opcode),
+                })?;
         self.command_map.insert(opcode, command);
-        self.default_opcode = opcode + 1;
+        self.default_opcode = default_opcode;
         Ok(())
     }
 

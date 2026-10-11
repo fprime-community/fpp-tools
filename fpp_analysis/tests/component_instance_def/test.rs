@@ -104,3 +104,8 @@ fn invalid_negative_int() {
 fn conflicting_ids_equal_base() {
     run_test("component_instance_def/conflicting_ids_equal_base")
 }
+
+#[test]
+fn base_id_overflow() {
+    run_test("component_instance_def/base_id_overflow")
+}

@@ -173,7 +173,16 @@ impl ComponentInstance {
             return Ok(None);
         };
         let qualified_name = a.get_qualified_name(&symbol);
-        let max_id = base_id + component.get_max_id();
+        let max_id = base_id.checked_add(component.get_max_id()).ok_or_else(|| {
+            SemanticError::InvalidIntValue {
+                loc: node.base_id.span(),
+                v: None,
+                msg: format!(
+                    "the ID range starting at base ID {} is out of range",
+                    base_id
+                ),
+            }
+        })?;
 
         Ok(Some(ComponentInstance {
             node: Arc::new(node.clone()),
