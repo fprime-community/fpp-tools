@@ -1,5 +1,0 @@
- --> [ local path prefix ]/compiler/tools/fpp-depend/test/missing_include_input.fpp:3:9
-  |
-3 | include "missing_include_input_nope.fppi"
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot open file [ local path prefix ]/compiler/tools/fpp-depend/test/missing_include_input_nope.fppi
-

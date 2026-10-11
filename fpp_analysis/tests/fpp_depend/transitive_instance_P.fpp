@@ -1,5 +1,0 @@
-module B {
-
-  port P
-
-}

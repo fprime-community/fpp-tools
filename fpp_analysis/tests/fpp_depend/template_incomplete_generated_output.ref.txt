@@ -1,2 +1,0 @@
-IncompleteArrArrayAc.cpp
-IncompleteArrArrayAc.hpp

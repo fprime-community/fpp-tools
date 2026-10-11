@@ -1,1 +1,0 @@
-constant e = 2

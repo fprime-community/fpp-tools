@@ -1,1 +1,0 @@
-[ local path prefix ]/compiler/tools/fpp-depend/test/T.fpp

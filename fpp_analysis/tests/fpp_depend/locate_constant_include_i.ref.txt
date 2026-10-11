@@ -1,1 +1,0 @@
-[ local path prefix ]/compiler/tools/fpp-depend/test/locate_constant_include_3.fppi

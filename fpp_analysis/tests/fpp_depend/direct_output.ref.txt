@@ -1,3 +1,0 @@
-[ local path prefix ]/compiler/tools/fpp-depend/test/direct_b.fpp
-[ local path prefix ]/compiler/tools/fpp-depend/test/direct_d.fpp
-[ local path prefix ]/compiler/tools/fpp-depend/test/direct_e.fpp

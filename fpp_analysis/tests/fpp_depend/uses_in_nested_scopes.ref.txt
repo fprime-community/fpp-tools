@@ -1,7 +1,0 @@
-[ local path prefix ]/compiler/tools/fpp-depend/test/uses_in_nested_scopes_m_e.fpp
-[ local path prefix ]/compiler/tools/fpp-depend/test/uses_in_nested_scopes_m_i.fpp
-[ local path prefix ]/compiler/tools/fpp-depend/test/uses_in_nested_scopes_m_inst.fpp
-[ local path prefix ]/compiler/tools/fpp-depend/test/uses_in_nested_scopes_m_k.fpp
-[ local path prefix ]/compiler/tools/fpp-depend/test/uses_in_nested_scopes_m_s.fpp
-[ local path prefix ]/compiler/tools/fpp-depend/test/uses_in_nested_scopes_m_sm2.fpp
-[ local path prefix ]/compiler/tools/fpp-depend/test/uses_in_nested_scopes_m_sm_t.fpp

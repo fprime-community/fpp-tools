@@ -1,8 +1,0 @@
- --> [ local path prefix ]/compiler/tools/fpp-depend/test/syntax_dep_bad.fpp:2:1
-  |
-2 |
-  | ^ syntax error: expression expected
-  |
-  = note: expected one of [, {, (, identifier, ., -, true, false, sizeof, literal float, literal integer, literal string
-  = note: got end of input
-

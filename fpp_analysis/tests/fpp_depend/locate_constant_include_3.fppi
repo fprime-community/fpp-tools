@@ -1,1 +1,0 @@
-constant a = 0
