@@ -70,26 +70,33 @@ fn template_unmatched_remote_arg() {
     run_test("port_matching/template_unmatched_remote_arg")
 }
 
+// Rust-only tests (no Scala counterpart)
+
+/// The first connection without a match is reported
 #[test]
 fn missing_connection_order() {
     run_test("port_matching/missing_connection_order")
 }
 
+/// An unmatched connection after a connection type error
 #[test]
 fn unmatched_after_type_error() {
     run_test("port_matching/unmatched_after_type_error")
 }
 
+/// An unmatched connection after a port numbering error
 #[test]
 fn unmatched_after_too_many_ports() {
     run_test("port_matching/unmatched_after_too_many_ports")
 }
 
+/// An unmatched connection after an instance membership error
 #[test]
 fn unmatched_after_instance_error() {
     run_test("port_matching/unmatched_after_instance_error")
 }
 
+/// The first unmatched connection that is not at a matched port is reported
 #[test]
 fn unmatched_order() {
     run_test("port_matching/unmatched_order")

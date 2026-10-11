@@ -6,28 +6,18 @@ fn shift_ok() {
 }
 
 #[test]
+fn shift_negative_amount_error() {
+    run_test("numeric_shift/shift_negative_amount_error")
+}
+
+#[test]
+fn shift_negative_rshift_error() {
+    run_test("numeric_shift/shift_negative_rshift_error")
+}
+
+#[test]
 fn shift_amount_too_large_error() {
     run_test("numeric_shift/shift_amount_too_large_error")
-}
-
-#[test]
-fn shift_boolean_value_error() {
-    run_test("numeric_shift/shift_boolean_value_error")
-}
-
-#[test]
-fn shift_empty_struct_error() {
-    run_test("numeric_shift/shift_empty_struct_error")
-}
-
-#[test]
-fn shift_alias_value_error() {
-    run_test("numeric_shift/shift_alias_value_error")
-}
-
-#[test]
-fn shift_alias_enum_value_error() {
-    run_test("numeric_shift/shift_alias_enum_value_error")
 }
 
 #[test]
@@ -46,30 +36,49 @@ fn shift_invalid_type_error() {
 }
 
 #[test]
-fn shift_negative_amount_error() {
-    run_test("numeric_shift/shift_negative_amount_error")
+fn shift_boolean_value_error() {
+    run_test("numeric_shift/shift_boolean_value_error")
 }
 
+// Rust-only tests (no Scala counterpart)
+
+/// An empty struct value may not be shifted
 #[test]
-fn shift_negative_rshift_error() {
-    run_test("numeric_shift/shift_negative_rshift_error")
+fn shift_empty_struct_error() {
+    run_test("numeric_shift/shift_empty_struct_error")
 }
 
+/// A shift operand may not have an alias type
+#[test]
+fn shift_alias_value_error() {
+    run_test("numeric_shift/shift_alias_value_error")
+}
+
+/// A shift operand may not have an alias of an enum type
+#[test]
+fn shift_alias_enum_value_error() {
+    run_test("numeric_shift/shift_alias_enum_value_error")
+}
+
+/// A right shift of a non-negative value by more than its width gives 0
 #[test]
 fn shift_wide_amount_positive_error() {
     run_test("numeric_shift/shift_wide_amount_positive_error")
 }
 
+/// A right shift of a negative value by more than its width gives -1
 #[test]
 fn shift_wide_amount_negative_error() {
     run_test("numeric_shift/shift_wide_amount_negative_error")
 }
 
+/// A shift result past the 128-bit integer range is an error
 #[test]
 fn shift_overflow_error() {
     run_test("numeric_shift/shift_overflow_error")
 }
 
+/// Shifts of enum constants
 #[test]
 fn shift_enum_ok() {
     run_test("numeric_shift/shift_enum_ok")

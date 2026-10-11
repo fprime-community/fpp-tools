@@ -162,36 +162,43 @@ fn undef_time_get() {
 
 // Rust-only tests (no Scala counterpart)
 
+/// An output port may not have queue full behavior
 #[test]
 fn output_queue_full() {
     run_test("port_instance/output_queue_full")
 }
 
+/// The implied use of a special port that names a module is an error
 #[test]
 fn special_port_module() {
     run_test("port_instance/special_port_module")
 }
 
+/// An undefined array size is reported before an undefined port type
 #[test]
 fn undef_size_and_port() {
     run_test("port_instance/undef_size_and_port")
 }
 
+/// An undefined priority is reported before an undefined implied port
 #[test]
 fn undef_priority_and_implied_port() {
     run_test("port_instance/undef_priority_and_implied_port")
 }
 
+/// The qualifier of an implied port use that is not a qualifier
 #[test]
 fn implied_port_qualifier_not_qualifier() {
     run_test("port_instance/implied_port_qualifier_not_qualifier")
 }
 
+/// An implied port use whose qualifier lacks the port
 #[test]
 fn implied_port_undef_member() {
     run_test("port_instance/implied_port_undef_member")
 }
 
+/// A port array size outside the 32-bit range is an error
 #[test]
 fn array_size_out_of_range() {
     run_test("port_instance/array_size_out_of_range")

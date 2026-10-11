@@ -8,10 +8,6 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[features]
-
-disabled-tests = []
-
 [dependencies]
 fpp_ast = { path = "../fpp_ast", version = "=0.0.0" }
 fpp_core = { path = "../fpp_core", version = "=0.0.0" }

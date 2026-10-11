@@ -131,6 +131,38 @@ fn run(dep_paths: &[&str], file_path: &str, unconnected: bool) {
     }
 }
 
+mod array {
+    mod test;
+}
+
+mod command {
+    mod test;
+}
+
+mod component {
+    mod test;
+}
+
+mod component_instance_def {
+    mod test;
+}
+
+mod connection_direct {
+    mod test;
+}
+
+mod connection_pattern {
+    mod test;
+}
+
+mod constant {
+    mod test;
+}
+
+mod container {
+    mod test;
+}
+
 mod cycles {
     mod test;
 }
@@ -139,115 +171,7 @@ mod defs {
     mod test;
 }
 
-mod interface {
-    mod test;
-}
-
-mod types {
-    mod test;
-}
-
-mod port_matching {
-    mod test;
-}
-
-mod record {
-    mod test;
-}
-
-mod port_numbering {
-    mod test;
-}
-
-mod array {
-    mod test;
-}
-
-mod tlm_packets {
-    mod test;
-}
-
 mod enums {
-    mod test;
-}
-
-mod tlm_channel {
-    mod test;
-}
-
-mod framework_defs {
-    mod test;
-}
-
-mod expr {
-    mod test;
-}
-
-mod component {
-    mod test;
-}
-
-mod param {
-    mod test;
-}
-
-mod container {
-    mod test;
-}
-
-mod component_instance_def {
-    mod test;
-}
-
-mod port_instance {
-    mod test;
-}
-
-mod constant {
-    mod test;
-}
-
-mod structs {
-    mod test;
-}
-
-mod invalid_symbols {
-    mod test;
-}
-
-mod redef {
-    mod test;
-}
-
-mod state_machine_defs {
-    mod test;
-}
-
-mod numeric_shift {
-    mod test;
-}
-
-mod unconnected {
-    mod test;
-}
-
-mod command {
-    mod test;
-}
-
-mod port {
-    mod test;
-}
-
-mod instance_spec {
-    mod test;
-}
-
-mod connection_direct {
-    mod test;
-}
-
-mod spec_init {
     mod test;
 }
 
@@ -255,23 +179,19 @@ mod event {
     mod test;
 }
 
-mod spec_loc {
+mod expr {
     mod test;
 }
 
-mod system {
+mod framework_defs {
     mod test;
 }
 
-mod top_import {
+mod instance_spec {
     mod test;
 }
 
-mod state_machine_instance {
-    mod test;
-}
-
-mod connection_pattern {
+mod interface {
     mod test;
 }
 
@@ -279,11 +199,47 @@ mod internal_port {
     mod test;
 }
 
-mod top_ports {
+mod invalid_symbols {
     mod test;
 }
 
-mod template {
+mod numeric_shift {
+    mod test;
+}
+
+mod param {
+    mod test;
+}
+
+mod port {
+    mod test;
+}
+
+mod port_instance {
+    mod test;
+}
+
+mod port_matching {
+    mod test;
+}
+
+mod port_numbering {
+    mod test;
+}
+
+mod record {
+    mod test;
+}
+
+mod redef {
+    mod test;
+}
+
+mod spec_init {
+    mod test;
+}
+
+mod spec_loc {
     mod test;
 }
 
@@ -321,4 +277,50 @@ mod state_machine {
     mod undef {
         mod test;
     }
+}
+
+mod state_machine_instance {
+    mod test;
+}
+
+mod structs {
+    mod test;
+}
+
+mod system {
+    mod test;
+}
+
+mod template {
+    mod test;
+}
+
+mod tlm_channel {
+    mod test;
+}
+
+mod tlm_packets {
+    mod test;
+}
+
+mod top_import {
+    mod test;
+}
+
+mod top_ports {
+    mod test;
+}
+
+mod types {
+    mod test;
+}
+
+mod unconnected {
+    mod test;
+}
+
+// Rust-only test directories (no Scala counterpart)
+
+mod state_machine_defs {
+    mod test;
 }

@@ -17,6 +17,7 @@ fn undef_phase() {
 
 // Rust-only tests (no Scala counterpart)
 
+/// An init phase outside the 32-bit range is an error
 #[test]
 fn phase_out_of_range() {
     run_test("spec_init/phase_out_of_range")

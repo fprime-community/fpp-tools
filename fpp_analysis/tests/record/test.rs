@@ -57,6 +57,7 @@ fn ok() {
 
 // Rust-only tests (no Scala counterpart)
 
+/// A component with records and no containers is reported once
 #[test]
 fn missing_container_order() {
     run_test("record/missing_container_order")
