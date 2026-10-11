@@ -6,7 +6,7 @@ use fpp_analysis::semantics::{
     SymbolInterface, Type,
 };
 use fpp_ast::{
-    AstNode, FormalParam, FormalParamKind, MoveWalkable, Name, Node, TemplateParam,
+    AstNode, Expr, ExprKind, FormalParam, FormalParamKind, MoveWalkable, Name, Node, TemplateParam,
     TemplateParamInterface, Visitor,
 };
 use fpp_core::{BytePos, CompilerContext, LineCol, SourceFile};
@@ -55,6 +55,14 @@ impl<'ast> Visitor<'ast> for FindPositionVisitor<'ast> {
 
                 a.push(node);
                 out
+            } else if let Node::Expr(Expr {
+                kind: ExprKind::Binop { .. },
+                ..
+            }) = node
+            {
+                // A binary expression is located at its operator, so its left
+                // operand lies before its span
+                node.walk(a, self)
             } else {
                 // This node does not span the range
                 // We don't need to walk it since it's children won't span it either

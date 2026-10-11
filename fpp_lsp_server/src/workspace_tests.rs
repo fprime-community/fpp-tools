@@ -528,6 +528,65 @@ constant d = 3
     );
 }
 
+/// The line and character that goto-definition jumps to from a zero-based
+/// `line`/`character`, if it jumps anywhere.
+fn definition_at(state: &GlobalState, uri: &str, line: u32, character: u32) -> Option<(u32, u32)> {
+    let response = crate::handlers::handle_goto_definition(
+        state,
+        lsp_types::GotoDefinitionParams {
+            text_document_position_params: lsp_types::TextDocumentPositionParams {
+                text_document: lsp_types::TextDocumentIdentifier {
+                    uri: Uri::from_str(uri).unwrap(),
+                },
+                position: lsp_types::Position { line, character },
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+        },
+    )
+    .expect("goto definition should not error");
+    match response? {
+        lsp_types::GotoDefinitionResponse::Scalar(location) => {
+            Some((location.range.start.line, location.range.start.character))
+        }
+        other => panic!("expected one location, got {other:?}"),
+    }
+}
+
+/// A binary expression is located at its operator, so its left operand lies
+/// before its location. Goto-definition must still find the uses in either
+/// operand, at any depth of the expression.
+#[test]
+fn goto_definition_reaches_both_operands_of_a_binary_expression() {
+    let dir = fixture_dir("ws_binop_goto");
+    let text = "\
+module M {
+  constant A = 1
+}
+constant B = M.A + 1
+constant C = 1 + M.A
+constant D = M.A * 2 + M.A << 1
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let module_m = Some((0, 7));
+    let constant_a = Some((1, 11));
+    for (line, character, definition) in [
+        (3, 13, module_m),
+        (3, 15, constant_a),
+        (4, 19, constant_a),
+        (5, 13, module_m),
+        (5, 15, constant_a),
+        (5, 25, constant_a),
+    ] {
+        assert_eq!(
+            definition_at(&state, &uri, line, character),
+            definition,
+            "goto definition at {line}:{character}"
+        );
+    }
+}
+
 /// A module template body is a module member list, so it may hold `include`
 /// specifiers. The document-link visitor must descend into it, or the include in
 /// a template body is not a clickable link.
