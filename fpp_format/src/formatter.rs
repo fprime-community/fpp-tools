@@ -628,7 +628,11 @@ fn flat_sep(prev: &SyntaxToken, cur: &SyntaxToken) -> &'static str {
     if cur.kind() == POST_ANNOTATION {
         return "  ";
     }
-    if prev.kind() == DOT || cur.kind() == DOT {
+    if cur.kind() == DOT && prev.kind() == LITERAL_INT && !is_hex_literal(prev) {
+        // `1 .x` selects a member of 1; `1.x` would lex as a float literal
+        return " ";
+    }
+    if prev.kind() == DOT || (cur.kind() == DOT && !is_absolute_name_dot(cur)) {
         return "";
     }
     // The enum representation-type colon (`enum E : U8`) takes a leading space,
@@ -668,6 +672,20 @@ fn flat_sep(prev: &SyntaxToken, cur: &SyntaxToken) -> &'static str {
         return "";
     }
     " "
+}
+
+/// Whether `tok` is the leading dot of an absolute name (`.a`, `.M.T`), which
+/// is spaced like the name it begins.
+fn is_absolute_name_dot(tok: &SyntaxToken) -> bool {
+    tok.prev_sibling_or_token().is_none()
+        && tok.parent().is_some_and(|p| match p.kind() {
+            QUAL_IDENT | EXPR_IDENT | PORT_INSTANCE_IDENTIFIER | TLM_CHANNEL_IDENTIFIER => true,
+            _ => false,
+        })
+}
+
+fn is_hex_literal(tok: &SyntaxToken) -> bool {
+    tok.text().starts_with("0x") || tok.text().starts_with("0X")
 }
 
 fn is_unary(tok: &SyntaxToken) -> bool {

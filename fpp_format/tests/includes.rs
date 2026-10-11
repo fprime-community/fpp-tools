@@ -157,19 +157,86 @@ fn detects_include_cycle() {
 }
 
 #[test]
-fn skips_state_machine_include() {
+fn formats_state_machine_and_state_includes() {
     let dir = TmpDir::new();
-    // A state-machine include has no standalone entrypoint, so it must not be
-    // recursed into (and must not error).
+    // An include in a state machine is a fragment of state machine members,
+    // and an include in a state is a fragment of state members.
     dir.write(
         "root.fpp",
-        "module M {\nstate machine S {\ninclude \"sm.fppi\"\n}\n}\n",
+        "module M {\nstate machine S {\ninclude \"sm.fppi\"\nstate B {\ninclude \"state.fppi\"\n}\n}\n}\n",
     );
-    dir.write("sm.fppi", "initial enter A\nstate A\n");
+    dir.write("sm.fppi", "initial enter A\nstate A {   entry do { a } }\n");
+    dir.write("state.fppi", "entry   do { a }\non s enter A\n");
 
     let units = fmt(&dir.0.join("root.fpp")).expect("format should succeed");
-    assert_eq!(units.len(), 1, "state machine include should be skipped");
-    assert_eq!(units[0].path.file_name().unwrap(), "root.fpp");
+    assert_eq!(units.len(), 3, "unexpected units: {:?}", units);
+    let by_name = |name: &str| {
+        units
+            .iter()
+            .find(|u| u.path.file_name().unwrap() == name)
+            .unwrap_or_else(|| panic!("missing unit {name}"))
+    };
+    assert_eq!(by_name("sm.fppi").entry, TopEntryPoint::StateMachine);
+    assert_eq!(by_name("state.fppi").entry, TopEntryPoint::State);
+    assert_eq!(
+        by_name("sm.fppi").formatted,
+        "initial enter A\nstate A {\n    entry do { a }\n}\n"
+    );
+    assert_eq!(
+        by_name("state.fppi").formatted,
+        "entry do { a }\non s enter A\n"
+    );
+}
+
+#[test]
+fn nested_include_inherits_fragment_entry() {
+    let dir = TmpDir::new();
+    // An include at the top of a component fragment is itself a component
+    // fragment.
+    dir.write(
+        "top.fpp",
+        "module M {\n  passive component C {\n    include \"a.fppi\"\n  }\n}\n",
+    );
+    dir.write("a.fppi", "include \"b.fppi\"\n");
+    dir.write("b.fppi", "event E severity activity high format \"x\"\n");
+
+    let units = fmt(&dir.0.join("top.fpp")).expect("format should succeed");
+    assert_eq!(units.len(), 3, "unexpected units: {:?}", units);
+    for u in &units[1..] {
+        assert_eq!(u.entry, TopEntryPoint::Component, "{}", u.path.display());
+    }
+}
+
+#[test]
+fn formats_packet_and_packet_set_includes() {
+    let dir = TmpDir::new();
+    dir.write(
+        "top.fpp",
+        "module M { topology T { telemetry packets P {\n include \"set.fppi\"\n } } }\n",
+    );
+    dir.write(
+        "set.fppi",
+        "@ Included packet\npacket P2 id 1 group 1 {\n  i4.c4\n  include \"channel.fppi\"\n}\n@< Included packet\n",
+    );
+    dir.write("channel.fppi", "i5.c5\n");
+
+    let units = fmt(&dir.0.join("top.fpp")).expect("format should succeed");
+    assert_eq!(units.len(), 3, "unexpected units: {:?}", units);
+    let set = units
+        .iter()
+        .find(|u| u.path.file_name().unwrap() == "set.fppi")
+        .unwrap();
+    assert_eq!(set.entry, TopEntryPoint::TlmPacketSet);
+    assert_eq!(
+        set.formatted,
+        "@ Included packet\npacket P2 id 1 group 1 {\n    i4.c4\n    include \"channel.fppi\"\n}  @< Included packet\n"
+    );
+    let channel = units
+        .iter()
+        .find(|u| u.path.file_name().unwrap() == "channel.fppi")
+        .unwrap();
+    assert_eq!(channel.entry, TopEntryPoint::TlmPacket);
+    assert_eq!(channel.formatted, "i5.c5\n");
 }
 
 #[test]

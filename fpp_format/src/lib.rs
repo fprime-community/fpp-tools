@@ -87,9 +87,9 @@ impl std::error::Error for FormatError {}
 
 /// Format FPP source text with the given options.
 ///
-/// Returns the formatted text, or an error if the input has parse errors.
-/// Note: The formatter will still attempt to format code with parse errors,
-/// but may return a `ParseError` if the errors are severe.
+/// Returns the formatted text, or `FormatError::ParseError` if the input has
+/// any syntax error; the input is never partially formatted. The output uses
+/// the line endings of the input.
 pub fn format_text(
     text: &str,
     entry: TopEntryPoint,
@@ -111,7 +111,20 @@ pub fn format_text(
     let formatter = Formatter::new(options);
     let formatted = formatter.format(&root);
 
-    Ok(formatted)
+    Ok(restore_line_endings(text, formatted))
+}
+
+/// The formatter writes `\n` line endings. If the first line of `original`
+/// ends with `\r\n`, rewrite every line ending of `formatted` as `\r\n`.
+pub(crate) fn restore_line_endings(original: &str, formatted: String) -> String {
+    let crlf = original
+        .find('\n')
+        .is_some_and(|i| original[..i].ends_with('\r'));
+    if crlf {
+        formatted.replace("\r\n", "\n").replace('\n', "\r\n")
+    } else {
+        formatted
+    }
 }
 
 /// Format an FPP file and return the formatted text.
@@ -126,6 +139,46 @@ pub fn format_file(path: &Path, entry: TopEntryPoint) -> Result<String, FormatEr
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_lexer_errors_are_not_formatted() {
+        // A lexer error is a parse error, so the input is not formatted.
+        for input in [
+            "constant a = 1 \\ x\n  + 2\n",
+            "constant a = \"abc\n",
+            "constant a = 1.5x\n",
+            "constant\ta = 1\n",
+        ] {
+            assert!(
+                matches!(
+                    format_text(input, TopEntryPoint::Module, FormatOptions::default()),
+                    Err(FormatError::ParseError(_))
+                ),
+                "{:?}",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn test_signed_exponent_is_not_split() {
+        // Either the literal lexes as one token and is kept, or it is a lexer
+        // error; it is never rewritten as a subtraction.
+        let input = "constant a = 1e-3\nconstant b = 2.5E+10\n";
+        if let Ok(formatted) = format_text(input, TopEntryPoint::Module, FormatOptions::default()) {
+            assert_eq!(formatted, input);
+        }
+    }
+
+    #[test]
+    fn test_restore_line_endings() {
+        assert_eq!(restore_line_endings("a\n", "b\nc\n".into()), "b\nc\n");
+        assert_eq!(
+            restore_line_endings("a\r\nb\n", "b\nc\r\n".into()),
+            "b\r\nc\r\n"
+        );
+        assert_eq!(restore_line_endings("a", "b\n".into()), "b\n");
+    }
 
     #[test]
     fn test_default_options() {

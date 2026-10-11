@@ -103,6 +103,9 @@ pub fn render(doc: &Doc, width: usize, indent_width: usize) -> String {
     let mut col: usize = 0;
     let mut line: usize = 0;
     let mut anchors: Vec<Anchor> = Vec::new();
+    // Lines whose end lies inside a text spanning several lines (a multi-line
+    // string literal); their trailing spaces belong to the text.
+    let mut verbatim_lines: Vec<usize> = Vec::new();
     let mut stack: Vec<(i32, Mode, &Doc)> = vec![(0, Mode::Break, doc)];
 
     while let Some((ind, mode, d)) = stack.pop() {
@@ -111,7 +114,9 @@ pub fn render(doc: &Doc, width: usize, indent_width: usize) -> String {
             Doc::Text(s) => {
                 out.push_str(s);
                 if let Some(nl) = s.rfind('\n') {
-                    line += s.matches('\n').count();
+                    let newlines = s.matches('\n').count();
+                    verbatim_lines.extend(line..line + newlines);
+                    line += newlines;
                     col = s[nl + 1..].chars().count();
                 } else {
                     col += s.chars().count();
@@ -156,7 +161,7 @@ pub fn render(doc: &Doc, width: usize, indent_width: usize) -> String {
     }
 
     let aligned = align(&out, &anchors, indent_width);
-    finish(aligned)
+    finish(aligned, &verbatim_lines)
 }
 
 fn emit_break(
@@ -292,11 +297,19 @@ fn align(text: &str, anchors: &[Anchor], iw: usize) -> String {
     lines.join("\n")
 }
 
-/// Trim trailing whitespace on each line and ensure exactly one final newline.
-fn finish(text: String) -> String {
+/// Trim trailing whitespace on each line, except the lines listed in
+/// `verbatim_lines`, and ensure exactly one final newline.
+fn finish(text: String, verbatim_lines: &[usize]) -> String {
     let mut out: String = text
         .split('\n')
-        .map(|l| l.trim_end())
+        .enumerate()
+        .map(|(i, l)| {
+            if verbatim_lines.binary_search(&i).is_ok() {
+                l
+            } else {
+                l.trim_end()
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n");
     while out.ends_with('\n') {

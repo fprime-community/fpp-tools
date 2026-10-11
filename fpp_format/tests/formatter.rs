@@ -18,6 +18,36 @@ fn format_src(
     Ok(Formatter::new(options).format(&root))
 }
 
+/// The AST that fpp_parser builds for `text`, serialized without spans, so
+/// two sources compare equal exactly when they mean the same thing.
+fn ast_json(text: &str, entry: TopEntryPoint) -> String {
+    let mut diagnostics = vec![];
+    let mut ctx = fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
+    let json = fpp_core::run(&mut ctx, || {
+        let src = fpp_core::SourceFile::new("input.fpp", text.to_string());
+        match entry {
+            TopEntryPoint::Module => {
+                serde_json::to_string_pretty(&fpp_parser::parse(src, |p| p.trans_unit(), None))
+            }
+            TopEntryPoint::Component => serde_json::to_string_pretty(&fpp_parser::parse(
+                src,
+                |p| p.component_members(),
+                None,
+            )),
+            _ => unimplemented!("no AST comparison for {:?}", entry),
+        }
+        .unwrap()
+    });
+    drop(ctx);
+    assert!(
+        diagnostics.is_empty(),
+        "fpp_parser rejects the input:\n{}\n{}",
+        String::from_utf8_lossy(&diagnostics),
+        text
+    );
+    json
+}
+
 fn run_test(file_name: &str, entry: TopEntryPoint) {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
@@ -66,6 +96,14 @@ fn run_test(file_name: &str, entry: TopEntryPoint) {
         );
     }
 
+    // Formatting preserves the meaning of the source.
+    assert_eq!(
+        ast_json(&src, entry),
+        ast_json(&formatted, entry),
+        "{}: formatting changed the AST",
+        file_name
+    );
+
     let formatted2 = format_src(&formatted, entry, FormatOptions::default())
         .expect("second format should succeed");
     if formatted != formatted2 {
@@ -112,6 +150,13 @@ fmt_test!(constant_align, "constant-align");
 fmt_test!(enum_annotation_align, "enum-annotation-align");
 fmt_test!(param_annotation, "param-annotation");
 fmt_test!(blank_lines, "blank-lines");
+fmt_test!(absolute_names, "absolute-names");
+fmt_test!(component_dictionary, "component-dictionary");
+fmt_test!(float_literals, "float-literals");
+fmt_test!(
+    multiline_string_trailing_space,
+    "multiline-string-trailing-space"
+);
 
 #[test]
 fn component_inner() {

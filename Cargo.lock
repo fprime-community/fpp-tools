@@ -426,8 +426,12 @@ name = "fpp_format"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "fpp_core",
+ "fpp_errors",
  "fpp_lsp_parser",
+ "fpp_parser",
  "pretty_assertions",
+ "serde_json",
 ]
 
 [[package]]
