@@ -587,6 +587,65 @@ constant D = M.A * 2 + M.A << 1
     }
 }
 
+/// The start and end (line, character) of each location that find-references
+/// returns from a zero-based `line`/`character`, in the order returned.
+fn references_at(
+    state: &GlobalState,
+    uri: &str,
+    line: u32,
+    character: u32,
+) -> Vec<((u32, u32), (u32, u32))> {
+    crate::handlers::handle_references(
+        state,
+        lsp_types::ReferenceParams {
+            text_document_position: lsp_types::TextDocumentPositionParams {
+                text_document: lsp_types::TextDocumentIdentifier {
+                    uri: Uri::from_str(uri).unwrap(),
+                },
+                position: lsp_types::Position { line, character },
+            },
+            work_done_progress_params: Default::default(),
+            partial_result_params: Default::default(),
+            context: lsp_types::ReferenceContext {
+                include_declaration: false,
+            },
+        },
+    )
+    .expect("references should not error")
+    .unwrap_or_default()
+    .into_iter()
+    .map(|l| {
+        (
+            (l.range.start.line, l.range.start.character),
+            (l.range.end.line, l.range.end.character),
+        )
+    })
+    .collect()
+}
+
+/// A type use is recorded under its type name, its qualified identifier and
+/// the identifier's name, all with the same span. Find-references lists each
+/// use once, in source order.
+#[test]
+fn references_list_each_type_use_once() {
+    let dir = fixture_dir("ws_references_dedup");
+    let text = "\
+array A = [3] U32
+struct S { x: A, y: A }
+type T = A
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    assert_eq!(state.diagnostics.all(), Default::default());
+    let uses = vec![((1, 14), (1, 15)), ((1, 20), (1, 21)), ((2, 9), (2, 10))];
+    assert_eq!(
+        references_at(&state, &uri, 0, 6),
+        uses,
+        "from the definition"
+    );
+    assert_eq!(references_at(&state, &uri, 1, 20), uses, "from a use");
+}
+
 /// A module template body is a module member list, so it may hold `include`
 /// specifiers. The document-link visitor must descend into it, or the include in
 /// a template body is not a clickable link.

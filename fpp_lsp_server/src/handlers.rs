@@ -698,21 +698,31 @@ pub fn handle_references(
         };
 
         if let Some(symbol) = symbol {
-            // Look for all use-def resolutions that map to this symbol
-            Ok(Some(
-                state
-                    .analysis
-                    .use_def_map
-                    .iter()
-                    .filter_map(|(node, i_symbol)| {
-                        if symbol.node() == i_symbol.node() {
-                            Some(node_to_location(state, *node))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect(),
-            ))
+            // Look for all use-def resolutions that map to this symbol. One use
+            // can be recorded under several nodes with the same span (a type
+            // name, its qualified identifier and the identifier's name), so the
+            // locations are sorted and each is reported once.
+            let mut locations: Vec<Location> = state
+                .analysis
+                .use_def_map
+                .iter()
+                .filter_map(|(node, i_symbol)| {
+                    if symbol.node() == i_symbol.node() {
+                        Some(node_to_location(state, *node))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            locations.sort_by(|l1, l2| {
+                (l1.uri.as_str(), l1.range.start, l1.range.end).cmp(&(
+                    l2.uri.as_str(),
+                    l2.range.start,
+                    l2.range.end,
+                ))
+            });
+            locations.dedup();
+            Ok(Some(locations))
         } else {
             Ok(None)
         }
