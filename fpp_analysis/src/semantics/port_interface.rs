@@ -84,7 +84,7 @@ impl PortInterface {
             .ok_or_else(|| SemanticError::InvalidPortInstanceId {
                 loc: name.span(),
                 port_name: name.data.clone(),
-                instance_type: self.instance_type.clone(),
+                symbol_kind: self.instance_type.clone(),
                 interface_name: interface_name.to_string(),
             })
     }

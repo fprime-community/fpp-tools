@@ -27,9 +27,9 @@ impl CheckSystemDefs {
             Ok(())
         } else {
             Err(SemanticError::InvalidSymbol {
-                symbol_name: t.get_name().to_string(),
-                msg: "topology used here must be a deployment topology".to_string(),
+                name: t.get_name().to_string(),
                 loc,
+                msg: "topology used here must be a deployment topology".to_string(),
                 def_loc: t.get_loc(),
             })
         }

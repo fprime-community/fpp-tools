@@ -226,13 +226,10 @@ fn check_module_qualifiers(a: &Analysis, symbol: &Symbol) -> bool {
     while let Some(parent) = a.parent_symbol_map.get(current) {
         if !matches!(parent, Symbol::Module(_)) {
             let error = SemanticError::InvalidQualifier {
+                name: a.get_qualified_name(parent),
                 loc: symbol.get_loc(),
-                msg: format!(
-                    "invalid qualifier {}: not a module symbol",
-                    a.get_qualified_name(parent)
-                ),
+                msg: "not a module symbol".to_string(),
                 def_loc: parent.get_loc(),
-                def_msg: "symbol is defined here".to_string(),
             };
             Diagnostic::from(error)
                 .note(format!(

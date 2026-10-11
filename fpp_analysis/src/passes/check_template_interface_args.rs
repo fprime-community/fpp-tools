@@ -76,7 +76,7 @@ impl CheckTemplateInterfaceArgs {
             .implements(&iface.port_interface)
             .map_err(|err| SemanticError::InterfaceImplements {
                 loc: value.span(),
-                inner: Box::new(err),
+                err: Box::new(err),
             })
     }
 }

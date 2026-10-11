@@ -246,9 +246,9 @@ impl<'ast> FinalizeConstantExprs<'ast> {
             // Invalid use of a symbol in an expression
             _ => {
                 SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
-                    msg: "not a constant symbol".to_string(),
+                    name: symbol.name().data.clone(),
                     loc: node.span(),
+                    msg: "not a constant symbol".to_string(),
                     def_loc: symbol.node().span(),
                 }
                 .emit();

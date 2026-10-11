@@ -44,8 +44,8 @@ where
         name: &str,
     ) -> SemanticResult<S> {
         mapping(name).ok_or_else(|| SemanticError::UndefinedSymbol {
-            ng: ng.to_string(),
             name: name.to_string(),
+            symbol_kind: ng.to_string(),
             loc: id.span(),
         })
     }
@@ -116,9 +116,9 @@ where
                 .clone();
             let scope = (self.get_symbol_scope)(a, &qualifier_symbol).ok_or_else(|| {
                 SemanticError::InvalidSymbol {
-                    symbol_name: qualifier_symbol.name().data.clone(),
-                    msg: "not a qualifier".to_string(),
+                    name: qualifier_symbol.name().data.clone(),
                     loc: id.span(),
+                    msg: "not a qualifier".to_string(),
                     def_loc: qualifier_symbol.get_loc(),
                 }
             })?;

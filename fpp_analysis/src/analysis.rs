@@ -619,9 +619,9 @@ impl Analysis {
 
     fn invalid_symbol(symbol: &Symbol, id: fpp_core::Node, msg: &str) -> SemanticError {
         SemanticError::InvalidSymbol {
-            symbol_name: symbol.name().data.clone(),
-            msg: msg.to_string(),
+            name: symbol.name().data.clone(),
             loc: id.span(),
+            msg: msg.to_string(),
             def_loc: symbol.node().span(),
         }
     }
@@ -1258,9 +1258,9 @@ impl Analysis {
             }
             None => Ok(None),
             Some(represented) => Err(SemanticError::InvalidSymbol {
-                symbol_name: symbol.name().data.clone(),
-                msg: "not a component instance symbol".to_string(),
+                name: symbol.name().data.clone(),
                 loc: id.span(),
+                msg: "not a component instance symbol".to_string(),
                 def_loc: represented.node().span(),
             }),
         }

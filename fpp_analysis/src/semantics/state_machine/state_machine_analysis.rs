@@ -132,10 +132,10 @@ impl StateMachineAnalysis {
             None => {
                 crate::errors::SemanticError::ChoiceTypeMismatch {
                     loc: te.get_span(),
-                    loc1: te1.get_span(),
-                    show1: crate::semantics::state_machine::TypeOption::show(to1),
-                    loc2: te2.get_span(),
-                    show2: crate::semantics::state_machine::TypeOption::show(&to2),
+                    to_loc1: te1.get_span(),
+                    to1: crate::semantics::state_machine::TypeOption::show(to1),
+                    to_loc2: te2.get_span(),
+                    to2: crate::semantics::state_machine::TypeOption::show(&to2),
                 }
                 .emit();
                 None
@@ -159,9 +159,9 @@ impl StateMachineAnalysis {
             crate::errors::SemanticError::CallSiteTypeMismatch {
                 loc,
                 te_kind: te_kind.to_string(),
-                te_show: crate::semantics::state_machine::TypeOption::show(te_to),
+                te_ty: crate::semantics::state_machine::TypeOption::show(te_to),
                 site_kind: site_kind.to_string(),
-                site_show: crate::semantics::state_machine::TypeOption::show(site_to),
+                site_ty: crate::semantics::state_machine::TypeOption::show(site_to),
             }
             .emit();
         }

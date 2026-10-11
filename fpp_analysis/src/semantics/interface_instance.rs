@@ -136,7 +136,7 @@ impl InterfaceInstance {
             .ok_or_else(|| SemanticError::InvalidPortInstanceId {
                 loc,
                 port_name: name.to_string(),
-                instance_type: self
+                symbol_kind: self
                     .get_interface(a)
                     .expect("interface instance references a resolved component or topology")
                     .instance_type

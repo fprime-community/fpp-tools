@@ -62,9 +62,9 @@ impl<'ast> CheckTypeUses<'ast> {
             }
             _ => {
                 SemanticError::InvalidSymbol {
-                    symbol_name: symbol.unqualified_name().to_string(),
-                    msg: "not a type symbol".to_string(),
+                    name: symbol.unqualified_name().to_string(),
                     loc: node.span(),
+                    msg: "not a type symbol".to_string(),
                     def_loc: symbol.get_loc(),
                 }
                 .emit();

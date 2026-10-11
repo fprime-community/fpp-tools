@@ -56,7 +56,7 @@ impl StateMachineInstance {
             Some(Symbol::StateMachine(sm)) => sm.clone(),
             Some(symbol) => {
                 return Err(SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
+                    name: symbol.name().data.clone(),
                     loc: qid.span(),
                     msg: "not a state machine symbol".to_string(),
                     def_loc: symbol.node().span(),

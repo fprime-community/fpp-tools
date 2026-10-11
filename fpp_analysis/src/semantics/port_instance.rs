@@ -242,7 +242,7 @@ impl PortInstance {
                 Some(Symbol::Port(symbol)) => PortInstanceType::DefPort(symbol.clone()),
                 Some(symbol) => {
                     return Err(SemanticError::InvalidSymbol {
-                        symbol_name: symbol.name().data.clone(),
+                        name: symbol.name().data.clone(),
                         loc: qid.span(),
                         msg: "not a port symbol".to_string(),
                         def_loc: symbol.node().span(),
@@ -284,7 +284,7 @@ impl PortInstance {
             // Fw.Time
             Some(symbol) => {
                 return Err(SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
+                    name: symbol.name().data.clone(),
                     loc,
                     msg: "not a port symbol".to_string(),
                     def_loc: symbol.node().span(),

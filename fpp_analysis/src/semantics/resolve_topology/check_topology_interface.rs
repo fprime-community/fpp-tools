@@ -15,7 +15,7 @@ pub fn check(a: &Analysis, t: &Topology) -> SemanticResult {
             Err(err) => {
                 return Err(SemanticError::InterfaceImplements {
                     loc: impl_use.span(),
-                    inner: Box::new(err),
+                    err: Box::new(err),
                 });
             }
         }

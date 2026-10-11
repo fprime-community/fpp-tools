@@ -297,9 +297,9 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
             }
             // Definition has a shorter name: the use is a member of the definition
             SemanticError::InvalidSymbol {
-                symbol_name: sym_qualified_name,
-                msg: format!("it has {} as a member", iu_name),
+                name: sym_qualified_name,
                 loc: iu.id().span(),
+                msg: format!("it has {} as a member", iu_name),
                 def_loc: sym.get_loc(),
             }
             .emit();

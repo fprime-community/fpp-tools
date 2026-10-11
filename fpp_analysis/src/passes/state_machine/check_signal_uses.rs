@@ -27,7 +27,7 @@ impl StateMachineAnalysisVisitor for CheckSignalUses {
                 match initial_map.get(&sym) {
                     Some(prev_st) => {
                         SemanticError::DuplicateSignal {
-                            name: sym.get_unqualified_name().to_string(),
+                            sig_name: sym.get_unqualified_name().to_string(),
                             state_name: node.name.data.clone(),
                             loc: st.signal.span(),
                             prev_loc: prev_st.signal.span(),

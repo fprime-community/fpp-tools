@@ -246,9 +246,9 @@ impl Topology {
             && def.is_deployment
         {
             return Err(SemanticError::InvalidSymbol {
-                symbol_name: symbol.name().data.clone(),
-                msg: "use of deployment topology is not allowed here".to_string(),
+                name: symbol.name().data.clone(),
                 loc,
+                msg: "use of deployment topology is not allowed here".to_string(),
                 def_loc: top.node().span(),
             });
         }

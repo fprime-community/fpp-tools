@@ -76,7 +76,7 @@ impl Endpoint {
                     loc,
                     port_number: n,
                     port: self.port.qualified_name(),
-                    array_size: size,
+                    size,
                     spec_loc: self.port.port_instance.get_loc(),
                 });
             }
