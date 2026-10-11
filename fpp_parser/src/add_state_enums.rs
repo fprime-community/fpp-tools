@@ -69,11 +69,11 @@ fn def_state_machine(sm: &mut DefStateMachine) {
     );
 
     match get_state_enum(sm, span) {
-        Ok(def_enum) => sm
+        Ok(state_enum) => sm
             .members
             .as_mut()
             .unwrap()
-            .insert(0, StateMachineMember::DefEnum(def_enum)),
+            .insert(0, StateMachineMember::DefEnum(state_enum)),
         Err(err) => Diagnostic::from(err).emit(),
     }
 }
