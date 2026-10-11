@@ -1,9 +1,7 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::visit_expansion;
 use crate::errors::{SemanticError, SemanticResult};
-use crate::semantics::{
-    PrimitiveIntSignedness, Symbol, SymbolInterface, Type, int_kind_signedness,
-};
+use crate::semantics::{PrimitiveInt, Signedness, Symbol, SymbolInterface, Type};
 use fpp_ast::{
     AstNode, DefAbsType, DefAliasType, DefArray, DefConstant, DefEnum, DefModuleTemplate,
     DefStateMachine, DefStruct, MoveWalkable, Node, SpecTemplateExpand, Visitor,
@@ -292,9 +290,9 @@ fn require_integer_type_alias(a: &Analysis, name: &str, id: fpp_core::Node) -> S
 
 /// Whether the underlying type of the type at `id` is a primitive integer type
 /// of the given signedness
-fn has_signedness(a: &Analysis, id: fpp_core::Node, signedness: PrimitiveIntSignedness) -> bool {
+fn has_signedness(a: &Analysis, id: fpp_core::Node, signedness: Signedness) -> bool {
     match Type::underlying_type(&a.type_map[&id]).deref() {
-        Type::PrimitiveInt(kind) => int_kind_signedness(*kind) == signedness,
+        Type::PrimitiveInt(kind) => kind.signedness() == signedness,
         _ => false,
     }
 }
@@ -304,7 +302,7 @@ fn require_signed_integer_type_alias(
     name: &str,
     id: fpp_core::Node,
 ) -> SemanticResult {
-    if has_signedness(a, id, PrimitiveIntSignedness::Signed) {
+    if has_signedness(a, id, Signedness::Signed) {
         Ok(())
     } else {
         Err(SemanticError::InvalidType {
@@ -323,7 +321,7 @@ fn require_unsigned_integer_type_alias(
     name: &str,
     id: fpp_core::Node,
 ) -> SemanticResult {
-    if has_signedness(a, id, PrimitiveIntSignedness::Unsigned) {
+    if has_signedness(a, id, Signedness::Unsigned) {
         Ok(())
     } else {
         Err(SemanticError::InvalidType {

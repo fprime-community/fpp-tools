@@ -772,31 +772,38 @@ impl TypeConversionError {
 pub type TypeConversionResult = Result<(), TypeConversionError>;
 
 /// Primitive types
-pub trait PrimitiveType {
+pub trait Primitive {
     /// The width of the type, in bits
     fn bit_width(&self) -> u32;
 }
 
+/// Primitive integer types, given by their kinds
+pub trait PrimitiveInt: Primitive {
+    /// The signedness of the type
+    fn signedness(&self) -> Signedness;
+}
+
 /// The signedness of a primitive integer type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PrimitiveIntSignedness {
+pub enum Signedness {
     Signed,
     Unsigned,
 }
 
-/// The signedness of a primitive integer type
-pub fn int_kind_signedness(kind: IntegerKind) -> PrimitiveIntSignedness {
-    match kind {
-        IntegerKind::I8 | IntegerKind::I16 | IntegerKind::I32 | IntegerKind::I64 => {
-            PrimitiveIntSignedness::Signed
-        }
-        IntegerKind::U8 | IntegerKind::U16 | IntegerKind::U32 | IntegerKind::U64 => {
-            PrimitiveIntSignedness::Unsigned
+impl PrimitiveInt for IntegerKind {
+    fn signedness(&self) -> Signedness {
+        match self {
+            IntegerKind::I8 | IntegerKind::I16 | IntegerKind::I32 | IntegerKind::I64 => {
+                Signedness::Signed
+            }
+            IntegerKind::U8 | IntegerKind::U16 | IntegerKind::U32 | IntegerKind::U64 => {
+                Signedness::Unsigned
+            }
         }
     }
 }
 
-impl PrimitiveType for IntegerKind {
+impl Primitive for IntegerKind {
     fn bit_width(&self) -> u32 {
         match self {
             IntegerKind::I8 => 8,
@@ -811,7 +818,7 @@ impl PrimitiveType for IntegerKind {
     }
 }
 
-impl PrimitiveType for FloatKind {
+impl Primitive for FloatKind {
     fn bit_width(&self) -> u32 {
         match self {
             FloatKind::F32 => 32,
