@@ -942,9 +942,8 @@ module M {
         })
     }
 
-    /// A port interface keeps its ports in the order they were added, which is
-    /// the order Scala's immutable Map iterates them in for up to four entries,
-    /// so the checks that walk it report the port Scala reports.
+    /// A port interface keeps its ports in the order they were added, so the
+    /// checks that walk it report the first offending port in that order.
     #[test]
     fn ports_are_walked_in_insertion_order() {
         with_analysis(|component, _| {
