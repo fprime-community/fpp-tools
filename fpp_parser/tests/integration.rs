@@ -319,6 +319,11 @@ fn state_machine_dictionary() {
 }
 
 #[test]
+fn commit_points() {
+    run_test("commit-points")
+}
+
+#[test]
 fn uncommitted_member() {
     run_test("uncommitted-member")
 }
