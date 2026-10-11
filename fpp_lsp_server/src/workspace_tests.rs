@@ -463,6 +463,38 @@ module B {
     assert_eq!(expansion_lines, vec![4, 7]);
 }
 
+/// The server names its files by `file://` URI, while a location specifier names
+/// the file of its definition by a path relative to the specifier. A specifier
+/// that names the right file is accepted however its path is spelled, and one
+/// that names another file is reported with the path that it names.
+#[test]
+fn location_specifiers_compare_paths_of_file_uris() {
+    let dir = fixture_dir("ws_spec_loc");
+    let text = "\
+locate constant a at \"Top.fpp\"
+locate constant b at \"./sub/../Top.fpp\"
+locate constant c at \"../ws_spec_loc/Top.fpp\"
+locate constant c at \"Top.fpp\"
+locate constant d at \"Other.fpp\"
+constant a = 0
+constant b = 1
+constant c = 2
+constant d = 3
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    let diagnostics = state.diagnostics.get(&uri);
+    let messages: Vec<(u32, &str)> = diagnostics
+        .iter()
+        .map(|d| (d.range.start.line, d.message.as_str()))
+        .collect();
+    let other = dir.join("Other.fpp");
+    assert_eq!(
+        messages,
+        vec![(4, format!("incorrect location path {}", other.display()).as_str())]
+    );
+}
+
 /// A module template body is a module member list, so it may hold `include`
 /// specifiers. The document-link visitor must descend into it, or the include in
 /// a template body is not a clickable link.
