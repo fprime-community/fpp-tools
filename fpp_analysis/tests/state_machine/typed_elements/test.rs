@@ -31,6 +31,11 @@ fn choice_shadowed_error() {
 }
 
 #[test]
+fn choice_shadowed_ok() {
+    run_test("state_machine/typed_elements/choice_shadowed_ok")
+}
+
+#[test]
 fn choice_u32_bool() {
     run_test("state_machine/typed_elements/choice_u32_bool")
 }

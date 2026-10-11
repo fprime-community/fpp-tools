@@ -9,3 +9,8 @@ fn constant_ok() {
 fn shadowed_error() {
     run_test("state_machine/constants/shadowed_error")
 }
+
+#[test]
+fn shadowed_ok() {
+    run_test("state_machine/constants/shadowed_ok")
+}

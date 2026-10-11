@@ -71,6 +71,11 @@ fn shadowed_error() {
 }
 
 #[test]
+fn shadowed_ok() {
+    run_test("state_machine/types/shadowed_ok")
+}
+
+#[test]
 fn signal_undef_type() {
     run_test("state_machine/types/signal_undef_type")
 }
