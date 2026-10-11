@@ -211,10 +211,7 @@ pub fn apply(a: &Analysis, t: &mut Topology) -> SemanticResult {
     }
     // Fold over instances and matchings
     for (ci, _) in t.component_instance_map() {
-        let Some(comp) = a.component_map.get(&ci.component_symbol) else {
-            continue;
-        };
-        let matchings = comp.port_matching_list.clone();
+        let matchings = ci.component(a).port_matching_list.clone();
         for pm in &matchings {
             handle_port_matching(t, &ci, pm)?;
         }

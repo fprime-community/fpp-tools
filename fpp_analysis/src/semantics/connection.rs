@@ -9,11 +9,6 @@ use fpp_core::{Span, Spanned};
 use std::cmp::Ordering;
 use std::sync::Arc;
 
-/// Compare two locations. See [`Span::compare`].
-pub fn cmp_span(a: &Span, b: &Span) -> Ordering {
-    a.compare(b)
-}
-
 /// An imported topology used as an interface instance.
 ///
 /// This stores identity only (symbol + resolved name + location). The full

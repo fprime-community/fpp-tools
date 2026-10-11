@@ -4,9 +4,9 @@ use crate::semantics::{
     Component, InitSpecifier, InterfaceInstance, PortInstanceIdentifier, PortInterface, Symbol,
 };
 use fpp_ast::{AstNode, ComponentKind, DefComponentInstance, Expr, LitString};
-use fpp_core::{Span, Spanned};
+use fpp_core::{File, Span, Spanned};
 use rustc_hash::FxHashMap as HashMap;
-use std::path::{Component as PathComponent, Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 /// An FPP component instance
@@ -96,6 +96,13 @@ impl ComponentInstance {
     /// holds the component's symbol, and the component lives in the analysis.
     pub fn get_component<'a>(&self, a: &'a Analysis) -> Option<&'a Component> {
         a.component_map.get(&self.component_symbol)
+    }
+
+    /// The component this is an instance of. A component instance is created
+    /// only once its component is in the component map, so it is there.
+    pub(crate) fn component<'a>(&self, a: &'a Analysis) -> &'a Component {
+        self.get_component(a)
+            .expect("the component of a component instance is in the component map")
     }
 
     /// Builds a port instance identifier for a port on this component
@@ -191,46 +198,25 @@ impl ComponentInstance {
 /// The URI scheme that `fpp_lsp_server` uses to identify on-disk source files.
 const FILE_URI_SCHEME: &str = "file://";
 
-/// Resolves the file of a component instance
+/// Gets the file
 fn get_file(node: &LitString) -> String {
-    let uri = node.span().file().uri();
-    // The LSP server names source files by `file://` URI. Resolve inside the
-    // path part and put the scheme back, so the result stays a well-formed URI
-    // rather than a path with a `file:` name component in it.
-    let (scheme, path) = match uri.strip_prefix(FILE_URI_SCHEME) {
-        Some(path) => (FILE_URI_SCHEME, path),
-        // Any other URI — a plain path, or `<stdin>` — is used as written.
-        None => ("", uri.as_str()),
-    };
-    let dir = Path::new(path).parent().unwrap_or(Path::new(""));
-    format!(
-        "{scheme}{}",
-        normalize_path(&dir.join(&node.data)).to_string_lossy()
-    )
-}
-
-/// Lexically normalizes a path, removing `.` components and resolving `..`
-/// against the preceding component, without touching the file system.
-fn normalize_path(path: &Path) -> PathBuf {
-    let mut result = PathBuf::new();
-    for component in path.components() {
-        match component {
-            PathComponent::CurDir => {}
-            PathComponent::ParentDir => {
-                // Only pop a component that `..` can cancel out.
-                if matches!(
-                    result.components().next_back(),
-                    Some(PathComponent::Normal(_))
-                ) {
-                    result.pop();
-                } else {
-                    result.push(component);
-                }
-            }
-            other => result.push(other),
+    let loc = node.span();
+    let uri = loc.file().uri();
+    match uri.strip_prefix(FILE_URI_SCHEME) {
+        // The LSP server names source files by `file://` URI. Resolve inside
+        // the path part and put the scheme back, so the result stays a
+        // well-formed URI rather than a path with a `file:` name component in
+        // it.
+        Some(path) => {
+            let dir = Path::new(path).parent().unwrap_or(Path::new("/"));
+            let path = File::get_path(&dir.join(&node.data).to_string_lossy());
+            format!("{FILE_URI_SCHEME}{}", path.to_string_lossy())
         }
+        None => loc
+            .get_relative_path(&node.data)
+            .to_string_lossy()
+            .into_owned(),
     }
-    result
 }
 
 /// Construct an invalid instance error
@@ -315,18 +301,33 @@ mod tests {
         })
     }
 
+    /// `path` resolved against the current directory, as a string
+    fn in_cwd(path: &str) -> String {
+        fpp_core::File::get_path(path)
+            .to_string_lossy()
+            .into_owned()
+    }
+
     #[test]
     fn impl_file_resolves_against_the_specifying_source_directory() {
         assert_eq!(
             file_for("topology/T.fpp", "impl/C.hpp"),
-            "topology/impl/C.hpp"
+            in_cwd("topology/impl/C.hpp")
         );
-        assert_eq!(file_for("topology/T.fpp", "./C.hpp"), "topology/C.hpp");
-        assert_eq!(file_for("topology/T.fpp", "../impl/C.hpp"), "impl/C.hpp");
+        assert_eq!(
+            file_for("topology/T.fpp", "./C.hpp"),
+            in_cwd("topology/C.hpp")
+        );
+        assert_eq!(
+            file_for("topology/T.fpp", "../impl/C.hpp"),
+            in_cwd("impl/C.hpp")
+        );
         assert_eq!(
             file_for("/proj/topology/T.fpp", "../impl/C.hpp"),
             "/proj/impl/C.hpp"
         );
+        // A `..` at the root is the root
+        assert_eq!(file_for("/T.fpp", "../C.hpp"), "/C.hpp");
     }
 
     #[test]
@@ -339,15 +340,14 @@ mod tests {
             file_for("file:///proj/T.fpp", "impl/C.hpp"),
             "file:///proj/impl/C.hpp"
         );
+        assert_eq!(file_for("file:///T.fpp", "../C.hpp"), "file:///C.hpp");
     }
 
     #[test]
-    fn impl_file_for_a_source_with_no_directory_is_the_specifier_path() {
-        // `<stdin>` and a bare file name both contribute no directory.
-        assert_eq!(file_for("<stdin>", "impl/C.hpp"), "impl/C.hpp");
-        assert_eq!(file_for("T.fpp", "./impl/../C.hpp"), "C.hpp");
-        // A `..` that has nothing to cancel against is kept.
-        assert_eq!(file_for("<stdin>", "../C.hpp"), "../C.hpp");
+    fn impl_file_for_standard_input_resolves_against_the_current_directory() {
+        assert_eq!(file_for("<stdin>", "impl/C.hpp"), in_cwd("impl/C.hpp"));
+        assert_eq!(file_for("<stdin>", "../C.hpp"), in_cwd("../C.hpp"));
+        assert_eq!(file_for("T.fpp", "./impl/../C.hpp"), in_cwd("C.hpp"));
     }
 
     #[test]

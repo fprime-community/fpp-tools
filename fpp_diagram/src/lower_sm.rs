@@ -20,7 +20,7 @@ use fpp_core::{Annotated, Span, Spanned};
 /// A source-order sort key for a span: `(file, byte offset)`. Ordering diagram
 /// elements by this makes the layout follow the order things appear in the FPP
 /// source, so reordering states in the source reorders them in the diagram.
-/// Mirrors `fpp_analysis`'s `cmp_span`.
+/// Like [`Span::compare`], it orders by file and then by position in the file.
 type SpanKey = (String, u32);
 
 fn span_key(span: Span) -> SpanKey {

@@ -12,26 +12,23 @@ pub struct CheckChoiceCycles;
 impl CheckChoiceCycles {
     pub fn state_machine_analysis(sma: &mut StateMachineAnalysis) -> SmResult {
         let nodes: Vec<TgNode> = sma.transition_graph.arc_map.keys().cloned().collect();
-        let mut s = State::default();
         let mut reported_cycles: Vec<HashSet<TgArc>> = Vec::new();
         for node in nodes {
             if let StateOrChoice::Choice(c) = node.soc {
-                match Self::visit(sma, s.clear_path(), c) {
-                    Ok(next) => s = next,
-                    Err(cycle) => {
-                        // The search reaches a cycle again from every other
-                        // choice on it, so emit each cycle once and keep scanning
-                        // the remaining choices for other cycles. A cycle is
-                        // *blocking*: the typed-element pass walks the choice
-                        // graph assuming it is acyclic and would otherwise
-                        // recurse forever, so mark it so the gate stops there.
-                        let arcs = cycle.arcs();
-                        if !reported_cycles.contains(&arcs) {
-                            cycle.error().emit();
-                            reported_cycles.push(arcs);
-                        }
-                        sma.blocking_error = true;
+                // Each search starts with an empty path
+                if let Err(cycle) = Self::visit(sma, State::default(), c) {
+                    // The search reaches a cycle again from every other choice
+                    // on it, so emit each cycle once and keep scanning the
+                    // remaining choices for other cycles. A cycle is
+                    // *blocking*: the typed-element pass walks the choice graph
+                    // assuming it is acyclic and would otherwise recurse
+                    // forever, so mark it so the gate stops there.
+                    let arcs = cycle.arcs();
+                    if !reported_cycles.contains(&arcs) {
+                        cycle.error().emit();
+                        reported_cycles.push(arcs);
                     }
+                    sma.blocking_error = true;
                 }
             }
         }
@@ -39,22 +36,11 @@ impl CheckChoiceCycles {
     }
 }
 
+/// The state of a search for a choice cycle
 #[derive(Clone, Default)]
 struct State {
-    #[allow(dead_code)]
-    visited: HashSet<StateMachineSymbol>,
     path_set: HashSet<StateMachineSymbol>,
     path_list: Vec<TgArc>,
-}
-
-impl State {
-    fn clear_path(&self) -> State {
-        State {
-            visited: self.visited.clone(),
-            path_set: HashSet::default(),
-            path_list: Vec::new(),
-        }
-    }
 }
 
 impl CheckChoiceCycles {
@@ -85,7 +71,6 @@ impl CheckChoiceCycles {
                 s = Self::visit(sma, s2, c1)?;
             }
         }
-        s.visited.insert(c);
         s.path_set = path_set;
         Ok(s)
     }

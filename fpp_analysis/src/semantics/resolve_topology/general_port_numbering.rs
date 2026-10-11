@@ -37,11 +37,7 @@ fn number_output_port_array(t: &mut Topology, pii: &PortInstanceIdentifier) {
 pub fn apply(a: &Analysis, t: &mut Topology) {
     // Fold over instances and ports
     for ci in t.component_instance_map().into_keys() {
-        // An instance whose component failed to check has no port interface
-        let Some(port_interface) = ci.get_interface(a) else {
-            continue;
-        };
-        for pi in port_interface.port_map.values() {
+        for pi in ci.component(a).port_interface.port_map.values() {
             let pii = PortInstanceIdentifier {
                 interface_instance: InterfaceInstance::from_component_instance(ci.clone()),
                 port_instance: pi.clone(),

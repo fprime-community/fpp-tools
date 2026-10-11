@@ -379,7 +379,8 @@ instance c: C base id 0x100 \
         assert_eq!(instance.cpu, Some(0));
         // The implementation file is resolved against the directory of the file
         // that specifies it, then normalized.
-        assert_eq!(instance.file.as_deref(), Some("impl/C.hpp"));
+        let file = fpp_core::File::get_path("impl/C.hpp");
+        assert_eq!(instance.file.as_deref(), file.to_str());
         assert!(instance.get_component(a).is_some());
         assert!(instance.get_interface(a).is_some());
     });

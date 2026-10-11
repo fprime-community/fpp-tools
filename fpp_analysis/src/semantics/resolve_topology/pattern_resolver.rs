@@ -3,8 +3,8 @@
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
-    Component, ComponentInstance, Connection, ConnectionPattern, Direction, Endpoint,
-    InterfaceInstance, PortInstance, PortInstanceIdentifier,
+    ComponentInstance, Connection, ConnectionPattern, Direction, Endpoint, InterfaceInstance,
+    PortInstance, PortInstanceIdentifier,
 };
 use fpp_ast::{ConnectionPatternKind, SpecialPortInstanceKind};
 use fpp_core::Span;
@@ -66,7 +66,8 @@ trait PatternResolver {
         let is_general_port =
             |pi: &&PortInstance| self.a().is_general_port(pi, direction, port_type_name);
         let (ci, loc) = ci_use;
-        let ports: Vec<PortInstance> = component(self.a(), ci)
+        let ports: Vec<PortInstance> = ci
+            .component(self.a())
             .port_map()
             .values()
             .filter(is_general_port)
@@ -168,20 +169,13 @@ fn missing_port<T>(loc: Span, kind: &str, instance_name: &str) -> SemanticResult
     })
 }
 
-/// The component of a component instance. An instance is entered into the
-/// component instance map only once its component is in the component map.
-fn component<'a>(a: &'a Analysis, ci: &ComponentInstance) -> &'a Component {
-    ci.get_component(a)
-        .expect("the component of a component instance is in the component map")
-}
-
 fn get_special_port(
     a: &Analysis,
     ci_use: &InstanceUse,
     kind: SpecialPortInstanceKind,
 ) -> SemanticResult<PortInstanceIdentifier> {
     let (ci, loc) = ci_use;
-    match component(a, ci).special_port_map().get(&kind) {
+    match ci.component(a).special_port_map().get(&kind) {
         Some(pi) => Ok(PortInstanceIdentifier {
             interface_instance: InterfaceInstance::from_component_instance(ci.clone()),
             port_instance: PortInstance::Special(pi.clone()),
