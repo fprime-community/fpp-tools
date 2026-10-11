@@ -1,7 +1,7 @@
   --> [ local path prefix ]/state_machine/transition_graph/two_choice_cycles.fpp:10:3
    |
 10 |   choice C1 { if g enter S else enter C2 }
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle:
    |
   ::: [ local path prefix ]/state_machine/transition_graph/two_choice_cycles.fpp:10:33
    |
@@ -16,7 +16,7 @@
   --> [ local path prefix ]/state_machine/transition_graph/two_choice_cycles.fpp:12:3
    |
 12 |   choice C3 { if g enter S else enter C4 }
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle:
    |
   ::: [ local path prefix ]/state_machine/transition_graph/two_choice_cycles.fpp:12:33
    |

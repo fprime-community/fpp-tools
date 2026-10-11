@@ -1,7 +1,7 @@
  --> [ local path prefix ]/state_machine/transition_graph/choice_cycle_side_branch.fpp:8:3
   |
 8 |   choice A { if g enter B else enter S }
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle:
   |
  ::: [ local path prefix ]/state_machine/transition_graph/choice_cycle_side_branch.fpp:8:19
   |

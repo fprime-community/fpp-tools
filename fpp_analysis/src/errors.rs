@@ -1190,7 +1190,7 @@ impl From<SemanticError> for Diagnostic {
                 d
             }
             SemanticError::ChoiceCycle { loc, path } => {
-                let mut d = Diagnostic::new(loc, Level::Error, "encountered a choice cycle");
+                let mut d = Diagnostic::new(loc, Level::Error, "encountered a choice cycle:");
                 for (span, transition) in path {
                     d = d.span_note(span, transition);
                 }

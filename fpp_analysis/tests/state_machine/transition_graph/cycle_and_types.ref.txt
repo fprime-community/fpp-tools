@@ -1,7 +1,7 @@
  --> [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:5:3
   |
 5 |   choice C1 { if g enter C2 else enter C2 }
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle:
   |
  ::: [ local path prefix ]/state_machine/transition_graph/cycle_and_types.fpp:5:20
   |
