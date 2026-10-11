@@ -18,7 +18,7 @@
 //! at the end of the input (see [Parser::alternative_failed]).
 
 use crate::cursor::Cursor;
-use crate::error::{ParseError, ParseResult};
+use crate::error::{ParseResult, SyntaxError};
 use crate::parser_state::ParserState;
 use crate::token::Token;
 use fpp_ast::*;
@@ -42,14 +42,14 @@ pub struct Parser<'a> {
     /// one of an alternative whose failure the failure of other alternatives
     /// replaced. If the element sequences end without another error at the
     /// top level, it is the error.
-    eof_error: Option<ParseError>,
+    eof_error: Option<SyntaxError>,
     /// The bracket of a subscript that is not a selector, before which the
     /// expression being parsed ends, and the failure of the subscript if it
     /// fails at a token after the bracket and before its commit point. A
     /// token that must follow the expression is expected at the bracket, or,
     /// if the token does not commit, the failure of the subscript is the
     /// failure, which is further.
-    selector_failure: Option<((fpp_core::Span, TokenKind), Option<ParseError>)>,
+    selector_failure: Option<((fpp_core::Span, TokenKind), Option<SyntaxError>)>,
 }
 
 /// The state of the element being parsed in an element sequence.
@@ -80,7 +80,7 @@ struct ElementState {
     /// The error of a later alternative that commits on the keyword the
     /// element starts with, which is the failure of the element if the
     /// element fails at the end of the input
-    alternative_error: Option<Box<ParseError>>,
+    alternative_error: Option<Box<SyntaxError>>,
 }
 
 /// A type, array, constant, enum or struct definition: the definitions that
@@ -371,6 +371,16 @@ impl<'a> Parser<'a> {
     }
 
     fn connection(&mut self) -> ParseResult<Connection> {
+        /// A port instance identifier and its optional index
+        fn connection_port(p: &mut Parser) -> ParseResult<(PortInstanceIdentifier, Option<Expr>)> {
+            let port = p.port_instance_identifier()?;
+            let index = match p.peek(0) {
+                LeftSquare => Some(p.index()?),
+                _ => None,
+            };
+            Ok((port, index))
+        }
+
         self.first_alternative();
         let first_span = self.current_span();
 
@@ -382,19 +392,9 @@ impl<'a> Parser<'a> {
             _ => false,
         };
 
-        let from_port = self.port_instance_identifier()?;
-        let from_index = match self.peek(0) {
-            LeftSquare => Some(self.index()?),
-            _ => None,
-        };
-
+        let (from_port, from_index) = connection_port(self)?;
         self.consume(RightArrow)?;
-
-        let to_port = self.port_instance_identifier()?;
-        let to_index = match self.peek(0) {
-            LeftSquare => Some(self.index()?),
-            _ => None,
-        };
+        let (to_port, to_index) = connection_port(self)?;
 
         Ok(Connection {
             node_id: self.node(first_span),
@@ -470,7 +470,7 @@ impl<'a> Parser<'a> {
         let format = match self.peek(0) {
             Keyword(Format) => {
                 self.next();
-                Some(self.lit_string()?)
+                Some(self.literal_string()?)
             }
             _ => None,
         };
@@ -528,6 +528,16 @@ impl<'a> Parser<'a> {
     }
 
     fn def_component_instance(&mut self) -> ParseResult<DefComponentInstance> {
+        /// The optional init specifiers in braces
+        fn init_spec_sequence(p: &mut Parser) -> ParseResult<Vec<SpecInit>> {
+            match p.peek(0) {
+                LeftCurly => p.enclosed(LeftCurly, RightCurly, |p| {
+                    p.annotated_element_sequence(&Parser::spec_init, Semi)
+                }),
+                _ => Ok(vec![]),
+            }
+        }
+
         let first = self.consume_keyword(Instance)?;
         self.commit();
         let name = self.name()?;
@@ -542,7 +552,7 @@ impl<'a> Parser<'a> {
             match self.peek(0) {
                 Keyword(Type) => {
                     self.next();
-                    Some(self.lit_string()?)
+                    Some(self.literal_string()?)
                 }
                 _ => None,
             }
@@ -552,7 +562,7 @@ impl<'a> Parser<'a> {
             match self.peek(0) {
                 Keyword(At) => {
                     self.next();
-                    Some(self.lit_string()?)
+                    Some(self.literal_string()?)
                 }
                 _ => None,
             }
@@ -583,14 +593,7 @@ impl<'a> Parser<'a> {
         let priority = self.opt_expr(Priority)?;
         let cpu = self.opt_expr(Cpu)?;
 
-        let init_specs = {
-            match self.peek(0) {
-                LeftCurly => self.enclosed(LeftCurly, RightCurly, |p| {
-                    p.annotated_element_sequence(&Parser::spec_init, Semi)
-                })?,
-                _ => vec![],
-            }
-        };
+        let init_specs = init_spec_sequence(self)?;
 
         Ok(DefComponentInstance {
             node_id: self.node(first.span()),
@@ -680,6 +683,10 @@ impl<'a> Parser<'a> {
     }
 
     fn def_enum(&mut self) -> ParseResult<DefEnum> {
+        fn constants(p: &mut Parser) -> Vec<DefEnumConstant> {
+            p.annotated_element_sequence(&Parser::def_enum_constant, Comma)
+        }
+
         let (first, is_dictionary_def) = self.dictionary_opt(Enum)?;
         self.commit();
         let name = self.name()?;
@@ -692,9 +699,7 @@ impl<'a> Parser<'a> {
             _ => None,
         };
 
-        let constants = self.enclosed(LeftCurly, RightCurly, |p| {
-            p.annotated_element_sequence(&Parser::def_enum_constant, Comma)
-        })?;
+        let constants = self.enclosed(LeftCurly, RightCurly, constants)?;
 
         let default = self.opt_expr(Default)?;
 
@@ -839,13 +844,15 @@ impl<'a> Parser<'a> {
     }
 
     fn def_struct(&mut self) -> ParseResult<DefStruct> {
+        fn members(p: &mut Parser) -> Vec<StructTypeMember> {
+            p.annotated_element_sequence(&Parser::struct_type_member, Comma)
+        }
+
         let (first, is_dictionary_def) = self.dictionary_opt(Struct)?;
         self.commit();
         let name = self.name()?;
 
-        let members = self.enclosed(LeftCurly, RightCurly, |p| {
-            p.annotated_element_sequence(&Parser::struct_type_member, Comma)
-        })?;
+        let members = self.enclosed(LeftCurly, RightCurly, members)?;
 
         let default = self.opt_expr(Default)?;
 
@@ -859,27 +866,32 @@ impl<'a> Parser<'a> {
     }
 
     fn spec_tlm_packet_set(&mut self) -> ParseResult<SpecTlmPacketSet> {
+        /// The optional channels the packet set omits
+        fn omitted(p: &mut Parser) -> ParseResult<Vec<TlmChannelIdentifier>> {
+            match p.peek(0) {
+                Keyword(Omit) => {
+                    p.next();
+                    p.enclosed(LeftCurly, RightCurly, |p| {
+                        p.element_sequence(
+                            &|p| {
+                                p.first_alternative();
+                                p.tlm_channel_identifier()
+                            },
+                            Comma,
+                        )
+                    })
+                }
+                _ => Ok(vec![]),
+            }
+        }
+
         let first = self.consume_keyword(Telemetry)?;
         self.consume_keyword(Packets)?;
         self.commit();
         let name = self.name()?;
         let members = self.enclosed(LeftCurly, RightCurly, Parser::tlm_packet_set_members)?;
 
-        let omitted = match self.peek(0) {
-            Keyword(Omit) => {
-                self.next();
-                self.enclosed(LeftCurly, RightCurly, |p| {
-                    p.element_sequence(
-                        &|p| {
-                            p.first_alternative();
-                            p.tlm_channel_identifier()
-                        },
-                        Comma,
-                    )
-                })?
-            }
-            _ => vec![],
-        };
+        let omitted = omitted(self)?;
 
         Ok(SpecTlmPacketSet {
             node_id: self.node(first.span()),
@@ -961,32 +973,36 @@ impl<'a> Parser<'a> {
     }
 
     fn expr_node(&mut self) -> ParseResult<Expr> {
-        let mut left = self.shift_operand()?;
+        self.left_assoc(Parser::shift_operand, |op| match op {
+            ShiftLeft => Some(Binop::LShift),
+            ShiftRight => Some(Binop::RShift),
+            _ => None,
+        })
+    }
 
-        loop {
-            let op = match self.peek(0) {
-                ShiftLeft => Some(Binop::LShift),
-                ShiftRight => Some(Binop::RShift),
-                _ => None,
-            };
-
-            match op {
-                Some(op) => {
-                    let op_token = self.next().unwrap();
-                    self.commit();
-                    let right = self.shift_operand()?;
-                    left = Expr {
-                        node_id: self.node(op_token.span()),
-                        kind: ExprKind::Binop {
-                            left: Box::new(left),
-                            op,
-                            right: Box::new(right),
-                        },
-                    }
-                }
-                None => return Ok(left),
+    /// Parse operands with `operand`, separated by the binary operators that
+    /// `binop` gives for their tokens, and combine them left-associatively.
+    /// Each binary expression is located at its operator.
+    fn left_assoc(
+        &mut self,
+        operand: fn(&mut Parser<'a>) -> ParseResult<Expr>,
+        binop: fn(TokenKind) -> Option<Binop>,
+    ) -> ParseResult<Expr> {
+        let mut left = operand(self)?;
+        while let Some(op) = binop(self.peek(0)) {
+            let op_token = self.next().unwrap();
+            self.commit();
+            let right = operand(self)?;
+            left = Expr {
+                node_id: self.node(op_token.span()),
+                kind: ExprKind::Binop {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                },
             }
         }
+        Ok(left)
     }
 
     fn primary_expr(&mut self) -> ParseResult<Expr> {
@@ -1010,7 +1026,7 @@ impl<'a> Parser<'a> {
                 let first = self.next().unwrap();
                 Ok(Expr {
                     node_id: self.node(first.span()),
-                    kind: ExprKind::LiteralFloat(first.text().to_string()),
+                    kind: ExprKind::LiteralFloat(first.str().to_string()),
                 })
             }
             Identifier => {
@@ -1018,7 +1034,7 @@ impl<'a> Parser<'a> {
                 Ok(Expr {
                     node_id: self.node(first.span()),
                     kind: ExprKind::Ident {
-                        value: first.text().to_string(),
+                        value: first.str().to_string(),
                         is_absolute: false,
                     },
                 })
@@ -1040,7 +1056,7 @@ impl<'a> Parser<'a> {
                 Ok(Expr {
                     node_id: self.node(first.span()),
                     kind: ExprKind::Ident {
-                        value: id.text().to_string(),
+                        value: id.str().to_string(),
                         is_absolute: true,
                     },
                 })
@@ -1049,7 +1065,7 @@ impl<'a> Parser<'a> {
                 let first = self.next().unwrap();
                 Ok(Expr {
                     node_id: self.node(first.span()),
-                    kind: ExprKind::LiteralInt(first.text().to_string()),
+                    kind: ExprKind::LiteralInt(first.str().to_string()),
                 })
             }
             LeftParen => {
@@ -1081,7 +1097,7 @@ impl<'a> Parser<'a> {
                 let first = self.next().unwrap();
                 Ok(Expr {
                     node_id: self.node(first.span()),
-                    kind: ExprKind::LiteralString(first.text().to_string()),
+                    kind: ExprKind::LiteralString(first.str().to_string()),
                 })
             }
             LeftCurly => {
@@ -1190,13 +1206,20 @@ impl<'a> Parser<'a> {
     /// Scala parser tries first and which fails there.
     fn post_fix_expr(&mut self, operand_start: Option<fpp_core::Span>) -> ParseResult<Expr> {
         let committed = self.begin_alternative();
-        let mut left = match (self.primary_expr(), operand_start) {
+        let left = match (self.primary_expr(), operand_start) {
             (Ok(left), _) => self.end_alternative(committed, left),
             (Err(err), Some(loc)) => {
                 return Err(self.alternative_failed(err, committed, loc, "expression"));
             }
             (Err(err), None) => return Err(self.end_alternative(committed, err)),
         };
+        self.member_selectors(left)
+    }
+
+    /// Parse the member selections and array subscripts that follow the
+    /// expression `left`, and apply them to it in order. Each one is located
+    /// at `left`.
+    fn member_selectors(&mut self, mut left: Expr) -> ParseResult<Expr> {
         let first_span = left.span();
         loop {
             match self.peek(0) {
@@ -1269,20 +1292,22 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn unary_minus(&mut self) -> ParseResult<Expr> {
+        let first = self.consume(Minus)?;
+        self.commit();
+        let e = self.post_fix_expr(None)?;
+        Ok(Expr {
+            node_id: self.node(first.span()),
+            kind: ExprKind::Unop {
+                op: Unop::Minus,
+                e: Box::new(e),
+            },
+        })
+    }
+
     fn mul_div_operand(&mut self) -> ParseResult<Expr> {
         match self.peek(0) {
-            Minus => {
-                let first = self.next().unwrap();
-                self.commit();
-                let right = self.post_fix_expr(None)?;
-                Ok(Expr {
-                    node_id: self.node(first.span()),
-                    kind: ExprKind::Unop {
-                        op: Unop::Minus,
-                        e: Box::new(right),
-                    },
-                })
-            }
+            Minus => self.unary_minus(),
             _ => {
                 let operand_start = self.peek_span(0);
                 self.post_fix_expr(operand_start)
@@ -1291,61 +1316,19 @@ impl<'a> Parser<'a> {
     }
 
     fn add_sub_operand(&mut self) -> ParseResult<Expr> {
-        let mut left = self.mul_div_operand()?;
-
-        loop {
-            let op = match self.peek(0) {
-                Star => Some(Binop::Mul),
-                Slash => Some(Binop::Div),
-                _ => None,
-            };
-
-            match op {
-                Some(op) => {
-                    let op_token = self.next().unwrap();
-                    self.commit();
-                    let right = self.mul_div_operand()?;
-                    left = Expr {
-                        node_id: self.node(op_token.span()),
-                        kind: ExprKind::Binop {
-                            left: Box::new(left),
-                            op,
-                            right: Box::new(right),
-                        },
-                    }
-                }
-                None => return Ok(left),
-            }
-        }
+        self.left_assoc(Parser::mul_div_operand, |op| match op {
+            Star => Some(Binop::Mul),
+            Slash => Some(Binop::Div),
+            _ => None,
+        })
     }
 
     fn shift_operand(&mut self) -> ParseResult<Expr> {
-        let mut left = self.add_sub_operand()?;
-
-        loop {
-            let op = match self.peek(0) {
-                Plus => Some(Binop::Add),
-                Minus => Some(Binop::Sub),
-                _ => None,
-            };
-
-            match op {
-                Some(op) => {
-                    let op_token = self.next().unwrap();
-                    self.commit();
-                    let right = self.add_sub_operand()?;
-                    left = Expr {
-                        node_id: self.node(op_token.span()),
-                        kind: ExprKind::Binop {
-                            left: Box::new(left),
-                            op,
-                            right: Box::new(right),
-                        },
-                    }
-                }
-                None => return Ok(left),
-            }
-        }
+        self.left_assoc(Parser::add_sub_operand, |op| match op {
+            Plus => Some(Binop::Add),
+            Minus => Some(Binop::Sub),
+            _ => None,
+        })
     }
 
     fn opt_expr(&mut self, prefix_keyword: KeywordKind) -> ParseResult<Option<Expr>> {
@@ -1597,30 +1580,25 @@ impl<'a> Parser<'a> {
     }
 
     fn spec_command(&mut self) -> ParseResult<SpecCommand> {
+        fn kind(p: &mut Parser) -> ParseResult<InputPortKind> {
+            let kind = match p.peek(0) {
+                Keyword(Async) => InputPortKind::Async,
+                Keyword(Guarded) => InputPortKind::Guarded,
+                Keyword(Sync) => InputPortKind::Sync,
+                _ => {
+                    return Err(p.cursor.err_expected_one_of(
+                        "command kind expected",
+                        vec![Keyword(Async), Keyword(Guarded), Keyword(Sync)],
+                    ));
+                }
+            };
+            p.next();
+            Ok(kind)
+        }
+
         let first_span = self.current_span();
-
-        let kind = match self.peek(0) {
-            Keyword(Async) => {
-                self.next();
-                self.consume_keyword(Command)?;
-                Ok(InputPortKind::Async)
-            }
-            Keyword(Guarded) => {
-                self.next();
-                self.consume_keyword(Command)?;
-                Ok(InputPortKind::Guarded)
-            }
-            Keyword(Sync) => {
-                self.next();
-                self.consume_keyword(Command)?;
-                Ok(InputPortKind::Sync)
-            }
-            _ => Err(self.cursor.err_expected_one_of(
-                "command kind expected",
-                vec![Keyword(Async), Keyword(Guarded), Keyword(Sync)],
-            )),
-        }?;
-
+        let kind = kind(self)?;
+        self.consume_keyword(Command)?;
         let name = self.name()?;
         self.commit();
         let params = self.formal_param_list()?;
@@ -1676,71 +1654,61 @@ impl<'a> Parser<'a> {
         }
 
         fn pattern_graph(p: &mut Parser) -> ParseResult<SpecPatternConnectionGraph> {
+            fn pattern_kind(p: &mut Parser) -> ParseResult<ConnectionPatternKind> {
+                let kind = match p.peek(0) {
+                    Keyword(Command) => ConnectionPatternKind::Command,
+                    Keyword(Event) => ConnectionPatternKind::Event,
+                    Keyword(Health) => ConnectionPatternKind::Health,
+                    Keyword(Param) => ConnectionPatternKind::Param,
+                    Keyword(Telemetry) => ConnectionPatternKind::Telemetry,
+                    Keyword(Text) => {
+                        p.next();
+                        p.consume_keyword(Event)?;
+                        return Ok(ConnectionPatternKind::TextEvent);
+                    }
+                    Keyword(Time) => ConnectionPatternKind::Time,
+                    _ => {
+                        return Err(p.cursor.err_expected_one_of(
+                            "connection pattern graph kind expected",
+                            vec![
+                                Keyword(Telemetry),
+                                Keyword(Command),
+                                Keyword(Event),
+                                Keyword(Health),
+                                Keyword(Param),
+                                Keyword(Text),
+                                Keyword(Time),
+                            ],
+                        ));
+                    }
+                };
+                p.next();
+                Ok(kind)
+            }
+
+            /// The optional target instances in braces
+            fn instance_sequence(p: &mut Parser) -> ParseResult<Vec<QualIdent>> {
+                match p.peek(0) {
+                    LeftCurly => p.enclosed(LeftCurly, RightCurly, |p| {
+                        p.element_sequence(
+                            &|p| {
+                                p.first_alternative();
+                                p.qual_ident()
+                            },
+                            Comma,
+                        )
+                    }),
+                    _ => Ok(vec![]),
+                }
+            }
+
             let first_span = p.current_span();
-
-            let kind = match p.peek(0) {
-                Keyword(Command) => {
-                    p.next();
-                    ConnectionPatternKind::Command
-                }
-                Keyword(Event) => {
-                    p.next();
-                    ConnectionPatternKind::Event
-                }
-                Keyword(Health) => {
-                    p.next();
-                    ConnectionPatternKind::Health
-                }
-                Keyword(Param) => {
-                    p.next();
-                    ConnectionPatternKind::Param
-                }
-                Keyword(Telemetry) => {
-                    p.next();
-                    ConnectionPatternKind::Telemetry
-                }
-                Keyword(Text) => {
-                    p.next();
-                    p.consume_keyword(Event)?;
-                    ConnectionPatternKind::TextEvent
-                }
-                Keyword(Time) => {
-                    p.next();
-                    ConnectionPatternKind::Time
-                }
-                _ => {
-                    return Err(p.cursor.err_expected_one_of(
-                        "connection pattern graph kind expected",
-                        vec![
-                            Keyword(Telemetry),
-                            Keyword(Command),
-                            Keyword(Event),
-                            Keyword(Health),
-                            Keyword(Param),
-                            Keyword(Text),
-                            Keyword(Time),
-                        ],
-                    ));
-                }
-            };
-
+            let kind = pattern_kind(p)?;
             p.consume_keyword(Connections)?;
             p.commit();
             p.consume_keyword(Instance)?;
             let source = p.qual_ident()?;
-
-            let targets = match p.peek(0) {
-                LeftCurly => p.enclosed(LeftCurly, RightCurly, |p| {
-                    p.element_sequence(
-                        &|p| {
-                            p.first_alternative();
-                            p.qual_ident()
-                        },
-                        Comma,
-                    )
-                })?,
-                _ => vec![],
-            };
+            let targets = instance_sequence(p)?;
 
             Ok(SpecPatternConnectionGraph {
                 node_id: p.node(first_span),
@@ -1800,7 +1768,7 @@ impl<'a> Parser<'a> {
                             Ok(EventSeverity::ActivityLow)
                         }
                         // The other severity levels fail at `activity`
-                        EOF => Err(ParseError::EndOfInputIn {
+                        EOF => Err(SyntaxError::EndOfInputIn {
                             loc: first.span(),
                             construct: "severity level",
                         }),
@@ -1822,7 +1790,7 @@ impl<'a> Parser<'a> {
                             Ok(EventSeverity::WarningLow)
                         }
                         // The other severity levels fail at `warning`
-                        EOF => Err(ParseError::EndOfInputIn {
+                        EOF => Err(SyntaxError::EndOfInputIn {
                             loc: first.span(),
                             construct: "severity level",
                         }),
@@ -1880,7 +1848,7 @@ impl<'a> Parser<'a> {
         let id = self.opt_expr(Id);
         let id = self.expression_before(id, Keyword(Format))?;
         self.consume_keyword(Format)?;
-        let format = self.lit_string()?;
+        let format = self.literal_string()?;
         let throttle = match self.peek(0) {
             Keyword(Throttle) => Some(throttle_clause(self)?),
             _ => None,
@@ -1900,7 +1868,7 @@ impl<'a> Parser<'a> {
     fn spec_include(&mut self) -> ParseResult<SpecInclude> {
         let first = self.consume_keyword(Include)?;
         self.commit();
-        let file = self.lit_string()?;
+        let file = self.literal_string()?;
         Ok(SpecInclude {
             node_id: self.node(first.span()),
             file,
@@ -1913,7 +1881,7 @@ impl<'a> Parser<'a> {
         self.commit();
         let phase = self.expr_node();
         let phase = self.expression_before(phase, LiteralString)?;
-        let code = self.lit_string()?;
+        let code = self.literal_string()?;
 
         Ok(SpecInit {
             node_id: self.node(first.span()),
@@ -1998,7 +1966,7 @@ impl<'a> Parser<'a> {
                         // `state machine` commits after `state`, and the
                         // failure of the other alternatives at `state`
                         // replaces its failure at the end of the input
-                        Err(err) if err.is_at_end_of_input() => Err(ParseError::EndOfInputIn {
+                        Err(err) if err.is_at_end_of_input() => Err(SyntaxError::EndOfInputIn {
                             loc: state.span(),
                             construct: "location kind",
                         }),
@@ -2038,7 +2006,7 @@ impl<'a> Parser<'a> {
                 // The other alternatives fail at `dictionary`, which is
                 // further than the end of the input
                 (Err(err), Some(dictionary)) if err.is_at_end_of_input() => {
-                    Err(ParseError::EndOfInputIn {
+                    Err(SyntaxError::EndOfInputIn {
                         loc: dictionary.span(),
                         construct: "location kind",
                     })
@@ -2084,7 +2052,7 @@ impl<'a> Parser<'a> {
 
         let symbol = self.qual_ident()?;
         self.consume_keyword(At)?;
-        let file = self.lit_string()?;
+        let file = self.literal_string()?;
         Ok(SpecLoc {
             node_id: self.node(first.span()),
             kind,
@@ -2147,131 +2115,60 @@ impl<'a> Parser<'a> {
     }
 
     fn spec_port_instance(&mut self) -> ParseResult<SpecPortInstance> {
-        fn general(p: &mut Parser) -> ParseResult<SpecPortInstance> {
-            let first = match p.peek_span(0) {
-                Some(span) => span,
-                None => {
+        fn general_kind(p: &mut Parser) -> ParseResult<GeneralPortInstanceKind> {
+            let kind = match p.peek(0) {
+                Keyword(Async) => GeneralPortInstanceKind::Input(InputPortKind::Async),
+                Keyword(Guarded) => GeneralPortInstanceKind::Input(InputPortKind::Guarded),
+                Keyword(Sync) => GeneralPortInstanceKind::Input(InputPortKind::Sync),
+                Keyword(Output) => {
+                    p.next();
+                    return Ok(GeneralPortInstanceKind::Output);
+                }
+                _ => {
                     return Err(p.cursor.err_expected_one_of(
-                        "general port expected",
+                        "expected general port instance",
                         vec![
                             Keyword(Async),
-                            Keyword(Sync),
                             Keyword(Guarded),
+                            Keyword(Sync),
                             Keyword(Output),
                         ],
                     ));
                 }
             };
-
-            let kind = match p.peek(0) {
-                Keyword(Async) => {
-                    p.next();
-                    p.consume_keyword(Input)?;
-                    Ok(GeneralPortInstanceKind::Input(InputPortKind::Async))
-                }
-                Keyword(Guarded) => {
-                    p.next();
-                    p.consume_keyword(Input)?;
-                    Ok(GeneralPortInstanceKind::Input(InputPortKind::Guarded))
-                }
-                Keyword(Sync) => {
-                    p.next();
-                    p.consume_keyword(Input)?;
-                    Ok(GeneralPortInstanceKind::Input(InputPortKind::Sync))
-                }
-                Keyword(Output) => {
-                    p.next();
-                    Ok(GeneralPortInstanceKind::Output)
-                }
-                _ => Err(p.cursor.err_expected_one_of(
-                    "expected general port instance",
-                    vec![
-                        Keyword(Async),
-                        Keyword(Guarded),
-                        Keyword(Sync),
-                        Keyword(Output),
-                    ],
-                )),
-            }?;
-            p.commit();
-
-            p.consume_keyword(Port)?;
-            let name = p.name()?;
-
-            p.consume(Colon)?;
-            let size = match p.peek(0) {
-                LeftSquare => Some(p.index()?),
-                _ => None,
-            };
-
-            let port = match p.peek(0) {
-                Keyword(Serial) => {
-                    p.consume_keyword(Serial)?;
-                    None
-                }
-                Identifier | Dot => Some(p.qual_ident()?),
-                _ => {
-                    return Err(p.cursor.err_expected_one_of(
-                        "port type expected",
-                        vec![Identifier, Dot, Keyword(Serial)],
-                    ));
-                }
-            };
-
-            let priority = p.opt_expr(Priority)?;
-
-            let queue_full = p.opt_queue_full_node()?;
-
-            Ok(SpecPortInstance::General(SpecGeneralPortInstance {
-                node_id: p.node(first),
-                kind,
-                name,
-                size,
-                port,
-                priority,
-                queue_full,
-            }))
+            p.next();
+            p.consume_keyword(Input)?;
+            Ok(kind)
         }
 
-        fn special(p: &mut Parser) -> ParseResult<SpecPortInstance> {
-            let first = match p.peek_span(0) {
-                Some(span) => span,
-                None => {
-                    return Err(p.cursor.err_expected_one_of(
-                        "special port expected",
-                        vec![
-                            Keyword(Async),
-                            Keyword(Sync),
-                            Keyword(Guarded),
-                            Keyword(Command),
-                            Keyword(Event),
-                            Keyword(Param),
-                            Keyword(Product),
-                            Keyword(Telemetry),
-                            Keyword(Text),
-                            Keyword(Time),
-                        ],
-                    ));
+        /// The port type, or `None` for a serial port
+        fn instance_type(p: &mut Parser) -> ParseResult<Option<QualIdent>> {
+            match p.peek(0) {
+                Keyword(Serial) => {
+                    p.consume_keyword(Serial)?;
+                    Ok(None)
                 }
-            };
+                Identifier | Dot => Ok(Some(p.qual_ident()?)),
+                _ => Err(p.cursor.err_expected_one_of(
+                    "port type expected",
+                    vec![Identifier, Dot, Keyword(Serial)],
+                )),
+            }
+        }
 
-            let input_kind = match p.peek(0) {
-                Keyword(Async) => {
-                    p.next();
-                    Some(InputPortKind::Async)
-                }
-                Keyword(Sync) => {
-                    p.next();
-                    Some(InputPortKind::Sync)
-                }
-                Keyword(Guarded) => {
-                    p.next();
-                    Some(InputPortKind::Guarded)
-                }
-                _ => None,
-            };
-
+        fn special_input_kind(p: &mut Parser) -> Option<InputPortKind> {
             let kind = match p.peek(0) {
+                Keyword(Async) => InputPortKind::Async,
+                Keyword(Sync) => InputPortKind::Sync,
+                Keyword(Guarded) => InputPortKind::Guarded,
+                _ => return None,
+            };
+            p.next();
+            Some(kind)
+        }
+
+        fn special_kind(p: &mut Parser) -> ParseResult<SpecialPortInstanceKind> {
+            match p.peek(0) {
                 Keyword(Command) => {
                     p.next();
                     match p.peek(0) {
@@ -2365,7 +2262,78 @@ impl<'a> Parser<'a> {
                         Keyword(Time),
                     ],
                 )),
-            }?;
+            }
+        }
+
+        fn general(p: &mut Parser) -> ParseResult<SpecPortInstance> {
+            let first = match p.peek_span(0) {
+                Some(span) => span,
+                None => {
+                    return Err(p.cursor.err_expected_one_of(
+                        "general port expected",
+                        vec![
+                            Keyword(Async),
+                            Keyword(Sync),
+                            Keyword(Guarded),
+                            Keyword(Output),
+                        ],
+                    ));
+                }
+            };
+
+            let kind = general_kind(p)?;
+            p.commit();
+
+            p.consume_keyword(Port)?;
+            let name = p.name()?;
+
+            p.consume(Colon)?;
+            let size = match p.peek(0) {
+                LeftSquare => Some(p.index()?),
+                _ => None,
+            };
+
+            let port = instance_type(p)?;
+
+            let priority = p.opt_expr(Priority)?;
+
+            let queue_full = p.opt_queue_full_node()?;
+
+            Ok(SpecPortInstance::General(SpecGeneralPortInstance {
+                node_id: p.node(first),
+                kind,
+                name,
+                size,
+                port,
+                priority,
+                queue_full,
+            }))
+        }
+
+        fn special(p: &mut Parser) -> ParseResult<SpecPortInstance> {
+            let first = match p.peek_span(0) {
+                Some(span) => span,
+                None => {
+                    return Err(p.cursor.err_expected_one_of(
+                        "special port expected",
+                        vec![
+                            Keyword(Async),
+                            Keyword(Sync),
+                            Keyword(Guarded),
+                            Keyword(Command),
+                            Keyword(Event),
+                            Keyword(Param),
+                            Keyword(Product),
+                            Keyword(Telemetry),
+                            Keyword(Text),
+                            Keyword(Time),
+                        ],
+                    ));
+                }
+            };
+
+            let input_kind = special_input_kind(p);
+            let kind = special_kind(p)?;
 
             if let Err(err) = p.consume_keyword(Port) {
                 return Err(match kind {
@@ -2379,7 +2347,7 @@ impl<'a> Parser<'a> {
                     | SpecialPortInstanceKind::ProductSend
                         if err.is_at_end_of_input() =>
                     {
-                        ParseError::EndOfInputIn {
+                        SyntaxError::EndOfInputIn {
                             loc: p.cursor.last_token_span(),
                             construct: "port instance",
                         }
@@ -2491,7 +2459,7 @@ impl<'a> Parser<'a> {
                         // of the alternatives at `on` replaces its failure
                         Err(err) if err.is_at_end_of_input() => {
                             p.eof_error.get_or_insert(err);
-                            Err(ParseError::EndOfInputIn {
+                            Err(SyntaxError::EndOfInputIn {
                                 loc: first.span(),
                                 construct: "update kind",
                             })
@@ -2535,7 +2503,15 @@ impl<'a> Parser<'a> {
             })
         }
 
-        fn limit_sequence(p: &mut Parser) -> ParseResult<Vec<TlmChannelLimit>> {
+        /// The optional limits in braces after the keyword `keyword`
+        fn limit_sequence(
+            p: &mut Parser,
+            keyword: KeywordKind,
+        ) -> ParseResult<Vec<TlmChannelLimit>> {
+            if p.peek(0) != Keyword(keyword) {
+                return Ok(vec![]);
+            }
+            p.next();
             p.enclosed(LeftCurly, RightCurly, |p| p.element_sequence(&limit, Comma))
         }
 
@@ -2556,25 +2532,13 @@ impl<'a> Parser<'a> {
         let format = match self.peek(0) {
             Keyword(Format) => {
                 self.next();
-                Some(self.lit_string()?)
+                Some(self.literal_string()?)
             }
             _ => None,
         };
 
-        let low = match self.peek(0) {
-            Keyword(Low) => {
-                self.next();
-                limit_sequence(self)?
-            }
-            _ => vec![],
-        };
-        let high = match self.peek(0) {
-            Keyword(High) => {
-                self.next();
-                limit_sequence(self)?
-            }
-            _ => vec![],
-        };
+        let low = limit_sequence(self, Low)?;
+        let high = limit_sequence(self, High)?;
 
         Ok(SpecTlmChannel {
             node_id: self.node(first.span()),
@@ -2745,7 +2709,7 @@ impl<'a> Parser<'a> {
         let format = match self.peek(0) {
             Keyword(Format) => {
                 self.next();
-                Some(self.lit_string()?)
+                Some(self.literal_string()?)
             }
             _ => None,
         };
@@ -2869,17 +2833,25 @@ impl<'a> Parser<'a> {
 
     fn transition_expr(&mut self) -> ParseResult<TransitionExpr> {
         let first_span = self.current_span();
-
-        let do_expr = match self.peek(0) {
+        let actions = match self.peek(0) {
             Keyword(Do) => Some(self.scoped(|p| p.do_expr())?),
             _ => None,
         };
+        self.transition_target(first_span, actions)
+    }
 
+    /// Parse the rest of a transition expression that starts at `first_span`
+    /// with the actions `actions`: `enter` and the target
+    fn transition_target(
+        &mut self,
+        first_span: fpp_core::Span,
+        actions: Option<DoExpr>,
+    ) -> ParseResult<TransitionExpr> {
         // The do expression, or the missing one, fails further than the end
         // of the input: at the closing brace of the actions, or at `enter`,
         // where `do` is expected
-        let actions_fail_at = match &do_expr {
-            Some(do_expr) => Some(last_token(do_expr.span())),
+        let actions_fail_at = match &actions {
+            Some(actions) => Some(last_token(actions.span())),
             None if self.peek(0) == Keyword(Enter) => Some(first_span),
             None => None,
         };
@@ -2890,7 +2862,7 @@ impl<'a> Parser<'a> {
             }
             _ => Err(self.cursor.err_expected_one_of(
                 "expected transition expression",
-                match do_expr {
+                match actions {
                     Some(_) => vec![Keyword(Enter)],
                     None => vec![Keyword(Enter), Keyword(Do)],
                 },
@@ -2899,10 +2871,10 @@ impl<'a> Parser<'a> {
         match (target, actions_fail_at) {
             (Ok(target), _) => Ok(TransitionExpr {
                 node_id: self.node(first_span),
-                actions: do_expr,
+                actions,
                 target,
             }),
-            (Err(err), Some(loc)) if err.is_at_end_of_input() => Err(ParseError::EndOfInputIn {
+            (Err(err), Some(loc)) if err.is_at_end_of_input() => Err(SyntaxError::EndOfInputIn {
                 loc,
                 construct: "transition",
             }),
@@ -2911,9 +2883,26 @@ impl<'a> Parser<'a> {
     }
 
     fn transition_or_do(&mut self) -> ParseResult<TransitionOrDo> {
-        let first_span = self.current_span();
+        /// A transition expression that starts at `first_span` with the
+        /// actions `actions`
+        fn transition_parser(
+            p: &mut Parser,
+            first_span: fpp_core::Span,
+            actions: Option<DoExpr>,
+        ) -> ParseResult<TransitionOrDo> {
+            Ok(TransitionOrDo::Transition(
+                p.transition_target(first_span, actions)?,
+            ))
+        }
 
-        let do_expr = match self.peek(0) {
+        /// The actions `actions` alone
+        fn do_parser(actions: DoExpr) -> TransitionOrDo {
+            TransitionOrDo::Do(actions)
+        }
+
+        // Both alternatives may start with a do expression
+        let first_span = self.current_span();
+        let actions = match self.peek(0) {
             Keyword(Do) => Some(self.do_expr()?),
             _ => None,
         };
@@ -2921,32 +2910,13 @@ impl<'a> Parser<'a> {
         // After a do expression, the transition alternative needs `enter` and
         // a target; otherwise the do expression alone is the alternative
         let is_transition = self.peek(0) == Keyword(Enter)
-            && (do_expr.is_none()
+            && (actions.is_none()
                 || self.peek(1) == Identifier
                 || (self.peek(1) == Dot && self.peek(2) == Identifier));
 
-        match (is_transition, do_expr) {
-            (true, actions) => {
-                self.next();
-                let target = match self.qual_ident() {
-                    Ok(target) => target,
-                    // A do expression, which both alternatives can start
-                    // with, fails at `enter`
-                    Err(err) if err.is_at_end_of_input() => {
-                        return Err(ParseError::EndOfInputIn {
-                            loc: first_span,
-                            construct: "transition",
-                        });
-                    }
-                    Err(err) => return Err(err),
-                };
-                Ok(TransitionOrDo::Transition(TransitionExpr {
-                    node_id: self.node(first_span),
-                    actions,
-                    target,
-                }))
-            }
-            (false, Some(de)) => Ok(TransitionOrDo::Do(de)),
+        match (is_transition, actions) {
+            (true, actions) => transition_parser(self, first_span, actions),
+            (false, Some(actions)) => Ok(do_parser(actions)),
             (false, None) => Err(self.cursor.err_expected_one_of(
                 "expected transition or do",
                 vec![Keyword(Do), Keyword(Enter)],
@@ -3202,15 +3172,15 @@ impl<'a> Parser<'a> {
     /// dot that no identifier follows, would start after an expression or a
     /// qualified identifier, if the token after the dot is not the end of the
     /// input. The selection fails there, which is further than the dot.
-    fn dot_selector_failure(&mut self) -> Option<ParseError> {
+    fn dot_selector_failure(&mut self) -> Option<SyntaxError> {
         if self.peek(0) != Dot || matches!(self.peek(1), Identifier | EOF) {
             return None;
         }
-        let (last, got) = self.peek_token_at(1)?;
-        Some(ParseError::ExpectedToken {
+        let (got_span, got) = self.peek_token_at(1)?;
+        Some(SyntaxError::ExpectedToken {
             expected: Identifier,
             got,
-            last,
+            got_span,
             msg: "unexpected token",
         })
     }
@@ -3220,10 +3190,10 @@ impl<'a> Parser<'a> {
     /// is expected at the bracket.
     fn expression_before<T>(&mut self, out: ParseResult<T>, expected: TokenKind) -> ParseResult<T> {
         match (out, self.selector_failure.take()) {
-            (Err(_), Some(((last, got), _))) => Err(ParseError::ExpectedToken {
+            (Err(_), Some(((got_span, got), _))) => Err(SyntaxError::ExpectedToken {
                 expected,
                 got,
-                last,
+                got_span,
                 msg: "unexpected token",
             }),
             (out, _) => out,
@@ -3237,22 +3207,22 @@ impl<'a> Parser<'a> {
     /// subscript does.
     fn enclosed_expression_failed(
         &mut self,
-        err: ParseError,
+        err: SyntaxError,
         committed: bool,
         loc: fpp_core::Span,
-    ) -> ParseError {
+    ) -> SyntaxError {
         match self.selector_failure.take() {
             // The subscript fails further than the `)`
             Some((_, Some(selector_failure))) => {
                 self.element.committed = committed;
                 selector_failure
             }
-            Some(((last, got), None)) => {
+            Some(((got_span, got), None)) => {
                 self.element.committed = committed;
-                ParseError::ExpectedToken {
+                SyntaxError::ExpectedToken {
                     expected: RightParen,
                     got,
-                    last,
+                    got_span,
                     msg: "unexpected token",
                 }
             }
@@ -3283,11 +3253,11 @@ impl<'a> Parser<'a> {
     /// passed a commit point.
     fn alternative_failed(
         &mut self,
-        err: ParseError,
+        err: SyntaxError,
         committed: bool,
         loc: fpp_core::Span,
         construct: &'static str,
-    ) -> ParseError {
+    ) -> SyntaxError {
         // A subscript that is not a selector ends the expression, and does
         // not fail the alternative
         if !err.is_at_end_of_input() || self.selector_failure.is_some() {
@@ -3297,7 +3267,7 @@ impl<'a> Parser<'a> {
             self.eof_error.get_or_insert(err);
         }
         self.element.committed = committed;
-        ParseError::EndOfInputIn { loc, construct }
+        SyntaxError::EndOfInputIn { loc, construct }
     }
 
     /// Mark the element being parsed as the first alternative of its sequence
@@ -3315,11 +3285,11 @@ impl<'a> Parser<'a> {
     /// its first keyword and then expects an identifier at the token `n`
     /// tokens ahead
     fn alternative_expects_identifier_at(&mut self, n: usize) {
-        self.element.alternative_error = self.peek_token_at(n).map(|(last, got)| {
-            Box::new(ParseError::ExpectedToken {
+        self.element.alternative_error = self.peek_token_at(n).map(|(got_span, got)| {
+            Box::new(SyntaxError::ExpectedToken {
                 expected: Identifier,
                 got,
-                last,
+                got_span,
                 msg: "unexpected token",
             })
         });
@@ -3364,32 +3334,32 @@ impl<'a> Parser<'a> {
     }
 
     /// The error for an unexpected next token
-    fn unexpected_token(&mut self) -> ParseError {
+    fn unexpected_token(&mut self) -> SyntaxError {
         match self.peek_token() {
-            Some((got_span, got_kind)) => ParseError::UnexpectedToken { got_kind, got_span },
+            Some((got_span, got_kind)) => SyntaxError::UnexpectedToken { got_kind, got_span },
             None => self.cursor.err_unexpected_eof(),
         }
     }
 
     /// The error for an element sequence that ends at the token `got`: what
     /// follows the sequence is expected there instead
-    fn sequence_ended_at(&self, (span, got): (fpp_core::Span, TokenKind)) -> ParseError {
+    fn sequence_ended_at(&self, (span, got): (fpp_core::Span, TokenKind)) -> SyntaxError {
         match self.sequence_end() {
-            EOF => ParseError::UnexpectedToken {
+            EOF => SyntaxError::UnexpectedToken {
                 got_kind: got,
                 got_span: span,
             },
-            end => ParseError::ExpectedToken {
+            end => SyntaxError::ExpectedToken {
                 expected: end,
                 got,
-                last: span,
+                got_span: span,
                 msg: "unexpected token",
             },
         }
     }
 
     /// The error for an element sequence that ends at the next token
-    fn sequence_ended_at_next(&mut self) -> ParseError {
+    fn sequence_ended_at_next(&mut self) -> SyntaxError {
         match self.peek_token() {
             Some(token) => self.sequence_ended_at(token),
             None => self.cursor.err_unexpected_eof(),
@@ -3401,7 +3371,7 @@ impl<'a> Parser<'a> {
     fn element<T>(
         &mut self,
         elt: &dyn Fn(&mut Parser<'a>) -> ParseResult<T>,
-    ) -> Result<T, (ParseError, ElementState)> {
+    ) -> Result<T, (SyntaxError, ElementState)> {
         let outer = std::mem::take(&mut self.element);
         let out = elt(self);
         let inner = std::mem::replace(&mut self.element, outer);
@@ -3414,7 +3384,7 @@ impl<'a> Parser<'a> {
     /// pre-annotations, if there is one. Returns whether the sequence goes on.
     fn element_failed(
         &mut self,
-        mut err: ParseError,
+        mut err: SyntaxError,
         mut state: ElementState,
         annotation_start: Option<(fpp_core::Span, TokenKind)>,
         element_start: Option<(fpp_core::Span, TokenKind)>,
@@ -3458,7 +3428,7 @@ impl<'a> Parser<'a> {
             // alternatives fail
             if at_eof {
                 let (got_span, got_kind) = state.alternatives_fail_at.unwrap_or(element_start);
-                ParseError::UnexpectedToken { got_kind, got_span }
+                SyntaxError::UnexpectedToken { got_kind, got_span }
             } else {
                 err
             }
@@ -3494,10 +3464,10 @@ impl<'a> Parser<'a> {
     /// that passed a commit point is the error, if there is one.
     fn sequence_ended_at_stop(
         &mut self,
-        err: ParseError,
+        err: SyntaxError,
         stop: (fpp_core::Span, TokenKind),
         committed: bool,
-    ) -> ParseError {
+    ) -> SyntaxError {
         if self.sequence_end() == EOF {
             match self.eof_error.take() {
                 Some(eof_error) => eof_error,
@@ -3679,7 +3649,7 @@ impl<'a> Parser<'a> {
         let ident = self.consume(Identifier)?;
         Ok(Ident {
             node_id: self.node(ident.span()),
-            data: ident.text().to_string(),
+            data: ident.str().to_string(),
         })
     }
 
@@ -3687,7 +3657,7 @@ impl<'a> Parser<'a> {
         let ident = self.consume(Identifier)?;
         Ok(Name {
             node_id: self.node(ident.span()),
-            data: ident.text().to_string(),
+            data: ident.str().to_string(),
         })
     }
 
@@ -3695,7 +3665,7 @@ impl<'a> Parser<'a> {
         let mut out: Vec<String> = vec![];
 
         while self.peek(0) == PostAnnotation {
-            out.push(self.next().unwrap().text().to_string())
+            out.push(self.next().unwrap().str().to_string())
         }
 
         out
@@ -3705,7 +3675,7 @@ impl<'a> Parser<'a> {
         let mut out: Vec<String> = vec![];
 
         while self.peek(0) == PreAnnotation {
-            out.push(self.next().unwrap().text().to_string())
+            out.push(self.next().unwrap().str().to_string())
         }
 
         out
@@ -3742,7 +3712,7 @@ impl<'a> Parser<'a> {
 
     /// Parse a string literal. Its `inner_span` covers the source text between
     /// the quotes, before any escape or indent is removed from it.
-    fn lit_string(&mut self) -> ParseResult<LitString> {
+    fn literal_string(&mut self) -> ParseResult<LitString> {
         let (tok, inner_span) = match self.peek(0) {
             LiteralString => {
                 let token = self.next().unwrap();
@@ -3776,7 +3746,7 @@ impl<'a> Parser<'a> {
         Ok(LitString {
             node_id: self.node(tok.span()),
             inner_span,
-            data: tok.text().to_string(),
+            data: tok.str().to_string(),
         })
     }
 }

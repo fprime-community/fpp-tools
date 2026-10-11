@@ -79,14 +79,11 @@ fn run_test_with(file_paths: &[&str], ref_path: &str, resolve_includes: bool) {
     }
 }
 
+// The tests of fpp-syntax, in the order of its run script. `syntax_stdin` is in
+// stdin.rs.
 #[test]
 fn comments() {
     run_test("comments")
-}
-
-#[test]
-fn crlf() {
-    run_test("crlf")
 }
 
 #[test]
@@ -97,11 +94,6 @@ fn embedded_tab() {
 #[test]
 fn empty() {
     run_test("empty")
-}
-
-#[test]
-fn escaped_include_path() {
-    run_test("escaped-include-path")
 }
 
 #[test]
@@ -134,12 +126,6 @@ fn include_cycle_2() {
     run_test_files(&["cycle-2"], "include-cycle-2")
 }
 
-// Rust-only: the cycle entered at its third file
-#[test]
-fn include_cycle_3() {
-    run_test_files(&["cycle-3"], "include-cycle-3")
-}
-
 #[test]
 fn include_missing_file() {
     run_test("include-missing-file")
@@ -148,11 +134,6 @@ fn include_missing_file() {
 #[test]
 fn include_module() {
     run_test("include-module")
-}
-
-#[test]
-fn include_packet_comment() {
-    run_test("include-packet-comment")
 }
 
 #[test]
@@ -181,34 +162,8 @@ fn include_topology() {
 }
 
 #[test]
-fn implements_newline() {
-    run_test("implements-newline")
-}
-
-#[test]
-fn numeric_shift() {
-    run_test("numeric-shift")
-}
-
-#[test]
 fn parse_error() {
     run_test("parse-error")
-}
-
-// Rust-only: the errors reported after the first one
-#[test]
-fn parse_error_recovery() {
-    run_test("parse-error-recovery")
-}
-
-#[test]
-fn expr_shift_sizeof() {
-    run_test("expr-shift-sizeof")
-}
-
-#[test]
-fn state_machine_defs() {
-    run_test("state-machine-defs")
 }
 
 #[test]
@@ -232,8 +187,8 @@ fn syntax_kwd_names() {
 }
 
 #[test]
-fn system() {
-    run_test("system")
+fn template() {
+    run_test("template")
 }
 
 #[test]
@@ -252,13 +207,56 @@ fn dictionary_specifier() {
 }
 
 #[test]
-fn topology() {
-    run_test("topology")
+fn numeric_shift() {
+    run_test("numeric-shift")
+}
+
+// Rust-only: the cycle entered at its third file
+#[test]
+fn include_cycle_3() {
+    run_test_files(&["cycle-3"], "include-cycle-3")
+}
+
+// Rust-only: the errors reported after the first one
+#[test]
+fn parse_error_recovery() {
+    run_test("parse-error-recovery")
+}
+
+// Rust-only: more of the syntax
+#[test]
+fn crlf() {
+    run_test("crlf")
 }
 
 #[test]
-fn template() {
-    run_test("template")
+fn escaped_include_path() {
+    run_test("escaped-include-path")
+}
+
+#[test]
+fn implements_newline() {
+    run_test("implements-newline")
+}
+
+#[test]
+fn expr_shift_sizeof() {
+    run_test("expr-shift-sizeof")
+}
+
+#[test]
+fn state_machine_defs() {
+    run_test("state-machine-defs")
+}
+
+#[test]
+fn system() {
+    run_test("system")
+}
+
+#[test]
+fn topology() {
+    run_test("topology")
 }
 
 // Rust-only: the template forms that `template` leaves out
@@ -267,6 +265,7 @@ fn template_forms() {
     run_test("template-forms")
 }
 
+// The 'template error' cases of ParserSpec.scala, as file tests
 #[test]
 fn template_error() {
     run_test("template-error")
@@ -374,6 +373,11 @@ fn interface_member_error() {
 }
 
 // Rust-only: include resolution
+#[test]
+fn include_packet_comment() {
+    run_test("include-packet-comment")
+}
+
 #[test]
 fn include_stray_brace() {
     run_test("include-stray-brace")

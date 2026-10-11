@@ -19,7 +19,7 @@ fn list(s: &str) -> Result<Vec<(TokenKind, String)>, String> {
         let mut cursor = Cursor::new(file, s, None);
         let mut tokens = vec![];
         while let Some(token) = cursor.next() {
-            tokens.push((token.kind(), token.text().to_string()));
+            tokens.push((token.kind(), token.str().to_string()));
         }
 
         tokens

@@ -20,7 +20,7 @@ pub enum IncludeParentKind {
 
 /// The state of the transform: the kind of member list each included file is
 /// spliced into
-type ResolveIncludesState = FxHashMap<SourceFile, IncludeParentKind>;
+type State = FxHashMap<SourceFile, IncludeParentKind>;
 
 /// Resolve include specifiers
 pub struct ResolveIncludes<Reader: FileReader> {
@@ -33,11 +33,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
     }
 
     /// Resolve the include specifiers of a list of translation units
-    pub fn trans_unit_list(
-        &self,
-        a: &mut ResolveIncludesState,
-        tul: &mut [TransUnit],
-    ) -> ControlFlow<()> {
+    pub fn trans_unit_list(&self, a: &mut State, tul: &mut [TransUnit]) -> ControlFlow<()> {
         for tu in tul {
             self.visit_trans_unit(a, tu)?;
         }
@@ -46,7 +42,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
 
     fn component_member(
         &self,
-        a: &mut ResolveIncludesState,
+        a: &mut State,
         mut member: ComponentMember,
         out: &mut Vec<ComponentMember>,
     ) {
@@ -66,12 +62,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
         }
     }
 
-    fn module_member(
-        &self,
-        a: &mut ResolveIncludesState,
-        mut member: ModuleMember,
-        out: &mut Vec<ModuleMember>,
-    ) {
+    fn module_member(&self, a: &mut State, mut member: ModuleMember, out: &mut Vec<ModuleMember>) {
         match &mut member {
             ModuleMember::SpecInclude(spec_include) => {
                 self.resolve_spec_include(
@@ -94,7 +85,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
     /// transitively inside a template definition.
     fn module_template_member(
         &self,
-        a: &mut ResolveIncludesState,
+        a: &mut State,
         member: ModuleMember,
         out: &mut Vec<ModuleMember>,
     ) {
@@ -103,7 +94,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
 
     fn state_machine_member(
         &self,
-        a: &mut ResolveIncludesState,
+        a: &mut State,
         mut member: StateMachineMember,
         out: &mut Vec<StateMachineMember>,
     ) {
@@ -125,12 +116,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
         }
     }
 
-    fn state_member(
-        &self,
-        a: &mut ResolveIncludesState,
-        mut member: StateMember,
-        out: &mut Vec<StateMember>,
-    ) {
+    fn state_member(&self, a: &mut State, mut member: StateMember, out: &mut Vec<StateMember>) {
         match &mut member {
             StateMember::SpecInclude(spec_include) => {
                 self.resolve_spec_include(
@@ -151,7 +137,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
 
     fn tlm_packet_member(
         &self,
-        a: &mut ResolveIncludesState,
+        a: &mut State,
         mut member: TlmPacketMember,
         out: &mut Vec<TlmPacketMember>,
     ) {
@@ -175,7 +161,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
 
     fn tlm_packet_set_member(
         &self,
-        a: &mut ResolveIncludesState,
+        a: &mut State,
         mut member: TlmPacketSetMember,
         out: &mut Vec<TlmPacketSetMember>,
     ) {
@@ -199,7 +185,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
 
     fn topology_member(
         &self,
-        a: &mut ResolveIncludesState,
+        a: &mut State,
         mut member: TopologyMember,
         out: &mut Vec<TopologyMember>,
     ) {
@@ -221,12 +207,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
         }
     }
 
-    fn tu_member(
-        &self,
-        a: &mut ResolveIncludesState,
-        tum: ModuleMember,
-        out: &mut Vec<ModuleMember>,
-    ) {
+    fn tu_member(&self, a: &mut State, tum: ModuleMember, out: &mut Vec<ModuleMember>) {
         self.module_member(a, tum, out)
     }
 
@@ -273,27 +254,25 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
         )
     }
 
-    /// Parse the file that `spec_include` names with `parser`, and splice its
-    /// members, transformed by `transformer`, into `out`
+    /// Parse the file that the include specifier `node` names with `parser`,
+    /// and splice its members, transformed by `transformer`, into `out`
     fn resolve_spec_include<T>(
         &self,
-        a: &mut ResolveIncludesState,
+        a: &mut State,
         kind: IncludeParentKind,
-        spec_include: &SpecInclude,
+        node: &SpecInclude,
         parser: fn(&mut Parser) -> Vec<T>,
-        transformer: fn(&ResolveIncludes<Reader>, &mut ResolveIncludesState, T, &mut Vec<T>),
+        transformer: fn(&ResolveIncludes<Reader>, &mut State, T, &mut Vec<T>),
         out: &mut Vec<T>,
     ) {
-        let including_loc = spec_include.file.span();
-        let path = match self
-            .reader
-            .resolve(including_loc.file(), &spec_include.file.data)
-        {
+        let spec = node;
+        let including_loc = spec.file.span();
+        let path = match self.reader.resolve(including_loc.file(), &spec.file.data) {
             Ok(path) => path,
             Err(_) => {
                 fpp_core::Diagnostic::from(FileError::CannotResolvePath {
                     loc: including_loc,
-                    name: spec_include.file.data.clone(),
+                    name: spec.file.data.clone(),
                 })
                 .emit();
                 return;
@@ -331,7 +310,7 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
 
 impl<Reader: FileReader> MutVisitor for ResolveIncludes<Reader> {
     type Break = ();
-    type State = ResolveIncludesState;
+    type State = State;
 
     fn visit_trans_unit(
         &self,

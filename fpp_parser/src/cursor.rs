@@ -1,4 +1,4 @@
-use crate::error::{ParseError, ParseResult};
+use crate::error::{ParseResult, SyntaxError};
 use crate::token::Token;
 use fpp_core::{BytePos, Diagnostic, Level, SourceFile, Span, Spanned};
 use fpp_lexer::{Lexer, LexerError, TokenKind};
@@ -386,18 +386,18 @@ impl<'a> Cursor<'a> {
         msg: &'static str,
         expected: TokenKind,
         got: TokenKind,
-    ) -> ParseError {
-        ParseError::ExpectedToken {
+    ) -> SyntaxError {
+        SyntaxError::ExpectedToken {
             expected,
             got,
-            last: self.next_token_span(),
+            got_span: self.next_token_span(),
             msg,
         }
     }
 
-    pub fn err_unexpected_eof(&self) -> ParseError {
-        ParseError::UnexpectedEof {
-            last: self.end_of_input_span(),
+    pub fn err_unexpected_eof(&self) -> SyntaxError {
+        SyntaxError::UnexpectedEof {
+            loc: self.end_of_input_span(),
         }
     }
 
@@ -405,13 +405,13 @@ impl<'a> Cursor<'a> {
         &mut self,
         msg: &'static str,
         expected_one_of: Vec<TokenKind>,
-    ) -> ParseError {
+    ) -> SyntaxError {
         let (got_kind, got_span) = match self.peek_internal(0) {
             None => (TokenKind::EOF, self.end_of_input_span()),
             Some(got) => (got.kind, got.span),
         };
 
-        ParseError::ExpectedOneOf {
+        SyntaxError::ExpectedOneOf {
             expected: expected_one_of,
             got_span,
             got_kind,
@@ -545,7 +545,7 @@ mod lexer_spec;
 #[cfg(test)]
 mod test {
     use crate::cursor::Cursor;
-    use crate::error::ParseError;
+    use crate::error::SyntaxError;
     use crate::token::Token;
     use fpp_core::{SourceFile, Spanned};
     use fpp_lexer::TokenKind::*;
@@ -588,13 +588,13 @@ mod test {
     fn lex_texts(content: &str) -> Vec<(TokenKind, String)> {
         lex(content)
             .iter()
-            .map(|tok| (tok.kind(), tok.text().to_string()))
+            .map(|tok| (tok.kind(), tok.str().to_string()))
             .collect()
     }
 
     fn assert_token_eq(token: &Token, kind: TokenKind, text: &str) {
         assert_eq!(token.kind(), kind);
-        assert_eq!(token.text(), text);
+        assert_eq!(token.str(), text);
     }
 
     #[test]
@@ -961,8 +961,8 @@ mod test {
             cursor.next();
 
             match cursor.consume(Equals) {
-                Err(ParseError::ExpectedToken { last, got, .. }) => {
-                    assert_eq!(last, b);
+                Err(SyntaxError::ExpectedToken { got_span, got, .. }) => {
+                    assert_eq!(got_span, b);
                     assert_eq!(got, Identifier);
                 }
                 other => panic!("{other:?}"),
@@ -975,9 +975,9 @@ mod test {
             assert_eq!(cursor.peek(1), Identifier);
 
             match cursor.consume(Identifier) {
-                Err(ParseError::ExpectedToken { last, got, .. }) => {
+                Err(SyntaxError::ExpectedToken { got_span, got, .. }) => {
                     assert_eq!(got, Eol);
-                    assert_eq!(last.start().line(), 0);
+                    assert_eq!(got_span.start().line(), 0);
                 }
                 other => panic!("{other:?}"),
             }
@@ -999,11 +999,11 @@ mod test {
             with_cursor(content, |cursor| {
                 cursor.next();
                 match cursor.consume(Identifier) {
-                    Err(ParseError::ExpectedToken { last, got, .. }) => {
+                    Err(SyntaxError::ExpectedToken { got_span, got, .. }) => {
                         assert_eq!(got, Eol);
-                        assert_eq!(last.start().line(), 1, "{content:?}");
-                        assert_eq!(last.start().column(), 0, "{content:?}");
-                        assert!(last.is_empty());
+                        assert_eq!(got_span.start().line(), 1, "{content:?}");
+                        assert_eq!(got_span.start().column(), 0, "{content:?}");
+                        assert!(got_span.is_empty());
                     }
                     other => panic!("{other:?}"),
                 }
@@ -1014,7 +1014,7 @@ mod test {
         with_cursor("constant # c\n  a", |cursor| {
             cursor.next();
             match cursor.err_expected_one_of("identifier expected", vec![Identifier]) {
-                ParseError::ExpectedOneOf {
+                SyntaxError::ExpectedOneOf {
                     got_kind, got_span, ..
                 } => {
                     assert_eq!(got_kind, Eol);
@@ -1032,7 +1032,7 @@ mod test {
             cursor.next();
 
             match cursor.err_expected_one_of("expression expected", vec![LiteralInt]) {
-                ParseError::ExpectedOneOf {
+                SyntaxError::ExpectedOneOf {
                     got_kind,
                     got_span,
                     msg,
