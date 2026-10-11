@@ -118,7 +118,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union InterfaceInstance native fpp_analysis::semantics::InterfaceInstance handle clone alias "InterfaceInstance" accessor native repr name(qualified_name) {
+    union InterfaceInstance native fpp_analysis::semantics::InterfaceInstance handle clone alias "InterfaceInstance" accessor native repr display {
         variants {
             Component => ComponentInterfaceInstance : payload,
             Topology => TopologyInterfaceInstance : payload,
@@ -812,7 +812,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity PortInstanceIdentifier native fpp_analysis::semantics::PortInstanceIdentifier identity qualified_name(qualified_name) repr name(qualified_name) {
+    entity PortInstanceIdentifier native fpp_analysis::semantics::PortInstanceIdentifier identity qualified_name(qualified_name) repr display {
         fields {
             interface_instance: union(InterfaceInstance),
             port_instance: union(PortInstance),
@@ -925,7 +925,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity StateMachineInstance native fpp_analysis::semantics::StateMachineInstance repr name(get_name) {
+    entity StateMachineInstance native fpp_analysis::semantics::state_machine::StateMachineInstance repr name(get_name) {
         fields {
             node: astdef(SpecStateMachineInstance),
             state_machine: astdef(DefStateMachine),
@@ -942,6 +942,7 @@ fpp_python_macros::fpp_sem_bindings! {
 
     entity StateMachineNestedScope native fpp_analysis::semantics::state_machine::StateMachineNestedScope {
         methods {
+            global_scope -> entity(StateMachineNestedScope),
             inner_scope -> ref entity(StateMachineScope),
         }
     }
