@@ -1,0 +1,1 @@
+[ local path prefix ]/compiler/tools/fpp-depend/test/qual_ident_name_order_right.fpp

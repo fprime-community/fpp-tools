@@ -1,0 +1,1 @@
+[ local path prefix ]/compiler/tools/fpp-depend/test/nested_scope_prefix_ref_p.fpp

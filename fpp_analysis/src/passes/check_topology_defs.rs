@@ -158,6 +158,7 @@ impl<'ast> Visitor<'ast> for CheckTopologyDefs {
                 loc: node.span(),
                 name: node.name.data.clone(),
                 msg: "only a deployment topology may specify a telemetry packet set".to_string(),
+                notes: vec![],
             }
             .emit();
         }

@@ -3,8 +3,8 @@ use crate::semantics::{
     Command, ComponentInstance, Container, Event, Param, Record, Symbol, TlmChannel,
     TlmChannelIdentifier, TlmPacketSet, Topology,
 };
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use std::collections::BTreeMap;
+use indexmap::IndexMap;
+use rustc_hash::{FxBuildHasher, FxHashMap as HashMap, FxHashSet as HashSet};
 
 /// An FPP dictionary
 #[derive(Debug, Clone, Default)]
@@ -12,34 +12,34 @@ pub struct Dictionary {
     /// A set of symbols used in the dictionary
     pub used_symbol_set: HashSet<Symbol>,
     /// The map from global IDs to command entries
-    pub command_entry_map: BTreeMap<CommandOpcode, CommandEntry>,
+    pub command_entry_map: IndexMap<CommandOpcode, CommandEntry, FxBuildHasher>,
     /// The map from global IDs to telemetry channel entries
-    pub tlm_channel_entry_map: BTreeMap<TlmChannelId, TlmChannelEntry>,
+    pub tlm_channel_entry_map: IndexMap<TlmChannelId, TlmChannelEntry, FxBuildHasher>,
     /// The reverse telemetry channel map (for packet construction)
     pub reverse_tlm_channel_entry_map: HashMap<TlmChannelEntry, TlmChannelId>,
     /// The map from global IDs to event entries
-    pub event_entry_map: BTreeMap<EventId, EventEntry>,
+    pub event_entry_map: IndexMap<EventId, EventEntry, FxBuildHasher>,
     /// The map from global IDs to parameter entries
-    pub param_entry_map: BTreeMap<ParamId, ParamEntry>,
+    pub param_entry_map: IndexMap<ParamId, ParamEntry, FxBuildHasher>,
     /// The map from global IDs to record entries
-    pub record_entry_map: BTreeMap<RecordId, RecordEntry>,
+    pub record_entry_map: IndexMap<RecordId, RecordEntry, FxBuildHasher>,
     /// The map from global IDs to container entries
-    pub container_entry_map: BTreeMap<ContainerId, ContainerEntry>,
+    pub container_entry_map: IndexMap<ContainerId, ContainerEntry, FxBuildHasher>,
     /// The map from packet set names to packet sets
-    pub tlm_packet_set_map: BTreeMap<String, TlmPacketSet>,
+    pub tlm_packet_set_map: IndexMap<String, TlmPacketSet, FxBuildHasher>,
 }
 
 /// A command opcode
 pub type CommandOpcode = i128;
-/// A telemetry channel identifier
+/// A telemetry channel ID
 pub type TlmChannelId = i128;
-/// An event identifier
+/// An event ID
 pub type EventId = i128;
-/// A parameter identifier
+/// A parameter ID
 pub type ParamId = i128;
-/// A record identifier
+/// A record ID
 pub type RecordId = i128;
-/// A container identifier
+/// A container ID
 pub type ContainerId = i128;
 
 impl Dictionary {
@@ -64,7 +64,7 @@ impl Dictionary {
             None => Err(SemanticError::ChannelNotInDictionary {
                 loc: channel_id.get_loc(),
                 channel_name: channel_id.get_qualified_name(),
-                top_name: t.get_name().to_string(),
+                topology_name: t.get_name().to_string(),
             }),
         }
     }

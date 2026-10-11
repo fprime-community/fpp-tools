@@ -5,6 +5,7 @@ use crate::semantics::{
 use crate::used_symbols::UsedSymbols;
 use fpp_ast::Visitable;
 use rustc_hash::FxHashSet as HashSet;
+use std::sync::Arc;
 
 /// Fills in the used symbols for a dictionary
 pub struct DictionaryUsedSymbols<'a> {
@@ -45,7 +46,16 @@ impl<'a> DictionaryUsedSymbols<'a> {
         let Some(component) = ci.get_component(a) else {
             return HashSet::default();
         };
-        let commands: Vec<Command> = component.command_map.values().cloned().collect();
+        let commands: Vec<_> = component
+            .command_map
+            .values()
+            .filter_map(|command| match command {
+                Command::NonParam { node, .. } => Some(node.clone()),
+                // A parameter command is implied by a parameter specifier, which
+                // is visited through the parameter map, so it adds nothing here
+                _ => None,
+            })
+            .collect();
         let events: Vec<_> = component
             .event_map
             .values()
@@ -73,40 +83,37 @@ impl<'a> DictionaryUsedSymbols<'a> {
             .collect();
 
         let used_symbols = UsedSymbols::new();
-        let mut out: HashSet<Symbol> = HashSet::default();
-        for command in &commands {
-            // A parameter command is implied by a parameter specifier, which is
-            // visited through the parameter map, so it adds nothing here.
-            if let Command::NonParam { node, .. } = command {
-                out.extend(collect(a, &used_symbols, node.as_ref()));
-            }
-        }
-        for node in &events {
-            out.extend(collect(a, &used_symbols, node.as_ref()));
-        }
-        for node in &tlm_channels {
-            out.extend(collect(a, &used_symbols, node.as_ref()));
-        }
-        for node in &params {
-            out.extend(collect(a, &used_symbols, node.as_ref()));
-        }
-        for node in &records {
-            out.extend(collect(a, &used_symbols, node.as_ref()));
-        }
-        for node in &containers {
-            out.extend(collect(a, &used_symbols, node.as_ref()));
-        }
-        out
+        let command_symbols = get_used_symbols_for_specifier(a, &used_symbols, &commands);
+        let event_symbols = get_used_symbols_for_specifier(a, &used_symbols, &events);
+        let tlm_channel_symbols = get_used_symbols_for_specifier(a, &used_symbols, &tlm_channels);
+        let param_symbols = get_used_symbols_for_specifier(a, &used_symbols, &params);
+        let record_symbols = get_used_symbols_for_specifier(a, &used_symbols, &records);
+        let container_symbols = get_used_symbols_for_specifier(a, &used_symbols, &containers);
+        [
+            command_symbols,
+            event_symbols,
+            tlm_channel_symbols,
+            param_symbols,
+            record_symbols,
+            container_symbols,
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
 
-/// Runs shallow used-symbol analysis over a single specifier node
-fn collect<'n, N: Visitable<'n, UsedSymbols<'n>>>(
+/// The symbols used by a list of specifiers
+fn get_used_symbols_for_specifier<'n, N: Visitable<'n, UsedSymbols<'n>>>(
     a: &mut Analysis,
     used_symbols: &UsedSymbols<'n>,
-    node: &'n N,
+    specifiers: &'n [Arc<N>],
 ) -> HashSet<Symbol> {
-    let saved = std::mem::take(&mut a.used_symbol_set);
-    let _ = node.visit(a, used_symbols);
-    std::mem::replace(&mut a.used_symbol_set, saved)
+    let mut out = HashSet::default();
+    for specifier in specifiers {
+        let saved = std::mem::take(&mut a.used_symbol_set);
+        let _ = specifier.as_ref().visit(a, used_symbols);
+        out.extend(std::mem::replace(&mut a.used_symbol_set, saved));
+    }
+    out
 }

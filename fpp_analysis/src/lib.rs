@@ -128,9 +128,6 @@ pub mod passes {
     pub(crate) mod check_spec_locs;
     pub use check_spec_locs::*;
 
-    mod build_spec_loc_map;
-    pub use build_spec_loc_map::*;
-
     mod check_system_defs;
     pub use check_system_defs::*;
 

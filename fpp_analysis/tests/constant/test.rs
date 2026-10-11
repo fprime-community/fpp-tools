@@ -71,6 +71,16 @@ fn dictionary_error() {
 }
 
 #[test]
+fn dictionary_alias_error() {
+    run_test("constant/dictionary_alias_error")
+}
+
+#[test]
+fn dictionary_alias_template_error() {
+    run_test("constant/dictionary_alias_template_error")
+}
+
+#[test]
 fn dictionary_ok() {
     run_test("constant/dictionary_ok")
 }
@@ -88,4 +98,10 @@ fn shadowed_ok() {
 #[test]
 fn absolute_undef() {
     run_test("constant/absolute_undef")
+}
+
+#[test]
+#[ignore = "needs dictionary definitions in state machines to parse"]
+fn dictionary_state_machine_ok() {
+    run_test("constant/dictionary_state_machine_ok")
 }

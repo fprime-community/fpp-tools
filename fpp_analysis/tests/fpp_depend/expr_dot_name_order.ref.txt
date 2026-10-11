@@ -1,0 +1,1 @@
+[ local path prefix ]/compiler/tools/fpp-depend/test/expr_dot_name_order_right.fpp

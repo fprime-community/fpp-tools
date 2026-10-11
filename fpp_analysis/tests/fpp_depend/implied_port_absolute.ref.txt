@@ -1,0 +1,1 @@
+[ local path prefix ]/compiler/tools/fpp-depend/test/implied_port_absolute_fw_cmd.fpp

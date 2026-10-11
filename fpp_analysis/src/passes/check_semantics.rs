@@ -62,7 +62,7 @@ impl CheckSemantics {
         BuildSpecLocMap.visit_trans_units(a, tul())?;
         CheckSpecLocs.visit_trans_units(a, tul())?;
         CheckDictionaryDefs.visit_trans_units(a, tul())?;
-        ConstructDictionaryMap::construct(a);
+        ConstructDictionaryMap.visit_trans_units(a, tul())?;
         CheckSystemDefs.visit_trans_units(a, tul())?;
 
         ControlFlow::Continue(())

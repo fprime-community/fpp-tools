@@ -19,8 +19,8 @@ impl Display for FrameworkDependency {
 }
 
 impl FrameworkDependency {
-    /// The sort order of a framework dependency
-    pub fn order(&self) -> usize {
+    /// The position of a framework dependency in the sort order
+    pub fn order_map(&self) -> usize {
         match self {
             FrameworkDependency::FwCompQueued => 0,
             FrameworkDependency::Os => 1,
@@ -30,6 +30,6 @@ impl FrameworkDependency {
 
     /// Sorts a sequence of framework dependencies
     pub fn sort(s: &mut [FrameworkDependency]) {
-        s.sort_by_key(FrameworkDependency::order);
+        s.sort_by_key(FrameworkDependency::order_map);
     }
 }

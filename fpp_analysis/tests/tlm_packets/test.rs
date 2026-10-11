@@ -109,6 +109,15 @@ fn duplicate_packet_name() {
     )
 }
 
+// Rust-only: duplicate packet names are reported in model order
+#[test]
+fn duplicate_packet_name_explicit_ids() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/duplicate_packet_name_explicit_ids",
+    )
+}
+
 #[test]
 fn instance_not_in_topology() {
     run_test_with(
@@ -170,4 +179,53 @@ fn not_deployment_after_instance_error() {
 #[test]
 fn not_deployment_after_connection_error() {
     run_test("tlm_packets/not_deployment_after_connection_error")
+}
+
+#[test]
+fn topology_order_files() {
+    run_test_with(
+        &["tlm_packets/instances", "tlm_packets/topology_order_b"],
+        "tlm_packets/topology_order_a",
+    )
+}
+
+#[test]
+fn topology_order_template() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/topology_order_template",
+    )
+}
+
+#[test]
+fn topology_order_include() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/topology_order_include",
+    )
+}
+
+#[test]
+fn shadowed_instance_error() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/shadowed_instance_error",
+    )
+}
+
+// Rust-only: the order in which the channels of a packet set are checked
+#[test]
+fn channel_order_instances() {
+    run_test("tlm_packets/channel_order_instances")
+}
+
+#[test]
+#[ignore = "needs Component::tlm_channel_map in declaration order"]
+fn channel_order_ids() {
+    run_test("tlm_packets/channel_order_ids")
+}
+
+#[test]
+fn used_channel_order() {
+    run_test_with(&["tlm_packets/instances"], "tlm_packets/used_channel_order")
 }
