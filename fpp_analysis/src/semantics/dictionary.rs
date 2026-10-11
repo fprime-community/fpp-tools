@@ -165,7 +165,7 @@ pub struct EventEntry {
 mod tests {
     use super::Dictionary;
     use crate::semantics::Symbol;
-    use crate::{Analysis, add_state_enums, check_semantics, resolve_templates};
+    use crate::{Analysis, CheckSemantics};
     use fpp_core::SourceFile;
 
     /// Two instances of one component, each providing a command, an event, a
@@ -269,9 +269,11 @@ deployment topology T {
             let source = SourceFile::new("dictionary_test.fpp", SRC.to_string());
             let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
             let mut a = Analysis::new();
-            add_state_enums(&mut ast);
-            let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
-            let _ = check_semantics(&mut a, vec![&ast]);
+            let _ = CheckSemantics::tu_list(
+                &mut a,
+                fpp_fs::FsReader {},
+                std::slice::from_mut(&mut ast),
+            );
             let (_, dictionary) = a
                 .dictionary_map
                 .iter()

@@ -2,7 +2,7 @@ use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::passes::EnterSymbols;
 use crate::passes::enter_module_symbols::EnterModuleSymbols;
-use crate::semantics::{NameGroup, Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion};
+use crate::semantics::{Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion};
 use fpp_ast::{
     AstNode, DefModule, DefModuleTemplate, ModuleMember, SpecTemplateExpand, TemplateArgKind,
     TemplateParam, Visitable, Visitor, Walkable,
@@ -99,8 +99,8 @@ impl EnterTemplateExpansionSymbols {
                 def_node: tmpl.clone(),
                 expansion: Arc::new(node.clone()),
                 params: params.clone(),
-                param_scope: Scope::new(),
-                scope: Scope::new(),
+                param_scope: Scope::empty(),
+                scope: Scope::empty(),
                 local_scope_map: HashMap::default(),
             },
         );
@@ -149,7 +149,7 @@ impl EnterTemplateExpansionSymbols {
         }
 
         // Duplicate the symbols entries into the outer scope
-        let owner = a.nested_scope.current().clone();
+        let owner = a.nested_scope.inner_scope().clone();
         let mut dest = a.get_scope(&owner).clone();
         let result = Self::merge_scope(a, &mut dest, &template_scope);
         *a.get_scope_mut(&owner) = dest;
@@ -221,8 +221,8 @@ impl EnterTemplateExpansionSymbols {
     /// merging with a same-named module at the expansion site.
     fn collect_module_scopes(a: &Analysis, scope: &Scope, map: &mut HashMap<Symbol, Scope>) {
         let mut module_symbols: Vec<Symbol> = Vec::new();
-        for ng in NameGroup::all() {
-            for (_, symbol) in scope.get_group(ng).iter() {
+        for (_, nsm) in scope.iter() {
+            for (_, symbol) in nsm.iter() {
                 if matches!(symbol, Symbol::Module(_)) && !module_symbols.contains(symbol) {
                     module_symbols.push(symbol.clone());
                 }
@@ -239,15 +239,12 @@ impl EnterTemplateExpansionSymbols {
         }
     }
 
-    /// Copy the bindings of `src` into `dest`
+    /// Copy the bindings of `src` into `dest`, in the order the name groups and
+    /// the names were entered into `src`
     fn merge_scope(a: &mut Analysis, dest: &mut Scope, src: &Scope) -> SemanticResult {
-        for ng in NameGroup::all() {
-            let symbols: Vec<Symbol> = src
-                .get_group(ng)
-                .iter()
-                .map(|(_, symbol)| symbol.clone())
-                .collect();
-            for symbol in symbols {
+        for (ng, nsm) in src.iter() {
+            for (_, symbol) in nsm.iter() {
+                let symbol = symbol.clone();
                 match dest.get(ng, &symbol.name().data) {
                     // The name is already bound to this symbol, for example
                     // because we merged it when visiting another name group
@@ -276,12 +273,12 @@ impl EnterTemplateExpansionSymbols {
             .symbol_scope_map
             .get(prev_symbol)
             .cloned()
-            .unwrap_or_else(Scope::new);
+            .unwrap_or_else(Scope::empty);
         let scope = a
             .symbol_scope_map
             .get(symbol)
             .cloned()
-            .unwrap_or_else(Scope::new);
+            .unwrap_or_else(Scope::empty);
         let mut merged_scope = prev_scope;
         Self::merge_scope(a, &mut merged_scope, &scope)?;
         // Both symbols denote the same module, so both must see all its members

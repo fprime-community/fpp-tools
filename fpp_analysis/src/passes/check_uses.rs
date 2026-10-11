@@ -8,15 +8,15 @@ use crate::semantics::{
     Symbol, SymbolInterface,
 };
 use fpp_ast::{
-    AstNode, DefEnum, Expr, ExprKind, Ident, Node, QualIdent, SpecTemplateExpand, Visitable,
-    Visitor,
+    AstNode, DefComponent, DefEnum, DefModule, DefStateMachine, Expr, ExprKind, Ident, Node,
+    QualIdent, SpecTemplateExpand, TypeName, TypeNameKind, Visitable, Visitor,
 };
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 
 /// Match uses to their definitions
 pub struct CheckUses<'ast> {
-    super_: BasicUseAnalyzer<'ast, Analysis, Self>,
+    super_: BasicUseAnalyzer<'ast, Self>,
 }
 
 impl<'ast> Default for CheckUses<'ast> {
@@ -115,15 +115,38 @@ impl<'ast> CheckUses<'ast> {
         }
         ControlFlow::Continue(())
     }
+
+    /// Visit a definition with members in the scope that it opens
+    fn visit_in_scope<N: AstNode>(
+        &self,
+        a: &mut Analysis,
+        def: &N,
+        node: Node<'ast>,
+    ) -> ControlFlow<()> {
+        let symbol = a
+            .get_symbol(def)
+            .expect("definition should be entered by EnterSymbols");
+        a.nested_scope.push(ScopeOwner::Symbol(symbol));
+        let res = self.super_visit(a, node);
+        a.nested_scope.pop();
+        res
+    }
 }
 
 impl<'ast> Visitor<'ast> for CheckUses<'ast> {
     type Break = ();
     type State = Analysis;
 
-    // Walk all nodes deeply and collect up scope where relevant
     fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
         self.super_.visit(self, a, node)
+    }
+
+    fn visit_def_component(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefComponent,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_in_scope(a, node, Node::DefComponent(node))
     }
 
     /// Resolve the representation type in the enclosing scope, and the
@@ -142,6 +165,14 @@ impl<'ast> Visitor<'ast> for CheckUses<'ast> {
             a.nested_scope.pop();
         }
         res
+    }
+
+    fn visit_def_module(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefModule,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_in_scope(a, node, Node::DefModule(node))
     }
 
     /// Resolve the names inside an expanded template.
@@ -189,6 +220,14 @@ impl<'ast> Visitor<'ast> for CheckUses<'ast> {
             self.template_param(a, param)?;
         }
         ControlFlow::Continue(())
+    }
+
+    fn visit_def_state_machine(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefStateMachine,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_in_scope(a, node, Node::DefStateMachine(node))
     }
 }
 
@@ -311,10 +350,18 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
     fn type_use(
         &self,
         a: &mut Analysis,
-        node: &QualIdent,
+        node: &TypeName,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        check_qual_ident(a, NameGroup::Type, node);
+        match &node.kind {
+            TypeNameKind::QualIdent(qual_ident) => {
+                check_qual_ident(a, NameGroup::Type, qual_ident);
+                if let Some(symbol) = a.use_def_map.get(&qual_ident.id()).cloned() {
+                    a.use_def_map.insert(node.node_id, symbol);
+                }
+            }
+            _ => panic!("type use should be qualified identifier"),
+        }
         ControlFlow::Continue(())
     }
 

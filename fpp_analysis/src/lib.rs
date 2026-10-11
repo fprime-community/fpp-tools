@@ -30,8 +30,32 @@ pub mod analyzers {
     pub mod basic_use_analyzer;
     pub use basic_use_analyzer::*;
 
-    pub mod nested_analyzer;
-    pub use nested_analyzer::*;
+    pub mod component_analyzer;
+    pub use component_analyzer::*;
+
+    pub mod enum_analyzer;
+    pub use enum_analyzer::*;
+
+    pub mod interface_analyzer;
+    pub use interface_analyzer::*;
+
+    pub mod module_analyzer;
+    pub use module_analyzer::*;
+
+    pub mod state_machine_analyzer;
+    pub use state_machine_analyzer::*;
+
+    pub mod template_expand_analyzer;
+    pub use template_expand_analyzer::*;
+
+    pub mod tlm_packet_set_analyzer;
+    pub use tlm_packet_set_analyzer::*;
+
+    pub mod topology_analyzer;
+    pub use topology_analyzer::*;
+
+    pub mod type_expression_analyzer;
+    pub use type_expression_analyzer::*;
 
     pub mod use_analyzer;
     pub use use_analyzer::*;
@@ -231,11 +255,17 @@ pub mod semantics {
     mod scope;
     pub use scope::*;
 
+    mod nested_scope;
+    pub use nested_scope::*;
+
+    mod name_symbol_map;
+    pub use name_symbol_map::*;
+
     mod template_expansion;
     pub use template_expansion::*;
 
-    mod name_groups;
-    pub use name_groups::*;
+    mod name_group;
+    pub use name_group::*;
 
     mod use_def_matching;
     pub use use_def_matching::*;
@@ -255,9 +285,8 @@ pub mod semantics {
     pub mod interned_def;
     pub use interned_def::*;
 
-    mod generic_name_symbol_map;
-    mod generic_nested_scope;
     mod generic_scope;
+    pub(crate) use generic_scope::{GenericNameSymbolMap, GenericNestedScope, GenericScope};
 
     #[cfg(test)]
     mod format_spec;

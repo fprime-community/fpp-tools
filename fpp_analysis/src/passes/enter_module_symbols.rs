@@ -21,7 +21,7 @@ pub(crate) trait EnterModuleSymbols<'ast>:
         let parent_symbol = a.parent_symbol.clone();
 
         let existing_symbol = a
-            .get_scope(a.nested_scope.current())
+            .get_scope(a.nested_scope.inner_scope())
             .get(NameGroup::Value, name);
         let symbol = match existing_symbol {
             Some(symbol @ Symbol::Module(_)) => {
@@ -47,7 +47,7 @@ pub(crate) trait EnterModuleSymbols<'ast>:
                     // Go on with a module symbol that is in no scope, so that the
                     // members of the module are still entered
                     let module = Symbol::Module(Arc::new(def.into()));
-                    a.symbol_scope_map.insert(module.clone(), Scope::new());
+                    a.symbol_scope_map.insert(module.clone(), Scope::empty());
                     module
                 }
             },
@@ -58,8 +58,8 @@ pub(crate) trait EnterModuleSymbols<'ast>:
                 // A module definition resides in all the name groups, the system
                 // name group included (FPP spec, Scoping of Names).
                 let module = Symbol::Module(Arc::new(def.into()));
-                a.symbol_scope_map.insert(module.clone(), Scope::new());
-                for ng in NameGroup::all() {
+                a.symbol_scope_map.insert(module.clone(), Scope::empty());
+                for ng in NameGroup::GROUPS {
                     if let Err(err) = a.symbol_put(ng, module.clone()) {
                         err.emit();
                     }

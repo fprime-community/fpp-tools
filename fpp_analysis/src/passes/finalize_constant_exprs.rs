@@ -320,15 +320,6 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for FinalizeConstantExprs<'ast> {
         self.constant_use_node(a, node.node_id)
     }
 
-    fn implied_constant_use(
-        &self,
-        a: &mut Analysis,
-        node: &Expr,
-        _: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.constant_use_node(a, node.node_id)
-    }
-
     fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
         let Symbol::TemplateConstantArg { param_def, value } = arg else {
             return ControlFlow::Continue(());

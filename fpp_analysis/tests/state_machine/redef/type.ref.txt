@@ -8,8 +8,11 @@
 2 |   type T
   |   ------ previous definition is here
 
- --> [ local path prefix ]/state_machine/redef/type.fpp:1:15
+ --> [ local path prefix ]/state_machine/redef/type.fpp:1:1
   |
-1 | state machine SM {
-  |               ^^ state machine must have initial transition
+1 | / state machine SM {
+2 | |   type T
+3 | |   type T
+4 | | }
+  | |_^ state machine must have initial transition
 

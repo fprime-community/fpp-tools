@@ -59,3 +59,28 @@ fn sizeof_string_2() {
 fn topology_implements() {
     run_test("cycles/topology_implements")
 }
+
+#[test]
+fn tail() {
+    run_test("cycles/tail")
+}
+
+#[test]
+fn template_constant_arg() {
+    run_test("cycles/template_constant_arg")
+}
+
+#[test]
+fn template_type_arg() {
+    run_test("cycles/template_type_arg")
+}
+
+#[test]
+fn template_interface_arg() {
+    run_test("cycles/template_interface_arg")
+}
+
+#[test]
+fn implied_type_use() {
+    run_test("cycles/implied_type_use")
+}

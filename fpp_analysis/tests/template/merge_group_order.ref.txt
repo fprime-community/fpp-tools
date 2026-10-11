@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/template/merge_group_order.fpp:7:3
+  |
+7 |   constant a = 1
+  |   ^^^^^^^^^^^^^^ redefinition of symbol a
+  |
+  = note: expanded at [ local path prefix ]/template/merge_group_order.fpp:10:1
+  |
+ ::: [ local path prefix ]/template/merge_group_order.fpp:4:1
+  |
+4 | constant a = 0
+  | -------------- previous definition is here
+

@@ -8,7 +8,7 @@ use std::ops::ControlFlow;
 /// Analyze uses
 /// This analyzer assumes that CheckUses has already been run to populate the use-def map
 pub struct UseAnalyzer<'ast, V: UseAnalysisPass<'ast, Analysis>> {
-    super_: BasicUseAnalyzer<'ast, Analysis, V>,
+    super_: BasicUseAnalyzer<'ast, V>,
 }
 
 impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Default for UseAnalyzer<'ast, V> {

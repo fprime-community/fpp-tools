@@ -625,7 +625,7 @@ impl std::fmt::Display for PortMatching {
 mod tests {
     use super::Component;
     use crate::semantics::{PortInstance, Symbol, SymbolInterface, state_machine};
-    use crate::{Analysis, add_state_enums, check_semantics, resolve_templates};
+    use crate::{Analysis, CheckSemantics};
     use fpp_ast::SpecialPortInstanceKind;
     use fpp_core::SourceFile;
 
@@ -685,9 +685,11 @@ module M {
             let source = SourceFile::new("component_test.fpp", SRC.to_string());
             let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
             let mut a = Analysis::new();
-            add_state_enums(&mut ast);
-            let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
-            let _ = check_semantics(&mut a, vec![&ast]);
+            let _ = CheckSemantics::tu_list(
+                &mut a,
+                fpp_fs::FsReader {},
+                std::slice::from_mut(&mut ast),
+            );
             let component = a
                 .component_map
                 .values()

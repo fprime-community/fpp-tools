@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/types/state_machine_not_a_type.fpp:5:15
+  |
+5 | array T = [3] S
+  |               ^ invalid use of symbol S: not a type symbol
+  |
+ ::: [ local path prefix ]/types/state_machine_not_a_type.fpp:4:1
+  |
+4 | state machine S { initial enter A; state A }
+  | -------------------------------------------- symbol is defined here
+

@@ -1,8 +1,9 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
+use crate::analyzers::analyzer::Analyzer;
+use crate::analyzers::module_analyzer::ModuleAnalyzer;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::QualifiedName;
-use fpp_ast::{DefModule, DefModuleTemplate, SpecLoc, SpecTemplateExpand, Visitor, Walkable};
+use fpp_ast::{DefModuleTemplate, Node, SpecLoc, Visitor, Walkable};
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -14,23 +15,8 @@ impl<'ast> Visitor<'ast> for BuildSpecLocMap {
     type Break = ();
     type State = Analysis;
 
-    fn visit_def_module(
-        &self,
-        a: &mut Self::State,
-        node: &'ast DefModule,
-    ) -> ControlFlow<Self::Break> {
-        a.scope_name_list.insert(0, node.name.data.clone());
-        let result = node.walk(a, self);
-        a.scope_name_list.remove(0);
-        result
-    }
-
-    fn visit_spec_template_expand(
-        &self,
-        a: &mut Self::State,
-        node: &'ast SpecTemplateExpand,
-    ) -> ControlFlow<Self::Break> {
-        visit_expansion(self, a, node)
+    fn super_visit(&self, a: &mut Self::State, node: Node<'ast>) -> ControlFlow<Self::Break> {
+        ModuleAnalyzer::new().visit(self, a, node)
     }
 
     /// A location specifier in the body of a template is analyzed at the point of

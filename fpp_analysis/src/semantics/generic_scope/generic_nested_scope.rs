@@ -45,7 +45,7 @@ impl<L: Clone> GenericNestedScope<L> {
     }
 
     /// Get the innermost nested scope
-    pub fn current(&self) -> &L {
+    pub fn inner_scope(&self) -> &L {
         self.0.last().expect("empty scope stack")
     }
 

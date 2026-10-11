@@ -8,8 +8,11 @@
 2 |   state S
   |   ------- previous definition is here
 
- --> [ local path prefix ]/state_machine/redef/state.fpp:1:15
+ --> [ local path prefix ]/state_machine/redef/state.fpp:1:1
   |
-1 | state machine M {
-  |               ^ state machine must have initial transition
+1 | / state machine M {
+2 | |   state S
+3 | |   state S
+4 | | }
+  | |_^ state machine must have initial transition
 

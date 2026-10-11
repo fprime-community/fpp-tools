@@ -46,7 +46,7 @@ impl StateMachineAnalysisVisitor for EnterStateMachineSymbols {
         // Enter the state symbol into the enclosing scope
         self.visit_node(sma, symbol.clone(), &[StateMachineNameGroup::State])?;
         // Push a new scope for the state members and set the parent state
-        sma.nested_scope.push(StateMachineScope::new());
+        sma.nested_scope.push(StateMachineScope::empty());
         sma.parent_state = Some(symbol.clone());
         state_analyzer::def_state(self, sma, node)?;
         // Save the state scope and pop it off the stack

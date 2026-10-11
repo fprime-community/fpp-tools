@@ -3,8 +3,11 @@
 6 |   struct S2 { x: S1 format "{.3f}" }
   |                             ^^^^^ invalid format string: struct S1 is not a floating-point type
 
- --> [ local path prefix ]/state_machine/types/struct_format_not_numeric.fpp:4:15
+ --> [ local path prefix ]/state_machine/types/struct_format_not_numeric.fpp:4:1
   |
-4 | state machine SM {
-  |               ^^ state machine must have initial transition
+4 | / state machine SM {
+5 | |   struct S1 { x: U32, y: string }
+6 | |   struct S2 { x: S1 format "{.3f}" }
+7 | | }
+  | |_^ state machine must have initial transition
 

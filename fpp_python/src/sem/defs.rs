@@ -77,6 +77,7 @@ fpp_python_macros::fpp_sem_bindings! {
             get_template_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
             get_topology(id: node) throws(SemanticError) -> opt(entity(Topology)),
             get_topology_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
+            implied_uses(node: node) -> opt(entity(ImpliedUseSet)),
             lookup_scope(symbol: ref union(Symbol)) -> opt(entity(Scope)),
             nested_scope_at(symbol: ref union(Symbol)) -> entity(NestedScope),
             template_expansion_params(node: node) -> opt(list(union(Symbol))),
@@ -875,7 +876,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Scope native fpp_analysis::semantics::Scope {
+    entity Scope native fpp_analysis::semantics::Scope repr display {
     }
 
     entity StateMachine native fpp_analysis::semantics::StateMachine {
@@ -946,7 +947,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity StateMachineScope native fpp_analysis::semantics::state_machine::StateMachineScope {
+    entity StateMachineScope native fpp_analysis::semantics::state_machine::StateMachineScope repr display {
     }
 
     entity TemplateExpansion native fpp_analysis::semantics::TemplateExpansion {

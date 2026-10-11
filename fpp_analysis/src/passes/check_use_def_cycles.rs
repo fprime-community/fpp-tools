@@ -25,19 +25,6 @@ impl<'ast> CheckUseDefCycles<'ast> {
         }
     }
 
-    /// Visit a definition node with the symbol entered for it
-    fn visit_def(
-        &self,
-        a: &mut Analysis,
-        symbol: Option<Symbol>,
-        node: Node<'ast>,
-    ) -> ControlFlow<()> {
-        match symbol {
-            Some(symbol) => self.visit_def_post(a, symbol, |s, a| s.super_visit(a, node)),
-            None => ControlFlow::Continue(()),
-        }
-    }
-
     fn error(&self, a: &Analysis, symbol: &Symbol) {
         SemanticError::UseDefCycle {
             loc: symbol.get_loc(),
@@ -121,36 +108,15 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         self.super_.visit(self, a, node)
     }
 
-    /// Check the translation units for cycles. The pass only checks the
-    /// model: the symbols it visits are not visited for the later passes.
-    fn visit_trans_units(
-        &self,
-        a: &mut Analysis,
-        i: impl Iterator<Item = &'ast TransUnit>,
-    ) -> ControlFlow<Self::Break> {
-        let visited_symbol_set = a.visited_symbol_set.clone();
-        let use_def_symbol_set = a.use_def_symbol_set.clone();
-        let use_def_matching_list = a.use_def_matching_list.clone();
-        let mut res = ControlFlow::Continue(());
-        for tu in i {
-            res = self.visit_trans_unit(a, tu);
-            if res.is_break() {
-                break;
-            }
-        }
-        a.visited_symbol_set = visited_symbol_set;
-        a.use_def_symbol_set = use_def_symbol_set;
-        a.use_def_matching_list = use_def_matching_list;
-        res
-    }
-
     fn visit_def_alias_type(
         &self,
         a: &mut Self::State,
         node: &'ast DefAliasType,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
-        self.visit_def(a, symbol, Node::DefAliasType(node))
+        let symbol = a
+            .get_symbol(node)
+            .expect("definition should be entered by EnterSymbols");
+        self.visit_def_post(a, symbol, |s, a| s.super_visit(a, Node::DefAliasType(node)))
     }
 
     fn visit_def_array(
@@ -158,8 +124,10 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         a: &mut Self::State,
         node: &'ast DefArray,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
-        self.visit_def(a, symbol, Node::DefArray(node))
+        let symbol = a
+            .get_symbol(node)
+            .expect("definition should be entered by EnterSymbols");
+        self.visit_def_post(a, symbol, |s, a| s.super_visit(a, Node::DefArray(node)))
     }
 
     fn visit_def_constant(
@@ -167,13 +135,17 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         a: &mut Self::State,
         node: &'ast DefConstant,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
-        self.visit_def(a, symbol, Node::DefConstant(node))
+        let symbol = a
+            .get_symbol(node)
+            .expect("definition should be entered by EnterSymbols");
+        self.visit_def_post(a, symbol, |s, a| s.super_visit(a, Node::DefConstant(node)))
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
-        self.visit_def(a, symbol, Node::DefEnum(node))
+        let symbol = a
+            .get_symbol(node)
+            .expect("definition should be entered by EnterSymbols");
+        self.visit_def_post(a, symbol, |s, a| s.super_visit(a, Node::DefEnum(node)))
     }
 
     fn visit_def_enum_constant(
@@ -181,8 +153,12 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         a: &mut Self::State,
         node: &'ast DefEnumConstant,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
-        self.visit_def(a, symbol, Node::DefEnumConstant(node))
+        let symbol = a
+            .get_symbol(node)
+            .expect("definition should be entered by EnterSymbols");
+        self.visit_def_post(a, symbol, |s, a| {
+            s.super_visit(a, Node::DefEnumConstant(node))
+        })
     }
 
     fn visit_def_struct(
@@ -190,8 +166,10 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         a: &mut Self::State,
         node: &'ast DefStruct,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
-        self.visit_def(a, symbol, Node::DefStruct(node))
+        let symbol = a
+            .get_symbol(node)
+            .expect("definition should be entered by EnterSymbols");
+        self.visit_def_post(a, symbol, |s, a| s.super_visit(a, Node::DefStruct(node)))
     }
 
     fn visit_def_topology(
@@ -199,8 +177,10 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         a: &mut Self::State,
         node: &'ast DefTopology,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
-        self.visit_def(a, symbol, Node::DefTopology(node))
+        let symbol = a
+            .get_symbol(node)
+            .expect("definition should be entered by EnterSymbols");
+        self.visit_def_post(a, symbol, |s, a| s.super_visit(a, Node::DefTopology(node)))
     }
 
     fn visit_def_interface(
@@ -208,8 +188,10 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         a: &mut Self::State,
         node: &'ast DefInterface,
     ) -> ControlFlow<Self::Break> {
-        let symbol = a.get_symbol(node);
-        self.visit_def(a, symbol, Node::DefInterface(node))
+        let symbol = a
+            .get_symbol(node)
+            .expect("definition should be entered by EnterSymbols");
+        self.visit_def_post(a, symbol, |s, a| s.super_visit(a, Node::DefInterface(node)))
     }
 }
 
@@ -259,9 +241,9 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUseDefCycles<'ast> {
     fn type_use(
         &self,
         a: &mut Analysis,
-        node: &QualIdent,
+        node: &TypeName,
         use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        self.visit_use(a, node.id(), use_)
+        self.visit_use(a, node.node_id, use_)
     }
 }

@@ -2,7 +2,7 @@ use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::basic_use_analyzer::{BasicUseAnalyzer, UseAnalysisPass, visit_template_arg};
 use crate::passes::compute_dependencies::ComputeDependencies;
-use crate::semantics::{ImpliedUseKind, QualifiedName, Symbol};
+use crate::semantics::{QualifiedName, Symbol};
 use fpp_ast::*;
 use fpp_core::{Error, File, FileReader, SourceFile, Spanned};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -63,7 +63,7 @@ impl<'ast> Visitor<'ast> for CollectTemplateExpansions {
 /// `expanded_template_names` is the set of names of the module templates that
 /// those translation units expand.
 struct TuAnalyzer<'ast, 'r, Reader: FileReader> {
-    super_: BasicUseAnalyzer<'ast, Analysis, Self>,
+    super_: BasicUseAnalyzer<'ast, Self>,
     reader: &'r Reader,
     expanded_template_names: HashSet<String>,
 }
@@ -93,14 +93,8 @@ impl<'ast, Reader: FileReader> Visitor<'ast> for TuAnalyzer<'ast, '_, Reader> {
         a: &mut Analysis,
         node: &'ast DefTopology,
     ) -> ControlFlow<Self::Break> {
-        // Add dependencies based on explicit and implicit uses in the topology.
-        // The implied uses and the implements clause are in the scope that
-        // encloses the topology, and the members are in the topology's scope.
-        self.visit_implied_uses(a, node.node_id)?;
-        for implements in &node.implements {
-            self.interface_use(a, implements, implements.into())?;
-        }
-        self.scoped(a, &node.name.data, |a| node.members.visit(a, self))?;
+        // Add dependencies based on explicit and implicit uses in the topology
+        self.super_.visit(self, a, Node::DefTopology(node))?;
         // Add dependencies based on dictionary specifiers
         if node.is_deployment && !a.include_dictionary_deps {
             // This is the first deployment topology we have visited.
@@ -150,42 +144,6 @@ impl<'ast, Reader: FileReader> Visitor<'ast> for TuAnalyzer<'ast, '_, Reader> {
             }
         }
         ControlFlow::Continue(())
-    }
-
-    // The members of a module, a component and a state machine are in the scope
-    // of their definition
-
-    fn visit_def_module(
-        &self,
-        a: &mut Analysis,
-        node: &'ast DefModule,
-    ) -> ControlFlow<Self::Break> {
-        self.scoped(a, &node.name.data, |a| {
-            self.super_.visit(self, a, Node::DefModule(node))
-        })
-    }
-
-    fn visit_def_component(
-        &self,
-        a: &mut Analysis,
-        node: &'ast DefComponent,
-    ) -> ControlFlow<Self::Break> {
-        self.scoped(a, &node.name.data, |a| {
-            self.super_.visit(self, a, Node::DefComponent(node))
-        })
-    }
-
-    fn visit_def_state_machine(
-        &self,
-        a: &mut Analysis,
-        node: &'ast DefStateMachine,
-    ) -> ControlFlow<Self::Break> {
-        if node.members.is_none() {
-            return self.super_.visit(self, a, Node::DefStateMachine(node));
-        }
-        self.scoped(a, &node.name.data, |a| {
-            self.super_.visit(self, a, Node::DefStateMachine(node))
-        })
     }
 }
 
@@ -259,40 +217,13 @@ impl<'ast, Reader: FileReader> UseAnalysisPass<'ast, Analysis> for TuAnalyzer<'a
     fn type_use(
         &self,
         a: &mut Analysis,
-        node: &QualIdent,
+        node: &TypeName,
         use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        self.analyze_use(a, SpecLocKind::Type, use_, node.is_absolute())
-    }
-
-    /// An implied use names a definition by its fully qualified name
-    fn implied_constant_use(
-        &self,
-        a: &mut Analysis,
-        _node: &Expr,
-        use_: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.analyze_constant_use(a, use_, true)
-    }
-
-    /// An implied use names a definition by its fully qualified name
-    fn implied_port_use(
-        &self,
-        a: &mut Analysis,
-        _node: &QualIdent,
-        use_: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.analyze_use(a, SpecLocKind::Port, use_, true)
-    }
-
-    /// An implied use names a definition by its fully qualified name
-    fn implied_type_use(
-        &self,
-        a: &mut Analysis,
-        _node: &QualIdent,
-        use_: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.analyze_use(a, SpecLocKind::Type, use_, true)
+        let is_absolute = node
+            .get_is_absolute_opt()
+            .expect("a type use is a qualified identifier");
+        self.analyze_use(a, SpecLocKind::Type, use_, is_absolute)
     }
 
     fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
@@ -438,34 +369,6 @@ impl<'ast, 'r, Reader: FileReader> TuAnalyzer<'ast, 'r, Reader> {
         } else {
             self.analyze_use(a, SpecLocKind::Type, qualifier.into(), is_absolute)
         }
-    }
-
-    /// Visit the implied uses recorded at an AST node
-    fn visit_implied_uses(&self, a: &mut Analysis, id: fpp_core::Node) -> ControlFlow<()> {
-        for iu in a.get_implied_uses(ImpliedUseKind::Constant, id) {
-            self.implied_constant_use(a, &iu.as_expr_node(), iu.name().clone())?;
-        }
-        for iu in a.get_implied_uses(ImpliedUseKind::Port, id) {
-            self.implied_port_use(a, &iu.as_qual_ident_node(), iu.name().clone())?;
-        }
-        for iu in a.get_implied_uses(ImpliedUseKind::Type, id) {
-            self.implied_type_use(a, &iu.as_qual_ident_node(), iu.name().clone())?;
-        }
-        ControlFlow::Continue(())
-    }
-
-    /// Visit the members of a definition with its name pushed onto the scope
-    /// name list
-    fn scoped(
-        &self,
-        a: &mut Analysis,
-        name: &str,
-        visit: impl FnOnce(&mut Analysis) -> ControlFlow<()>,
-    ) -> ControlFlow<()> {
-        a.scope_name_list.insert(0, name.to_string());
-        let result = visit(a);
-        a.scope_name_list.remove(0);
-        result
     }
 }
 

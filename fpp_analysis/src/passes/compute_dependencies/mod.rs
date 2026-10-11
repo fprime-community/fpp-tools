@@ -8,9 +8,9 @@ mod framework;
 pub use framework::*;
 
 use crate::Analysis;
-use crate::passes::ConstructImpliedUseMap;
+use crate::passes::{ConstructImpliedUseMap, ReaderRef};
 use fpp_ast::{TransUnit, Visitor};
-use fpp_core::{Error, FileReader, SourceFile};
+use fpp_core::FileReader;
 use std::ops::ControlFlow;
 
 /// Compute dependencies for a list of translation units
@@ -49,19 +49,5 @@ impl<'r, Reader: FileReader> ComputeDependencies<'r, Reader> {
         a.dependency_file_set
             .retain(|f| !included_file_set.contains(f));
         ControlFlow::Continue(())
-    }
-}
-
-/// A borrowed [`FileReader`], for a [`fpp_parser::ResolveIncludes`], which takes
-/// its reader by value
-struct ReaderRef<'r, Reader: FileReader>(&'r Reader);
-
-impl<Reader: FileReader> FileReader for ReaderRef<'_, Reader> {
-    fn resolve(&self, current: SourceFile, include: &str) -> Result<String, Error> {
-        self.0.resolve(current, include)
-    }
-
-    fn read(&self, path: &str) -> Result<String, Error> {
-        self.0.read(path)
     }
 }

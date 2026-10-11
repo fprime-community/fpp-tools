@@ -271,12 +271,7 @@ fn a_use_of_a_constant_parameter_resolves_to_the_bound_argument() {
 fn a_use_of_a_type_parameter_resolves_to_the_bound_argument() {
     with_analysis(MODEL, |a, ast| {
         let def = alias_type_at(ast, "M2.Alias");
-        let qual_ident = match &def.type_name.kind {
-            fpp_ast::TypeNameKind::QualIdent(q) => q,
-            other => panic!("expected a qualified identifier type name, got {other:?}"),
-        };
-        use fpp_ast::AstNode;
-        match a.use_def_map.get(&qual_ident.id()) {
+        match a.use_def_map.get(&def.type_name.node_id) {
             Some(Symbol::TemplateTypeArg { param_def, value }) => {
                 assert_eq!(param_def.name.data, "Ty");
                 assert!(matches!(

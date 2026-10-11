@@ -33,8 +33,15 @@ impl<'ast> CheckTypeUses<'ast> {
         }
     }
 
-    fn visit_use(&self, a: &mut Analysis, node: &QualIdent) -> ControlFlow<()> {
-        let symbol = match a.use_def_map.get(&node.id()) {
+    /// Visit the definition a type use refers to, and give the type name the
+    /// type of the definition.
+    ///
+    /// A symbol that is not a type definition or a type parameter is rejected
+    /// before its node is looked up in the type map. A state machine is in the
+    /// type name group, and the implied use of its state enum gives its node
+    /// a type.
+    fn visit_use(&self, a: &mut Analysis, node: &TypeName) -> ControlFlow<()> {
+        let symbol = match a.use_def_map.get(&node.node_id) {
             // The use did not resolve, which CheckUses reported
             None => return ControlFlow::Continue(()),
             Some(symbol) => symbol.clone(),
@@ -66,7 +73,7 @@ impl<'ast> CheckTypeUses<'ast> {
         };
 
         if let Some(ty) = a.type_map.get(&symbol.node()).cloned() {
-            a.assign_type(node.id(), ty);
+            a.assign_type(node.node_id, ty);
         }
 
         ControlFlow::Continue(())
@@ -243,14 +250,6 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         })
     }
 
-    fn visit_expr(&self, a: &mut Self::State, node: &'ast Expr) -> ControlFlow<Self::Break> {
-        // Expressions are not type uses, so we do not delegate to the use
-        // analyzer chain. We still walk sub-expressions so that a `sizeof(T)`
-        // nested anywhere in an expression has its type name resolved by
-        // `visit_type_name`.
-        node.walk(a, self)
-    }
-
     fn visit_type_name(
         &self,
         a: &mut Self::State,
@@ -260,16 +259,15 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
             TypeNameKind::Bool => Type::Boolean,
             TypeNameKind::Floating(kind) => Type::Float(*kind),
             TypeNameKind::Integer(kind) => Type::PrimitiveInt(*kind),
-            TypeNameKind::QualIdent(qi) => {
+            TypeNameKind::QualIdent(_) => {
                 self.super_visit(a, Node::TypeName(node))?;
-                let t = match a.type_map.get(&qi.id()) {
-                    Some(t) => t.clone(),
-                    // The type use did not resolve. Map it to the shared
-                    // unknown type so every type name has an entry and later
-                    // passes can read a resolved type unconditionally.
-                    None => a.unknown_type(node.span()),
-                };
-                a.assign_type(node.node_id, t);
+                // The type use did not resolve. Map it to the shared unknown
+                // type so every type name has an entry and later passes can
+                // read a resolved type unconditionally.
+                if !a.type_map.contains_key(&node.node_id) {
+                    let t = a.unknown_type(node.span());
+                    a.assign_type(node.node_id, t);
+                }
                 return ControlFlow::Continue(());
             }
             TypeNameKind::String(_) => {
@@ -287,7 +285,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckTypeUses<'ast> {
     fn type_use(
         &self,
         a: &mut Analysis,
-        node: &QualIdent,
+        node: &TypeName,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.visit_use(a, node)
