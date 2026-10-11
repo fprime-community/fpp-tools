@@ -1,9 +1,7 @@
  --> [ local path prefix ]/record/id_not_numeric.fpp:3:28
   |
 3 |   product record R: U32 id "abc"
-  |                            ^^^^^ cannot convert expression to integer
-  |
-  = note: string cannot be converted to Integer
+  |                            ^^^^^ cannot convert string to a numeric type
 
  --> [ local path prefix ]/record/id_not_numeric.fpp:1:1
   |

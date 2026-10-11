@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/expr/dot_anon_struct_member_error.fpp:3:16
+  |
+3 | constant c = s.b
+  |                ^ no member b in anonymous struct value
+  |
+ ::: [ local path prefix ]/expr/dot_anon_struct_member_error.fpp:2:1
+  |
+2 | constant s = { a = 1 }
+  | ---------------------- symbol is defined here
+

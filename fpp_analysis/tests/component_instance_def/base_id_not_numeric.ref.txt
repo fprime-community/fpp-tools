@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/component_instance_def/base_id_not_numeric.fpp:3:23
+  |
+3 | instance c: C base id "a"
+  |                       ^^^ cannot convert string to a numeric type
+

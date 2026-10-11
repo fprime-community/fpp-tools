@@ -1,5 +1,10 @@
- --> [ local path prefix ]/expr/sizeof_error.fpp:3:14
+ --> [ local path prefix ]/expr/sizeof_error.fpp:3:21
   |
 3 | constant a = sizeof(T)
-  |              ^^^^^^^^^ size of type T is not known in the model
+  |                     ^ size of type T is not known in the model
+  |
+ ::: [ local path prefix ]/expr/sizeof_error.fpp:1:1
+  |
+1 | type T
+  | ------ type is defined here
 

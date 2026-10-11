@@ -1,7 +1,7 @@
  --> [ local path prefix ]/array/default_shadowed_error.fpp:7:27
   |
 7 |   array A = [3] S default [ s, s, s ]
-  |                           ^^^^^^^^^^^ default value cannot be converted to array A
+  |                           ^^^^^^^^^^^ cannot convert [3] { x: Integer, e: enum E } to array A
   |
   = note: array element type cannot be converted
   = note: no member `x` in the struct type

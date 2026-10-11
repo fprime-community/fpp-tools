@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/subscript_index_numeric_order_error.fpp:2:14
+  |
+2 | constant c = 1[-true]
+  |              ^ Integer is not an array type
+

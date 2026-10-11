@@ -109,3 +109,18 @@ fn shadowed_error() {
 fn shadowed_ok() {
     run_test("component_instance_def/shadowed_ok")
 }
+
+#[test]
+fn base_id_not_numeric() {
+    run_test("component_instance_def/base_id_not_numeric")
+}
+
+#[test]
+fn queue_size_not_numeric() {
+    run_test("component_instance_def/queue_size_not_numeric")
+}
+
+#[test]
+fn cpu_not_numeric() {
+    run_test("component_instance_def/cpu_not_numeric")
+}

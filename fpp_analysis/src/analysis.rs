@@ -1,9 +1,10 @@
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
     Component, ComponentInstance, Dictionary, FppSystem, FrameworkDefinitions, ImpliedUse,
-    ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, NameGroup, NestedScope, QualifiedName,
-    Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion, TlmPacketSet, Topology, Type,
-    UseDefMatching, Value, state_machine::StateMachine,
+    ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, MathError, MathResult, NameGroup,
+    NestedScope, QualifiedName, Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion,
+    TlmPacketSet, Topology, Type, TypeConversionError, UseDefMatching, Value,
+    state_machine::StateMachine,
 };
 use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc};
 use fpp_core::{File, SourceFile, Span, Spanned};
@@ -270,6 +271,179 @@ impl Analysis {
     /// Add a value to the value map
     pub fn assign_value(&mut self, node: fpp_core::Node, value: Value) {
         self.value_map.insert(node, value);
+    }
+
+    /// Compute the common type for a list of node Ids
+    pub(crate) fn common_type(
+        &self,
+        nodes: &[fpp_core::Node],
+        empty_list_error: SemanticError,
+    ) -> SemanticResult<Arc<Type>> {
+        let Some((first_node_id, rest)) = nodes.split_first() else {
+            return Err(empty_list_error);
+        };
+        let mut prev_node_id = *first_node_id;
+        let mut prev_type = self.type_map[first_node_id].clone();
+        for node_id in rest {
+            let current_type = &self.type_map[node_id];
+            let loc = prev_node_id.span();
+            prev_type = Analysis::common_type_of_types(&prev_type, current_type, loc)?;
+            prev_node_id = *node_id;
+        }
+        Ok(prev_type)
+    }
+
+    /// Compute the common type for two node Ids
+    pub(crate) fn common_type_of_pair(
+        &self,
+        id1: fpp_core::Node,
+        id2: fpp_core::Node,
+        error_loc: Span,
+    ) -> SemanticResult<Arc<Type>> {
+        let t1 = &self.type_map[&id1];
+        let t2 = &self.type_map[&id2];
+        Analysis::common_type_of_types(t1, t2, error_loc)
+    }
+
+    /// Add two nodes
+    ///
+    /// Integer values are `i128`, so an integer result that does not fit is an
+    /// error at `loc`, the location of the operation.
+    pub(crate) fn add(
+        &self,
+        id1: fpp_core::Node,
+        id2: fpp_core::Node,
+        loc: Span,
+    ) -> SemanticResult<Value> {
+        let v1 = &self.value_map[&id1];
+        let v2 = &self.value_map[&id2];
+        Analysis::arithmetic_result(v1.add(v2), loc, "addition failed")
+    }
+
+    /// Subtract one node from another
+    pub(crate) fn sub(
+        &self,
+        id1: fpp_core::Node,
+        id2: fpp_core::Node,
+        loc: Span,
+    ) -> SemanticResult<Value> {
+        let v1 = &self.value_map[&id1];
+        let v2 = &self.value_map[&id2];
+        Analysis::arithmetic_result(v1.sub(v2), loc, "subtraction failed")
+    }
+
+    /// Multiply two nodes
+    pub(crate) fn mul(
+        &self,
+        id1: fpp_core::Node,
+        id2: fpp_core::Node,
+        loc: Span,
+    ) -> SemanticResult<Value> {
+        let v1 = &self.value_map[&id1];
+        let v2 = &self.value_map[&id2];
+        Analysis::arithmetic_result(v1.mul(v2), loc, "multiplication failed")
+    }
+
+    /// Divide one node by another
+    pub(crate) fn div(
+        &self,
+        id1: fpp_core::Node,
+        id2: fpp_core::Node,
+        loc: Span,
+    ) -> SemanticResult<Value> {
+        let v1 = &self.value_map[&id1];
+        let v2 = &self.value_map[&id2];
+        if v2.is_zero() {
+            let loc = id2.span();
+            Err(SemanticError::DivisionByZero { loc })
+        } else {
+            Analysis::arithmetic_result(v1.div(v2), loc, "division failed")
+        }
+    }
+
+    /// Left shift an integer value
+    pub(crate) fn lshift(
+        &self,
+        id1: fpp_core::Node,
+        id2: fpp_core::Node,
+        loc: Span,
+    ) -> SemanticResult<Value> {
+        self.shift(id1, id2, loc, Value::shl, "left shift")
+    }
+
+    /// Right shift an integer value
+    pub(crate) fn rshift(
+        &self,
+        id1: fpp_core::Node,
+        id2: fpp_core::Node,
+        loc: Span,
+    ) -> SemanticResult<Value> {
+        self.shift(id1, id2, loc, Value::shr, "right shift")
+    }
+
+    /// Helper method to shift v1 by v2, checking that v2 is a valid shift amount
+    ///
+    /// A shift operand of an integer type may hold a floating-point value:
+    /// negating a value of an alias of a floating-point type has type Integer.
+    /// Such an operand is an error, as an operand of a floating-point type is.
+    fn shift(
+        &self,
+        id1: fpp_core::Node,
+        id2: fpp_core::Node,
+        loc: Span,
+        op: fn(&Value, &Value) -> MathResult,
+        op_name: &str,
+    ) -> SemanticResult<Value> {
+        let v1 = &self.value_map[&id1];
+        let v2 = &self.value_map[&id2];
+        let not_an_integer = |id: fpp_core::Node, v: &Value| SemanticError::InvalidType {
+            loc: id.span(),
+            msg: format!("{} is not an integer or enum type", v.get_type()),
+            notes: vec![],
+        };
+
+        let Some(shift_amount) = v2.as_shift_int() else {
+            return Err(not_an_integer(id2, v2));
+        };
+
+        if !(0..=255).contains(&shift_amount) {
+            let loc = id2.span();
+            Err(SemanticError::InvalidShiftAmount { loc })
+        } else {
+            match op(v1, v2) {
+                Ok(v) => Ok(v),
+                Err(MathError::InvalidInputs) => Err(not_an_integer(id1, v1)),
+                Err(MathError::ShiftOverflow) => Err(SemanticError::InvalidIntValue {
+                    loc,
+                    v: None,
+                    msg: "shift result is too large to represent".to_string(),
+                }),
+                Err(_) => panic!("internal error: {op_name} failed"),
+            }
+        }
+    }
+
+    /// Negate a value
+    ///
+    /// `loc` is the location of the negation, where a result that does not fit
+    /// in an `i128` is reported.
+    pub(crate) fn neg(&self, id: fpp_core::Node, loc: Span) -> SemanticResult<Value> {
+        let v = &self.value_map[&id];
+        Analysis::arithmetic_result(v.negate(), loc, "negation failed")
+    }
+
+    /// The value computed by an arithmetic operation at `loc`. The operands of
+    /// an operation that type checks are numbers, or strings for addition.
+    fn arithmetic_result(result: MathResult, loc: Span, failure: &str) -> SemanticResult<Value> {
+        match result {
+            Ok(v) => Ok(v),
+            Err(MathError::Overflow) => Err(SemanticError::InvalidIntValue {
+                loc,
+                v: None,
+                msg: "arithmetic result is too large to represent".to_string(),
+            }),
+            Err(_) => panic!("internal error: {failure}"),
+        }
     }
 
     /// Gets the finalized type of a type-name use node.
@@ -606,7 +780,11 @@ impl Analysis {
             Err(reason) => Err(SemanticError::TypeMismatch {
                 loc,
                 msg: format!("cannot convert {} to {}", from, to),
-                reason: Some(Box::new(reason)),
+                reason: match reason {
+                    // The message already names the two types
+                    TypeConversionError::Mismatch { .. } => None,
+                    reason => Some(Box::new(reason)),
+                },
             }),
         }
     }
@@ -666,6 +844,22 @@ impl Analysis {
             }
         }
         Ok(())
+    }
+
+    /// Compute the common type for two types
+    pub(crate) fn common_type_of_types(
+        t1: &Arc<Type>,
+        t2: &Arc<Type>,
+        error_loc: Span,
+    ) -> SemanticResult<Arc<Type>> {
+        match Type::common_type(t1, t2) {
+            None => Err(SemanticError::TypeMismatch {
+                loc: error_loc,
+                msg: format!("cannot compute common type of {} and {}", t1, t2),
+                reason: None,
+            }),
+            Some(t) => Ok(t),
+        }
     }
 
     /// Check that a formal parameter list has no duplicate parameter names.

@@ -732,28 +732,39 @@ fn type_predicates_and_helpers() {
         let alias_enum = alias_type("AE", default_enum(), 603);
         let alias_arr = alias_type("AA", anon_array(Some(3), i32()), 604);
 
-        // is_int / is_float / is_numeric / is_primitive through aliases
-        assert!(alias_i32.is_int());
-        assert!(alias_f32.is_float());
-        assert!(alias_i32.is_numeric());
-        assert!(alias_i32.is_primitive());
-        assert!(alias_bool.is_primitive());
-        assert!(!alias_arr.is_primitive());
+        // is_int / is_float / is_numeric / is_primitive: an alias type is none
+        // of these, and its underlying type answers for the aliased type
+        assert!(!alias_i32.is_int());
+        assert!(!alias_f32.is_float());
+        assert!(!alias_i32.is_numeric());
+        assert!(!alias_i32.is_primitive());
+        assert!(!alias_bool.is_primitive());
+        assert!(Type::underlying_type(&alias_i32).is_int());
+        assert!(Type::underlying_type(&alias_f32).is_float());
+        assert!(Type::underlying_type(&alias_i32).is_numeric());
+        assert!(Type::underlying_type(&alias_bool).is_primitive());
+        assert!(!Type::underlying_type(&alias_arr).is_primitive());
 
-        // is_convertible_to_numeric: enums (and aliases of enums) are convertible
-        assert!(alias_enum.is_convertible_to_numeric());
+        // is_convertible_to_numeric: numeric types and enums are convertible;
+        // an alias of an enum is not, though its underlying type is
+        assert!(!alias_enum.is_convertible_to_numeric());
+        assert!(Type::underlying_type(&alias_enum).is_convertible_to_numeric());
         assert!(default_enum().is_convertible_to_numeric());
         assert!(!string(None).is_convertible_to_numeric());
 
-        // is_promotable_to_array: numeric/bool/string/enum yes; abs type no
+        // is_promotable_to_array: numeric/bool/string/enum yes; abs type and
+        // alias type no
         assert!(i32().is_promotable_to_array());
         assert!(boolean().is_promotable_to_array());
         assert!(string(None).is_promotable_to_array());
         assert!(default_enum().is_promotable_to_array());
         assert!(!default_abs_type().is_promotable_to_array());
+        assert!(!alias_i32.is_promotable_to_array());
 
-        // array_size through alias / array / anon-array; None otherwise
-        assert_eq!(alias_arr.array_size(), Some(3));
+        // array_size of an array or anonymous array; None otherwise, including
+        // for an alias of an array type
+        assert_eq!(alias_arr.array_size(), None);
+        assert_eq!(Type::underlying_type(&alias_arr).array_size(), Some(3));
         assert_eq!(anon_array(Some(5), i32()).array_size(), Some(5));
         assert_eq!(
             array("A", anon_array(Some(2), i32()), 605).array_size(),
@@ -761,7 +772,8 @@ fn type_predicates_and_helpers() {
         );
         assert_eq!(i32().array_size(), None);
 
-        // has_numeric_members: arrays/structs of numerics yes; of strings no
+        // has_numeric_members: arrays/structs of numerics yes; of strings no;
+        // an alias type has numeric members if its underlying type does
         assert!(anon_array(Some(2), i32()).has_numeric_members());
         assert!(anon_struct(&[("x", i32()), ("y", f32())]).has_numeric_members());
         assert!(!anon_struct(&[("x", string(None))]).has_numeric_members());

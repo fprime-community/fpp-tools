@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/expr/neg_enum_error.fpp:3:27
+  |
+3 | struct S { x: E } default { x = -E.A }
+  |                           ^^^^^^^^^^^^ cannot convert { x: Integer } to struct S
+  |
+  = note: struct member `x` type cannot be converted
+  = note: Integer cannot be converted to enum E
+

@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/enums/invalid_constants_multiline.fpp:2:1
+  |
+2 | / enum E {
+3 | |   A = 1
+4 | |   B
+5 | | }
+  | |_^ enum constants must be all explicit or all implied
+

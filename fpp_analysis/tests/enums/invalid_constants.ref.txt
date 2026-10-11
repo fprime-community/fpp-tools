@@ -1,7 +1,5 @@
- --> [ local path prefix ]/enums/invalid_constants.fpp:1:17
+ --> [ local path prefix ]/enums/invalid_constants.fpp:1:1
   |
 1 | enum E { A = 1, B }
-  |                 ^ expected constant value to be explicit
-  |
-  = note: enum constants must be all explicit or all implied
+  | ^^^^^^^^^^^^^^^^^^^ enum constants must be all explicit or all implied
 

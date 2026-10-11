@@ -1,7 +1,5 @@
  --> [ local path prefix ]/structs/size_not_numeric.fpp:1:16
   |
 1 | struct S { x: ["abc"] U32 }
-  |                ^^^^^ cannot convert expression to integer
-  |
-  = note: string cannot be converted to Integer
+  |                ^^^^^ cannot convert string to a numeric type
 

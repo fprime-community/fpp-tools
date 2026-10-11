@@ -1,7 +1,5 @@
  --> [ local path prefix ]/port_instance/bad_priority_product_recv.fpp:9:50
   |
 9 |   async product recv port productRecvIn priority "abc"
-  |                                                  ^^^^^ cannot convert expression to integer
-  |
-  = note: string cannot be converted to Integer
+  |                                                  ^^^^^ cannot convert string to a numeric type
 

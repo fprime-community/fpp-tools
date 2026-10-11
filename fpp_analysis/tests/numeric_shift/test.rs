@@ -16,6 +16,16 @@ fn shift_boolean_value_error() {
 }
 
 #[test]
+fn shift_alias_value_error() {
+    run_test("numeric_shift/shift_alias_value_error")
+}
+
+#[test]
+fn shift_alias_enum_value_error() {
+    run_test("numeric_shift/shift_alias_enum_value_error")
+}
+
+#[test]
 fn shift_float_amount_error() {
     run_test("numeric_shift/shift_float_amount_error")
 }

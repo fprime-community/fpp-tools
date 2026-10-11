@@ -5,7 +5,7 @@ use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::SemanticError;
 use crate::semantics::{
     AnonArrayType, AnonArrayValue, AnonStructType, AnonStructValue, ArrayValue, IntegerValue,
-    PrimitiveIntegerValue, QualifiedName, StructValue, Symbol, SymbolInterface, Type, Value,
+    QualifiedName, StructValue, Symbol, SymbolInterface, Type, Value,
 };
 use fpp_ast::{DefConstant, Expr, ExprKind, Node, Visitable, Visitor};
 use fpp_core::Spanned;
@@ -34,52 +34,16 @@ impl<'ast> FinalizeConstantExprs<'ast> {
         }
     }
 
-    /// The common type of the elements of an array expression
-    fn common_elt_type(&self, a: &Analysis, elts: &[Expr]) -> Result<Arc<Type>, SemanticError> {
-        let Some((first, rest)) = elts.split_first() else {
-            return Err(SemanticError::EmptyArray {
-                loc: elts.first().map_or_else(
-                    || panic!("an array expression with no elements has no location"),
-                    |e| e.span(),
-                ),
-            });
-        };
-        let mut prev = first;
-        let mut common = match a.type_map.get(&first.node_id) {
-            None => return Err(SemanticError::EmptyArray { loc: first.span() }),
-            Some(ty) => ty.clone(),
-        };
-        for elt in rest {
-            let Some(elt_ty) = a.type_map.get(&elt.node_id) else {
-                continue;
-            };
-            match Type::common_type(&common, elt_ty) {
-                Some(ty) => common = ty,
-                None => {
-                    return Err(SemanticError::InvalidType {
-                        loc: prev.span(),
-                        msg: format!(
-                            "cannot compute common type of {} and {}",
-                            common.as_ref(),
-                            elt_ty.as_ref()
-                        ),
-                        notes: vec![],
-                    });
-                }
-            }
-            prev = elt;
-        }
-        Ok(common)
-    }
-
     /// Recompute the type and value of an array expression
-    fn finalize_array(
+    fn expr_array_node(
         &self,
         a: &mut Analysis,
         node: &'ast Expr,
         elts: &'ast [Expr],
     ) -> ControlFlow<()> {
-        let elt_type = match self.common_elt_type(a, elts) {
+        let empty_list_error = SemanticError::EmptyArray { loc: node.span() };
+        let ids: Vec<fpp_core::Node> = elts.iter().map(|e| e.node_id).collect();
+        let elt_type = match a.common_type(&ids, empty_list_error) {
             Ok(ty) => ty,
             Err(err) => {
                 err.emit();
@@ -95,13 +59,13 @@ impl<'ast> FinalizeConstantExprs<'ast> {
                 .filter_map(|e| a.type_map.get(&e.node_id))
                 .map(|ty| ty.to_string())
                 .collect();
-            SemanticError::InvalidType {
+            SemanticError::TypeMismatch {
                 loc: node.span(),
                 msg: format!(
                     "cannot compute common type of array value with elements: {}",
                     type_names.join(", ")
                 ),
-                notes: vec![],
+                reason: None,
             }
             .emit();
             return ControlFlow::Break(());
@@ -131,7 +95,7 @@ impl<'ast> FinalizeConstantExprs<'ast> {
     }
 
     /// Recompute the type and value of an array subscript expression
-    fn finalize_array_subscript(
+    fn expr_array_subscript_node(
         &self,
         a: &mut Analysis,
         node: &'ast Expr,
@@ -144,12 +108,17 @@ impl<'ast> FinalizeConstantExprs<'ast> {
             _ => return ControlFlow::Continue(()),
         };
 
-        let index = match a.value_map.get(&e2.node_id) {
-            Some(Value::PrimitiveInteger(PrimitiveIntegerValue { value, .. })) => *value,
-            Some(Value::Integer(IntegerValue(value))) => *value,
+        // The index is converted to Integer (spec, Array Subscript Expressions)
+        let index = match a
+            .value_map
+            .get(&e2.node_id)
+            .and_then(|v| v.convert(&Arc::new(Type::Integer)))
+        {
+            Some(Value::Integer(IntegerValue(index))) => index,
             _ => return ControlFlow::Continue(()),
         };
 
+        // Check if the index is in bounds
         // For a scalar value promoted to an array, the size is not known until
         // the array type is finalized, so this is the first place where the upper
         // bound can be checked
@@ -193,7 +162,7 @@ impl<'ast> FinalizeConstantExprs<'ast> {
     }
 
     /// Recompute the type and value of a struct member selection
-    fn finalize_dot(
+    fn expr_dot_node(
         &self,
         a: &mut Analysis,
         node: &'ast Expr,
@@ -226,7 +195,7 @@ impl<'ast> FinalizeConstantExprs<'ast> {
     }
 
     /// Recompute the type and value of a struct expression
-    fn finalize_struct(
+    fn expr_struct_node(
         &self,
         a: &mut Analysis,
         node: &'ast Expr,
@@ -256,6 +225,46 @@ impl<'ast> FinalizeConstantExprs<'ast> {
         );
         ControlFlow::Continue(())
     }
+
+    /// Recompute the type and value of a use of a constant symbol
+    fn constant_use_node(&self, a: &mut Analysis, node: fpp_core::Node) -> ControlFlow<()> {
+        let Some(symbol) = a.use_def_map.get(&node).cloned() else {
+            return ControlFlow::Continue(());
+        };
+        match &symbol {
+            // Constant symbol: visit the constant definition to recompute its
+            // type and value
+            Symbol::Constant(def) => {
+                def.visit(a, self)?;
+            }
+            // Enum symbol: if this is in scope, then we are in the enum
+            // definition, so it already has a type and value
+            Symbol::EnumConstant(_) => {}
+            Symbol::TemplateConstantArg { .. } => {
+                self.template_constant_arg(a, &symbol)?;
+            }
+            // Invalid use of a symbol in an expression
+            _ => {
+                SemanticError::InvalidSymbol {
+                    symbol_name: symbol.name().data.clone(),
+                    msg: "not a constant symbol".to_string(),
+                    loc: node.span(),
+                    def_loc: symbol.node().span(),
+                }
+                .emit();
+                return ControlFlow::Break(());
+            }
+        }
+
+        let id = symbol.node();
+        if let Some(ty) = a.type_map.get(&id).cloned() {
+            a.assign_type(node, ty);
+        }
+        if let Some(v) = a.value_map.get(&id).cloned() {
+            a.assign_value(node, v);
+        }
+        ControlFlow::Continue(())
+    }
 }
 
 impl<'ast> Visitor<'ast> for FinalizeConstantExprs<'ast> {
@@ -267,14 +276,20 @@ impl<'ast> Visitor<'ast> for FinalizeConstantExprs<'ast> {
     }
 
     fn visit_expr(&self, a: &mut Analysis, node: &'ast Expr) -> ControlFlow<Self::Break> {
+        // An expression with no value failed to type check or to evaluate, and
+        // that error is already reported
+        if !a.value_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
         self.super_visit(a, Node::Expr(node))?;
         match &node.kind {
-            ExprKind::Array(elts) => self.finalize_array(a, node, elts),
-            ExprKind::ArraySubscript { e1, e2 } => self.finalize_array_subscript(a, node, e1, e2),
-            ExprKind::Dot { e, id } => self.finalize_dot(a, node, e, &id.data),
-            ExprKind::Struct(members) => self.finalize_struct(a, node, members),
-            // Every other kind of expression keeps the type and value it was
-            // given before the type definitions were finalized
+            ExprKind::Array(elts) => self.expr_array_node(a, node, elts),
+            ExprKind::ArraySubscript { e1, e2 } => self.expr_array_subscript_node(a, node, e1, e2),
+            ExprKind::Dot { e, id } => self.expr_dot_node(a, node, e, &id.data),
+            ExprKind::Struct(members) => self.expr_struct_node(a, node, members),
+            // An identifier use was updated by constant_use during super_visit,
+            // and every other kind of expression keeps the type and value it had
+            // before the type definitions were finalized
             _ => ControlFlow::Continue(()),
         }
     }
@@ -302,32 +317,16 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for FinalizeConstantExprs<'ast> {
         node: &Expr,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        let Some(symbol) = a.use_def_map.get(&node.node_id).cloned() else {
-            return ControlFlow::Continue(());
-        };
-        match &symbol {
-            // Constant symbol: visit the constant definition to recompute its
-            // type and value
-            Symbol::Constant(def) => {
-                def.visit(a, self)?;
-            }
-            // Enum symbol: if this is in scope, then we are in the enum
-            // definition, so it already has a type and value
-            Symbol::EnumConstant(_) => {}
-            Symbol::TemplateConstantArg { .. } => {
-                self.template_constant_arg(a, &symbol)?;
-            }
-            _ => return ControlFlow::Continue(()),
-        }
+        self.constant_use_node(a, node.node_id)
+    }
 
-        let id = symbol.node();
-        if let Some(ty) = a.type_map.get(&id).cloned() {
-            a.assign_type(node.node_id, ty);
-        }
-        if let Some(v) = a.value_map.get(&id).cloned() {
-            a.assign_value(node.node_id, v);
-        }
-        ControlFlow::Continue(())
+    fn implied_constant_use(
+        &self,
+        a: &mut Analysis,
+        node: &Expr,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.constant_use_node(a, node.node_id)
     }
 
     fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
@@ -340,7 +339,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for FinalizeConstantExprs<'ast> {
 
         visit_template_arg(self, a, arg)?;
 
-        let Some(ty) = a.get_finalized_type(param_def.type_name.node_id) else {
+        let Some(ty) = a.type_map.get(&param_def.type_name.node_id).cloned() else {
             return ControlFlow::Continue(());
         };
         let Some(v) = a.value_map.get(&value.node_id).cloned() else {
@@ -353,10 +352,10 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for FinalizeConstantExprs<'ast> {
                 ControlFlow::Continue(())
             }
             None => {
-                SemanticError::InvalidType {
+                SemanticError::TypeMismatch {
                     loc,
                     msg: format!("cannot convert value {} to type {}", v, ty),
-                    notes: vec![],
+                    reason: None,
                 }
                 .emit();
                 // The bound parameter has no usable value, so every use of it

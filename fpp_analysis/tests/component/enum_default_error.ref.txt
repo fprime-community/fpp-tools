@@ -1,7 +1,5 @@
  --> [ local path prefix ]/component/enum_default_error.fpp:2:27
   |
 2 |   enum E { X, Y } default "abc"
-  |                           ^^^^^ default value cannot be converted to enum E
-  |
-  = note: string cannot be converted to enum E
+  |                           ^^^^^ cannot convert string to enum E
 

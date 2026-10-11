@@ -31,6 +31,16 @@ fn module_hides_constant() {
 }
 
 #[test]
+fn enum_type_as_constant() {
+    run_test("invalid_symbols/enum_type_as_constant")
+}
+
+#[test]
+fn state_machine_as_constant() {
+    run_test("invalid_symbols/state_machine_as_constant")
+}
+
+#[test]
 fn constant_as_type() {
     run_test("invalid_symbols/constant_as_type")
 }

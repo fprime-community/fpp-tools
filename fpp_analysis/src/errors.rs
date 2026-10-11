@@ -77,15 +77,13 @@ pub enum SemanticError {
     EmptyArray {
         loc: Span,
     },
-    EnumConstantShouldBeImplied {
-        loc: Span,
-    },
-    EnumConstantShouldBeExplicit {
+    /// Invalid enum constants
+    InvalidEnumConstants {
         loc: Span,
     },
     /// Duplicate enum value
-    DuplicateEnumConstant {
-        value: i128,
+    DuplicateEnumValue {
+        value: String,
         loc: Span,
         prev_loc: Span,
     },
@@ -103,10 +101,25 @@ pub enum SemanticError {
     InvalidShiftAmount {
         loc: Span,
     },
-    /// A member-selection expression names a member that does not exist on the type
-    InvalidTypeForMemberSelection {
+    /// No member in anonymous struct type
+    InvalidAnonStructMember {
+        member_name: String,
         loc: Span,
-        member: String,
+        /// The definition of the symbol whose value has no such member, if
+        /// the selection is from a symbol
+        def_loc: Option<Span>,
+    },
+    /// No member in struct type
+    InvalidStructMember {
+        member_name: String,
+        loc: Span,
+        struct_type_name: String,
+        def_loc: Span,
+    },
+    /// No member in a value whose type has no members
+    InvalidTypeForMemberSelection {
+        member_name: String,
+        loc: Span,
         type_name: String,
     },
     /// Invalid format string
@@ -671,24 +684,17 @@ impl From<SemanticError> for Diagnostic {
             SemanticError::EmptyArray { loc } => {
                 Diagnostic::new(loc, Level::Error, "array expression may not be empty")
             }
-            SemanticError::EnumConstantShouldBeImplied { loc } => {
-                Diagnostic::new(loc, Level::Error, "expected constant value to be implied")
-                    .note("enum constants must be all explicit or all implied")
-            }
-            SemanticError::EnumConstantShouldBeExplicit { loc } => {
-                Diagnostic::new(loc, Level::Error, "expected constant value to be explicit")
-                    .note("enum constants must be all explicit or all implied")
-            }
-            SemanticError::DuplicateEnumConstant {
+            SemanticError::InvalidEnumConstants { loc } => Diagnostic::new(
+                loc,
+                Level::Error,
+                "enum constants must be all explicit or all implied",
+            ),
+            SemanticError::DuplicateEnumValue {
                 value,
                 loc,
                 prev_loc,
-            } => Diagnostic::new(
-                loc,
-                Level::Error,
-                format!("duplicate enum constant `{}`", value),
-            )
-            .span_note(prev_loc, "previously defined here"),
+            } => Diagnostic::new(loc, Level::Error, format!("duplicate enum value {}", value))
+                .span_note(prev_loc, "previous occurrence is here"),
             SemanticError::InvalidIntValue { loc, v, msg } => match v {
                 None => Diagnostic::new(loc, Level::Error, msg),
                 Some(v) => {
@@ -704,14 +710,43 @@ impl From<SemanticError> for Diagnostic {
                     "shift amount must be a non-negative value that must be in the range [0,255]",
                 )
             }
-            SemanticError::InvalidTypeForMemberSelection {
+            SemanticError::InvalidAnonStructMember {
+                member_name,
                 loc,
-                member,
+                def_loc,
+            } => {
+                let diag = Diagnostic::new(
+                    loc,
+                    Level::Error,
+                    format!("no member {} in anonymous struct value", member_name),
+                );
+                match def_loc {
+                    Some(def_loc) => diag.span_note(def_loc, "symbol is defined here"),
+                    None => diag,
+                }
+            }
+            SemanticError::InvalidStructMember {
+                member_name,
+                loc,
+                struct_type_name,
+                def_loc,
+            } => Diagnostic::new(
+                loc,
+                Level::Error,
+                format!(
+                    "no member {} in struct type {}",
+                    member_name, struct_type_name
+                ),
+            )
+            .span_note(def_loc, "symbol is defined here"),
+            SemanticError::InvalidTypeForMemberSelection {
+                member_name,
+                loc,
                 type_name,
             } => Diagnostic::new(
                 loc,
                 Level::Error,
-                format!("{} has no member `{}`", type_name, member),
+                format!("no member {} in value of type {}", member_name, type_name),
             ),
             SemanticError::InvalidFormatString { loc, msg, context } => {
                 let diag =

@@ -1,7 +1,5 @@
  --> [ local path prefix ]/types/string_size_not_numeric.fpp:3:27
   |
 3 | array A = [3] string size "abc"
-  |                           ^^^^^ cannot convert expression to integer
-  |
-  = note: string cannot be converted to Integer
+  |                           ^^^^^ cannot convert string to a numeric type
 

@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/dot_anon_struct_literal_member_error.fpp:2:24
+  |
+2 | constant c = { a = 1 }.b
+  |                        ^ no member b in anonymous struct value
+

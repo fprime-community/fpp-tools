@@ -1,7 +1,7 @@
  --> [ local path prefix ]/state_machine/types/struct_default_error.fpp:5:13
   |
 5 |     default { x = 0, e = E.X, a = [ 1, 2, 3 ], b = 5 }
-  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ default value cannot be converted to struct S
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot convert { x: Integer, e: enum E, a: [3] Integer, b: Integer } to struct S
   |
   = note: no member `b` in the struct type
 

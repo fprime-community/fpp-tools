@@ -93,7 +93,9 @@ def test_alias_type(m):
 
 
 def test_type_predicates(m):
-    assert rtype(m, "M.Alias").is_int is True
+    # An alias type is not an integer type; its underlying type is
+    assert rtype(m, "M.Alias").is_int is False
+    assert rtype(m, "M.Alias").underlying_type.is_int is True
     assert rtype(m, "M.E").is_int is False
     assert rtype(m, "M.Arr").is_numeric is False
 

@@ -1,0 +1,15 @@
+ --> [ local path prefix ]/expr/struct_duplicate_order_error.fpp:2:33
+  |
+2 | constant c = { a = { b = 1 }.c, a = 2 }
+  |                                 ^^^^^ duplicate struct member `a`
+  |
+ ::: [ local path prefix ]/expr/struct_duplicate_order_error.fpp:2:16
+  |
+2 | constant c = { a = { b = 1 }.c, a = 2 }
+  |                --------------- previously defined here
+
+ --> [ local path prefix ]/expr/struct_duplicate_order_error.fpp:2:30
+  |
+2 | constant c = { a = { b = 1 }.c, a = 2 }
+  |                              ^ no member c in anonymous struct value
+

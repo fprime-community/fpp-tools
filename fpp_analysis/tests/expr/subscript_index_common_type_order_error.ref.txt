@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/subscript_index_common_type_order_error.fpp:3:14
+  |
+3 | constant b = a[[1, true]]
+  |              ^ Integer is not an array type
+

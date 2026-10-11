@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/template/alias_param_neg_float_shift_error.fpp:5:16
+  |
+5 |   constant c = (-p) << 1
+  |                ^^^^ F32 is not an integer or enum type
+  |
+  = note: expanded at [ local path prefix ]/template/alias_param_neg_float_shift_error.fpp:7:1
+

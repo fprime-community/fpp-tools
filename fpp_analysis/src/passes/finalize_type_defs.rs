@@ -303,7 +303,11 @@ impl<'ast> FinalizeTypeDefs<'ast> {
     /// TypeVisitor applied to the type of the type name: the type of a
     /// `string size n` type name does not hold the size expression, so the
     /// type is reached through the type name.
-    fn type_name_node(&self, a: &mut Analysis, node: &'ast TypeName) -> ControlFlow<(), Arc<Type>> {
+    pub(crate) fn type_name_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast TypeName,
+    ) -> ControlFlow<(), Arc<Type>> {
         self.finalize_type_name(a, node, true)
     }
 

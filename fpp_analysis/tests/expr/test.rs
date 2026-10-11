@@ -16,6 +16,11 @@ fn neg_error() {
 }
 
 #[test]
+fn neg_enum_error() {
+    run_test("expr/neg_enum_error")
+}
+
+#[test]
 fn div_by_zero() {
     run_test("expr/div_by_zero")
 }
@@ -28,6 +33,11 @@ fn div_by_near_zero_float() {
 #[test]
 fn add_ok() {
     run_test("expr/add_ok")
+}
+
+#[test]
+fn add_enum_error() {
+    run_test("expr/add_enum_error")
 }
 
 #[test]
@@ -71,6 +81,11 @@ fn neg_ok() {
 }
 
 #[test]
+fn neg_enum_ok() {
+    run_test("expr/neg_enum_ok")
+}
+
+#[test]
 fn array_empty() {
     run_test("expr/array_empty")
 }
@@ -81,6 +96,21 @@ fn dot_bad_expr() {
 }
 
 #[test]
+fn dot_struct_member_error() {
+    run_test("expr/dot_struct_member_error")
+}
+
+#[test]
+fn dot_anon_struct_member_error() {
+    run_test("expr/dot_anon_struct_member_error")
+}
+
+#[test]
+fn dot_anon_struct_literal_member_error() {
+    run_test("expr/dot_anon_struct_literal_member_error")
+}
+
+#[test]
 fn paren_ok() {
     run_test("expr/paren_ok")
 }
@@ -88,6 +118,11 @@ fn paren_ok() {
 #[test]
 fn struct_duplicate() {
     run_test("expr/struct_duplicate")
+}
+
+#[test]
+fn struct_duplicate_order_error() {
+    run_test("expr/struct_duplicate_order_error")
 }
 
 #[test]
@@ -163,6 +198,16 @@ fn binop_numeric_error() {
 #[test]
 fn subscript_order_error() {
     run_test("expr/subscript_order_error")
+}
+
+#[test]
+fn subscript_index_common_type_order_error() {
+    run_test("expr/subscript_index_common_type_order_error")
+}
+
+#[test]
+fn subscript_index_numeric_order_error() {
+    run_test("expr/subscript_index_numeric_order_error")
 }
 
 #[test]
