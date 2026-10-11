@@ -58,13 +58,14 @@ impl CheckTemplateInterfaceArgs {
         };
         let (instance, iface) = match resolve() {
             Ok(Some(resolved)) => resolved,
-            // A use that did not resolve was reported by CheckUses
+            // A use that did not resolve, or that names an instance whose
+            // definition failed to check, was already reported
             Ok(None) => return Ok(()),
             Err(_) if resolved_by_topology => return Ok(()),
             Err(err) => return Err(err),
         };
-        // An interface instance is built from an entry of the component map or
-        // the topology map, so it has a port interface
+        // An interface instance is built from an entry of the component
+        // instance map or the topology map, so it has a port interface
         let port_interface = instance
             .get_interface(a)
             .expect("an interface instance has a port interface");
