@@ -1,6 +1,6 @@
 use crate::owned::{OwnedDiagnostic, OwnedDiagnosticMessage};
 use annotate_snippets::{Annotation, AnnotationKind, Element, Group, Snippet};
-use fpp_core::{DiagnosticDataSnippet, DiagnosticMessageKind, Level};
+use fpp_core::{DiagnosticDataChainKind, DiagnosticDataSnippet, DiagnosticMessageKind, Level};
 
 fn diagnostic_level<'a>(level: Level) -> annotate_snippets::Level<'a> {
     match level {
@@ -35,20 +35,17 @@ fn snippet_elements<'a>(
         .annotation(diagnostic_snippet_to_annotation(message, kind, snippet));
 
     std::iter::once(Element::from(excerpt))
-        .chain(snippet.include_spans.iter().map(|include_loc| {
+        .chain(snippet.includes_expands.iter().map(|chain_loc| {
+            let how = match chain_loc.kind {
+                DiagnosticDataChainKind::Included => "included from",
+                DiagnosticDataChainKind::Expanded => "expanded at",
+            };
             Element::Message(annotate_snippets::Level::NOTE.message(format!(
-                "included from {}:{}:{}",
-                include_loc.uri,
-                include_loc.line + 1,
-                include_loc.column + 1
-            )))
-        }))
-        .chain(snippet.expand_spans.iter().map(|expand_loc| {
-            Element::Message(annotate_snippets::Level::NOTE.message(format!(
-                "expanded at {}:{}:{}",
-                expand_loc.uri,
-                expand_loc.line + 1,
-                expand_loc.column + 1
+                "{} {}:{}:{}",
+                how,
+                chain_loc.loc.uri,
+                chain_loc.loc.line + 1,
+                chain_loc.loc.column + 1
             )))
         }))
         .collect()

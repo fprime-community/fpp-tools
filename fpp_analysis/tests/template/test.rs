@@ -116,6 +116,11 @@ fn expand_before_invalid_nested() {
 }
 
 #[test]
+fn expand_in_include() {
+    run_test("template/expand_in_include")
+}
+
+#[test]
 fn expand_not_a_template() {
     run_test("template/expand_not_a_template")
 }
