@@ -805,7 +805,8 @@ impl Analysis {
 pub trait IdMap<T> {
     fn get(&self, id: &i128) -> Option<&T>;
     fn insert(&mut self, id: i128, element: T);
-    /// The values of the map, in id order
+    /// The values of the map, in insertion order for an insertion-ordered map
+    /// and in id order otherwise
     fn values_by_id(&self) -> Vec<&T>;
 }
 
@@ -832,6 +833,20 @@ impl<T> IdMap<T> for std::collections::BTreeMap<i128, T> {
 
     fn insert(&mut self, id: i128, element: T) {
         std::collections::BTreeMap::insert(self, id, element);
+    }
+
+    fn values_by_id(&self) -> Vec<&T> {
+        self.values().collect()
+    }
+}
+
+impl<T> IdMap<T> for indexmap::IndexMap<i128, T, rustc_hash::FxBuildHasher> {
+    fn get(&self, id: &i128) -> Option<&T> {
+        indexmap::IndexMap::get(self, id)
+    }
+
+    fn insert(&mut self, id: i128, element: T) {
+        indexmap::IndexMap::insert(self, id, element);
     }
 
     fn values_by_id(&self) -> Vec<&T> {

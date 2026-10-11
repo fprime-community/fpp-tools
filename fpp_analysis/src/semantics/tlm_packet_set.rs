@@ -3,7 +3,8 @@ use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{Dictionary, TlmChannelIdentifier, TlmPacket, Topology};
 use fpp_ast::SpecTlmPacketSet;
 use fpp_core::{Span, Spanned};
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use indexmap::IndexMap;
+use rustc_hash::{FxBuildHasher, FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
 /// An FPP telemetry packet set
@@ -12,7 +13,7 @@ pub struct TlmPacketSet {
     /// The AST node
     pub node: Arc<SpecTlmPacketSet>,
     /// The map from packet IDs to packets
-    pub packet_map: HashMap<i128, TlmPacket>,
+    pub packet_map: IndexMap<i128, TlmPacket, FxBuildHasher>,
     /// The next default packet ID
     pub default_packet_id: i128,
     /// The set of omitted channel IDs
@@ -27,7 +28,7 @@ impl TlmPacketSet {
     pub fn new(node: Arc<SpecTlmPacketSet>) -> TlmPacketSet {
         TlmPacketSet {
             node,
-            packet_map: HashMap::default(),
+            packet_map: IndexMap::default(),
             default_packet_id: 0,
             omitted_id_set: HashSet::default(),
             omitted_location_map: HashMap::default(),
