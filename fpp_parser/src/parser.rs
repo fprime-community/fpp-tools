@@ -2873,7 +2873,6 @@ impl<'a> Parser<'a> {
 
     fn expr(&mut self) -> ParseResult<Expr> {
         let mut left = self.expr_shift_operand()?;
-        let first_span = left.span();
 
         loop {
             let op = match self.peek(0) {
@@ -2884,11 +2883,11 @@ impl<'a> Parser<'a> {
 
             match op {
                 Some(op) => {
-                    self.next();
+                    let op_token = self.next().unwrap();
                     self.commit();
                     let right = self.expr_shift_operand()?;
                     left = Expr {
-                        node_id: self.node(first_span),
+                        node_id: self.node(op_token.span()),
                         kind: ExprKind::Binop {
                             left: Box::new(left),
                             op,
@@ -2903,7 +2902,6 @@ impl<'a> Parser<'a> {
 
     fn expr_shift_operand(&mut self) -> ParseResult<Expr> {
         let mut left = self.expr_add_sub_operand()?;
-        let first_span = left.span();
 
         loop {
             let op = match self.peek(0) {
@@ -2914,11 +2912,11 @@ impl<'a> Parser<'a> {
 
             match op {
                 Some(op) => {
-                    self.next();
+                    let op_token = self.next().unwrap();
                     self.commit();
                     let right = self.expr_add_sub_operand()?;
                     left = Expr {
-                        node_id: self.node(first_span),
+                        node_id: self.node(op_token.span()),
                         kind: ExprKind::Binop {
                             left: Box::new(left),
                             op,
@@ -2933,7 +2931,6 @@ impl<'a> Parser<'a> {
 
     fn expr_add_sub_operand(&mut self) -> ParseResult<Expr> {
         let mut left = self.expr_mul_div_operand()?;
-        let first_span = left.span();
 
         loop {
             let op = match self.peek(0) {
@@ -2944,11 +2941,11 @@ impl<'a> Parser<'a> {
 
             match op {
                 Some(op) => {
-                    self.next();
+                    let op_token = self.next().unwrap();
                     self.commit();
                     let right = self.expr_mul_div_operand()?;
                     left = Expr {
-                        node_id: self.node(first_span),
+                        node_id: self.node(op_token.span()),
                         kind: ExprKind::Binop {
                             left: Box::new(left),
                             op,
