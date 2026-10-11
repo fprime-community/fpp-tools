@@ -40,7 +40,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/crlf.fpp:5:16,
+                            start: [ local path prefix ]/crlf.fpp:6:5,
                             end: [ local path prefix ]/crlf.fpp:6:8,
                         },
                     },

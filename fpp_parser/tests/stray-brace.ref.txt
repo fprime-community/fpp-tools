@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/stray-brace.fpp:2:1
+  |
+2 | }
+  | ^ syntax error: unexpected token
+  |
+  = note: got }
+

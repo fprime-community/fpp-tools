@@ -392,14 +392,6 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    /// Generate a generic syntax error located at the next token
-    pub fn err(&mut self, msg: &'static str) -> ParseError {
-        ParseError::Syntax {
-            last: self.next_token_span(),
-            msg,
-        }
-    }
-
     pub fn err_unexpected_eof(&self) -> ParseError {
         ParseError::UnexpectedEof {
             last: self.end_of_input_span(),
@@ -970,11 +962,6 @@ mod test {
                     assert_eq!(last, b);
                     assert_eq!(got, Identifier);
                 }
-                other => panic!("{other:?}"),
-            }
-
-            match cursor.err("syntax") {
-                ParseError::Syntax { last, .. } => assert_eq!(last, b),
                 other => panic!("{other:?}"),
             }
         });

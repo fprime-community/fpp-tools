@@ -12,7 +12,7 @@ pub(crate) fn ast_node_struct(input: &ItemStruct) -> TokenStream {
                     Some(ident) if ident == "node_id" => {
                         let err = syn::Error::new_spanned(
                             field,
-                            "ast_node reserves the 'node_id' field name",
+                            "#[ast] reserves the 'node_id' field name",
                         )
                         .to_compile_error();
                         return err.into();
@@ -23,9 +23,11 @@ pub(crate) fn ast_node_struct(input: &ItemStruct) -> TokenStream {
                 match field.vis {
                     syn::Visibility::Public(_) => {}
                     _ => {
-                        let err =
-                            syn::Error::new_spanned(field, "all members of ast_node must be 'pub'")
-                                .to_compile_error();
+                        let err = syn::Error::new_spanned(
+                            field,
+                            "all members of an #[ast] struct must be 'pub'",
+                        )
+                        .to_compile_error();
                         return err.into();
                     }
                 }
@@ -50,8 +52,7 @@ pub(crate) fn ast_node_struct(input: &ItemStruct) -> TokenStream {
             // Return a compile_error if user applied macro on unsupported struct
             let err = syn::Error::new_spanned(
                 input,
-                "#[ast_node]
-#[derive(AstAnnotated)] only supports structs with named fields (braced structs).",
+                "#[ast] only supports structs with named fields (braced structs).",
             )
             .to_compile_error();
             return err.into();

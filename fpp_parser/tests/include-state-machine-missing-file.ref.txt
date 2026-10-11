@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/include-state-machine-missing-file.fpp:2:11
+  |
+2 |   include "this-file-should-not-exist.fppi"
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot open file [ local path prefix ]/this-file-should-not-exist.fppi
+
+ --> [ local path prefix ]/include-state-machine-missing-file.fpp:4:13
+  |
+4 |     include "this-file-should-not-exist-either.fppi"
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot open file [ local path prefix ]/this-file-should-not-exist-either.fppi
+

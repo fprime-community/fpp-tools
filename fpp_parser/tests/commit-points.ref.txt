@@ -1,0 +1,72 @@
+ --> [ local path prefix ]/commit-points.fpp:6:3
+  |
+6 |   initial enter 3
+  |   ^^^^^^^ syntax error: unexpected token
+  |
+  = note: expected }
+  = note: got initial
+
+  --> [ local path prefix ]/commit-points.fpp:11:5
+   |
+11 |     entry foo
+   |     ^^^^^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got entry
+
+  --> [ local path prefix ]/commit-points.fpp:16:3
+   |
+16 |   param p U32
+   |   ^^^^^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got param
+
+  --> [ local path prefix ]/commit-points.fpp:20:3
+   |
+20 |   telemetry 3: U32
+   |   ^^^^^^^^^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got telemetry
+
+  --> [ local path prefix ]/commit-points.fpp:24:3
+   |
+24 |   command foo port p
+   |   ^^^^^^^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got command
+
+  --> [ local path prefix ]/commit-points.fpp:28:23
+   |
+28 |   product container C default 3
+   |                       ^^^^^^^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got default
+
+  --> [ local path prefix ]/commit-points.fpp:32:10
+   |
+32 |   type T = 1
+   |          ^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got =
+
+  --> [ local path prefix ]/commit-points.fpp:36:18
+   |
+36 |   constant a = 1 constant b = 2
+   |                  ^^^^^^^^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got constant
+
+  --> [ local path prefix ]/commit-points.fpp:40:3
+   |
+40 |   state machine 3
+   |   ^^^^^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got state
+

@@ -1,10 +1,5 @@
-use crate::Diagnosed;
-use fpp_ast::{
-    DefModuleTemplate, ModuleMember, MoveWalkable, MutVisitor, Node, QualIdent, Replicator,
-    TransUnit, Visitor,
-};
+use fpp_ast::{DefModuleTemplate, ModuleMember, MutVisitor, QualIdent, Replicator, TransUnit};
 use fpp_core::{SourceFile, Spanned};
-use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 
 pub struct Input {
@@ -175,42 +170,4 @@ fn expand_member(
         }
         _ => {}
     }
-}
-
-/// Fail if any `include` specifier survived resolution, which means definitions in
-/// the model are invisible to this tool.
-///
-/// `fpp_parser::ResolveIncludes` handles `include` inside a module, component,
-/// topology, telemetry packet, and telemetry packet set. It does not handle
-/// `state machine` or `state` bodies, so those are what this catches.
-pub fn check_unresolved_includes(units: &[TransUnit]) -> Result<(), Diagnosed> {
-    struct FindInclude;
-    impl<'ast> Visitor<'ast> for FindInclude {
-        type Break = ();
-        type State = bool;
-
-        fn super_visit(&self, found: &mut bool, node: Node<'ast>) -> ControlFlow<()> {
-            if let Node::SpecInclude(spec) = node {
-                spec.span()
-                    .error(
-                        "this `include` was not resolved, so definitions inside it are invisible",
-                    )
-                    .note(format!(
-                        "cannot read the members of `{}` here",
-                        spec.file.data
-                    ))
-                    .note(
-                        "`include` inside a `state machine` or `state` body is not yet supported; \
-                         move those definitions into the file that needs them",
-                    )
-                    .emit();
-                *found = true;
-            }
-            node.walk(found, self)
-        }
-    }
-
-    let mut found = false;
-    let _ = FindInclude.visit_trans_units(&mut found, units.iter());
-    if found { Err(Diagnosed) } else { Ok(()) }
 }

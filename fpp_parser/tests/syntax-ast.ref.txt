@@ -2053,33 +2053,27 @@ TransUnit(
                         },
                     },
                     members: [
-                        DefConstant {
-                            name: Name {
-                                data: "x",
+                        SpecInclude {
+                            file: LitString {
+                                data: "constant.fppi",
+                                inner_span: Span {
+                                    start: [ local path prefix ]/syntax.fpp:161:14,
+                                    end: [ local path prefix ]/syntax.fpp:161:27,
+                                },
                                 node_id: Span {
-                                    start: [ local path prefix ]/constant.fppi:2:10,
-                                    end: [ local path prefix ]/constant.fppi:2:11,
+                                    start: [ local path prefix ]/syntax.fpp:161:13,
+                                    end: [ local path prefix ]/syntax.fpp:161:28,
                                 },
                             },
-                            value: Expr {
-                                kind: LiteralInt(
-                                    "0",
-                                ),
-                                node_id: Span {
-                                    start: [ local path prefix ]/constant.fppi:2:14,
-                                    end: [ local path prefix ]/constant.fppi:2:15,
-                                },
-                            },
-                            is_dictionary_def: false,
                             node_id: Span {
-                                start: [ local path prefix ]/constant.fppi:2:1,
-                                end: [ local path prefix ]/constant.fppi:2:15,
+                                start: [ local path prefix ]/syntax.fpp:161:5,
+                                end: [ local path prefix ]/syntax.fpp:161:28,
                             },
                             pre_annotation: [
-                                "Included constant",
+                                "Include specifier",
                             ],
                             post_annotation: [
-                                "Included constant",
+                                "Include specifier",
                             ],
                         },
                     ],
@@ -2876,99 +2870,27 @@ TransUnit(
                                         "Telemetry packet",
                                     ],
                                 },
-                                SpecTlmPacket {
-                                    name: Name {
-                                        data: "P2",
+                                SpecInclude {
+                                    file: LitString {
+                                        data: "packet.fppi",
+                                        inner_span: Span {
+                                            start: [ local path prefix ]/syntax.fpp:220:16,
+                                            end: [ local path prefix ]/syntax.fpp:220:27,
+                                        },
                                         node_id: Span {
-                                            start: [ local path prefix ]/packet.fppi:2:8,
-                                            end: [ local path prefix ]/packet.fppi:2:10,
+                                            start: [ local path prefix ]/syntax.fpp:220:15,
+                                            end: [ local path prefix ]/syntax.fpp:220:28,
                                         },
                                     },
-                                    id: Some(
-                                        Expr {
-                                            kind: LiteralInt(
-                                                "1",
-                                            ),
-                                            node_id: Span {
-                                                start: [ local path prefix ]/packet.fppi:2:14,
-                                                end: [ local path prefix ]/packet.fppi:2:15,
-                                            },
-                                        },
-                                    ),
-                                    group: Expr {
-                                        kind: LiteralInt(
-                                            "1",
-                                        ),
-                                        node_id: Span {
-                                            start: [ local path prefix ]/packet.fppi:2:22,
-                                            end: [ local path prefix ]/packet.fppi:2:23,
-                                        },
-                                    },
-                                    members: [
-                                        TlmChannelIdentifier {
-                                            component_instance: Unqualified {
-                                                name: Ident {
-                                                    data: "i4",
-                                                    node_id: Span {
-                                                        start: [ local path prefix ]/packet.fppi:3:3,
-                                                        end: [ local path prefix ]/packet.fppi:3:5,
-                                                    },
-                                                },
-                                                is_absolute: false,
-                                                node_id: Span {
-                                                    start: [ local path prefix ]/packet.fppi:3:3,
-                                                    end: [ local path prefix ]/packet.fppi:3:5,
-                                                },
-                                            },
-                                            channel_name: Ident {
-                                                data: "c4",
-                                                node_id: Span {
-                                                    start: [ local path prefix ]/packet.fppi:3:6,
-                                                    end: [ local path prefix ]/packet.fppi:3:8,
-                                                },
-                                            },
-                                            node_id: Span {
-                                                start: [ local path prefix ]/packet.fppi:3:3,
-                                                end: [ local path prefix ]/packet.fppi:3:8,
-                                            },
-                                        },
-                                        TlmChannelIdentifier {
-                                            component_instance: Unqualified {
-                                                name: Ident {
-                                                    data: "i5",
-                                                    node_id: Span {
-                                                        start: [ local path prefix ]/channel.fppi:1:1,
-                                                        end: [ local path prefix ]/channel.fppi:1:3,
-                                                    },
-                                                },
-                                                is_absolute: false,
-                                                node_id: Span {
-                                                    start: [ local path prefix ]/channel.fppi:1:1,
-                                                    end: [ local path prefix ]/channel.fppi:1:3,
-                                                },
-                                            },
-                                            channel_name: Ident {
-                                                data: "c5",
-                                                node_id: Span {
-                                                    start: [ local path prefix ]/channel.fppi:1:4,
-                                                    end: [ local path prefix ]/channel.fppi:1:6,
-                                                },
-                                            },
-                                            node_id: Span {
-                                                start: [ local path prefix ]/channel.fppi:1:1,
-                                                end: [ local path prefix ]/channel.fppi:1:6,
-                                            },
-                                        },
-                                    ],
                                     node_id: Span {
-                                        start: [ local path prefix ]/packet.fppi:2:1,
-                                        end: [ local path prefix ]/packet.fppi:5:2,
+                                        start: [ local path prefix ]/syntax.fpp:220:7,
+                                        end: [ local path prefix ]/syntax.fpp:220:28,
                                     },
                                     pre_annotation: [
-                                        "Included packet",
+                                        "Include specifier",
                                     ],
                                     post_annotation: [
-                                        "Included packet",
+                                        "Include specifier",
                                     ],
                                 },
                             ],
@@ -3842,13 +3764,13 @@ TransUnit(
                                                     },
                                                 },
                                                 node_id: Span {
-                                                    start: [ local path prefix ]/syntax.fpp:291:27,
+                                                    start: [ local path prefix ]/syntax.fpp:291:29,
                                                     end: [ local path prefix ]/syntax.fpp:291:32,
                                                 },
                                             },
                                         },
                                         node_id: Span {
-                                            start: [ local path prefix ]/syntax.fpp:291:23,
+                                            start: [ local path prefix ]/syntax.fpp:291:25,
                                             end: [ local path prefix ]/syntax.fpp:291:32,
                                         },
                                     },
@@ -3885,13 +3807,13 @@ TransUnit(
                                             },
                                         },
                                         node_id: Span {
-                                            start: [ local path prefix ]/syntax.fpp:291:35,
+                                            start: [ local path prefix ]/syntax.fpp:291:38,
                                             end: [ local path prefix ]/syntax.fpp:291:41,
                                         },
                                     },
                                 },
                                 node_id: Span {
-                                    start: [ local path prefix ]/syntax.fpp:291:23,
+                                    start: [ local path prefix ]/syntax.fpp:291:33,
                                     end: [ local path prefix ]/syntax.fpp:291:41,
                                 },
                             },
@@ -3907,7 +3829,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/syntax.fpp:291:23,
+                            start: [ local path prefix ]/syntax.fpp:291:42,
                             end: [ local path prefix ]/syntax.fpp:291:45,
                         },
                     },
@@ -3958,7 +3880,7 @@ TransUnit(
                                             },
                                         },
                                         node_id: Span {
-                                            start: [ local path prefix ]/syntax.fpp:295:23,
+                                            start: [ local path prefix ]/syntax.fpp:295:25,
                                             end: [ local path prefix ]/syntax.fpp:295:28,
                                         },
                                     },
@@ -3974,7 +3896,7 @@ TransUnit(
                                     },
                                 },
                                 node_id: Span {
-                                    start: [ local path prefix ]/syntax.fpp:295:23,
+                                    start: [ local path prefix ]/syntax.fpp:295:29,
                                     end: [ local path prefix ]/syntax.fpp:295:33,
                                 },
                             },
@@ -3990,7 +3912,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/syntax.fpp:295:23,
+                            start: [ local path prefix ]/syntax.fpp:295:34,
                             end: [ local path prefix ]/syntax.fpp:295:38,
                         },
                     },
@@ -4642,7 +4564,7 @@ TransUnit(
                                             },
                                         },
                                         node_id: Span {
-                                            start: [ local path prefix ]/syntax.fpp:343:24,
+                                            start: [ local path prefix ]/syntax.fpp:343:26,
                                             end: [ local path prefix ]/syntax.fpp:343:29,
                                         },
                                     },
@@ -4664,7 +4586,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/syntax.fpp:343:23,
+                            start: [ local path prefix ]/syntax.fpp:343:31,
                             end: [ local path prefix ]/syntax.fpp:343:34,
                         },
                     },

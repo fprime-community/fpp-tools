@@ -96,7 +96,6 @@ pub fn run(
     };
 
     let mut units = model::parse(inputs);
-    model::check_unresolved_includes(&units)?;
     if rule_set.expand.state_enums {
         model::add_state_enums(&mut units);
     }

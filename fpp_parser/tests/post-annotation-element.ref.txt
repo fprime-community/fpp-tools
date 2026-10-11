@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/post-annotation-element.fpp:1:17
+  |
+1 | constant a = [1 @< x
+  |                 ^^^^ syntax error: unexpected token
+  |
+  = note: expected ]
+  = note: got post-annotation
+

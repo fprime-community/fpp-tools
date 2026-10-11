@@ -1,0 +1,32 @@
+ --> [ local path prefix ]/parse-error-recovery.fpp:5:1
+  |
+5 | + c
+  | ^ syntax error: module member expected
+  |
+  = note: expected one of dictionary, type, array, constant, enum, struct, active, passive, queued, instance, interface, module, port, state, system, deployment, topology, include, locate, expand
+  = note: got +
+
+ --> [ local path prefix ]/parse-error-recovery.fpp:7:1
+  |
+7 | + c
+  | ^ syntax error: module member expected
+  |
+  = note: expected one of dictionary, type, array, constant, enum, struct, active, passive, queued, instance, interface, module, port, state, system, deployment, topology, include, locate, expand
+  = note: got +
+
+  --> [ local path prefix ]/parse-error-recovery.fpp:14:17
+   |
+14 |     async input i: d -> d
+   |                 ^ syntax error: unexpected token
+   |
+   = note: expected port
+   = note: got identifier
+
+  --> [ local path prefix ]/parse-error-recovery.fpp:20:1
+   |
+20 |
+   | ^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got end of input
+

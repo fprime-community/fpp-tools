@@ -1,36 +1,9 @@
- --> [ local path prefix ]/parse-error.fpp:5:1
+ --> [ local path prefix ]/parse-error.fpp:1:1
   |
-5 | + c
-  | ^ syntax error: module member expected
+1 | onstant x = 1
+  | ^^^^^^^ syntax error: module member expected
   |
-  = note: included from [ local path prefix ]/include-parse-error.fpp:1:1
-  = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate, expand
-  = note: got +
-
- --> [ local path prefix ]/parse-error.fpp:7:1
-  |
-7 | + c
-  | ^ syntax error: module member expected
-  |
-  = note: included from [ local path prefix ]/include-parse-error.fpp:1:1
-  = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate, expand
-  = note: got +
-
-  --> [ local path prefix ]/parse-error.fpp:14:17
-   |
-14 |     async input i: d -> d
-   |                 ^ syntax error: unexpected token
-   |
-   = note: included from [ local path prefix ]/include-parse-error.fpp:1:1
-   = note: expected port
-   = note: got identifier
-
-  --> [ local path prefix ]/parse-error.fpp:20:1
-   |
-20 |
-   | ^ syntax error: unexpected token
-   |
-   = note: included from [ local path prefix ]/include-parse-error.fpp:1:1
-   = note: expected }
-   = note: got end of input
+  = note: included from [ local path prefix ]/include-parse-error.fpp:1:9
+  = note: expected one of dictionary, type, array, constant, enum, struct, active, passive, queued, instance, interface, module, port, state, system, deployment, topology, include, locate, expand
+  = note: got identifier
 

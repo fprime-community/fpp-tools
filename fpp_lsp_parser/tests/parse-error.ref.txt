@@ -1,119 +1,17 @@
-ROOT@0..206
-  WHITESPACE@0..2 "  "
-  COMMENT@2..20 "# constant =     1"
-  EOL@20..22 "\n\n"
-  DEF_CONSTANT@22..36
-    CONSTANT_KW@22..30 "constant"
-    WHITESPACE@30..31 " "
-    NAME@31..32
-      IDENT@31..32 "f"
-    WHITESPACE@32..33 " "
-    EQUALS@33..34 "="
-    WHITESPACE@34..35 " "
-    EXPR@35..36
-      EXPR_LITERAL@35..36
-        LITERAL_INT@35..36 "1"
-  EOL@36..38 "\n\n"
-  ERROR@38..40
-    PLUS@38..39 "+"
-    WHITESPACE@39..40 " "
-  ERROR@40..41
-    IDENT@40..41 "c"
-  EOL@41..43 "\n\n"
-  ERROR@43..45
-    PLUS@43..44 "+"
-    WHITESPACE@44..45 " "
-  ERROR@45..46
-    IDENT@45..46 "c"
-  EOL@46..48 "\n\n"
-  DEF_CONSTANT@48..62
-    CONSTANT_KW@48..56 "constant"
-    WHITESPACE@56..57 " "
-    NAME@57..58
-      IDENT@57..58 "g"
-    WHITESPACE@58..59 " "
-    EQUALS@59..60 "="
-    WHITESPACE@60..61 " "
-    EXPR@61..62
-      EXPR_LITERAL@61..62
-        LITERAL_INT@61..62 "2"
-  EOL@62..64 "\n\n"
-  DEF_COMPONENT@64..206
-    ACTIVE_KW@64..70 "active"
-    WHITESPACE@70..71 " "
-    COMPONENT_KW@71..80 "component"
-    WHITESPACE@80..81 " "
-    NAME@81..82
-      IDENT@81..82 "C"
-    WHITESPACE@82..83 " "
-    COMPONENT_MEMBER_LIST@83..206
-      LEFT_CURLY@83..84 "{"
-      EOL@84..85 "\n"
-      WHITESPACE@85..89 "    "
-      SPEC_PORT_INSTANCE_SPECIAL@89..108
-        TELEMETRY_KW@89..98 "telemetry"
-        WHITESPACE@98..99 " "
-        PORT_KW@99..103 "port"
-        WHITESPACE@103..104 " "
-        NAME@104..108
-          IDENT@104..108 "pOut"
-      EOL@108..110 "\n\n"
-      WHITESPACE@110..114 "    "
-      SPEC_PORT_INSTANCE_GENERAL@114..130
-        ASYNC_KW@114..119 "async"
-        WHITESPACE@119..120 " "
-        INPUT_KW@120..125 "input"
-        WHITESPACE@125..126 " "
-        NAME@126..127
-          IDENT@126..127 "i"
-        COLON@127..128 ":"
-        WHITESPACE@128..129 " "
-        QUAL_IDENT@129..130
-          IDENT@129..130 "d"
-      WHITESPACE@130..131 " "
-      ERROR@131..133
-        RIGHT_ARROW@131..133 "->"
-      WHITESPACE@133..134 " "
-      ERROR@134..135
-        IDENT@134..135 "d"
-      EOL@135..137 "\n\n"
-      WHITESPACE@137..141 "    "
-      SPEC_EVENT@141..204
-        EVENT_KW@141..146 "event"
-        WHITESPACE@146..147 " "
-        NAME@147..148
-          IDENT@147..148 "i"
-        WHITESPACE@148..149 " "
-        FORMAL_PARAM_LIST@149..157
-          LEFT_PAREN@149..150 "("
-          EOL@150..152 "\n\n"
-          WHITESPACE@152..156 "    "
-          RIGHT_PAREN@156..157 ")"
-        WHITESPACE@157..158 " "
-        EVENT_SEVERITY@158..178
-          SEVERITY_KW@158..166 "severity"
-          WHITESPACE@166..167 " "
-          WARNING_KW@167..174 "warning"
-          WHITESPACE@174..175 " "
-          LOW_KW@175..178 "low"
-        WHITESPACE@178..179 " "
-        FORMAT@179..193
-          FORMAT_KW@179..185 "format"
-          WHITESPACE@185..186 " "
-          LITERAL_STRING@186..193 "\"hello\""
-        WHITESPACE@193..194 " "
-        EVENT_THROTTLE@194..204
-          THROTTLE_KW@194..202 "throttle"
-          WHITESPACE@202..203 " "
-          EXPR@203..204
-            EXPR_LITERAL@203..204
-              LITERAL_INT@203..204 "1"
-      EOL@204..206 "\n\n"
-error 38..38: module member expected
-error 40..40: expected `;`
-error 43..43: module member expected
-error 45..45: expected `;`
-error 125..126: expected PORT_KW
-error 131..131: expected `SEMI`
-error 134..134: component member expected
-error 206..206: expected RIGHT_CURLY
+ROOT@0..14
+  ERROR@0..7
+    IDENT@0..7 "onstant"
+  WHITESPACE@7..8 " "
+  ERROR@8..9
+    IDENT@8..9 "x"
+  WHITESPACE@9..10 " "
+  ERROR@10..12
+    EQUALS@10..11 "="
+    WHITESPACE@11..12 " "
+  ERROR@12..13
+    LITERAL_INT@12..13 "1"
+  EOL@13..14 "\n"
+error 0..0: module member expected
+error 8..8: expected `;`
+error 10..10: module member expected
+error 12..12: expected `;`

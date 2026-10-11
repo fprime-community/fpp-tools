@@ -31,7 +31,7 @@ TransUnit(
                     },
                 },
                 node_id: Span {
-                    start: [ local path prefix ]/numeric-shift.fpp:1:14,
+                    start: [ local path prefix ]/numeric-shift.fpp:1:16,
                     end: [ local path prefix ]/numeric-shift.fpp:1:20,
                 },
             },
@@ -72,7 +72,7 @@ TransUnit(
                     },
                 },
                 node_id: Span {
-                    start: [ local path prefix ]/numeric-shift.fpp:2:14,
+                    start: [ local path prefix ]/numeric-shift.fpp:2:16,
                     end: [ local path prefix ]/numeric-shift.fpp:2:20,
                 },
             },
@@ -115,7 +115,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/numeric-shift.fpp:3:14,
+                            start: [ local path prefix ]/numeric-shift.fpp:3:16,
                             end: [ local path prefix ]/numeric-shift.fpp:3:20,
                         },
                     },
@@ -131,7 +131,7 @@ TransUnit(
                     },
                 },
                 node_id: Span {
-                    start: [ local path prefix ]/numeric-shift.fpp:3:14,
+                    start: [ local path prefix ]/numeric-shift.fpp:3:21,
                     end: [ local path prefix ]/numeric-shift.fpp:3:25,
                 },
             },
@@ -174,7 +174,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/numeric-shift.fpp:4:14,
+                            start: [ local path prefix ]/numeric-shift.fpp:4:16,
                             end: [ local path prefix ]/numeric-shift.fpp:4:19,
                         },
                     },
@@ -190,7 +190,7 @@ TransUnit(
                     },
                 },
                 node_id: Span {
-                    start: [ local path prefix ]/numeric-shift.fpp:4:14,
+                    start: [ local path prefix ]/numeric-shift.fpp:4:20,
                     end: [ local path prefix ]/numeric-shift.fpp:4:24,
                 },
             },
@@ -243,13 +243,13 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/numeric-shift.fpp:5:19,
+                            start: [ local path prefix ]/numeric-shift.fpp:5:21,
                             end: [ local path prefix ]/numeric-shift.fpp:5:24,
                         },
                     },
                 },
                 node_id: Span {
-                    start: [ local path prefix ]/numeric-shift.fpp:5:14,
+                    start: [ local path prefix ]/numeric-shift.fpp:5:16,
                     end: [ local path prefix ]/numeric-shift.fpp:5:24,
                 },
             },
@@ -292,7 +292,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/numeric-shift.fpp:6:14,
+                            start: [ local path prefix ]/numeric-shift.fpp:6:16,
                             end: [ local path prefix ]/numeric-shift.fpp:6:19,
                         },
                     },
@@ -308,7 +308,7 @@ TransUnit(
                     },
                 },
                 node_id: Span {
-                    start: [ local path prefix ]/numeric-shift.fpp:6:14,
+                    start: [ local path prefix ]/numeric-shift.fpp:6:20,
                     end: [ local path prefix ]/numeric-shift.fpp:6:24,
                 },
             },
@@ -353,7 +353,7 @@ TransUnit(
                                     },
                                 },
                                 node_id: Span {
-                                    start: [ local path prefix ]/numeric-shift.fpp:7:15,
+                                    start: [ local path prefix ]/numeric-shift.fpp:7:17,
                                     end: [ local path prefix ]/numeric-shift.fpp:7:21,
                                 },
                             },
@@ -375,7 +375,7 @@ TransUnit(
                     },
                 },
                 node_id: Span {
-                    start: [ local path prefix ]/numeric-shift.fpp:7:14,
+                    start: [ local path prefix ]/numeric-shift.fpp:7:23,
                     end: [ local path prefix ]/numeric-shift.fpp:7:26,
                 },
             },
@@ -425,7 +425,7 @@ TransUnit(
                     },
                 },
                 node_id: Span {
-                    start: [ local path prefix ]/numeric-shift.fpp:8:14,
+                    start: [ local path prefix ]/numeric-shift.fpp:8:17,
                     end: [ local path prefix ]/numeric-shift.fpp:8:21,
                 },
             },
@@ -468,7 +468,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/numeric-shift.fpp:9:14,
+                            start: [ local path prefix ]/numeric-shift.fpp:9:16,
                             end: [ local path prefix ]/numeric-shift.fpp:9:20,
                         },
                     },
@@ -484,7 +484,7 @@ TransUnit(
                     },
                 },
                 node_id: Span {
-                    start: [ local path prefix ]/numeric-shift.fpp:9:14,
+                    start: [ local path prefix ]/numeric-shift.fpp:9:21,
                     end: [ local path prefix ]/numeric-shift.fpp:9:25,
                 },
             },

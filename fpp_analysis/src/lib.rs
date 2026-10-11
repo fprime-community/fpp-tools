@@ -233,6 +233,12 @@ pub mod semantics {
     mod value_spec;
 }
 
+/// Resolve the include specifiers of a translation unit, reading the included
+/// files with `reader`.
+///
+/// The files included so far are recorded in `a.include_context_map`, with
+/// the kind of member list each one is spliced into, and in
+/// `a.included_file_set`.
 pub fn resolve_includes<Reader: FileReader>(
     a: &mut Analysis,
     reader: Reader,

@@ -1,0 +1,254 @@
+TransUnit(
+    [
+        DefAliasType {
+            name: Name {
+                data: "T",
+                node_id: Span {
+                    start: [ local path prefix ]/dictionary-specifier.fpp:1:17,
+                    end: [ local path prefix ]/dictionary-specifier.fpp:1:18,
+                },
+            },
+            type_name: TypeName {
+                kind: Integer(
+                    U32,
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/dictionary-specifier.fpp:1:21,
+                    end: [ local path prefix ]/dictionary-specifier.fpp:1:24,
+                },
+            },
+            is_dictionary_def: true,
+            node_id: Span {
+                start: [ local path prefix ]/dictionary-specifier.fpp:1:1,
+                end: [ local path prefix ]/dictionary-specifier.fpp:1:24,
+            },
+        },
+        DefArray {
+            name: Name {
+                data: "A",
+                node_id: Span {
+                    start: [ local path prefix ]/dictionary-specifier.fpp:2:18,
+                    end: [ local path prefix ]/dictionary-specifier.fpp:2:19,
+                },
+            },
+            size: Expr {
+                kind: LiteralInt(
+                    "2",
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/dictionary-specifier.fpp:2:23,
+                    end: [ local path prefix ]/dictionary-specifier.fpp:2:24,
+                },
+            },
+            elt_type: TypeName {
+                kind: Floating(
+                    F32,
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/dictionary-specifier.fpp:2:26,
+                    end: [ local path prefix ]/dictionary-specifier.fpp:2:29,
+                },
+            },
+            default: None,
+            format: None,
+            is_dictionary_def: true,
+            node_id: Span {
+                start: [ local path prefix ]/dictionary-specifier.fpp:2:1,
+                end: [ local path prefix ]/dictionary-specifier.fpp:2:29,
+            },
+        },
+        DefStruct {
+            name: Name {
+                data: "S",
+                node_id: Span {
+                    start: [ local path prefix ]/dictionary-specifier.fpp:3:19,
+                    end: [ local path prefix ]/dictionary-specifier.fpp:3:20,
+                },
+            },
+            members: [
+                StructTypeMember {
+                    name: Name {
+                        data: "x",
+                        node_id: Span {
+                            start: [ local path prefix ]/dictionary-specifier.fpp:3:23,
+                            end: [ local path prefix ]/dictionary-specifier.fpp:3:24,
+                        },
+                    },
+                    size: Some(
+                        Expr {
+                            kind: LiteralInt(
+                                "3",
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/dictionary-specifier.fpp:3:27,
+                                end: [ local path prefix ]/dictionary-specifier.fpp:3:28,
+                            },
+                        },
+                    ),
+                    type_name: TypeName {
+                        kind: Integer(
+                            U32,
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/dictionary-specifier.fpp:3:30,
+                            end: [ local path prefix ]/dictionary-specifier.fpp:3:33,
+                        },
+                    },
+                    format: None,
+                    node_id: Span {
+                        start: [ local path prefix ]/dictionary-specifier.fpp:3:23,
+                        end: [ local path prefix ]/dictionary-specifier.fpp:3:33,
+                    },
+                },
+                StructTypeMember {
+                    name: Name {
+                        data: "y",
+                        node_id: Span {
+                            start: [ local path prefix ]/dictionary-specifier.fpp:3:35,
+                            end: [ local path prefix ]/dictionary-specifier.fpp:3:36,
+                        },
+                    },
+                    size: None,
+                    type_name: TypeName {
+                        kind: Floating(
+                            F32,
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/dictionary-specifier.fpp:3:38,
+                            end: [ local path prefix ]/dictionary-specifier.fpp:3:41,
+                        },
+                    },
+                    format: None,
+                    node_id: Span {
+                        start: [ local path prefix ]/dictionary-specifier.fpp:3:35,
+                        end: [ local path prefix ]/dictionary-specifier.fpp:3:41,
+                    },
+                },
+                StructTypeMember {
+                    name: Name {
+                        data: "z",
+                        node_id: Span {
+                            start: [ local path prefix ]/dictionary-specifier.fpp:3:43,
+                            end: [ local path prefix ]/dictionary-specifier.fpp:3:44,
+                        },
+                    },
+                    size: None,
+                    type_name: TypeName {
+                        kind: String(
+                            None,
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/dictionary-specifier.fpp:3:46,
+                            end: [ local path prefix ]/dictionary-specifier.fpp:3:52,
+                        },
+                    },
+                    format: None,
+                    node_id: Span {
+                        start: [ local path prefix ]/dictionary-specifier.fpp:3:43,
+                        end: [ local path prefix ]/dictionary-specifier.fpp:3:52,
+                    },
+                },
+            ],
+            default: None,
+            is_dictionary_def: true,
+            node_id: Span {
+                start: [ local path prefix ]/dictionary-specifier.fpp:3:1,
+                end: [ local path prefix ]/dictionary-specifier.fpp:3:54,
+            },
+        },
+        DefEnum {
+            name: Name {
+                data: "E",
+                node_id: Span {
+                    start: [ local path prefix ]/dictionary-specifier.fpp:4:17,
+                    end: [ local path prefix ]/dictionary-specifier.fpp:4:18,
+                },
+            },
+            type_name: None,
+            constants: [
+                DefEnumConstant {
+                    name: Name {
+                        data: "X",
+                        node_id: Span {
+                            start: [ local path prefix ]/dictionary-specifier.fpp:4:21,
+                            end: [ local path prefix ]/dictionary-specifier.fpp:4:22,
+                        },
+                    },
+                    value: None,
+                    node_id: Span {
+                        start: [ local path prefix ]/dictionary-specifier.fpp:4:21,
+                        end: [ local path prefix ]/dictionary-specifier.fpp:4:22,
+                    },
+                },
+                DefEnumConstant {
+                    name: Name {
+                        data: "Y",
+                        node_id: Span {
+                            start: [ local path prefix ]/dictionary-specifier.fpp:4:24,
+                            end: [ local path prefix ]/dictionary-specifier.fpp:4:25,
+                        },
+                    },
+                    value: None,
+                    node_id: Span {
+                        start: [ local path prefix ]/dictionary-specifier.fpp:4:24,
+                        end: [ local path prefix ]/dictionary-specifier.fpp:4:25,
+                    },
+                },
+                DefEnumConstant {
+                    name: Name {
+                        data: "Z",
+                        node_id: Span {
+                            start: [ local path prefix ]/dictionary-specifier.fpp:4:27,
+                            end: [ local path prefix ]/dictionary-specifier.fpp:4:28,
+                        },
+                    },
+                    value: None,
+                    node_id: Span {
+                        start: [ local path prefix ]/dictionary-specifier.fpp:4:27,
+                        end: [ local path prefix ]/dictionary-specifier.fpp:4:28,
+                    },
+                },
+            ],
+            default: Some(
+                Expr {
+                    kind: Ident {
+                        value: "X",
+                        is_absolute: false,
+                    },
+                    node_id: Span {
+                        start: [ local path prefix ]/dictionary-specifier.fpp:4:39,
+                        end: [ local path prefix ]/dictionary-specifier.fpp:4:40,
+                    },
+                },
+            ),
+            is_dictionary_def: true,
+            node_id: Span {
+                start: [ local path prefix ]/dictionary-specifier.fpp:4:1,
+                end: [ local path prefix ]/dictionary-specifier.fpp:4:40,
+            },
+        },
+        DefConstant {
+            name: Name {
+                data: "C",
+                node_id: Span {
+                    start: [ local path prefix ]/dictionary-specifier.fpp:5:21,
+                    end: [ local path prefix ]/dictionary-specifier.fpp:5:22,
+                },
+            },
+            value: Expr {
+                kind: LiteralInt(
+                    "1",
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/dictionary-specifier.fpp:5:25,
+                    end: [ local path prefix ]/dictionary-specifier.fpp:5:26,
+                },
+            },
+            is_dictionary_def: true,
+            node_id: Span {
+                start: [ local path prefix ]/dictionary-specifier.fpp:5:1,
+                end: [ local path prefix ]/dictionary-specifier.fpp:5:26,
+            },
+        },
+    ],
+)

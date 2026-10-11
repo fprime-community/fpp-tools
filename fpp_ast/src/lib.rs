@@ -20,7 +20,9 @@ pub use template::*;
 pub use topology::*;
 pub use visit::*;
 
+/// An AST node with an identifier
 pub trait AstNode: fpp_core::Spanned + Sized {
+    /// The node identifier
     fn id(&self) -> fpp_core::Node;
 }
 
@@ -28,6 +30,7 @@ pub trait AstNode: fpp_core::Spanned + Sized {
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct TransUnit(pub Vec<ModuleMember>);
 
+/// A string literal
 #[ast]
 #[derive(Debug, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct LitString {
@@ -61,6 +64,16 @@ pub enum FloatKind {
     F64,
 }
 
+/// Writes the type name
+impl std::fmt::Display for FloatKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            FloatKind::F32 => "F32",
+            FloatKind::F64 => "F64",
+        })
+    }
+}
+
 /// Int type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum IntegerKind {
@@ -74,6 +87,23 @@ pub enum IntegerKind {
     I64,
 }
 
+/// Writes the type name
+impl std::fmt::Display for IntegerKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            IntegerKind::U8 => "U8",
+            IntegerKind::I8 => "I8",
+            IntegerKind::U16 => "U16",
+            IntegerKind::I16 => "I16",
+            IntegerKind::U32 => "U32",
+            IntegerKind::I32 => "I32",
+            IntegerKind::U64 => "U64",
+            IntegerKind::I64 => "I64",
+        })
+    }
+}
+
+/// The kinds of type name
 #[derive(Debug, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum TypeNameKind {
     #[visitable(ignore)]
@@ -273,6 +303,7 @@ pub struct StructExprMember {
     pub value: Expr,
 }
 
+/// The kinds of expression
 #[derive(Debug, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum ExprKind {
     Array(Vec<Expr>),
@@ -374,10 +405,33 @@ pub enum Binop {
     RShift,
 }
 
+/// Writes the operator
+impl std::fmt::Display for Binop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Binop::Add => "+",
+            Binop::Div => "/",
+            Binop::Mul => "*",
+            Binop::Sub => "-",
+            Binop::LShift => "<<",
+            Binop::RShift => ">>",
+        })
+    }
+}
+
 /// Unary operation
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum Unop {
     Minus,
+}
+
+/// Writes the operator
+impl std::fmt::Display for Unop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Unop::Minus => "-",
+        })
+    }
 }
 
 /// Abstract type definition
@@ -543,6 +597,23 @@ pub enum SpecLocKind {
     Interface,
 }
 
+/// Writes the location kind as it is spelled in a location specifier
+impl std::fmt::Display for SpecLocKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            SpecLocKind::Component => "component",
+            SpecLocKind::Instance => "instance",
+            SpecLocKind::Constant => "constant",
+            SpecLocKind::Port => "port",
+            SpecLocKind::StateMachine => "state machine",
+            SpecLocKind::Template => "template",
+            SpecLocKind::System => "system",
+            SpecLocKind::Type => "type",
+            SpecLocKind::Interface => "interface",
+        })
+    }
+}
+
 /// Location specifier
 #[ast]
 #[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
@@ -652,4 +723,30 @@ pub struct SpecInclude {
 #[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
 pub struct SpecInterfaceImport {
     pub interface: QualIdent,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    /// Each enum is written as it is spelled in FPP source
+    #[test]
+    fn enum_spellings() {
+        assert_eq!(FloatKind::F64.to_string(), "F64");
+        assert_eq!(IntegerKind::U32.to_string(), "U32");
+        assert_eq!(Binop::LShift.to_string(), "<<");
+        assert_eq!(Unop::Minus.to_string(), "-");
+        assert_eq!(SpecLocKind::StateMachine.to_string(), "state machine");
+        assert_eq!(InputPortKind::Guarded.to_string(), "guarded");
+        assert_eq!(QueueFull::Hook.to_string(), "hook");
+        assert_eq!(EventSeverity::WarningHigh.to_string(), "warning high");
+        assert_eq!(TlmChannelUpdate::OnChange.to_string(), "on change");
+        assert_eq!(TlmChannelLimitKind::Orange.to_string(), "orange");
+        assert_eq!(ConnectionPatternKind::TextEvent.to_string(), "text event");
+        assert_eq!(
+            GeneralPortInstanceKind::Input(InputPortKind::Async).to_string(),
+            "async input"
+        );
+        assert_eq!(GeneralPortInstanceKind::Output.to_string(), "output");
+    }
 }

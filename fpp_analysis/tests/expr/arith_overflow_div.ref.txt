@@ -1,5 +1,5 @@
- --> [ local path prefix ]/expr/arith_overflow_div.fpp:3:24
+ --> [ local path prefix ]/expr/arith_overflow_div.fpp:3:28
   |
 3 | constant divOverflow = min / (0 - 1)
-  |                        ^^^^^^^^^^^^^ arithmetic result is too large to represent
+  |                            ^^^^^^^^^ arithmetic result is too large to represent
 

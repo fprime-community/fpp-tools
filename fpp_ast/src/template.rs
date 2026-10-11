@@ -55,6 +55,7 @@ impl TemplateParam {
 /// Template parameter list
 pub type TemplateParamList = Vec<TemplateParam>;
 
+/// The kinds of template argument
 #[derive(Debug, Clone, Replicate, DirectWalkable, serde::Serialize)]
 pub enum TemplateArgKind {
     Constant(Expr),

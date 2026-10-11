@@ -1,0 +1,16 @@
+ --> [ local path prefix ]/eof-in-block.fpp:2:3
+  |
+2 |   constant a = 1 +
+  |   ^^^^^^^^ syntax error: unexpected token
+  |
+  = note: expected }
+  = note: got constant
+
+ --> [ local path prefix ]/eof-in-block.fpp:2:19
+  |
+2 |   constant a = 1 +
+  |                   ^ syntax error: unexpected token
+  |
+  = note: expected }
+  = note: got end of input
+

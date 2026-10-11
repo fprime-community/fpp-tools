@@ -285,6 +285,7 @@ impl<E: DiagnosticEmitter> CompilerContext<E> {
         self.files.iter().map(|f| f.deref())
     }
 
+    /// Create a new AST node with a fresh identifier, located at `span`
     pub(crate) fn node_add(&mut self, span: &Span) -> Node {
         let handle = self.nodes.push(NodeData {
             span_handle: span.handle,
@@ -322,6 +323,8 @@ impl<E: DiagnosticEmitter> CompilerContext<E> {
         Span { handle }
     }
 
+    /// Get the data of an AST node: its location and annotations. Panics if
+    /// the node is not in the context.
     pub fn node_get(&self, node: &Node) -> &NodeData {
         self.nodes.get(node.handle)
     }
@@ -339,6 +342,8 @@ impl<E: DiagnosticEmitter> CompilerContext<E> {
         self.nodes.get_mut(node.handle)
     }
 
+    /// Get the location of an AST node. Panics if the node is not in the
+    /// context.
     pub fn node_get_span(&self, node: &Node) -> Span {
         Span {
             handle: self.nodes.get(node.handle).span_handle,
