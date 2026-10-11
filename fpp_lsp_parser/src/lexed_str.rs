@@ -23,13 +23,58 @@ impl<'a> LexedStr<'a> {
     pub fn new(text: &'a str) -> LexedStr<'a> {
         let mut conv = Converter::new(text);
 
-        let lexer = fpp_lexer::Lexer::new(text);
-        for token in lexer {
-            let token_text = &text[conv.offset..][..token.len];
-            conv.push(token.kind.into(), token_text.len(), vec![]);
+        let mut lexer = fpp_lexer::Lexer::new(text);
+        for token in lexer.by_ref() {
+            conv.push(token.kind.into(), token.len);
         }
 
-        conv.finalize_with_eof()
+        let mut res = conv.finalize_with_eof();
+        for err in lexer.errors() {
+            let token = res.token_at_error(err.pos, err.len);
+            res.error.push(LexError {
+                msg: format!("invalid token: {}", err.msg),
+                token: token as u32,
+            });
+        }
+        res.add_unknown_token_errors();
+        res.error.sort_by_key(|e| e.token);
+        res
+    }
+
+    /// The index of the token that was being lexed when the lexer reported an
+    /// error at byte offset `pos` covering `len` bytes. A zero-length error
+    /// sits at the end of the token that reported it.
+    fn token_at_error(&self, pos: usize, len: usize) -> usize {
+        let n = self.len();
+        let after = if len == 0 {
+            self.start[..n].partition_point(|&s| (s as usize) < pos)
+        } else {
+            self.start[..n].partition_point(|&s| (s as usize) <= pos)
+        };
+        after.saturating_sub(1).min(n.saturating_sub(1))
+    }
+
+    /// Report the characters of an `UNKNOWN` token that the lexer did not
+    /// already report. These are the characters that cannot begin any token;
+    /// the parser skips them, as the Scala lexer does after reporting them.
+    fn add_unknown_token_errors(&mut self) {
+        for i in 0..self.len() {
+            if self.kind[i] != UNKNOWN || self.error.iter().any(|e| e.token as usize == i) {
+                continue;
+            }
+            let text = self.text(i);
+            let msgs = match text {
+                "$" => vec!["invalid usage of '$', expected identifier".to_string()],
+                "<" | ">" => vec![format!("'{text}'")],
+                _ => text.chars().map(invalid_character_message).collect(),
+            };
+            for msg in msgs {
+                self.error.push(LexError {
+                    msg: format!("invalid token: {msg}"),
+                    token: i as u32,
+                });
+            }
+        }
     }
 
     pub fn as_str(&self) -> &str {
@@ -121,18 +166,25 @@ impl<'a> Converter<'a> {
         self.res
     }
 
-    fn push(&mut self, kind: SyntaxKind, len: usize, errors: Vec<String>) {
+    fn push(&mut self, kind: SyntaxKind, len: usize) {
         self.res.push(kind, self.offset);
         self.offset += len;
+    }
+}
 
-        for msg in errors {
-            if !msg.is_empty() {
-                self.res.error.push(LexError {
-                    msg,
-                    token: self.res.len() as u32,
-                });
-            }
-        }
+/// The message for a character that cannot begin a token: its unicode value,
+/// in case the console cannot display it, with a note for a tab character.
+fn invalid_character_message(ch: char) -> String {
+    let prefix = format!("unicode value {}, hex 0x{:x}", ch as u32, ch as u32);
+    if ch == '\t' {
+        [
+            prefix.as_str(),
+            "note: embedded tab characters are not allowed in FPP source files",
+            "try configuring your editor to convert tabs to spaces",
+        ]
+        .join("\n")
+    } else {
+        prefix
     }
 }
 

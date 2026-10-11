@@ -116,15 +116,21 @@ pub(crate) fn build_tree(
         ),
     });
 
-    let (node, mut errors) = builder.finish_raw();
-    for (i, err) in lexed.errors() {
-        let text_range = lexed.text_range(i);
-        let text_range = TextRange::new(
-            text_range.start.try_into().unwrap(),
-            text_range.end.try_into().unwrap(),
-        );
-        errors.push(SyntaxError::new(err, text_range))
-    }
+    // The lexer errors come first: the Scala parser reports them before it
+    // parses anything.
+    let (node, parse_errors) = builder.finish_raw();
+    let mut errors: Vec<SyntaxError> = lexed
+        .errors()
+        .map(|(i, err)| {
+            let text_range = lexed.text_range(i);
+            let text_range = TextRange::new(
+                text_range.start.try_into().unwrap(),
+                text_range.end.try_into().unwrap(),
+            );
+            SyntaxError::new(err, text_range)
+        })
+        .collect();
+    errors.extend(parse_errors);
 
     (node, errors, is_eof)
 }

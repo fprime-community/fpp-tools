@@ -1,9 +1,7 @@
 ROOT@0..30
-  ERROR@0..1
-    UNKNOWN@0..1 "%"
+  UNKNOWN@0..1 "%"
   EOL@1..2 "\n"
-  ERROR@2..3
-    UNKNOWN@2..3 "\t"
+  UNKNOWN@2..3 "\t"
   EOL@3..4 "\n"
   ERROR@4..7
     IDENT@4..7 "tok"
@@ -13,7 +11,10 @@ ROOT@0..30
     IDENT@15..19 "tok2"
   WHITESPACE@19..20 " "
   WHITESPACE@20..30 "\\ illegal\n"
-error 0..0: module member expected
-error 2..2: module member expected
+error 0..1: invalid token: unicode value 37, hex 0x25
+error 2..3: invalid token: unicode value 9, hex 0x9
+note: embedded tab characters are not allowed in FPP source files
+try configuring your editor to convert tabs to spaces
+error 20..30: invalid token: non whitespace character illegal after line continuation
 error 4..4: module member expected
 error 15..15: expected `;`

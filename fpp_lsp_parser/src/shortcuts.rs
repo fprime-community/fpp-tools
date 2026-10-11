@@ -80,7 +80,9 @@ impl LexedStr<'_> {
         let mut skip = 0;
         while skip + i < self.len() {
             match self.kind(i + skip) {
-                WHITESPACE => {
+                // A character that cannot begin a token is reported by the
+                // lexer and skipped like whitespace.
+                WHITESPACE | UNKNOWN => {
                     skip += 1;
                 }
                 EOL | COMMENT | PRE_ANNOTATION | POST_ANNOTATION => {
@@ -306,7 +308,7 @@ impl Builder<'_, '_> {
             for _ in 0..n {
                 let kind = self.lexed.kind(self.pos);
                 match kind {
-                    WHITESPACE | COMMENT => {
+                    WHITESPACE | COMMENT | UNKNOWN => {
                         self.do_token(kind, 1);
                     }
                     _ => break,
