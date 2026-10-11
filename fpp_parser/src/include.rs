@@ -1,12 +1,16 @@
-use crate::error::{ParseError, ParseResult};
+use crate::error::ParseError;
 use crate::{Parser, parse};
 use fpp_ast::*;
-use fpp_core::{FileReader, Position, SourceFile, Span, Spanned};
+use fpp_core::{File, FileReader, SourceFile, Span, Spanned};
 use rustc_hash::FxHashMap;
 use std::ops::ControlFlow;
 
+/// The kind of member list that an included file is spliced into, which is
+/// the entry point its text is parsed with
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum IncludeParentKind {
+    State,
+    StateMachine,
     TlmPacketSet,
     TlmPacket,
     Topology,
@@ -14,8 +18,10 @@ pub enum IncludeParentKind {
     Component,
 }
 
+/// The kind of member list each included file is spliced into
 type ResolveIncludesState = FxHashMap<SourceFile, IncludeParentKind>;
 
+/// Resolve include specifiers
 pub struct ResolveIncludes<Reader: FileReader> {
     reader: Reader,
 }
@@ -25,38 +31,34 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
         ResolveIncludes { reader }
     }
 
-    fn check_loc_for_cycle(
-        including_span: Span,
-        including_path: &str,
-        loc_opt: Option<Span>,
-        mut visited_paths: Vec<Position>,
-    ) -> ParseResult<()> {
-        match loc_opt {
-            None => Ok(()),
-            Some(loc) => {
-                let uri = loc.file().uri();
-                visited_paths.push(loc.start());
-                if uri == including_path {
-                    Err(ParseError::IncludeCycle {
-                        span: including_span,
-                        include_cycle: visited_paths,
-                    })
-                } else {
-                    Self::check_loc_for_cycle(
-                        including_span,
-                        including_path,
-                        loc.including_span(),
-                        visited_paths,
-                    )
-                }
-            }
+    /// Check that including the file at `included_path` from the location
+    /// `including_span` does not close a cycle of includes
+    fn check_for_cycle(including_span: Span, included_path: &str) -> Result<(), ParseError> {
+        if including_span.file().uri() == "<stdin>" {
+            return Ok(());
         }
+
+        let included_file = File::from_string(included_path);
+        let mut visited_paths = vec![included_path.to_string()];
+        let mut loc_opt = Some(including_span);
+        while let Some(loc) = loc_opt {
+            let path = loc.file().uri();
+            let is_cycle = File::from_string(&path) == included_file;
+            visited_paths.insert(0, path);
+            if is_cycle {
+                return Err(ParseError::IncludeCycle {
+                    span: including_span,
+                    paths: visited_paths,
+                });
+            }
+            loc_opt = loc.including_span();
+        }
+
+        Ok(())
     }
 
-    fn check_for_cycle(including_span: Span, including_path: &str) -> ParseResult<()> {
-        Self::check_loc_for_cycle(including_span, including_path, Some(including_span), vec![])
-    }
-
+    /// Parse the file that `spec_include` names with `parser`, and splice its
+    /// members, transformed by `transformer`, into `out`
     fn resolve_spec_include<T>(
         &self,
         a: &mut ResolveIncludesState,
@@ -66,48 +68,43 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
         transformer: fn(&ResolveIncludes<Reader>, &mut ResolveIncludesState, T, &mut Vec<T>),
         out: &mut Vec<T>,
     ) {
-        let file_path = match self
+        let including_span = spec_include.file.span();
+        let path = match self
             .reader
-            .resolve(spec_include.span().file(), &spec_include.file.data)
+            .resolve(including_span.file(), &spec_include.file.data)
         {
-            Ok(file_path) => file_path,
-            Err(err) => {
-                fpp_core::Diagnostic::new(
-                    spec_include.file.span(),
-                    fpp_core::Level::Error,
-                    err.to_string(),
-                )
+            Ok(path) => path,
+            Err(_) => {
+                fpp_core::Diagnostic::from(ParseError::CannotResolvePath {
+                    span: including_span,
+                    name: spec_include.file.data.clone(),
+                })
                 .emit();
                 return;
             }
         };
 
-        match Self::check_for_cycle(spec_include.span(), &file_path) {
-            Ok(_) => {}
-            Err(err) => {
-                fpp_core::Diagnostic::from(err).emit();
-                return;
-            }
-        };
+        if let Err(err) = Self::check_for_cycle(including_span, &path) {
+            fpp_core::Diagnostic::from(err).emit();
+            return;
+        }
 
-        // Read the file
-        let content = match self.reader.read(&file_path) {
+        let content = match self.reader.read(&path) {
             Ok(content) => content,
-            Err(err) => {
-                fpp_core::Diagnostic::new(
-                    spec_include.file.span(),
-                    fpp_core::Level::Error,
-                    err.to_string(),
-                )
+            Err(_) => {
+                fpp_core::Diagnostic::from(ParseError::CannotOpen {
+                    span: including_span,
+                    name: path,
+                })
                 .emit();
                 return;
             }
         };
 
-        let file = SourceFile::new_with_parent(&file_path, content, spec_include.span().file());
+        let file = SourceFile::new_with_parent(&path, content, including_span.file());
         a.insert(file, kind);
 
-        let members = parse(file, parser, Some(spec_include.span()));
+        let members = parse(file, parser, Some(including_span));
         for member in members {
             transformer(self, a, member, out);
         }
@@ -173,6 +170,54 @@ impl<Reader: FileReader> ResolveIncludes<Reader> {
                     spec_include,
                     |p| p.module_members(),
                     Self::module_member,
+                    out,
+                );
+            }
+            _ => {
+                let _ = member.visit_mut(a, self);
+                out.push(member)
+            }
+        }
+    }
+
+    fn state_machine_member(
+        &self,
+        a: &mut ResolveIncludesState,
+        mut member: StateMachineMember,
+        out: &mut Vec<StateMachineMember>,
+    ) {
+        match &mut member {
+            StateMachineMember::SpecInclude(spec_include) => {
+                self.resolve_spec_include(
+                    a,
+                    IncludeParentKind::StateMachine,
+                    spec_include,
+                    |p| p.state_machine_members(),
+                    Self::state_machine_member,
+                    out,
+                );
+            }
+            _ => {
+                let _ = member.visit_mut(a, self);
+                out.push(member)
+            }
+        }
+    }
+
+    fn state_member(
+        &self,
+        a: &mut ResolveIncludesState,
+        mut member: StateMember,
+        out: &mut Vec<StateMember>,
+    ) {
+        match &mut member {
+            StateMember::SpecInclude(spec_include) => {
+                self.resolve_spec_include(
+                    a,
+                    IncludeParentKind::State,
+                    spec_include,
+                    |p| p.state_members(),
+                    Self::state_member,
                     out,
                 );
             }
@@ -272,6 +317,35 @@ impl<Reader: FileReader> MutVisitor for ResolveIncludes<Reader> {
         let old_members = std::mem::take(&mut node.members);
         for member in old_members.into_iter() {
             self.module_member(a, member, &mut node.members)
+        }
+
+        ControlFlow::Continue(())
+    }
+
+    fn visit_def_state(
+        &self,
+        a: &mut Self::State,
+        node: &mut DefState,
+    ) -> ControlFlow<Self::Break> {
+        let old_members = std::mem::take(&mut node.members);
+        for member in old_members.into_iter() {
+            self.state_member(a, member, &mut node.members)
+        }
+
+        ControlFlow::Continue(())
+    }
+
+    /// An external state machine has no members to resolve
+    fn visit_def_state_machine(
+        &self,
+        a: &mut Self::State,
+        node: &mut DefStateMachine,
+    ) -> ControlFlow<Self::Break> {
+        if let Some(members) = &mut node.members {
+            let old_members = std::mem::take(members);
+            for member in old_members.into_iter() {
+                self.state_machine_member(a, member, members)
+            }
         }
 
         ControlFlow::Continue(())

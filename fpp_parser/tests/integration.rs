@@ -6,16 +6,20 @@ use pretty_assertions::assert_eq;
 use std::path::PathBuf;
 use std::{env, fs};
 
+/// Parse `file_path`.fpp, resolve its includes, and compare the result with
+/// `file_path`.ref.txt
 fn run_test(file_path: &str) {
+    run_test_files(&[file_path], file_path)
+}
+
+/// Parse each of the files `file_paths` (without the `.fpp`), resolve their
+/// includes, and compare the result with `ref_path`.ref.txt
+fn run_test_files(file_paths: &[&str], ref_path: &str) {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
 
-    let mut fpp_file = path.clone();
-    fpp_file.push(file_path);
-    fpp_file.set_extension("fpp");
-
     let mut ref_file = path.clone();
-    ref_file.push(file_path);
+    ref_file.push(ref_path);
     ref_file.set_extension("ref.txt");
 
     let file_reader = FsReader {};
@@ -25,17 +29,24 @@ fn run_test(file_path: &str) {
         fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics_str));
 
     let ast: String = fpp_core::run(&mut ctx, || {
-        let source_file_path = fpp_file.to_str().unwrap();
-        let src = match file_reader.read(source_file_path) {
-            Ok(src) => SourceFile::new(source_file_path, src),
-            Err(err) => panic!("failed to open {}: {}", source_file_path, err),
-        };
+        let mut out = String::new();
+        for file_path in file_paths {
+            let mut fpp_file = path.clone();
+            fpp_file.push(file_path);
+            fpp_file.set_extension("fpp");
+            let source_file_path = fpp_file.to_str().unwrap();
+            let src = match file_reader.read(source_file_path) {
+                Ok(src) => SourceFile::new(source_file_path, src),
+                Err(err) => panic!("failed to open {}: {}", source_file_path, err),
+            };
 
-        // Parse the source
-        let mut ast = parse(src, |p| p.trans_unit(), None);
-        let mut source_files = Default::default();
-        let _ = ResolveIncludes::new(file_reader).visit_trans_unit(&mut source_files, &mut ast);
-        format!("{:#?}", ast)
+            // Parse the source
+            let mut ast = parse(src, |p| p.trans_unit(), None);
+            let mut source_files = Default::default();
+            let _ = ResolveIncludes::new(FsReader {}).visit_trans_unit(&mut source_files, &mut ast);
+            out.push_str(&format!("{:#?}", ast));
+        }
+        out
     });
 
     let output = if diagnostics_str.is_empty() {
@@ -61,21 +72,6 @@ fn run_test(file_path: &str) {
 #[test]
 fn comments() {
     run_test("comments")
-}
-
-#[test]
-fn cycle_1() {
-    run_test("cycle-1")
-}
-
-#[test]
-fn cycle_2() {
-    run_test("cycle-2")
-}
-
-#[test]
-fn cycle_3() {
-    run_test("cycle-3")
 }
 
 #[test]
@@ -109,6 +105,22 @@ fn include_constant_1() {
 }
 
 #[test]
+fn include_cycle_1() {
+    run_test_files(&["cycle-1"], "include-cycle-1")
+}
+
+#[test]
+fn include_cycle_2() {
+    run_test_files(&["cycle-2"], "include-cycle-2")
+}
+
+// Rust-only: the cycle entered at its third file
+#[test]
+fn include_cycle_3() {
+    run_test_files(&["cycle-3"], "include-cycle-3")
+}
+
+#[test]
 fn include_missing_file() {
     run_test("include-missing-file")
 }
@@ -124,8 +136,18 @@ fn include_packet_comment() {
 }
 
 #[test]
+fn include_parent_dir() {
+    run_test("subdir/include-parent-dir")
+}
+
+#[test]
 fn include_parse_error() {
     run_test("include-parse-error")
+}
+
+#[test]
+fn include_state_machine() {
+    run_test("include-state-machine")
 }
 
 #[test]
@@ -146,6 +168,12 @@ fn implements_newline() {
 #[test]
 fn parse_error() {
     run_test("parse-error")
+}
+
+// Rust-only: the errors reported after the first one
+#[test]
+fn parse_error_recovery() {
+    run_test("parse-error-recovery")
 }
 
 #[test]
@@ -181,6 +209,11 @@ fn system() {
 #[test]
 fn topology_ports() {
     run_test("topology-ports")
+}
+
+#[test]
+fn two_input_files() {
+    run_test_files(&["include-module", "include-component"], "two-input-files")
 }
 
 #[test]
@@ -283,4 +316,30 @@ fn eof_in_block() {
 #[test]
 fn interface_member_error() {
     run_test("interface-member-error")
+}
+
+// Rust-only: include resolution
+#[test]
+fn include_stray_brace() {
+    run_test("include-stray-brace")
+}
+
+#[test]
+fn include_normalized_path() {
+    run_test("include-normalized-path")
+}
+
+#[test]
+fn include_self() {
+    run_test("include-self")
+}
+
+#[test]
+fn include_state_machine_missing_file() {
+    run_test("include-state-machine-missing-file")
+}
+
+#[test]
+fn include_packet_leading_comment() {
+    run_test("include-packet-leading-comment")
 }

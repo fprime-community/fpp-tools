@@ -1,0 +1,79 @@
+TransUnit(
+    [
+        DefConstant {
+            name: Name {
+                data: "x",
+                node_id: Span {
+                    start: [ local path prefix ]/constant.fppi:2:10,
+                    end: [ local path prefix ]/constant.fppi:2:11,
+                },
+            },
+            value: Expr {
+                kind: LiteralInt(
+                    "0",
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/constant.fppi:2:14,
+                    end: [ local path prefix ]/constant.fppi:2:15,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/constant.fppi:2:1,
+                end: [ local path prefix ]/constant.fppi:2:15,
+            },
+            pre_annotation: [
+                "Included constant",
+            ],
+            post_annotation: [
+                "Included constant",
+            ],
+        },
+        DefConstant {
+            name: Name {
+                data: "y",
+                node_id: Span {
+                    start: [ local path prefix ]/include-constant-2.fppi:1:10,
+                    end: [ local path prefix ]/include-constant-2.fppi:1:11,
+                },
+            },
+            value: Expr {
+                kind: LiteralInt(
+                    "2",
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/include-constant-2.fppi:1:14,
+                    end: [ local path prefix ]/include-constant-2.fppi:1:15,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/include-constant-2.fppi:1:1,
+                end: [ local path prefix ]/include-constant-2.fppi:1:15,
+            },
+        },
+        DefConstant {
+            name: Name {
+                data: "z",
+                node_id: Span {
+                    start: [ local path prefix ]/include-constant-3.fppi:1:10,
+                    end: [ local path prefix ]/include-constant-3.fppi:1:11,
+                },
+            },
+            value: Expr {
+                kind: LiteralInt(
+                    "3",
+                ),
+                node_id: Span {
+                    start: [ local path prefix ]/include-constant-3.fppi:1:14,
+                    end: [ local path prefix ]/include-constant-3.fppi:1:15,
+                },
+            },
+            is_dictionary_def: false,
+            node_id: Span {
+                start: [ local path prefix ]/include-constant-3.fppi:1:1,
+                end: [ local path prefix ]/include-constant-3.fppi:1:15,
+            },
+        },
+    ],
+)

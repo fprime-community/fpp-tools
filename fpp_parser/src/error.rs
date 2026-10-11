@@ -1,4 +1,4 @@
-use fpp_core::{Diagnostic, Level, Position, Span};
+use fpp_core::{Diagnostic, Level, Span};
 use fpp_lexer::TokenKind;
 use std::fmt::Formatter;
 
@@ -28,9 +28,23 @@ pub(crate) enum ParseError {
         got_span: Span,
     },
 
+    /// Include cycle, through the files in `paths`: each one includes the
+    /// next, and the last is the first
     IncludeCycle {
         span: Span,
-        include_cycle: Vec<Position>,
+        paths: Vec<String>,
+    },
+
+    /// Cannot open file
+    CannotOpen {
+        span: Span,
+        name: String,
+    },
+
+    /// Cannot resolve path
+    CannotResolvePath {
+        span: Span,
+        name: String,
     },
 }
 
@@ -77,14 +91,21 @@ impl From<ParseError> for Diagnostic {
                 Diagnostic::new(got_span, Level::Error, "syntax error: unexpected token")
                     .note(format!("got {}", got_kind))
             }
-            ParseError::IncludeCycle {
-                span,
-                include_cycle,
-            } => {
-                let diag = Diagnostic::new(span, Level::Error, "include cycle detected");
-                include_cycle.into_iter().fold(diag, |diag, pos| {
-                    diag.note(format! {"included from {}", pos})
-                })
+            ParseError::IncludeCycle { span, paths } => {
+                let last = paths.len() - 1;
+                paths.into_iter().enumerate().fold(
+                    Diagnostic::new(span, Level::Error, "include cycle:"),
+                    |diag, (i, path)| match i == last {
+                        true => diag.note(path),
+                        false => diag.note(format!("{path} includes")),
+                    },
+                )
+            }
+            ParseError::CannotOpen { span, name } => {
+                Diagnostic::new(span, Level::Error, format!("cannot open file {name}"))
+            }
+            ParseError::CannotResolvePath { span, name } => {
+                Diagnostic::new(span, Level::Error, format!("cannot resolve path {name}"))
             }
         }
     }

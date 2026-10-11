@@ -1,11 +1,11 @@
 use crate::diagnostic::Diagnostic;
 use crate::diagnostic::Level;
-use crate::file::{File, SourceFile, normalize};
+use crate::file::SourceFile;
 use crate::interface::with;
 use crate::{BytePos, Spanned};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Span {
@@ -109,20 +109,14 @@ impl Span {
     ///
     /// For standard input, this is the current working directory.
     pub fn get_dir_path(&self) -> PathBuf {
-        let uri = self.file().uri();
-        if uri == "<stdin>" {
-            File::get_path("")
-        } else {
-            let path = File::get_path(&uri);
-            path.parent().map(Path::to_path_buf).unwrap_or(path)
-        }
+        self.file().get_dir_path()
     }
 
     /// Resolve a path relative to the path of this location
     ///
     /// The result is normalized lexically, without reading the file system.
     pub fn get_relative_path(&self, path: &str) -> PathBuf {
-        normalize(&self.get_dir_path().join(path))
+        self.file().get_relative_path(path)
     }
 
     /// Compare two locations: by file, then by line and column, then by the

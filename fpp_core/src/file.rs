@@ -71,31 +71,13 @@ pub(crate) fn normalize(path: &Path) -> PathBuf {
 }
 
 pub trait FileReader {
-    /// Resolve an include path relative to the parent source file
-    /// where the "include" exists
+    /// Resolve the path of a file included from the source file `current`,
+    /// relative to the directory of `current`
     fn resolve(&self, current: SourceFile, include: &str) -> Result<String, Error> {
-        let current_path = if current.uri() == "<stdin>" {
-            // Read from relative to the current directory
-            return Ok(include.to_string());
-        } else {
-            current.uri()
-        };
-
-        let parent_file_path = std::path::Path::new(&current_path).canonicalize()?;
-        match parent_file_path.parent() {
-            None => Err(format!("Cannot resolve parent directory of {}", current_path).into()),
-            Some(parent_dir) => {
-                let final_path = parent_dir.join(include);
-                match final_path.as_path().to_str() {
-                    None => Err(format!(
-                        "Failed to resolve path {} relative to {:?}",
-                        include, parent_dir
-                    )
-                    .into()),
-                    Some(file_path) => Ok(file_path.to_string()),
-                }
-            }
-        }
+        Ok(current
+            .get_relative_path(include)
+            .to_string_lossy()
+            .into_owned())
     }
 
     /// Read a file given its path
@@ -182,6 +164,26 @@ impl SourceFile {
 
     pub fn len(&self) -> usize {
         with(|w| w.file_len(self))
+    }
+
+    /// Get the directory path associated with the file
+    ///
+    /// For standard input, this is the current working directory.
+    pub fn get_dir_path(&self) -> PathBuf {
+        let uri = self.uri();
+        if uri == "<stdin>" {
+            File::get_path("")
+        } else {
+            let path = File::get_path(&uri);
+            path.parent().map(Path::to_path_buf).unwrap_or(path)
+        }
+    }
+
+    /// Resolve a path relative to the directory of the file
+    ///
+    /// The result is normalized lexically, without reading the file system.
+    pub fn get_relative_path(&self, path: &str) -> PathBuf {
+        normalize(&self.get_dir_path().join(path))
     }
 
     pub fn is_empty(&self) -> bool {
