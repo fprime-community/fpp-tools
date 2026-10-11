@@ -398,20 +398,10 @@ impl<'ast> EvalConstantExprs<'ast> {
         node: &'ast Expr,
         value: &str,
     ) -> ControlFlow<()> {
-        let value: f64 = match value.parse() {
-            Ok(value) => value,
-            Err(err) => {
-                SemanticError::InvalidIntValue {
-                    loc: node.span(),
-                    v: None,
-                    msg: format!("failed to parse floating value: {}", err),
-                }
-                .emit();
-                return ControlFlow::Break(());
-            }
-        };
         let v = Value::Float(FloatValue {
-            value,
+            value: value
+                .parse()
+                .expect("the lexer accepts only well-formed float literals"),
             kind: fpp_ast::FloatKind::F64,
         });
         a.assign_value(node.node_id, v);
