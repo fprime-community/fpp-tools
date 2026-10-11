@@ -205,6 +205,31 @@ fn letter_after_float_literal() {
 }
 
 #[test]
+fn identifier_part_after_float_literal() {
+    // An identifier-ignorable character ends the literal with an error, and
+    // then is an invalid character of its own
+    for s in ["1.5\u{ad}", "1.5\u{85}", "1.5\u{200b}"] {
+        let ch = &s[3..];
+        let code = ch.chars().next().unwrap() as u32;
+        assert_eq!(
+            errors(s),
+            expected_errors(&[
+                (s, "invalid literal number"),
+                (ch, &format!("unicode value {code}, hex 0x{code:x}")),
+            ]),
+            "{s:?}"
+        );
+    }
+
+    // A character outside the Basic Multilingual Plane is not part of an
+    // identifier, even if it is a letter
+    assert_eq!(
+        errors("1.5\u{1d400}"),
+        expected_errors(&[("\u{1d400}", "unicode value 119808, hex 0x1d400")])
+    );
+}
+
+#[test]
 fn annotations() {
     let tokens = lex(r#"@ Pre annotation
         Some Identifiers @< Post annotation"#);

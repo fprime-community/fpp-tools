@@ -19,7 +19,39 @@ pub fn digit2int(ch: char, base: u32) -> Option<u32> {
     if num < base { Some(num) } else { None }
 }
 
-/// Whether `c` may be part of a Unicode identifier
+/// Whether `c` may be part of a Unicode identifier.
+///
+/// The test is the one Java's `Character.isUnicodeIdentifierPart` makes for
+/// a single UTF-16 code unit: an identifier-continue character or an
+/// identifier-ignorable character of the Basic Multilingual Plane. A
+/// character outside that plane is two surrogate code units, neither of which
+/// is part of an identifier.
 pub fn is_identifier_part(c: char) -> bool {
-    unicode_ident::is_xid_continue(c)
+    c <= '\u{FFFF}' && (unicode_ident::is_xid_continue(c) || is_identifier_ignorable(c))
+}
+
+/// Whether `c` is ignorable in an identifier: a control character that is not
+/// whitespace, or a format character of the Basic Multilingual Plane
+fn is_identifier_ignorable(c: char) -> bool {
+    matches!(
+        c,
+        '\u{0000}'..='\u{0008}'
+            | '\u{000E}'..='\u{001B}'
+            | '\u{007F}'..='\u{009F}'
+            // Format characters
+            | '\u{00AD}'
+            | '\u{0600}'..='\u{0605}'
+            | '\u{061C}'
+            | '\u{06DD}'
+            | '\u{070F}'
+            | '\u{0890}'..='\u{0891}'
+            | '\u{08E2}'
+            | '\u{180E}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{2064}'
+            | '\u{2066}'..='\u{206F}'
+            | '\u{FEFF}'
+            | '\u{FFF9}'..='\u{FFFB}'
+    )
 }
