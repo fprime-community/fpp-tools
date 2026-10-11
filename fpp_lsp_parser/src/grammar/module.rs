@@ -13,10 +13,10 @@ pub(super) fn def_module(p: &mut Parser) {
             module_member,
             SEMI,
             MODULE_MEMBER_LIST,
-            "expected module member",
+            "module member expected",
         )
     } else {
-        p.error("expected '{'")
+        p.error("{ expected")
     }
 
     m.complete(p, DEF_MODULE);
@@ -72,10 +72,10 @@ fn def_module_template(p: &mut Parser) {
             module_member,
             SEMI,
             MODULE_MEMBER_LIST,
-            "expected module member",
+            "module member expected",
         )
     } else {
-        p.error("expected '{'")
+        p.error("{ expected")
     }
 
     m.complete(p, DEF_MODULE_TEMPLATE);
@@ -90,7 +90,7 @@ fn template_param_list(p: &mut Parser) {
             template_param,
             COMMA,
             TEMPLATE_PARAM_LIST,
-            "expected template parameter",
+            "template parameter expected",
         );
     }
 }
@@ -104,7 +104,7 @@ fn template_param(p: &mut Parser) {
             if p.eat(COLON) {
                 types::type_name(p);
             } else {
-                p.error("expected `:`");
+                p.error(": expected");
             }
         }
         TYPE_KW => {
@@ -117,12 +117,12 @@ fn template_param(p: &mut Parser) {
             if p.eat(COLON) {
                 qual_ident(p);
             } else {
-                p.error("expected `:`");
+                p.error(": expected");
             }
         }
         _ => {
             m.abandon(p);
-            p.err_and_bump("expected template parameter");
+            p.err_and_bump("template parameter expected");
             return;
         }
     }
@@ -148,7 +148,7 @@ fn template_arg_list(p: &mut Parser) {
             template_arg,
             COMMA,
             TEMPLATE_ARG_LIST,
-            "expected template argument",
+            "template argument expected",
         );
     }
 }
@@ -170,7 +170,7 @@ fn template_arg(p: &mut Parser) {
         }
         _ => {
             m.abandon(p);
-            p.err_and_bump("expected template argument");
+            p.err_and_bump("template argument expected");
             return;
         }
     }
@@ -280,7 +280,7 @@ fn def_component_instance(p: &mut Parser) {
             spec_init,
             SEMI,
             INIT_SPEC_LIST,
-            "expected initialization specifier",
+            "phase expected",
         )
     }
 
@@ -320,10 +320,11 @@ fn def_interface(p: &mut Parser) {
 }
 
 fn interface_member(p: &mut Parser) {
-    if p.at(IMPORT_KW) {
-        spec_import_interface(p);
-    } else {
-        component::spec_port_instance(p);
+    match p.current() {
+        IMPORT_KW => spec_import_interface(p),
+        ASYNC_KW | GUARDED_KW | SYNC_KW | OUTPUT_KW | COMMAND_KW | EVENT_KW | PARAM_KW
+        | PRODUCT_KW | TELEMETRY_KW | TEXT_KW | TIME_KW => component::spec_port_instance(p),
+        _ => p.err_and_bump("component member expected"),
     }
 }
 
@@ -338,7 +339,7 @@ pub(super) fn def_constant(p: &mut Parser) {
     if p.eat(EQUALS) {
         expr::expr(p);
     } else {
-        p.error("expected `=`");
+        p.error("= expected");
     }
 
     m.complete(p, DEF_CONSTANT);

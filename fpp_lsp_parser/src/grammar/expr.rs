@@ -178,7 +178,7 @@ fn expr_array(p: &mut Parser) -> CompletedMarker {
         expr,
         COMMA,
         EXPR_ARRAY_MEMBER_LIST,
-        "expected expression",
+        "expression expected",
     );
 
     m.complete(p, EXPR_ARRAY)
@@ -194,7 +194,7 @@ fn expr_struct(p: &mut Parser) -> CompletedMarker {
         expr_struct_member,
         COMMA,
         EXPR_STRUCT_MEMBER_LIST,
-        "expected struct member expression",
+        "identifier expected",
     );
 
     m.complete(p, EXPR_STRUCT)

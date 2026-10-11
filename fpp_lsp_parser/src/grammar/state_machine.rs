@@ -36,7 +36,7 @@ pub(super) fn def_state_machine(p: &mut Parser) {
             state_machine_member,
             SEMI,
             STATE_MACHINE_MEMBER_LIST,
-            "expected state machine member",
+            "state machine member expected",
         )
     }
 
@@ -64,7 +64,7 @@ pub(super) fn state_machine_member(p: &mut Parser) {
         CHOICE_KW => def_choice(p),
         _ => {
             p.err_recover(
-                "expected state machine member",
+                "state machine member expected",
                 STATE_MACHINE_MEMBER_RECOVERY_SET,
             );
         }
@@ -93,7 +93,7 @@ fn def_state(p: &mut Parser) {
             state_member,
             SEMI,
             STATE_MEMBER_LIST,
-            "expected state member",
+            "state member expected",
         );
     }
 
@@ -110,7 +110,7 @@ pub(super) fn state_member(p: &mut Parser) {
         INCLUDE_KW => spec_include(p),
         ON_KW => spec_state_transition(p),
         _ => {
-            p.err_recover("expected state machine member", STATE_MEMBER_RECOVERY_SET);
+            p.err_recover("state member expected", STATE_MEMBER_RECOVERY_SET);
         }
     }
 }
@@ -201,7 +201,7 @@ fn spec_state_entry(p: &mut Parser) {
     if p.at(DO_KW) {
         do_expr(p);
     } else {
-        p.error("expected do expression");
+        p.error("do expected");
         m.abandon(p);
         return;
     }
@@ -216,7 +216,7 @@ fn spec_state_exit(p: &mut Parser) {
     if p.at(DO_KW) {
         do_expr(p);
     } else {
-        p.error("expected do expression");
+        p.error("do expected");
         m.abandon(p);
         return;
     }
@@ -255,7 +255,7 @@ fn transition_or_do(p: &mut Parser) {
         m.complete(p, TRANSITION_EXPR);
     } else {
         m.abandon(p);
-        p.error("expected transition or do expression")
+        p.error("enter or do expected")
     }
 }
 
@@ -285,10 +285,10 @@ fn do_expr(p: &mut Parser) {
             name_ref,
             COMMA,
             DO_EXPR_MEMBER_LIST,
-            "expected action name",
+            "identifier expected",
         )
     } else {
-        p.error("expected '{'")
+        p.error("{ expected")
     }
 
     m.complete(p, DO_EXPR);

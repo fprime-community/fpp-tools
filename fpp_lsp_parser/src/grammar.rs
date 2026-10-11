@@ -291,7 +291,7 @@ fn formal_param_list(p: &mut Parser) {
             formal_param,
             COMMA,
             FORMAL_PARAM_LIST,
-            "expected formal parameter",
+            "identifier expected",
         );
     }
 }
@@ -305,13 +305,13 @@ fn formal_param(p: &mut Parser) {
         if p.eat(COLON) {
             types::type_name(p);
         } else {
-            p.error("expected `:`");
+            p.error(": expected");
         }
 
         m.complete(p, FORMAL_PARAM);
     } else {
         m.abandon(p);
-        p.err_and_bump("expected formal parameter");
+        p.err_and_bump("identifier expected");
     }
 }
 

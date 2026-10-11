@@ -30,13 +30,13 @@ pub(super) fn def_array(p: &mut Parser) {
     name_r(p, MEMBER_RECOVERY_SET);
 
     if !p.eat(EQUALS) {
-        p.error("expected `=`");
+        p.error("= expected");
     }
 
     if p.at(LEFT_SQUARE) {
         index_or_size(p);
     } else {
-        p.err_and_bump("expected `[`")
+        p.err_and_bump("[ expected")
     }
 
     type_name(p);
@@ -62,10 +62,10 @@ pub(super) fn def_struct(p: &mut Parser) {
             struct_field,
             COMMA,
             STRUCT_MEMBER_LIST,
-            "expected struct member",
+            "identifier expected",
         );
     } else {
-        p.error("expected `{`");
+        p.error("{ expected");
     }
 
     expr_opt(p, DEFAULT_KW, DEFAULT);
@@ -85,7 +85,7 @@ pub(super) fn struct_field(p: &mut Parser) {
         m.complete(p, STRUCT_MEMBER);
     } else {
         m.abandon(p);
-        p.err_and_bump("expected struct field declaration");
+        p.err_and_bump("identifier expected");
     }
 }
 
@@ -110,10 +110,10 @@ pub(super) fn def_enum(p: &mut Parser) {
             enum_member,
             COMMA,
             ENUM_MEMBER_LIST,
-            "expected enum member",
+            "identifier expected",
         );
     } else {
-        p.error("expected `{`");
+        p.error("{ expected");
     }
 
     expr_opt(p, DEFAULT_KW, DEFAULT);
@@ -131,7 +131,7 @@ pub(super) fn enum_member(p: &mut Parser) {
         m.complete(p, DEF_ENUM_CONSTANT);
     } else {
         m.abandon(p);
-        p.err_and_bump("expected enum variant");
+        p.err_and_bump("identifier expected");
     }
 }
 

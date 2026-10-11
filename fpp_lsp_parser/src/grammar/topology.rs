@@ -32,10 +32,10 @@ pub(super) fn def_topology(p: &mut Parser) {
             topology_member,
             SEMI,
             TOPOLOGY_MEMBER_LIST,
-            "expected topology member",
+            "topology member expected",
         );
     } else {
-        p.error("expected `{`")
+        p.error("{ expected")
     }
 
     m.complete(p, DEF_TOPOLOGY);
@@ -131,10 +131,10 @@ fn spec_tlm_packet_set(p: &mut Parser) {
             tlm_packet_set_member,
             COMMA,
             TLM_PACKET_SET_MEMBER_LIST,
-            "expected telemetry packet set member",
+            "telemetry packet set member expected",
         )
     } else {
-        p.error("expected `{`")
+        p.error("{ expected")
     }
 
     if p.at(OMIT_KW) {
@@ -148,10 +148,10 @@ fn spec_tlm_packet_set(p: &mut Parser) {
                 tlm_channel_identifier,
                 COMMA,
                 TLM_PACKET_OMIT_MEMBER_LIST,
-                "expected telemetry channel identifier",
+                "identifier expected",
             );
         } else {
-            p.error("expected `{`")
+            p.error("{ expected")
         }
 
         m.complete(p, TLM_PACKET_OMIT);
@@ -165,7 +165,7 @@ pub(super) fn tlm_packet_set_member(p: &mut Parser) {
         INCLUDE_KW => spec_include(p),
         PACKET_KW => spec_tlm_packet(p),
         _ => {
-            p.err_and_bump("topology member expected");
+            p.err_and_bump("telemetry packet set member expected");
         }
     }
 }
@@ -193,10 +193,10 @@ fn spec_tlm_packet(p: &mut Parser) {
             tlm_packet_member,
             COMMA,
             TLM_PACKET_MEMBER_LIST,
-            "expected telemetry packet member",
+            "telemetry packet member expected",
         );
     } else {
-        p.error("expected `{`")
+        p.error("{ expected")
     }
 
     m.complete(p, SPEC_TLM_PACKET);
@@ -244,7 +244,7 @@ fn spec_connection_graph_pattern(p: &mut Parser) {
             qual_ident,
             COMMA,
             PATTERN_TARGET_MEMBER_LIST,
-            "expected instance identifier",
+            "identifier expected",
         )
     }
 
@@ -265,10 +265,10 @@ fn spec_connection_graph_direct(p: &mut Parser) {
             connection,
             COMMA,
             CONNECTION_MEMBER_LIST,
-            "expected connection",
+            "identifier expected",
         );
     } else {
-        p.error("expected `{`")
+        p.error("{ expected")
     }
 
     m.complete(p, SPEC_CONNECTION_GRAPH_DIRECT);

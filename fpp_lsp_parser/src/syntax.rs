@@ -528,6 +528,56 @@ impl SyntaxKind {
         )
     }
 
+    /// The name of this kind in a diagnostic: the source text of a symbol or
+    /// a keyword, or the name of the construct (Scala's `accept` names).
+    pub fn display_name(self) -> String {
+        let symbol = match self {
+            IDENT | QUAL_IDENT | NAME | NAME_REF => "identifier",
+            EXPR => "expression",
+            TYPE_NAME => "type name",
+            LITERAL_FLOAT => "floating-point literal",
+            LITERAL_INT => "integer literal",
+            LITERAL_STRING => "string literal",
+            PRE_ANNOTATION => "pre annotation",
+            POST_ANNOTATION => "post annotation",
+            EOF => "end of input",
+            EOL => "end of line",
+            COLON => ":",
+            COMMA => ",",
+            DOT => ".",
+            EQUALS => "=",
+            LEFT_PAREN => "(",
+            LEFT_CURLY => "{",
+            LEFT_SQUARE => "[",
+            RIGHT_PAREN => ")",
+            RIGHT_CURLY => "}",
+            RIGHT_SQUARE => "]",
+            RIGHT_ARROW => "->",
+            MINUS => "-",
+            PLUS => "+",
+            SEMI => ";",
+            SLASH => "/",
+            STAR => "*",
+            SHIFT_LEFT => "<<",
+            SHIFT_RIGHT => ">>",
+            _ => "",
+        };
+        if !symbol.is_empty() {
+            return symbol.to_string();
+        }
+        let name = format!("{:?}", self);
+        match name.strip_suffix("_KW") {
+            // The integer and floating-point type keywords are upper case
+            Some(kw)
+                if self.is_type_primitive_keyword() && !matches!(self, BOOL_KW | STRING_KW) =>
+            {
+                kw.to_string()
+            }
+            Some(kw) => kw.to_ascii_lowercase(),
+            None => name.to_ascii_lowercase().replace('_', " "),
+        }
+    }
+
     /// Check if this syntax kind is a member list that should be indented
     /// Used by the formatter to determine indentation and member separation
     #[inline]

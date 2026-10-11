@@ -71,7 +71,7 @@ impl SyntaxTreeBuilder {
 
     pub fn expected(&mut self, expected: SyntaxKind, range: TextRange) {
         self.errors.push(SyntaxError::new_with_expected(
-            format!("expected {:?}", expected),
+            format!("{} expected", expected.display_name()),
             range,
             expected,
         ));
