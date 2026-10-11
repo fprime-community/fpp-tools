@@ -1522,10 +1522,15 @@ impl<'a> Parser<'a> {
         })
     }
 
+    /// Parse a qualified identifier. The node of an absolute identifier starts
+    /// at its leading `.`.
     fn qual_ident(&mut self) -> ParseResult<QualIdent> {
         let dot = self.opt_dot();
         let qid = self.qual_ident_node_list()?;
-        Ok(QualIdent::from_node_list(qid, dot.is_some()))
+        Ok(match dot {
+            Some(dot) => QualIdent::from_node_list_at(dot, qid, true),
+            None => QualIdent::from_node_list(qid, false),
+        })
     }
 
     fn qual_ident_node_list(&mut self) -> ParseResult<QualIdentNodeList> {
