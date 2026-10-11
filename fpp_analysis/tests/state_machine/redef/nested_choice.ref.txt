@@ -8,13 +8,22 @@
 5 |     choice C { if g enter S else enter S }
   |     -------------------------------------- previous definition is here
 
- --> [ local path prefix ]/state_machine/redef/nested_choice.fpp:1:15
+ --> [ local path prefix ]/state_machine/redef/nested_choice.fpp:1:1
   |
-1 | state machine M {
-  |               ^ state machine must have initial transition
+1 | / state machine M {
+2 | |   guard g
+3 | |   state S {
+4 | |     state T
+... |
+8 | | }
+  | |_^ state machine must have initial transition
 
- --> [ local path prefix ]/state_machine/redef/nested_choice.fpp:3:9
+ --> [ local path prefix ]/state_machine/redef/nested_choice.fpp:3:3
   |
-3 |   state S {
-  |         ^ state with substates must have initial transition
+3 | /   state S {
+4 | |     state T
+5 | |     choice C { if g enter S else enter S }
+6 | |     choice C { if g enter S else enter S }
+7 | |   }
+  | |___^ state with substates must have initial transition
 

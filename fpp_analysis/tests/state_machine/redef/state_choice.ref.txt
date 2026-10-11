@@ -8,8 +8,12 @@
 3 |   state S
   |   ------- previous definition is here
 
- --> [ local path prefix ]/state_machine/redef/state_choice.fpp:1:15
+ --> [ local path prefix ]/state_machine/redef/state_choice.fpp:1:1
   |
-1 | state machine M {
-  |               ^ state machine must have initial transition
+1 | / state machine M {
+2 | |   guard g
+3 | |   state S
+4 | |   choice S { if g enter S else enter S }
+5 | | }
+  | |_^ state machine must have initial transition
 

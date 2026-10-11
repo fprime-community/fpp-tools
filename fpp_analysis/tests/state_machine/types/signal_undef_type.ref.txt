@@ -3,8 +3,12 @@
 3 |   signal s: T
   |             ^ cannot find type `T` in scope
 
- --> [ local path prefix ]/state_machine/types/signal_undef_type.fpp:1:15
+ --> [ local path prefix ]/state_machine/types/signal_undef_type.fpp:1:1
   |
-1 | state machine M {
-  |               ^ state machine must have initial transition
+1 | / state machine M {
+2 | |
+3 | |   signal s: T
+4 | |
+5 | | }
+  | |_^ state machine must have initial transition
 

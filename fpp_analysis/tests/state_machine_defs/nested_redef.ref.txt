@@ -8,8 +8,11 @@
 2 |   type T
   |   ------ previous definition is here
 
- --> [ local path prefix ]/state_machine_defs/nested_redef.fpp:1:15
+ --> [ local path prefix ]/state_machine_defs/nested_redef.fpp:1:1
   |
-1 | state machine S {
-  |               ^ state machine must have initial transition
+1 | / state machine S {
+2 | |   type T
+3 | |   type T
+4 | | }
+  | |_^ state machine must have initial transition
 

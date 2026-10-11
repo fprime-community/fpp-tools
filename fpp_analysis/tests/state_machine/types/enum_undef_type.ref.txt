@@ -8,8 +8,10 @@
 2 |   enum E : T { X }
   |            ^ primitive integer type must be used
 
- --> [ local path prefix ]/state_machine/types/enum_undef_type.fpp:1:15
+ --> [ local path prefix ]/state_machine/types/enum_undef_type.fpp:1:1
   |
-1 | state machine SM {
-  |               ^^ state machine must have initial transition
+1 | / state machine SM {
+2 | |   enum E : T { X }
+3 | | }
+  | |_^ state machine must have initial transition
 

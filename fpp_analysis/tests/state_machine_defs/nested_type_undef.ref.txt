@@ -3,8 +3,10 @@
 2 |   signal sig: Undefined
   |               ^^^^^^^^^ cannot find type `Undefined` in scope
 
- --> [ local path prefix ]/state_machine_defs/nested_type_undef.fpp:1:15
+ --> [ local path prefix ]/state_machine_defs/nested_type_undef.fpp:1:1
   |
-1 | state machine S {
-  |               ^ state machine must have initial transition
+1 | / state machine S {
+2 | |   signal sig: Undefined
+3 | | }
+  | |_^ state machine must have initial transition
 

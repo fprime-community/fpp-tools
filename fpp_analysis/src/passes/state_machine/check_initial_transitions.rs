@@ -40,7 +40,7 @@ impl StateMachineAnalysisVisitor for CheckInitialTransitions {
             .collect();
         if let Err(err) = Self::check_one_initial_transition(
             initial_transitions,
-            node.name.span(),
+            node.span(),
             "state machine",
         ) {
             err.emit();
@@ -89,7 +89,7 @@ impl StateMachineAnalysisVisitor for CheckInitialTransitions {
     }
 
     fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
-        let loc = node.name.span();
+        let loc = node.span();
         let sub_states = node
             .members
             .iter()

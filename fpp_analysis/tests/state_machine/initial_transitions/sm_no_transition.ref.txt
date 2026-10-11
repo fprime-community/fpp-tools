@@ -1,5 +1,6 @@
- --> [ local path prefix ]/state_machine/initial_transitions/sm_no_transition.fpp:1:15
+ --> [ local path prefix ]/state_machine/initial_transitions/sm_no_transition.fpp:1:1
   |
-1 | state machine M {
-  |               ^ state machine must have initial transition
+1 | / state machine M {
+2 | | }
+  | |_^ state machine must have initial transition
 
