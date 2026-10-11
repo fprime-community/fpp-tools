@@ -135,8 +135,8 @@ impl Endpoint {
     /// Constructs a connection endpoint from AST info
     ///
     /// Returns `None` if the port instance identifier names an instance that is
-    /// unresolved or whose definition failed to check, or if the port number
-    /// does not have a numeric type (all already reported).
+    /// unresolved or whose definition failed to check (already reported). A
+    /// port number that does not have a numeric type is an error.
     pub fn from_ast(
         a: &Analysis,
         port: &ast::PortInstanceIdentifier,

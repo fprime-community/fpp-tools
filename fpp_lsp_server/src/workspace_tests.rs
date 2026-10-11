@@ -56,7 +56,9 @@ fn index_workspace(folder: &Path) -> GlobalState {
     state
 }
 
+/// The test creates a directory symbolic link, which needs the Unix API
 #[test]
+#[cfg(unix)]
 fn scan_mode_resolves_uses_through_symlinked_root() {
     let real = fixture_dir("ws_scan_real");
     let link = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -684,7 +686,9 @@ module M {
     );
 }
 
+/// The test creates a directory symbolic link, which needs the Unix API
 #[test]
+#[cfg(unix)]
 fn locs_mode_resolves_uses_through_symlinked_root() {
     let real = fixture_dir("ws_locs_real");
     let link = Path::new(env!("CARGO_MANIFEST_DIR"))
