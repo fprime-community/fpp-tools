@@ -1,11 +1,11 @@
+//! Resolve port numbers
+
 use super::{general_port_numbering, matched_port_numbering};
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{Connection, PortInstanceIdentifier, Topology};
 use rustc_hash::FxHashMap as HashMap;
 use std::collections::BTreeSet;
-
-// Resolve port numbers
 
 /// Check output ports for t
 fn check_output_ports(t: &Topology) -> SemanticResult {

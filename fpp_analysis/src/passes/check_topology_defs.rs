@@ -103,7 +103,7 @@ impl<'ast> Visitor<'ast> for CheckTopologyDefs {
         node: &'ast SpecDirectConnectionGraph,
     ) -> ControlFlow<Self::Break> {
         for ast in &node.connections {
-            match Connection::from_node(a, ast) {
+            match Connection::from_ast(a, ast) {
                 Ok(Some(c)) => {
                     let top = a
                         .topology
@@ -124,7 +124,8 @@ impl<'ast> Visitor<'ast> for CheckTopologyDefs {
         a: &mut Self::State,
         node: &'ast SpecPatternConnectionGraph,
     ) -> ControlFlow<Self::Break> {
-        let result = ConnectionPattern::from_spec(a, &Arc::new(node.clone())).and_then(|p| {
+        let pattern = Arc::new(node.clone());
+        let result = ConnectionPattern::from_spec_connection_graph(a, &pattern).and_then(|p| {
             let Some(p) = p else {
                 // A use in the pattern is unresolved (already reported)
                 return Ok(());
@@ -133,7 +134,7 @@ impl<'ast> Visitor<'ast> for CheckTopologyDefs {
                 .topology
                 .as_mut()
                 .expect("a topology is under construction");
-            top.add_pattern(p)
+            top.add_pattern(&node.kind, p)
         });
         if let Err(err) = result {
             err.emit();

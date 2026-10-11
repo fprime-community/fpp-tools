@@ -1,13 +1,15 @@
+//! Resolve a partially numbered topology
+
 use super::pattern_resolver;
 use crate::Analysis;
 use crate::errors::SemanticResult;
 use crate::semantics::{
-    ComponentInstance, Connection, ConnectionPattern, InterfaceInstance, Symbol, Topology,
+    ComponentInstance, Connection, ConnectionPattern, Endpoint, InterfaceInstance, Symbol,
+    Topology, TopologyPort,
 };
 use fpp_core::Span;
-use indexmap::IndexSet;
-
-// Resolve a partially numbered topology
+use indexmap::{IndexMap, IndexSet};
+use std::collections::BTreeMap;
 
 /// Check that connection instances are legal
 fn check_connection_instances(t: &Topology) -> SemanticResult {
@@ -18,18 +20,20 @@ fn check_connection_instances(t: &Topology) -> SemanticResult {
         t.look_up_instance_at(to_instance, c.to.loc)?;
         Ok(())
     };
-    for cs in t.connection_map.values() {
-        for c in cs {
-            check_connection(c)?;
-        }
+    for c in t.connection_map.values().flatten() {
+        check_connection(c)?;
     }
     Ok(())
 }
 
 /// Check that connection instances are legal
 fn check_port_instances(t: &Topology) -> SemanticResult {
-    for i in t.port_map.values() {
+    let check_port = |i: &TopologyPort| -> SemanticResult {
         t.look_up_instance_at(&i.pii.interface_instance, i.get_underlying_port_loc())?;
+        Ok(())
+    };
+    for port in t.port_map.values() {
+        check_port(port)?;
     }
     Ok(())
 }
@@ -56,11 +60,8 @@ fn check_pattern_instances(t: &Topology, pattern: &ConnectionPattern) -> Semanti
 fn compute_transitive_imports(a: &Analysis, t: &mut Topology) {
     let mut tis: IndexSet<Symbol> = IndexSet::default();
     for ts in t.get_imported_topology_symbols(a) {
-        if let Some(dep) = a.topology_map.get(&ts) {
-            for s in &dep.transitive_import_set {
-                tis.insert(s.clone());
-            }
-        }
+        let imported = &a.topology_map[&ts];
+        tis.extend(imported.transitive_import_set.iter().cloned());
         tis.insert(ts);
     }
     t.transitive_import_set = tis;
@@ -86,35 +87,29 @@ fn resolve_patterns(a: &Analysis, t: &mut Topology) -> SemanticResult {
 
 /// Resolve the imported connections of t
 fn resolve_imported_connections(a: &Analysis, t: &mut Topology) {
-    // Check whether an instance exists. A connection imported from a
-    // subtopology names the component instance directly, so an instance that is
-    // in this topology only through a bound template parameter still counts.
-    let endpoint_exists = |t: &Topology, endpoint: &crate::semantics::Endpoint| -> bool {
+    // Check whether an instance exists
+    let endpoint_exists = |t: &Topology, endpoint: &Endpoint| -> bool {
         let instance = &endpoint.port.interface_instance;
-        if t.instance_map.contains_key(instance) {
-            return true;
-        }
-        match instance.get_component_instance_opt() {
+        // A connection imported from a subtopology names the component
+        // instance directly, so an instance that is in this topology only
+        // through a bound template parameter still counts
+        let component_instance_exists = || match instance.get_component_instance_opt() {
             Some(ci) => t.look_up_component_instance_loc(ci).is_some(),
             None => false,
-        }
+        };
+        t.instance_map.contains_key(instance) || component_instance_exists()
+    };
+    // Check whether a connection exists
+    let exists = |t: &Topology, connection: &Connection| -> bool {
+        endpoint_exists(t, &connection.from) && endpoint_exists(t, &connection.to)
     };
     // Import connections from transitively imported topologies
-    let syms: Vec<Symbol> = t.transitive_import_set.iter().cloned().collect();
-    for s in syms {
-        let Some(dep) = a.topology_map.get(&s) else {
-            continue;
-        };
-        let graphs: Vec<(String, Vec<Connection>)> = dep
-            .local_connection_map
-            .iter()
-            .map(|(name, cs)| (name.clone(), cs.clone()))
-            .collect();
-        for (name, cs) in graphs {
+    let symbols: Vec<Symbol> = t.transitive_import_set.iter().cloned().collect();
+    for s in symbols {
+        for (name, cs) in &a.topology_map[&s].local_connection_map {
             for c in cs {
-                // Check whether a connection exists
-                if endpoint_exists(t, &c.from) && endpoint_exists(t, &c.to) {
-                    t.add_connection(&name, c);
+                if exists(t, c) {
+                    t.add_connection(name, c.clone());
                 }
             }
         }
@@ -123,42 +118,51 @@ fn resolve_imported_connections(a: &Analysis, t: &mut Topology) {
 
 /// Resolve connections to interface instances of t to component instances
 fn resolve_interfaces_to_component_instances(a: &Analysis, t: &mut Topology) {
+    fn visit_connection(a: &Analysis, tt: &mut Topology, graph_name: &str, c: &Connection) {
+        tt.add_local_connection(
+            graph_name,
+            Connection {
+                from: c.from.get_underlying_endpoint(a),
+                to: c.to.get_underlying_endpoint(a),
+                is_unmatched: c.is_unmatched,
+            },
+        );
+    }
+
+    fn visit_connection_graph(a: &Analysis, tt: &mut Topology, graph: (&String, &Vec<Connection>)) {
+        let (graph_name, connections) = graph;
+        for c in connections {
+            visit_connection(a, tt, graph_name, c);
+        }
+    }
+
     // Clear out connections of T and reprocess them
     // Resolve all port instance identifiers to their 'true' component instance port
-    let graphs: Vec<(String, Vec<Connection>)> = t
-        .local_connection_map
-        .iter()
-        .map(|(name, cs)| (name.clone(), cs.clone()))
-        .collect();
-    t.clear_connections();
-    for (graph_name, cs) in graphs {
-        for c in cs {
-            t.add_local_connection(
-                &graph_name,
-                Connection {
-                    from: c.from.get_underlying_endpoint(a),
-                    to: c.to.get_underlying_endpoint(a),
-                    is_unmatched: c.is_unmatched,
-                },
-            );
-        }
+    let local_connection_map = std::mem::take(&mut t.local_connection_map);
+    t.connection_map = IndexMap::default();
+    t.unmatched_connection_set = Vec::new();
+    t.output_connection_map = BTreeMap::new();
+    t.input_connection_map = BTreeMap::new();
+    t.from_port_number_map = BTreeMap::new();
+    t.to_port_number_map = BTreeMap::new();
+    for graph in &local_connection_map {
+        visit_connection_graph(a, t, graph);
     }
 }
 
 /// Resolve the instances of t
 fn resolve_instances(a: &Analysis, t: &mut Topology) {
-    let syms: Vec<Symbol> = t.get_imported_topology_symbols(a);
-    for from_symbol in syms {
-        if let Some(dep) = a.topology_map.get(&from_symbol) {
-            let entries: Vec<(InterfaceInstance, Span)> = dep
-                .instance_map
-                .iter()
-                .map(|(ii, l)| (ii.clone(), *l))
-                .collect();
-            for (instance, loc) in entries {
-                t.add_instance(instance, loc);
-            }
+    fn import_instance(t: &mut Topology, map_entry: (&InterfaceInstance, &Span)) {
+        let (instance, loc) = map_entry;
+        t.add_instance(instance.clone(), *loc);
+    }
+    fn import_instances(a: &Analysis, into: &mut Topology, from_symbol: &Symbol) {
+        for map_entry in &a.topology_map[from_symbol].instance_map {
+            import_instance(into, map_entry);
         }
+    }
+    for from_symbol in t.get_imported_topology_symbols(a) {
+        import_instances(a, t, &from_symbol);
     }
 }
 

@@ -9,26 +9,9 @@ use fpp_core::{Span, Spanned};
 use std::cmp::Ordering;
 use std::sync::Arc;
 
-/// Compare two spans deterministically by (file path, start byte position),
-/// then by the include chain and the expansion chain, used for connection
-/// sorting. Two copies of one span differ only in those chains.
+/// Compare two locations. See [`Span::compare`].
 pub fn cmp_span(a: &Span, b: &Span) -> Ordering {
-    let fa = format!("{}", a.file());
-    let fb = format!("{}", b.file());
-    fa.cmp(&fb)
-        .then_with(|| a.start().pos().cmp(&b.start().pos()))
-        .then_with(|| cmp_span_opt(a.including_span(), b.including_span()))
-        .then_with(|| cmp_span_opt(a.expanding_span(), b.expanding_span()))
-}
-
-/// Compare two optional spans, ordering `None` before `Some`.
-fn cmp_span_opt(a: Option<Span>, b: Option<Span>) -> Ordering {
-    match (a, b) {
-        (None, None) => Ordering::Equal,
-        (None, Some(_)) => Ordering::Less,
-        (Some(_), None) => Ordering::Greater,
-        (Some(a), Some(b)) => cmp_span(&a, &b),
-    }
+    a.compare(b)
 }
 
 /// An imported topology used as an interface instance.
@@ -349,17 +332,26 @@ impl PortInstanceIdentifier {
     }
 }
 
-/// A connection endpoint.
+/// A connection endpoint
 #[derive(Debug, Clone)]
 pub struct Endpoint {
-    /// Location where the endpoint is written
+    /// The location where the endpoint is defined
     pub loc: Span,
-    /// The resolved port instance identifier
+    /// The port instance identifier
     pub port: PortInstanceIdentifier,
-    /// The explicit port number, if any
+    /// The port number
     pub port_number: Option<i128>,
-    /// Topology port this endpoint mapped to, if resolved through an alias
+    /// Topology port this mapped to
     pub topology_port: Option<Box<Endpoint>>,
+}
+
+impl std::fmt::Display for Endpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.port_number {
+            Some(n) => write!(f, "{}[{}]", self.port.qualified_name(), n),
+            None => f.write_str(&self.port.qualified_name()),
+        }
+    }
 }
 
 impl PartialEq for Endpoint {
@@ -389,33 +381,7 @@ impl Ord for Endpoint {
 }
 
 impl Endpoint {
-    /// Build an endpoint from AST info. Returns `None` if unresolved.
-    pub fn from_node(
-        a: &Analysis,
-        port: &ast::PortInstanceIdentifier,
-        index: &Option<ast::Expr>,
-    ) -> SemanticResult<Option<Endpoint>> {
-        let Some(pid) = PortInstanceIdentifier::from_node(a, port)? else {
-            return Ok(None);
-        };
-        pid.port_instance.require_connection_at(port.span())?;
-        if let Some(index) = index {
-            Self::check_port_number_type(a, index)?;
-        }
-        let port_number = a.get_nonnegative_int_value_opt(index)?;
-        let endpoint = Endpoint {
-            loc: port.span(),
-            port: pid,
-            port_number,
-            topology_port: None,
-        };
-        if let Some(idx) = index {
-            endpoint.check_port_number(idx.span())?;
-        }
-        Ok(Some(endpoint))
-    }
-
-    /// Build an endpoint directly from a resolved identifier at a location.
+    /// Creates an endpoint with no port number at a location
     pub fn new(loc: Span, port: PortInstanceIdentifier) -> Endpoint {
         Endpoint {
             loc,
@@ -425,8 +391,41 @@ impl Endpoint {
         }
     }
 
-    /// Resolve this endpoint through topology-port aliases and bound template
-    /// parameters to the underlying component-instance port.
+    /// Check that port number is in bounds for the size
+    fn check_port_number(&self, loc: Span) -> SemanticResult {
+        if let Some(n) = self.port_number {
+            let size = self.port.port_instance.get_array_size();
+            if n >= size {
+                return Err(SemanticError::InvalidPortNumber {
+                    loc,
+                    port_number: n,
+                    port: self.port.qualified_name(),
+                    array_size: size,
+                    spec_loc: self.port.port_instance.get_loc(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Check that a port number has a numeric type, as the spec requires
+    fn check_port_number_type(a: &Analysis, index: &ast::Expr) -> SemanticResult {
+        match a.type_map.get(&index.node_id) {
+            Some(ty)
+                if !ty.is_numeric() && Type::convert(ty, &Arc::new(Type::Integer)).is_err() =>
+            {
+                Err(SemanticError::InvalidType {
+                    loc: index.span(),
+                    msg: format!("cannot convert {} to a numeric type", ty),
+                    notes: vec![],
+                })
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Get underlying endpoint by stripping off topology port aliases
+    /// and template interface parameters
     pub fn get_underlying_endpoint(&self, a: &Analysis) -> Endpoint {
         match &self.port.interface_instance {
             // This endpoint is already a component instance
@@ -473,48 +472,51 @@ impl Endpoint {
         }
     }
 
-    /// Check that a port number has a numeric type, as the spec requires
-    fn check_port_number_type(a: &Analysis, index: &ast::Expr) -> SemanticResult {
-        match a.type_map.get(&index.node_id) {
-            Some(ty)
-                if !ty.is_numeric() && Type::convert(ty, &Arc::new(Type::Integer)).is_err() =>
-            {
-                Err(SemanticError::InvalidType {
-                    loc: index.span(),
-                    msg: format!("cannot convert {} to a numeric type", ty),
-                    notes: vec![],
-                })
-            }
-            _ => Ok(()),
+    /// Constructs a connection endpoint from AST info
+    ///
+    /// Returns `None` if the port instance identifier names an instance that is
+    /// unresolved or whose definition failed to check (both already reported).
+    pub fn from_ast(
+        a: &Analysis,
+        port: &ast::PortInstanceIdentifier,
+        port_number: &Option<ast::Expr>,
+    ) -> SemanticResult<Option<Endpoint>> {
+        let Some(pid) = PortInstanceIdentifier::from_node(a, port)? else {
+            return Ok(None);
+        };
+        pid.port_instance.require_connection_at(port.span())?;
+        if let Some(pn) = port_number {
+            Self::check_port_number_type(a, pn)?;
         }
-    }
-
-    /// Check that an explicit port number is within bounds.
-    fn check_port_number(&self, loc: Span) -> SemanticResult {
-        if let Some(n) = self.port_number {
-            let size = self.port.port_instance.get_array_size();
-            if n >= size {
-                return Err(SemanticError::InvalidPortNumber {
-                    loc,
-                    port_number: n,
-                    port: self.port.qualified_name(),
-                    array_size: size,
-                    spec_loc: self.port.port_instance.get_loc(),
-                });
-            }
+        let pn = a.get_nonnegative_int_value_opt(port_number)?;
+        let endpoint = Endpoint {
+            loc: port.span(),
+            port: pid,
+            port_number: pn,
+            topology_port: None,
+        };
+        if let Some(pn) = port_number {
+            endpoint.check_port_number(pn.span())?;
         }
-        Ok(())
+        Ok(Some(endpoint))
     }
 }
 
-/// A resolved FPP connection.
+/// An FPP connection
 #[derive(Debug, Clone)]
 pub struct Connection {
-    /// The from endpoint.
+    /// The from endpoint
     pub from: Endpoint,
-    /// The to endpoint.
+    /// The to endpoint
     pub to: Endpoint,
+    /// Whether the connection is marked `unmatched`
     pub is_unmatched: bool,
+}
+
+impl std::fmt::Display for Connection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} -> {}", self.from, self.to)
+    }
 }
 
 impl PartialEq for Connection {
@@ -529,66 +531,17 @@ impl PartialOrd for Connection {
     }
 }
 impl Ord for Connection {
-    /// Compare two connections.
+    /// Compare two connections
     fn cmp(&self, other: &Self) -> Ordering {
         self.from
             .cmp(&other.from)
             .then_with(|| self.to.cmp(&other.to))
-            .then_with(|| cmp_span(&self.from.loc, &other.from.loc))
+            .then_with(|| self.from.loc.compare(&other.from.loc))
     }
 }
 
 impl Connection {
-    /// Construct a connection from resolved endpoints (no checks).
-    pub fn new(from: Endpoint, to: Endpoint) -> Connection {
-        Connection {
-            from,
-            to,
-            is_unmatched: false,
-        }
-    }
-
-    /// The location of the connection (its from endpoint).
-    pub fn get_loc(&self) -> Span {
-        self.from.loc
-    }
-
-    /// Get this endpoint of a connection at a port instance (by direction).
-    pub fn get_this_endpoint(&self, pi: &PortInstance) -> &Endpoint {
-        match pi.get_direction() {
-            Some(Direction::Input) => &self.to,
-            _ => &self.from,
-        }
-    }
-
-    /// Get the other endpoint of a connection at a port instance (by direction).
-    pub fn get_other_endpoint(&self, pi: &PortInstance) -> &Endpoint {
-        match pi.get_direction() {
-            Some(Direction::Input) => &self.from,
-            _ => &self.to,
-        }
-    }
-
-    /// Build a connection from an AST connection. Returns `None` if unresolved.
-    pub fn from_node(a: &Analysis, conn: &ast::Connection) -> SemanticResult<Option<Connection>> {
-        let Some(from) = Endpoint::from_node(a, &conn.from_port, &conn.from_index)? else {
-            return Ok(None);
-        };
-        let Some(to) = Endpoint::from_node(a, &conn.to_port, &conn.to_index)? else {
-            return Ok(None);
-        };
-        let connection = Connection {
-            from,
-            to,
-            is_unmatched: conn.is_unmatched,
-        };
-        connection.check_directions()?;
-        connection.check_types()?;
-        connection.check_serial_with_typed_input()?;
-        Ok(Some(connection))
-    }
-
-    /// Check that the connection goes output -> input.
+    /// Checks the directions of a connection
     fn check_directions(&self) -> SemanticResult {
         let from_instance = &self.from.port.port_instance;
         let to_instance = &self.to.port.port_instance;
@@ -613,7 +566,7 @@ impl Connection {
         }
     }
 
-    /// Check that the connection's port types are compatible.
+    /// Checks the types of a connection
     fn check_types(&self) -> SemanticResult {
         let from_instance = &self.from.port.port_instance;
         let to_instance = &self.to.port.port_instance;
@@ -638,8 +591,8 @@ impl Connection {
         }
     }
 
-    /// Check the case of a serial port connected to a typed port that returns a
-    /// value, in either direction.
+    /// Checks the case of a serial port connected to a typed port,
+    /// in either direction. The port type may not have a return type.
     fn check_serial_with_typed_input(&self) -> SemanticResult {
         let from_instance = &self.from.port.port_instance;
         let to_instance = &self.to.port.port_instance;
@@ -703,6 +656,62 @@ impl Connection {
             }
         };
         is_constrained_at(&self.from) || is_constrained_at(&self.to)
+    }
+
+    /// Creates a connection that is not marked `unmatched`
+    pub fn new(from: Endpoint, to: Endpoint) -> Connection {
+        Connection {
+            from,
+            to,
+            is_unmatched: false,
+        }
+    }
+
+    /// Gets the location of the connection
+    pub fn get_loc(&self) -> Span {
+        self.from.loc
+    }
+
+    /// Get this endpoint of a port connection at a port instance
+    pub fn get_this_endpoint(&self, pi: &PortInstance) -> &Endpoint {
+        match pi.get_direction() {
+            Some(Direction::Input) => &self.to,
+            _ => &self.from,
+        }
+    }
+
+    /// Get the other endpoint of a port connection at a port instance
+    pub fn get_other_endpoint(&self, pi: &PortInstance) -> &Endpoint {
+        match pi.get_direction() {
+            Some(Direction::Input) => &self.from,
+            _ => &self.to,
+        }
+    }
+
+    /// Constructs a connection from an AST connection
+    ///
+    /// Returns `None` if an endpoint names an instance that is unresolved or
+    /// whose definition failed to check (both already reported).
+    pub fn from_ast(
+        a: &Analysis,
+        connection: &ast::Connection,
+    ) -> SemanticResult<Option<Connection>> {
+        let Some(from) = Endpoint::from_ast(a, &connection.from_port, &connection.from_index)?
+        else {
+            return Ok(None);
+        };
+        let Some(to) = Endpoint::from_ast(a, &connection.to_port, &connection.to_index)? else {
+            return Ok(None);
+        };
+        let connection = Connection {
+            from,
+            to,
+            is_unmatched: connection.is_unmatched,
+        };
+        connection.check_directions()?;
+        connection.check_types()?;
+        connection.check_serial_with_typed_input()?;
+        Ok(Some(connection))
     }
 }
 
