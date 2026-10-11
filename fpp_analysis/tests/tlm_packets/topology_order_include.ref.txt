@@ -1,21 +1,15 @@
- --> [ local path prefix ]/tlm_packets/topology_order_include.fpp:5:3
+ --> [ local path prefix ]/tlm_packets/topology_order_include.fpp:5:21
   |
-5 | /   telemetry packets P {
-6 | |     packet X group 0 {
-7 | |     }
-8 | |   }
-  | |___^ invalid telemetry packet set P
+5 |   telemetry packets P {
+  |                     ^ invalid telemetry packet set P
   |
   = note: 1 telemetry channel is neither used nor marked as omitted
   = note: c1.T
 
- --> [ local path prefix ]/tlm_packets/include/topology_order.fppi:3:3
+ --> [ local path prefix ]/tlm_packets/include/topology_order.fppi:3:21
   |
-3 | /   telemetry packets Q {
-4 | |     packet X group 0 {
-5 | |     }
-6 | |   }
-  | |___^ invalid telemetry packet set Q
+3 |   telemetry packets Q {
+  |                     ^ invalid telemetry packet set Q
   |
   = note: included from [ local path prefix ]/tlm_packets/topology_order_include.fpp:10:9
   = note: 1 telemetry channel is neither used nor marked as omitted

@@ -1,10 +1,7 @@
-  --> [ local path prefix ]/tlm_packets/channel_order_ids.fpp:16:3
+  --> [ local path prefix ]/tlm_packets/channel_order_ids.fpp:16:21
    |
-16 | /   telemetry packets P {
-17 | |     packet A group 0 {
-18 | |     }
-19 | |   }
-   | |___^ invalid telemetry packet set P
+16 |   telemetry packets P {
+   |                     ^ invalid telemetry packet set P
    |
    = note: 2 telemetry channels are neither used nor marked as omitted
    = note: c1.T2

@@ -1,10 +1,7 @@
-  --> [ local path prefix ]/tlm_packets/channel_order_instances.fpp:19:3
+  --> [ local path prefix ]/tlm_packets/channel_order_instances.fpp:19:21
    |
-19 | /   telemetry packets P {
-20 | |     packet A group 0 {
-21 | |     }
-22 | |   }
-   | |___^ invalid telemetry packet set P
+19 |   telemetry packets P {
+   |                     ^ invalid telemetry packet set P
    |
    = note: 2 telemetry channels are neither used nor marked as omitted
    = note: a.T

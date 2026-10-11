@@ -46,7 +46,7 @@ impl TlmPacketSet {
 
     /// Gets the location of the packet set specifier
     pub fn get_loc(&self) -> Span {
-        self.node.span()
+        self.node.name.span()
     }
 
     /// Add a telemetry packet to the set
