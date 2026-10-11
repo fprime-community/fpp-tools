@@ -113,6 +113,30 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// The end-of-line token for the run of newlines and comments that starts at
+    /// `start`. The token is located at the comment that starts the run, or
+    /// else at the start of the line after the first newline of the run, so
+    /// that a syntax error at an end of line is reported on the line that
+    /// follows it.
+    fn eol_token(&self, start: usize) -> Token {
+        let rest = &self.content[start..];
+        let loc = if rest.starts_with('#') {
+            start
+        } else if rest.starts_with("\r\n") {
+            start + 2
+        } else {
+            start + 1
+        };
+        Token::new(
+            TokenKind::Eol,
+            None,
+            self.file,
+            loc as BytePos,
+            0,
+            self.include_span,
+        )
+    }
+
     fn next_internal(&mut self) -> Option<Token> {
         loop {
             let prev = self.pos;
@@ -132,14 +156,7 @@ impl<'a> Cursor<'a> {
                     // Check the next token
                     // Some tokens eat newlines and others don't
                     return match self.eat_newlines() {
-                        None => Some(Token::new(
-                            TokenKind::Eol,
-                            None,
-                            self.file,
-                            prev as BytePos,
-                            (self.pos - prev) as BytePos,
-                            self.include_span,
-                        )),
+                        None => Some(self.eol_token(prev)),
                         Some(lookahead) => {
                             match lookahead.kind {
                                 TokenKind::RightParen
@@ -162,14 +179,7 @@ impl<'a> Cursor<'a> {
                                     self.lookahead = Some(lookahead);
 
                                     // This is actually a newline delimiter
-                                    Some(Token::new(
-                                        TokenKind::Eol,
-                                        None,
-                                        self.file,
-                                        prev as BytePos,
-                                        (self.pos - prev) as BytePos,
-                                        self.include_span,
-                                    ))
+                                    Some(self.eol_token(prev))
                                 }
                             }
                         }
@@ -349,16 +359,9 @@ impl<'a> Cursor<'a> {
         self.last_consumed_span
     }
 
-    /// The location of the next token, or the end of the input if there is none.
-    /// An end-of-line token, which spans the run of newlines and comments it
-    /// stands for, is located where the run starts.
+    /// The location of the next token, or the end of the input if there is none
     fn next_token_span(&mut self) -> Span {
-        let file = self.file;
-        let include_span = self.include_span;
         match self.peek_internal(0) {
-            Some(tok) if tok.kind() == TokenKind::Eol => {
-                Span::new(file, tok.span().start().pos(), 0, include_span)
-            }
             Some(tok) => tok.span(),
             None => self.end_of_input_span(),
         }
@@ -981,6 +984,45 @@ mod test {
 
             cursor.next();
             assert_eq!(cursor.next().unwrap().span(), b);
+        });
+    }
+
+    #[test]
+    fn end_of_line_errors_are_located_on_the_next_line() {
+        // At the start of the line after the first newline of the run
+        for content in [
+            "constant\n  a",
+            "constant   \n\n\n  a",
+            "constant\r\n  a",
+            "constant\n",
+        ] {
+            with_cursor(content, |cursor| {
+                cursor.next();
+                match cursor.consume(Identifier) {
+                    Err(ParseError::ExpectedToken { last, got, .. }) => {
+                        assert_eq!(got, Eol);
+                        assert_eq!(last.start().line(), 1, "{content:?}");
+                        assert_eq!(last.start().column(), 0, "{content:?}");
+                        assert!(last.is_empty());
+                    }
+                    other => panic!("{other:?}"),
+                }
+            });
+        }
+
+        // At the comment that starts the run
+        with_cursor("constant # c\n  a", |cursor| {
+            cursor.next();
+            match cursor.err_expected_one_of("identifier expected", vec![Identifier]) {
+                ParseError::ExpectedOneOf {
+                    got_kind, got_span, ..
+                } => {
+                    assert_eq!(got_kind, Eol);
+                    assert_eq!(got_span.start().pos(), 9);
+                    assert!(got_span.is_empty());
+                }
+                other => panic!("{other:?}"),
+            }
         });
     }
 
