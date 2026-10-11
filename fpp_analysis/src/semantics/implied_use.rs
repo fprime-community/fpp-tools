@@ -77,7 +77,8 @@ impl ImpliedUse {
     }
 
     /// Runs `f`, annotating every error that `f` emits with the notes of this
-    /// implied use. See [`annotate_emitted_errors`].
+    /// implied use, as [`ImpliedUse::annotate_result`] annotates an error
+    /// result
     pub fn annotate_emitted_errors<T>(&self, f: impl FnOnce() -> T) -> T {
         annotate_emitted_errors(self.notes(), f)
     }
