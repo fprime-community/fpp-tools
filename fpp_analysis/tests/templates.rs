@@ -98,8 +98,9 @@ fn ignored_nodes(node: &Node) -> Vec<fpp_core::Node> {
     }
 }
 
-/// The flattened members of a translation unit or module: an expansion
-/// contributes the members it introduced
+/// Replace each template expansion specifier with the members that it
+/// introduced, so that the members of an expansion appear as members of the
+/// enclosing module
 fn flatten(members: &[ModuleMember]) -> Vec<&ModuleMember> {
     let mut out = Vec::new();
     for member in members {
@@ -297,6 +298,9 @@ fn a_use_of_a_type_parameter_resolves_to_the_bound_argument() {
         }
     });
 }
+
+// Scoping inside an expansion: a name in the template body resolves at the
+// point of the template definition, not at the point of expansion.
 
 #[test]
 fn a_name_in_the_body_resolves_at_the_point_of_the_definition() {
