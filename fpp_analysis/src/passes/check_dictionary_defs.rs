@@ -2,8 +2,8 @@ use crate::Analysis;
 use crate::analyzers::analyzer::visit_expansion;
 use crate::semantics::{Symbol, Type};
 use fpp_ast::{
-    DefAliasType, DefArray, DefConstant, DefEnum, DefModuleTemplate, DefStruct, MoveWalkable, Node,
-    SpecTemplateExpand, Visitor,
+    DefAliasType, DefArray, DefComponent, DefConstant, DefEnum, DefModule, DefModuleTemplate,
+    DefStruct, SpecTemplateExpand, Visitor, Walkable,
 };
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
@@ -28,8 +28,10 @@ impl CheckDictionaryDefs {
         let symbol = Symbol::Constant(Arc::new(node.clone()));
         let ok = match a.type_map.get(&node.node_id).map(|t| t.as_ref()) {
             Some(Type::String(_)) | Some(Type::Boolean) | Some(Type::Enum(_)) => true,
+            // An alias type is neither an integer type nor a floating-point type
+            Some(Type::Alias(_)) => false,
             Some(t) => t.is_numeric(),
-            // No recorded type: be lenient (an earlier pass already reported an error).
+            // The constant has no type when its value expression has none
             None => true,
         };
         if ok {
@@ -82,9 +84,21 @@ impl<'ast> Visitor<'ast> for CheckDictionaryDefs {
         ControlFlow::Continue(())
     }
 
-    /// Descend into every container so that dictionary definitions nested in
-    /// modules and components are reached.
-    fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
+    /// Visit module members
+    fn visit_def_module(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefModule,
+    ) -> ControlFlow<Self::Break> {
+        node.walk(a, self)
+    }
+
+    /// Visit component members
+    fn visit_def_component(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefComponent,
+    ) -> ControlFlow<Self::Break> {
         node.walk(a, self)
     }
 
