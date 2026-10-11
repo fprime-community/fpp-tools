@@ -1,7 +1,7 @@
 use crate::analyzers::state_machine::{
     SmResult, StateMachineAnalysisVisitor, StateMachineUseAnalyzer,
 };
-use crate::errors::SemanticError;
+use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::SymbolInterface;
 use crate::semantics::state_machine::{
     StateMachineAnalysis, StateMachineNameGroup, StateMachineSymbol,
@@ -18,6 +18,20 @@ use std::sync::Arc;
 pub struct CheckStateMachineUses;
 
 impl CheckStateMachineUses {
+    /// Get the symbol for a name from the environment
+    fn get_symbol_for_name(
+        ng: StateMachineNameGroup,
+        mapping: impl FnOnce(&str) -> Option<StateMachineSymbol>,
+        id: fpp_core::Node,
+        name: &str,
+    ) -> SemanticResult<StateMachineSymbol> {
+        mapping(name).ok_or_else(|| SemanticError::UndefinedSymbol {
+            ng: ng.to_string(),
+            name: name.to_string(),
+            loc: id.span(),
+        })
+    }
+
     /// Visit an identifier node and check a use
     fn visit_ident_node(
         &self,
@@ -25,22 +39,7 @@ impl CheckStateMachineUses {
         ng: StateMachineNameGroup,
         node: &Ident,
     ) -> SmResult {
-        match sma.nested_scope.get(ng, &node.data) {
-            Some(sym) => {
-                sma.use_def_map.insert(node.id(), sym);
-            }
-            None => {
-                // Blocking: later passes read this use out of `use_def_map`.
-                SemanticError::UndefinedSymbol {
-                    ng: ng.to_string(),
-                    name: node.data.clone(),
-                    loc: node.span(),
-                }
-                .emit();
-                sma.blocking_error = true;
-            }
-        }
-        ControlFlow::Continue(())
+        self.visit_unqualified_name(sma, ng, node.id(), node, false)
     }
 
     /// Visit a qualified identifier node and check a use
@@ -51,9 +50,13 @@ impl CheckStateMachineUses {
         node: &QualIdent,
     ) -> SmResult {
         match node {
-            QualIdent::Unqualified(unqualified) => {
-                self.visit_unqualified_name(sma, ng, node.id(), &unqualified.name)
-            }
+            QualIdent::Unqualified(unqualified) => self.visit_unqualified_name(
+                sma,
+                ng,
+                node.id(),
+                &unqualified.name,
+                unqualified.is_absolute,
+            ),
             QualIdent::Qualified(qualified) => {
                 self.visit_qualified_name(sma, ng, node.id(), &qualified.qualifier, &qualified.name)
             }
@@ -66,18 +69,16 @@ impl CheckStateMachineUses {
         ng: StateMachineNameGroup,
         id: fpp_core::Node,
         name: &Ident,
+        is_absolute: bool,
     ) -> SmResult {
-        match sma.nested_scope.get(ng, &name.data) {
-            Some(sym) => {
-                sma.use_def_map.insert(id, sym);
+        let mapping = |name: &str| sma.nested_scope.get(is_absolute, ng, name);
+        match Self::get_symbol_for_name(ng, mapping, id, &name.data) {
+            Ok(symbol) => {
+                sma.use_def_map.insert(id, symbol);
             }
-            None => {
-                SemanticError::UndefinedSymbol {
-                    ng: ng.to_string(),
-                    name: name.data.clone(),
-                    loc: name.span(),
-                }
-                .emit();
+            Err(err) => {
+                // Blocking: later passes read this use out of `use_def_map`.
+                err.emit();
                 sma.blocking_error = true;
             }
         }
@@ -95,34 +96,27 @@ impl CheckStateMachineUses {
         self.visit_qual_ident_node(sma, ng, qualifier)?;
         // If the qualifier itself did not resolve, its (blocking) error was
         // already emitted; we cannot resolve the member, so stop here.
-        let Some(qualifier_symbol) = sma.use_def_map.get(&qualifier.id()).cloned() else {
+        let Some(symbol) = sma.use_def_map.get(&qualifier.id()).cloned() else {
             return ControlFlow::Continue(());
         };
-        let scope = match sma.symbol_scope_map.get(&qualifier_symbol) {
-            Some(scope) => scope.clone(),
-            None => {
-                SemanticError::InvalidSymbol {
-                    symbol_name: qualifier_symbol.get_unqualified_name().to_string(),
-                    loc: qualifier.span(),
-                    msg: "not a qualifier".to_string(),
-                    def_loc: qualifier_symbol.node().span(),
-                }
-                .emit();
-                sma.blocking_error = true;
-                return ControlFlow::Continue(());
+        let Some(scope) = sma.symbol_scope_map.get(&symbol) else {
+            SemanticError::InvalidSymbol {
+                symbol_name: symbol.get_unqualified_name().to_string(),
+                loc: id.span(),
+                msg: "not a qualifier".to_string(),
+                def_loc: symbol.get_loc(),
             }
+            .emit();
+            sma.blocking_error = true;
+            return ControlFlow::Continue(());
         };
-        match scope.get(ng, &name.data) {
-            Some(sym) => {
-                sma.use_def_map.insert(id, sym);
+        let mapping = |name: &str| scope.get(ng, name);
+        match Self::get_symbol_for_name(ng, mapping, name.id(), &name.data) {
+            Ok(symbol) => {
+                sma.use_def_map.insert(id, symbol);
             }
-            None => {
-                SemanticError::UndefinedSymbol {
-                    ng: ng.to_string(),
-                    name: name.data.clone(),
-                    loc: name.span(),
-                }
-                .emit();
+            Err(err) => {
+                err.emit();
                 sma.blocking_error = true;
             }
         }

@@ -51,12 +51,42 @@ impl StateMachineNestedScope {
             .put(name_group, symbol)
     }
 
-    /// Get a symbol from the map. Return none if the name is not there.
-    pub fn get(&self, name_group: StateMachineNameGroup, name: &str) -> Option<StateMachineSymbol> {
+    /// Get a relative or absolute symbol from the nested scope
+    pub fn get(
+        &self,
+        is_absolute: bool,
+        name_group: StateMachineNameGroup,
+        name: &str,
+    ) -> Option<StateMachineSymbol> {
+        match is_absolute {
+            false => self.get_relative(name_group, name),
+            true => self.get_absolute(name_group, name),
+        }
+    }
+
+    /// Get a relative symbol from the nested scope. Start searching at the
+    /// bottom of the stack, working upwards. Return None if the name is not there.
+    pub fn get_relative(
+        &self,
+        name_group: StateMachineNameGroup,
+        name: &str,
+    ) -> Option<StateMachineSymbol> {
         self.scopes
             .iter()
             .rev()
             .find_map(|scope| scope.get(name_group, name))
+    }
+
+    /// Get an absolute symbol from the nested scope. Start searching at
+    /// the top of the stack. Return None if the name is not there
+    pub fn get_absolute(
+        &self,
+        name_group: StateMachineNameGroup,
+        name: &str,
+    ) -> Option<StateMachineSymbol> {
+        self.scopes
+            .first()
+            .and_then(|scope| scope.get(name_group, name))
     }
 
     /// Get the innermost nested scope
