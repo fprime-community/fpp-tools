@@ -2,7 +2,7 @@ use crate::semantics::state_machine::{
     StateMachineSymbol, StateMachineTypedElement, StateOrChoice,
 };
 use fpp_core::Spanned;
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use indexmap::{IndexMap, IndexSet};
 
 /// A node in a transition graph
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -100,7 +100,10 @@ impl Arc {
 }
 
 /// A map from nodes to their sets of arcs
-pub type ArcMap = HashMap<Node, HashSet<Arc>>;
+///
+/// The nodes and the arcs of each node iterate in the order they were added,
+/// which orders the diagnostics of the passes that walk the graph.
+pub type ArcMap = IndexMap<Node, IndexSet<Arc>>;
 
 /// An FPP transition graph
 #[derive(Debug, Clone, Default)]
@@ -144,7 +147,7 @@ impl TransitionGraph {
             arc_map: ArcMap::default(),
         };
         if let Some(node) = &self.initial_node {
-            tg.arc_map.insert(node.clone(), HashSet::default());
+            tg.arc_map.insert(node.clone(), IndexSet::new());
         }
         for arcs in self.arc_map.values() {
             for a in arcs {

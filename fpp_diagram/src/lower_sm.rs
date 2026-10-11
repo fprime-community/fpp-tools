@@ -67,10 +67,10 @@ pub fn lower_state_machine(
         });
     }
 
-    // All transitions. `arc_map` (a hash map of hash sets) has no stable
-    // iteration order, so build every edge keyed by its source location, sort by
-    // that, then assign sequential ids. Ordering by span is deterministic (fixing
-    // layout jitter) and makes transitions lay out in source order.
+    // All transitions. `arc_map` iterates in the order the transition graph was
+    // built, which is not source order, so build every edge keyed by its source
+    // location, sort by that, then assign sequential ids. Ordering by span makes
+    // transitions lay out in source order.
     let mut arc_edges: Vec<(SpanKey, SmEdge)> = sma
         .transition_graph
         .arc_map
@@ -103,11 +103,10 @@ pub fn lower_state_machine(
 
 /// Build a node for every state and choice in the transition graph.
 ///
-/// `arc_map` is a hash map with no stable iteration order, so we sort the
-/// resulting nodes by their definition's source location. This is both
-/// deterministic (fixing the layout jitter) and intuitive: states lay out in the
-/// order they appear in the FPP source, so reordering the source reorders the
-/// diagram.
+/// `arc_map` iterates in the order the transition graph was built, which is not
+/// source order, so we sort the resulting nodes by their definition's source
+/// location: states lay out in the order they appear in the FPP source, so
+/// reordering the source reorders the diagram.
 fn state_and_choice_nodes(sma: &StateMachineAnalysis) -> Vec<SmNode> {
     let mut nodes: Vec<(SpanKey, SmNode)> = sma
         .transition_graph
