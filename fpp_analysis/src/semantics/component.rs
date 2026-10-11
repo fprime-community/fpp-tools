@@ -710,7 +710,7 @@ impl Component {
             Some(tlm_channel) => Ok(tlm_channel.clone()),
             None => Err(SemanticError::InvalidTlmChannelName {
                 loc: name.span(),
-                name: name.data.clone(),
+                channel_name: name.data.clone(),
                 component_name: self.component_name().to_string(),
             }),
         }

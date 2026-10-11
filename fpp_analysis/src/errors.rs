@@ -256,7 +256,7 @@ pub enum SemanticError {
     /// Invalid telemetry channel identifier name
     InvalidTlmChannelName {
         loc: Span,
-        name: String,
+        channel_name: String,
         component_name: String,
     },
     /// Invalid component instance definition
@@ -286,25 +286,19 @@ pub enum SemanticError {
         loc: Span,
         prev_loc: Span,
     },
-    /// A telemetry packet set specified in a non-deployment topology.
+    /// Invalid telemetry packet set
     InvalidTlmPacketSet {
         loc: Span,
         name: String,
         msg: String,
-    },
-    /// Invalid telemetry packet set, reported against one of its channels
-    InvalidTlmPacketSetChannel {
-        loc: Span,
-        name: String,
-        msg: String,
-        /// Locations explaining the error, rendered as span notes
+        /// The locations that explain the error, rendered as span notes
         notes: Vec<(Span, String)>,
     },
-    /// A telemetry channel identifier that names no channel of the topology
+    /// Channel not in dictionary
     ChannelNotInDictionary {
         loc: Span,
         channel_name: String,
-        top_name: String,
+        topology_name: String,
     },
     /// Invalid interface instance
     InvalidInterfaceInstance {
@@ -356,13 +350,14 @@ pub enum SemanticError {
     },
     /// Inconsistent location specifiers
     InconsistentLocationPath {
-        /// Location of the first specifier's file string literal
+        /// Location of the file string literal of this specifier
         loc: Span,
-        /// The path named by the first specifier
+        /// The path named by this specifier
         path: String,
-        /// Location of the second specifier's file string literal
+        /// Location of the file string literal of the previous specifier for the
+        /// same symbol
         prev_loc: Span,
-        /// The path named by the second specifier
+        /// The path named by the previous specifier
         prev_path: String,
     },
     /// Incorrect dictionary specifier in location specifier
@@ -869,14 +864,14 @@ impl From<SemanticError> for Diagnostic {
             }
             SemanticError::InvalidTlmChannelName {
                 loc,
-                name,
+                channel_name,
                 component_name,
             } => Diagnostic::new(
                 loc,
                 Level::Error,
                 format!(
                     "{} is not a telemetry channel of component {}",
-                    name, component_name
+                    channel_name, component_name
                 ),
             ),
             SemanticError::InvalidDefComponentInstance { name, loc, msg } => {
@@ -910,13 +905,7 @@ impl From<SemanticError> for Diagnostic {
                     .span_note(prev_loc, "previous definition is here")
                     .note("each model may have at most one system definition")
             }
-            SemanticError::InvalidTlmPacketSet { loc, name, msg } => Diagnostic::new(
-                loc,
-                Level::Error,
-                format!("invalid telemetry packet set {}", name),
-            )
-            .note(msg),
-            SemanticError::InvalidTlmPacketSetChannel {
+            SemanticError::InvalidTlmPacketSet {
                 loc,
                 name,
                 msg,
@@ -935,13 +924,13 @@ impl From<SemanticError> for Diagnostic {
             SemanticError::ChannelNotInDictionary {
                 loc,
                 channel_name,
-                top_name,
+                topology_name,
             } => Diagnostic::new(
                 loc,
                 Level::Error,
                 format!(
                     "channel {} is not in the dictionary for topology {}",
-                    channel_name, top_name
+                    channel_name, topology_name
                 ),
             ),
             SemanticError::InvalidInterfaceInstance {

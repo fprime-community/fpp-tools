@@ -9,16 +9,6 @@ use std::ops::ControlFlow;
 /// Compute framework dependencies
 pub struct ComputeFrameworkDependencies;
 
-impl ComputeFrameworkDependencies {
-    pub fn compute(tul: &[&TransUnit]) -> HashSet<FrameworkDependency> {
-        let mut s = HashSet::default();
-        for tu in tul {
-            let _ = tu.visit(&mut s, &ComputeFrameworkDependencies);
-        }
-        s
-    }
-}
-
 impl<'ast> Visitor<'ast> for ComputeFrameworkDependencies {
     type Break = ();
     type State = HashSet<FrameworkDependency>;

@@ -83,16 +83,33 @@ impl<'a> DictionaryEntries<'a> {
     where
         &'a M: IntoIterator<Item = (&'a i128, &'a S)>,
     {
-        let mut entry_map = IndexMap::default();
-        for ci in self.t.component_instance_map().into_keys() {
-            let Some(component) = ci.get_component(self.a) else {
-                continue;
+        let add_entries_for_instance =
+            |entry_map: &mut IndexMap<i128, E, FxBuildHasher>, ci: &ComponentInstance| {
+                // A component instance whose component failed to check has no
+                // component
+                let Some(component) = ci.get_component(self.a) else {
+                    return;
+                };
+                for (local_id, s) in get_spec_map(component) {
+                    add_entry(entry_map, &construct_entry, ci, *local_id, s);
+                }
             };
-            for (local_id, s) in get_spec_map(component) {
-                let id = ci.base_id + local_id;
-                entry_map.insert(id, construct_entry(ci.clone(), s.clone()));
-            }
+        let mut entry_map = IndexMap::default();
+        for ci in self.t.component_instance_map().keys() {
+            add_entries_for_instance(&mut entry_map, ci);
         }
         entry_map
     }
+}
+
+fn add_entry<S: Clone, E>(
+    m: &mut IndexMap<i128, E, FxBuildHasher>,
+    construct_entry: impl Fn(ComponentInstance, S) -> E,
+    ci: &ComponentInstance,
+    local_id: i128,
+    s: &S,
+) {
+    let id = ci.base_id + local_id;
+    let entry = construct_entry(ci.clone(), s.clone());
+    m.insert(id, entry);
 }

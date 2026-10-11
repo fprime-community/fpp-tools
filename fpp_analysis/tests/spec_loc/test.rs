@@ -5,9 +5,8 @@ fn abs_type_ok() {
     run_test("spec_loc/abs_type_ok")
 }
 
-// Deeply-nested (2+ module) located definitions: confirm the path-lookup key
-// (`get_qualified_name`) matches the located-symbol key for definitions nested
-// more than one module deep (fidelity open question, agent 6).
+// Rust-only: location specifiers for definitions nested two or more modules
+// deep
 #[test]
 fn nested_ok() {
     run_test("spec_loc/nested_ok")

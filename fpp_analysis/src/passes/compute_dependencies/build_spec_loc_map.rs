@@ -7,8 +7,7 @@ use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-/// Build the location specifier map, checking that duplicate specifiers for the
-/// same symbol name a consistent path.
+/// Build the location specifier map
 pub struct BuildSpecLocMap;
 
 impl<'ast> Visitor<'ast> for BuildSpecLocMap {
@@ -26,22 +25,23 @@ impl<'ast> Visitor<'ast> for BuildSpecLocMap {
         result
     }
 
-    /// A location specifier in the body of a template is analyzed at the point of
-    /// the definition of the template, whether or not the template is expanded.
-    fn visit_def_module_template(
-        &self,
-        a: &mut Self::State,
-        node: &'ast DefModuleTemplate,
-    ) -> ControlFlow<Self::Break> {
-        node.members.walk(a, self)
-    }
-
     fn visit_spec_template_expand(
         &self,
         a: &mut Self::State,
         node: &'ast SpecTemplateExpand,
     ) -> ControlFlow<Self::Break> {
         visit_expansion(self, a, node)
+    }
+
+    /// A location specifier in the body of a template is analyzed at the point of
+    /// the definition of the template, whether or not the template is expanded,
+    /// and again, at the point of the expansion, for each expansion.
+    fn visit_def_module_template(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefModuleTemplate,
+    ) -> ControlFlow<Self::Break> {
+        node.members.walk(a, self)
     }
 
     fn visit_spec_loc(&self, a: &mut Self::State, node: &'ast SpecLoc) -> ControlFlow<Self::Break> {

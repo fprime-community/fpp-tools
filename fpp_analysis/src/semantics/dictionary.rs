@@ -31,15 +31,15 @@ pub struct Dictionary {
 
 /// A command opcode
 pub type CommandOpcode = i128;
-/// A telemetry channel identifier
+/// A telemetry channel ID
 pub type TlmChannelId = i128;
-/// An event identifier
+/// An event ID
 pub type EventId = i128;
-/// A parameter identifier
+/// A parameter ID
 pub type ParamId = i128;
-/// A record identifier
+/// A record ID
 pub type RecordId = i128;
-/// A container identifier
+/// A container ID
 pub type ContainerId = i128;
 
 impl Dictionary {
@@ -64,7 +64,7 @@ impl Dictionary {
             None => Err(SemanticError::ChannelNotInDictionary {
                 loc: channel_id.get_loc(),
                 channel_name: channel_id.get_qualified_name(),
-                top_name: t.get_name().to_string(),
+                topology_name: t.get_name().to_string(),
             }),
         }
     }

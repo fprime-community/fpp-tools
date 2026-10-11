@@ -1,14 +1,14 @@
 mod add_dependencies;
 pub use add_dependencies::*;
 
-mod compute_framework_dependencies;
-pub use compute_framework_dependencies::*;
+mod build_spec_loc_map;
+pub use build_spec_loc_map::*;
 
-mod framework_dependency;
-pub use framework_dependency::*;
+mod framework;
+pub use framework::*;
 
 use crate::Analysis;
-use crate::passes::{BuildSpecLocMap, ConstructImpliedUseMap};
+use crate::passes::ConstructImpliedUseMap;
 use fpp_ast::{TransUnit, Visitor};
 use fpp_core::{Error, FileReader, SourceFile};
 use std::ops::ControlFlow;
@@ -44,9 +44,7 @@ impl<'r, Reader: FileReader> ComputeDependencies<'r, Reader> {
         }
         BuildSpecLocMap.visit_trans_units(a, tul.iter())?;
         ConstructImpliedUseMap.visit_trans_units(a, tul.iter())?;
-        let expanded_template_names = CollectTemplateExpansions::names_in(tul.iter());
-        AddDependencies::new(self.reader, expanded_template_names)
-            .visit_trans_units(a, tul.iter())?;
+        AddDependencies::tu_list(self.reader, a, &tul)?;
         let included_file_set = a.included_file_set.clone();
         a.dependency_file_set
             .retain(|f| !included_file_set.contains(f));
