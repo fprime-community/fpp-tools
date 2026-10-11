@@ -3,7 +3,7 @@ use crate::semantics::{PortInstance, PortInterface, Symbol, SymbolInterface};
 use fpp_ast::{DefInterface, SpecInterfaceImport};
 use fpp_core::{Node, Span, Spanned};
 use indexmap::IndexMap;
-use rustc_hash::{FxBuildHasher, FxHashMap as HashMap};
+use rustc_hash::FxBuildHasher;
 use std::sync::Arc;
 
 /// An FPP interface
@@ -75,27 +75,14 @@ impl Interface {
     }
 
     /// The interfaces imported by this one, as (symbol, import specifier node)
-    /// pairs in the order of the import specifiers.
+    /// pairs in the order of the import specifiers. Rust-only: a copy of the
+    /// imports that the resolution can iterate while it updates the interface.
     pub fn imports_in_source_order(&self) -> Vec<(Symbol, Node)> {
         self.import_map
             .iter()
             .map(|(symbol, (node, _))| (symbol.clone(), *node))
             .collect()
     }
-}
-
-/// Resolve an interface, merging in the interfaces it imports in place
-pub fn resolve_interface(
-    interface_map: &HashMap<Symbol, Interface>,
-    interface: &mut Interface,
-) -> SemanticResult {
-    for (symbol, node) in interface.imports_in_source_order() {
-        if let Some(imported) = interface_map.get(&symbol) {
-            let imported = imported.clone();
-            interface.add_imported_interface(&imported, node)?;
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -105,7 +92,8 @@ mod tests {
     use fpp_core::{SourceFile, Spanned};
 
     /// `Interface::imports_in_source_order` lists the imports in the order of
-    /// the import specifiers, so `resolve_interface` merges them in that order.
+    /// the import specifiers, so `resolve_topology::resolve_interface::resolve`
+    /// merges them in that order.
     #[test]
     fn imports_are_merged_in_source_order() {
         const IMPORTS: &str = r#"

@@ -1,9 +1,9 @@
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
-    Command, Container, Event, GeneralPortInstance, Interface, NonParamKind, Param, ParamKind,
-    PortInstance, PortInterface, Record, SpecialPortInstance, StateMachineInstance, Symbol,
-    TlmChannel, state_machine,
+    Command, CommandOpcode, Container, ContainerId, Event, EventId, GeneralPortInstance, Interface,
+    NonParamKind, Param, ParamId, ParamKind, PortInstance, PortInterface, Record, RecordId,
+    SpecialPortInstance, StateMachineInstance, Symbol, TlmChannel, TlmChannelId, state_machine,
 };
 use fpp_ast::{
     ComponentKind, DefComponent, Ident, InputPortKind, SpecPortMatching, SpecialPortInstanceKind,
@@ -23,21 +23,21 @@ pub struct Component {
     /// The port interface of the component
     pub port_interface: PortInterface,
     /// The map from command opcodes to commands
-    pub command_map: IndexMap<i128, Command, FxBuildHasher>,
+    pub command_map: IndexMap<CommandOpcode, Command, FxBuildHasher>,
     /// The next default opcode
     pub default_opcode: i128,
     /// The map from telemetry channel IDs to channels
-    pub tlm_channel_map: IndexMap<i128, TlmChannel, FxBuildHasher>,
+    pub tlm_channel_map: IndexMap<TlmChannelId, TlmChannel, FxBuildHasher>,
     /// The map from telemetry channel names to channels
     pub tlm_channel_name_map: IndexMap<String, TlmChannel, FxBuildHasher>,
     /// The next default channel ID
     pub default_tlm_channel_id: i128,
     /// The map from event IDs to events
-    pub event_map: IndexMap<i128, Event, FxBuildHasher>,
+    pub event_map: IndexMap<EventId, Event, FxBuildHasher>,
     /// The next default event ID
     pub default_event_id: i128,
     /// The map from parameter IDs to parameters
-    pub param_map: IndexMap<i128, Param, FxBuildHasher>,
+    pub param_map: IndexMap<ParamId, Param, FxBuildHasher>,
     /// The list of port matching specifiers, most recent first
     pub spec_port_matching_list: Vec<Arc<SpecPortMatching>>,
     /// The map from state machine instance names to state machine instances
@@ -47,11 +47,11 @@ pub struct Component {
     /// The next default parameter ID
     pub default_param_id: i128,
     /// The map from container ids to containers
-    pub container_map: IndexMap<i128, Container, FxBuildHasher>,
+    pub container_map: IndexMap<ContainerId, Container, FxBuildHasher>,
     /// The next default container ID
     pub default_container_id: i128,
     /// The map from record ids to records
-    pub record_map: IndexMap<i128, Record, FxBuildHasher>,
+    pub record_map: IndexMap<RecordId, Record, FxBuildHasher>,
     /// The next default record ID
     pub default_record_id: i128,
 }
@@ -183,7 +183,11 @@ impl Component {
     }
 
     /// Add a command
-    pub fn add_command(&mut self, opcode_opt: Option<i128>, command: Command) -> SemanticResult {
+    pub fn add_command(
+        &mut self,
+        opcode_opt: Option<CommandOpcode>,
+        command: Command,
+    ) -> SemanticResult {
         let opcode = opcode_opt.unwrap_or(self.default_opcode);
         if let Some(prev_command) = self.command_map.get(&opcode) {
             return Err(SemanticError::DuplicateOpcodeValue {
@@ -220,7 +224,11 @@ impl Component {
     }
 
     /// Add a data product container
-    pub fn add_container(&mut self, id_opt: Option<i128>, container: Container) -> SemanticResult {
+    pub fn add_container(
+        &mut self,
+        id_opt: Option<ContainerId>,
+        container: Container,
+    ) -> SemanticResult {
         self.default_container_id = Analysis::add_element_to_id_map(
             &mut self.container_map,
             id_opt.unwrap_or(self.default_container_id),
@@ -231,7 +239,7 @@ impl Component {
     }
 
     /// Add an event
-    pub fn add_event(&mut self, id_opt: Option<i128>, event: Event) -> SemanticResult {
+    pub fn add_event(&mut self, id_opt: Option<EventId>, event: Event) -> SemanticResult {
         self.default_event_id = Analysis::add_element_to_id_map(
             &mut self.event_map,
             id_opt.unwrap_or(self.default_event_id),
@@ -242,7 +250,7 @@ impl Component {
     }
 
     /// Add a parameter
-    pub fn add_param(&mut self, id_opt: Option<i128>, param: Param) -> SemanticResult {
+    pub fn add_param(&mut self, id_opt: Option<ParamId>, param: Param) -> SemanticResult {
         let set_opcode = param.set_opcode;
         let save_opcode = param.save_opcode;
         let set_command = Command::Param {
@@ -285,7 +293,7 @@ impl Component {
     }
 
     /// Add a data product record
-    pub fn add_record(&mut self, id_opt: Option<i128>, record: Record) -> SemanticResult {
+    pub fn add_record(&mut self, id_opt: Option<RecordId>, record: Record) -> SemanticResult {
         self.default_record_id = Analysis::add_element_to_id_map(
             &mut self.record_map,
             id_opt.unwrap_or(self.default_record_id),
@@ -298,7 +306,7 @@ impl Component {
     /// Add a telemetry channel
     pub fn add_tlm_channel(
         &mut self,
-        id_opt: Option<i128>,
+        id_opt: Option<TlmChannelId>,
         tlm_channel: TlmChannel,
     ) -> SemanticResult {
         let name = tlm_channel.get_name().to_string();

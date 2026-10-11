@@ -1,7 +1,8 @@
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
-    Command, ComponentInstance, Container, Event, Param, Record, Symbol, TlmChannel,
-    TlmChannelIdentifier, TlmPacketSet, Topology,
+    Command, CommandOpcode, ComponentInstance, Container, ContainerId, Event, EventId, Param,
+    ParamId, Record, RecordId, Symbol, TlmChannel, TlmChannelId, TlmChannelIdentifier,
+    TlmPacketSet, Topology,
 };
 use indexmap::IndexMap;
 use rustc_hash::{FxBuildHasher, FxHashMap as HashMap, FxHashSet as HashSet};
@@ -28,19 +29,6 @@ pub struct Dictionary {
     /// The map from packet set names to packet sets
     pub tlm_packet_set_map: IndexMap<String, TlmPacketSet, FxBuildHasher>,
 }
-
-/// A command opcode
-pub type CommandOpcode = i128;
-/// A telemetry channel ID
-pub type TlmChannelId = i128;
-/// An event ID
-pub type EventId = i128;
-/// A parameter ID
-pub type ParamId = i128;
-/// A record ID
-pub type RecordId = i128;
-/// A container ID
-pub type ContainerId = i128;
 
 impl Dictionary {
     /// Updates the reverse tlm channel entry map

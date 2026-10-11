@@ -11,6 +11,9 @@ pub struct Container {
     pub default_priority: Option<i128>,
 }
 
+/// A container ID
+pub type ContainerId = i128;
+
 impl Container {
     /// Gets the name of the container
     pub fn get_name(&self) -> &str {

@@ -147,7 +147,8 @@ impl PortInstance {
         }
     }
 
-    /// Builds a topology port aliasing an underlying port instance
+    /// Builds a topology port aliasing an underlying port instance. Rust-only,
+    /// for [`Topology::add_port`](crate::semantics::Topology::add_port).
     pub fn topology(node: Arc<SpecTopPort>, underlying_port: PortInstance) -> PortInstance {
         PortInstance::Topology(TopologyPortInstance {
             node,
@@ -175,7 +176,10 @@ impl PortInstance {
         }
     }
 
-    /// Whether two port instances have the same connection signature
+    /// Whether two port instances have the same connection signature.
+    /// Rust-only, for
+    /// [`PortInterface::implements`](crate::semantics::PortInterface::implements)
+    /// and the Python bindings.
     pub fn signature_eq(&self, other: &PortInstance) -> bool {
         self.signature() == other.signature()
     }

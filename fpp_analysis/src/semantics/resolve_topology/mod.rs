@@ -15,6 +15,7 @@ mod general_port_numbering;
 mod matched_port_numbering;
 mod pattern_resolver;
 mod port_numbering_state;
+pub(crate) mod resolve_interface;
 mod resolve_partially_numbered;
 mod resolve_port_numbers;
 mod resolve_topology_instances;

@@ -34,6 +34,9 @@ pub use transition_graph::TransitionGraph;
 mod state_machine_analysis;
 pub use state_machine_analysis::*;
 
+mod state_machine_instance;
+pub use state_machine_instance::*;
+
 use crate::semantics::Symbol;
 use fpp_ast::{
     DefAction, DefGuard, DefSignal, DefState, DefStateMachine, SpecInitialTransition,
@@ -109,6 +112,8 @@ impl StateMachine {
     }
 
     /// The unqualified names of the leaf states, one per distinct leaf state.
+    /// Rust-only: a convenience for the Python bindings; the analysis uses
+    /// [`StateMachine::get_leaf_states`].
     pub fn leaf_state_names(&self) -> Vec<String> {
         Self::get_leaf_states(&self.node)
             .iter()

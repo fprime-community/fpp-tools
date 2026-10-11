@@ -16,6 +16,9 @@ pub struct Event {
     pub throttle: Option<Throttle>,
 }
 
+/// An event ID
+pub type EventId = i128;
+
 impl Event {
     /// Gets the name of the event
     pub fn get_name(&self) -> &str {

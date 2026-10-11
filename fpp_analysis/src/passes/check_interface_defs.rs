@@ -1,6 +1,7 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::visit_expansion;
-use crate::semantics::{Interface, PortInstance, Symbol, resolve_interface};
+use crate::semantics::resolve_topology::resolve_interface;
+use crate::semantics::{Interface, PortInstance, Symbol};
 use fpp_ast::{
     AstNode, DefInterface, DefModule, SpecGeneralPortInstance, SpecInterfaceImport,
     SpecPortInstance, SpecSpecialPortInstance, SpecTemplateExpand, Visitor, Walkable,
@@ -39,7 +40,7 @@ impl CheckInterfaceDefs {
         }
 
         // Use the updated analysis to resolve iface
-        if let Err(err) = resolve_interface(&a.interface_map, &mut iface) {
+        if let Err(err) = resolve_interface::resolve(a, &mut iface) {
             err.emit();
         }
 
