@@ -9,7 +9,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-memchr = "2.7.4"
 unicode-ident = "1.0.22"
 
 [dev-dependencies]

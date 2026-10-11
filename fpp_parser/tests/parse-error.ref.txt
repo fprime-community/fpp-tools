@@ -14,21 +14,19 @@
   = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate, expand
   = note: got +
 
-  --> [ local path prefix ]/parse-error.fpp:14:11
+  --> [ local path prefix ]/parse-error.fpp:14:17
    |
 14 |     async input i: d -> d
-   |           ^^^^^ syntax error: unexpected token
+   |                 ^ syntax error: unexpected token
    |
    = note: expected port
    = note: got identifier
 
-  --> [ local path prefix ]/parse-error.fpp:18:53
+  --> [ local path prefix ]/parse-error.fpp:20:1
    |
-18 |       ) severity warning low format "hello" throttle 1
-   |  _____________________________________________________^
-19 | |
-   | |_^ syntax error: unexpected token
+20 |
+   | ^ syntax error: unexpected token
    |
    = note: expected }
-   = note: got eof
+   = note: got end of input
 

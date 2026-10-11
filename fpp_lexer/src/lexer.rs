@@ -1,51 +1,61 @@
-use crate::token::KeywordKind::*;
+use crate::chars::{CR, LF, digit2int, is_identifier_part};
 use crate::token::TokenKind::*;
-use crate::token::{Token, TokenKind};
+use crate::token::{KeywordKind, Token, TokenKind};
 use std::str::Chars;
 
+/// A lexer error: an invalid token
+#[derive(Debug, Clone)]
 pub struct LexerError {
+    /// The byte offset where the error starts
     pub pos: usize,
+    /// The number of bytes the error covers
     pub len: usize,
+    /// The error message
     pub msg: String,
+    /// Notes that follow the message
+    pub notes: Vec<String>,
 }
 
+/// The scanner of FPP source text.
+///
+/// Iterating the lexer yields every token of the text, including the
+/// whitespace, comments and invalid characters between the tokens of the
+/// grammar, and collects the lexer errors in [`Lexer::errors`]. It does not
+/// suppress newlines or compute the values of literals; `fpp_parser` does that
+/// from the token texts.
+///
+/// The lexer reads the text one character at a time with `bump`, which
+/// reduces a CR LF pair to an LF. [`Lexer::first`], [`Lexer::second`] and
+/// [`Lexer::third`] look at the characters that follow without reading them.
 pub struct Lexer<'a> {
+    /// The byte offset of the next character to read
     pos: usize,
+    /// The byte offset of the first character of the current token
+    offset: usize,
+    /// The initial space indent of the current multi-line string literal
     indent: u32,
-    escaped_identifier: bool,
+    /// The next identifier is forced to not be a keyword
+    reserved_word: bool,
+    /// The text to scan
     content: &'a str,
 
-    /// Iterator over chars. Slightly faster than a &str.
+    /// The characters that remain to be read
     chars: Chars<'a>,
 
+    /// The errors found so far
     errors: Vec<LexerError>,
 }
 
+/// The character returned when looking past the end of the input
 const EOF_CHAR: char = '\0';
 
-/// Verify if a character is within the number base system
-#[inline]
-fn is_digit_in_base(ch: char, base: i32) -> bool {
-    let num = match ch {
-        '0'..='9' => (ch as i32) - ('0' as i32),
-        'a'..='z' => (ch as i32) - ('a' as i32) + 10,
-        'A'..='Z' => (ch as i32) - ('A' as i32) + 10,
-        _ => -1,
-    };
-
-    0 <= num && num <= base
-}
-
-#[inline]
-fn is_base_10_digit(ch: char) -> bool {
-    ch.is_ascii_digit()
-}
-
+/// Whether `c` may start an identifier
 #[inline]
 fn is_identifier_first(c: char) -> bool {
     matches!(c, 'A'..='Z' | '_' | 'a'..='z')
 }
 
+/// Whether `c` may follow the first character of an identifier
 #[inline]
 fn is_identifier_rest(c: char) -> bool {
     match c {
@@ -55,156 +65,23 @@ fn is_identifier_rest(c: char) -> bool {
     }
 }
 
-/// True if `c` is valid as a non-first character of an identifier.
-/// See [Rust language reference](https://doc.rust-lang.org/reference/identifiers.html) for
-/// a formal definition of valid identifier name.
-pub fn is_id_continue(c: char) -> bool {
-    unicode_ident::is_xid_continue(c)
-}
-
 impl<'a> Iterator for Lexer<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.reset_token();
-        let start = self.pos;
 
-        match self.next_token_kind() {
+        match self.fetch_token() {
             EOF => None,
             raw_kind => {
-                let end = self.pos;
-                let kind = match (raw_kind, self.escaped_identifier) {
-                    (Identifier, false) => {
-                        // Check if this is a keyword
-                        match &self.content[start..end] {
-                            "action" => Keyword(Action),
-                            "active" => Keyword(Active),
-                            "activity" => Keyword(Activity),
-                            "always" => Keyword(Always),
-                            "array" => Keyword(Array),
-                            "assert" => Keyword(Assert),
-                            "async" => Keyword(Async),
-                            "at" => Keyword(At),
-                            "base" => Keyword(Base),
-                            "block" => Keyword(Block),
-                            "bool" => Keyword(Bool),
-                            "change" => Keyword(Change),
-                            "command" => Keyword(Command),
-                            "component" => Keyword(Component),
-                            "connections" => Keyword(Connections),
-                            "constant" => Keyword(Constant),
-                            "container" => Keyword(Container),
-                            "cpu" => Keyword(Cpu),
-                            "default" => Keyword(Default),
-                            "deployment" => Keyword(Deployment),
-                            "diagnostic" => Keyword(Diagnostic),
-                            "dictionary" => Keyword(Dictionary),
-                            "do" => Keyword(Do),
-                            "drop" => Keyword(Drop),
-                            "else" => Keyword(Else),
-                            "enter" => Keyword(Enter),
-                            "entry" => Keyword(Entry),
-                            "enum" => Keyword(Enum),
-                            "event" => Keyword(Event),
-                            "every" => Keyword(Every),
-                            "exit" => Keyword(Exit),
-                            "expand" => Keyword(Expand),
-                            "external" => Keyword(External),
-                            "F32" => Keyword(F32),
-                            "F64" => Keyword(F64),
-                            "false" => Keyword(False),
-                            "fatal" => Keyword(Fatal),
-                            "format" => Keyword(Format),
-                            "get" => Keyword(Get),
-                            "group" => Keyword(Group),
-                            "guard" => Keyword(Guard),
-                            "guarded" => Keyword(Guarded),
-                            "health" => Keyword(Health),
-                            "high" => Keyword(High),
-                            "hook" => Keyword(Hook),
-                            "I16" => Keyword(I16),
-                            "I32" => Keyword(I32),
-                            "I64" => Keyword(I64),
-                            "I8" => Keyword(I8),
-                            "id" => Keyword(Id),
-                            "if" => Keyword(If),
-                            "implements" => Keyword(Implements),
-                            "import" => Keyword(Import),
-                            "include" => Keyword(Include),
-                            "initial" => Keyword(Initial),
-                            "input" => Keyword(Input),
-                            "instance" => Keyword(Instance),
-                            "interface" => Keyword(Interface),
-                            "internal" => Keyword(Internal),
-                            "choice" => Keyword(Choice),
-                            "locate" => Keyword(Locate),
-                            "low" => Keyword(Low),
-                            "machine" => Keyword(Machine),
-                            "match" => Keyword(Match),
-                            "module" => Keyword(Module),
-                            "omit" => Keyword(Omit),
-                            "on" => Keyword(On),
-                            "opcode" => Keyword(Opcode),
-                            "orange" => Keyword(Orange),
-                            "output" => Keyword(Output),
-                            "packet" => Keyword(Packet),
-                            "packets" => Keyword(Packets),
-                            "param" => Keyword(Param),
-                            "passive" => Keyword(Passive),
-                            "phase" => Keyword(Phase),
-                            "port" => Keyword(Port),
-                            "priority" => Keyword(Priority),
-                            "product" => Keyword(Product),
-                            "queue" => Keyword(Queue),
-                            "queued" => Keyword(Queued),
-                            "record" => Keyword(Record),
-                            "recv" => Keyword(Recv),
-                            "red" => Keyword(Red),
-                            "ref" => Keyword(Ref),
-                            "reg" => Keyword(Reg),
-                            "request" => Keyword(Request),
-                            "resp" => Keyword(Resp),
-                            "save" => Keyword(Save),
-                            "send" => Keyword(Send),
-                            "serial" => Keyword(Serial),
-                            "set" => Keyword(Set),
-                            "severity" => Keyword(Severity),
-                            "signal" => Keyword(Signal),
-                            "size" => Keyword(Size),
-                            "sizeof" => Keyword(Sizeof),
-                            "stack" => Keyword(Stack),
-                            "state" => Keyword(State),
-                            "string" => Keyword(String_),
-                            "struct" => Keyword(Struct),
-                            "sync" => Keyword(Sync),
-                            "system" => Keyword(System),
-                            "telemetry" => Keyword(Telemetry),
-                            "template" => Keyword(Template),
-                            "text" => Keyword(Text),
-                            "throttle" => Keyword(Throttle),
-                            "time" => Keyword(Time),
-                            "topology" => Keyword(Topology),
-                            "true" => Keyword(True),
-                            "type" => Keyword(Type),
-                            "U16" => Keyword(U16),
-                            "U32" => Keyword(U32),
-                            "U64" => Keyword(U64),
-                            "U8" => Keyword(U8),
-                            "unmatched" => Keyword(Unmatched),
-                            "update" => Keyword(Update),
-                            "warning" => Keyword(Warning),
-                            "with" => Keyword(With),
-                            "yellow" => Keyword(Yellow),
-                            _ => Identifier,
-                        }
-                    }
-                    (Identifier, true) => Identifier,
+                let kind = match raw_kind {
+                    Identifier => self.finish_ident(),
                     _ => raw_kind,
                 };
 
                 Some(Token {
                     kind,
-                    len: end - start,
+                    len: self.pos - self.offset,
                 })
             }
         }
@@ -212,31 +89,54 @@ impl<'a> Iterator for Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+    /// Create a lexer for `content`
     pub fn new(content: &'a str) -> Lexer<'a> {
         let chars = content.chars();
         Lexer {
             pos: 0,
+            offset: 0,
             indent: 0,
             content,
             chars,
-            escaped_identifier: false,
+            reserved_word: false,
             errors: vec![],
         }
     }
 
+    /// The errors found in the tokens read so far, in the order of the input
     pub fn errors(&self) -> impl Iterator<Item = &LexerError> {
         self.errors.iter()
     }
 
-    fn error<T: Into<String>>(&mut self, len: usize, msg: T) {
+    /// Generate an error at the current token
+    fn error<T: Into<String>>(&mut self, msg: T) {
+        self.error_at(self.offset, self.pos - self.offset, msg, vec![])
+    }
+
+    /// Generate an error covering `len` bytes at `pos`
+    fn error_at<T: Into<String>>(&mut self, pos: usize, len: usize, msg: T, notes: Vec<String>) {
         self.errors.push(LexerError {
-            pos: self.pos - len,
+            pos,
             len,
             msg: msg.into(),
+            notes,
         })
     }
 
-    fn next_token_kind(&mut self) -> TokenKind {
+    /// Finish up construction of identifier
+    fn finish_ident(&self) -> TokenKind {
+        if self.reserved_word {
+            Identifier
+        } else {
+            match KeywordKind::get(&self.content[self.offset..self.pos]) {
+                Some(keyword) => Keyword(keyword),
+                None => Identifier,
+            }
+        }
+    }
+
+    /// Read the next token and return its kind
+    fn fetch_token(&mut self) -> TokenKind {
         let first_char = match self.bump() {
             Some(c) => c,
             None => return EOF,
@@ -249,16 +149,19 @@ impl<'a> Lexer<'a> {
                 Whitespace
             }
 
-            // Escaped identifier
             '$' => {
+                // Reserved words (identifier that overlaps a keyword)
                 if is_identifier_first(self.first()) {
-                    self.eat_while(is_identifier_rest);
-                    self.escaped_identifier = true;
-                    Identifier
+                    self.reserved_word = true;
+                    self.fetch_ident_rest()
                 } else {
+                    self.error("invalid usage of '$', expected identifier");
                     Unknown
                 }
             }
+
+            // Identifier or keyword
+            'A'..='Z' | 'a'..='z' | '_' => self.fetch_ident_rest(),
 
             // Numeric literal
             '0' => {
@@ -270,93 +173,101 @@ impl<'a> Lexer<'a> {
                     _ => 10,
                 };
 
-                self.eat_number(base)
+                if base != 10 && digit2int(self.first(), base).is_none() {
+                    self.error("invalid literal number");
+                }
+
+                self.fetch_number(base)
             }
 
             // More numeric literals
-            '1'..='9' => self.eat_number(10),
-
-            'A'..='Z' | 'a'..='z' | '_' => {
-                self.eat_while(is_identifier_rest);
-                Identifier
-            }
+            '1'..='9' => self.fetch_number(10),
 
             // Escaped newline
             '\\' => {
                 // Absorb spaces until newline
                 self.eat_while(|c| c == ' ');
-                if self.first() != '\n' {
+                if self.first() != LF {
                     let start = self.pos;
-                    self.eat_while(|c| c != '\n');
-                    self.error(
-                        self.pos - start,
-                        "non whitespace character illegal after line continuation",
-                    );
-                    self.bump();
-                } else {
-                    // Skip the newline
-                    self.bump();
+                    self.eat_while(|c| c != LF);
+                    if start < self.pos {
+                        // Point at the characters that follow the backslash
+                        self.error_at(
+                            start,
+                            self.pos - start,
+                            "expected line continuation",
+                            vec![],
+                        );
+                    } else {
+                        // The input ends after the backslash
+                        self.error("expected line continuation");
+                    }
                 }
 
+                // Skip the newline
+                self.bump();
                 Whitespace
             }
 
             // String literals
-            '\"' => {
-                match (self.first(), self.second()) {
-                    // Multi-line string literal
-                    ('\"', '\"') => {
+            '"' => {
+                if self.first() == '"' {
+                    if self.second() == '"' {
+                        self.bump();
+                        self.bump();
+
                         // Skip the initial newline if it exists
-                        if self.third() == '\n' {
-                            self.bump_bytes(3);
-                        } else {
-                            self.bump_bytes(2);
+                        if self.first() == LF {
+                            self.bump();
                         }
 
-                        self.eat_multiline_string_literal()
-                    }
-
-                    // Empty string literal
-                    ('\"', _) => {
+                        self.indent = self.fetch_string_lit_multi_indent();
+                        self.fetch_string_lit_multi()
+                    } else {
+                        // Empty string literal
                         self.bump();
                         LiteralString
                     }
-
-                    // String literal
-                    _ => self.eat_string_literal(),
+                } else {
+                    self.fetch_string_lit_single()
                 }
             }
 
-            // Fractional floating literal (or DOT)
-            '.' => match self.first() {
-                '0'..='9' => self.eat_fraction(),
-                _ => Dot,
-            },
+            // Fractional floating
+            '.' => {
+                // Check if this is actually part of a float
+                if self.first().is_ascii_digit() {
+                    self.fetch_fraction()
+                } else {
+                    Dot
+                }
+            }
 
-            // Comment
+            // Line comment
             '#' => {
-                self.eat_until(b'\n');
+                self.eat_line_comment();
                 Comment
             }
 
-            // End of lines
-            '\n' => {
-                self.eat_while(|c| c == '\n');
+            // Newline
+            LF => {
+                self.eat_while(|c| c == LF);
                 Eol
             }
 
-            // Annotation
             '@' => {
-                if self.first() == '<' {
+                let kind = if self.first() == '<' {
                     self.bump();
-                    self.eat_until(b'\n');
                     PostAnnotation
                 } else {
-                    self.eat_until(b'\n');
                     PreAnnotation
-                }
+                };
+
+                self.fetch_annotation_rest();
+                kind
             }
 
+            // Token Symbols
             '*' => Star,
 
             '-' => {
@@ -368,11 +279,15 @@ impl<'a> Lexer<'a> {
                 }
             }
 
+            '+' => Plus,
+            '/' => Slash,
+
             '<' => {
                 if self.first() == '<' {
                     self.bump();
                     ShiftLeft
                 } else {
+                    self.error("'<'");
                     Unknown
                 }
             }
@@ -382,41 +297,81 @@ impl<'a> Lexer<'a> {
                     self.bump();
                     ShiftRight
                 } else {
+                    self.error("'>'");
                     Unknown
                 }
             }
 
-            '+' => Plus,
-            '/' => Slash,
             '=' => Equals,
             ';' => Semi,
             ':' => Colon,
             ',' => Comma,
             '(' => LeftParen,
             '{' => LeftCurly,
-            '[' => LeftSquare,
             ')' => RightParen,
-            ']' => RightSquare,
             '}' => RightCurly,
-            c if !c.is_ascii() => self.invalid_ident(),
-            _ => Unknown,
+            '[' => LeftSquare,
+            ']' => RightSquare,
+
+            ch => {
+                // Print out the unicode value, in case the console can't
+                // display it as a character
+                let msg = format!("unicode value {}, hex 0x{:x}", ch as u32, ch as u32);
+
+                // Generate a special error message for tab characters
+                // These are especially tricky and also somewhat common
+                let notes = if ch == '\t' {
+                    vec![
+                        "embedded tab characters are not allowed in FPP source files".to_string(),
+                        "try configuring your editor to convert tabs to spaces".to_string(),
+                    ]
+                } else {
+                    vec![]
+                };
+
+                self.error_at(self.offset, self.pos - self.offset, msg, notes);
+                Unknown
+            }
         }
     }
 
-    fn eat_multiline_string_literal(&mut self) -> TokenKind {
-        // Count the indent on the first line
-        self.indent = 0;
+    /// Read the rest of a line comment
+    fn eat_line_comment(&mut self) {
+        self.eat_while(|c| c != LF);
+    }
+
+    /// Read the rest of an identifier
+    fn fetch_ident_rest(&mut self) -> TokenKind {
+        // Valid identifier characters
+        self.eat_while(is_identifier_rest);
+        Identifier
+    }
+
+    /// Read the rest of an annotation, up to the end of the line
+    fn fetch_annotation_rest(&mut self) {
+        self.eat_while(|c| c != LF);
+    }
+
+    /// Compute the initial space indent
+    fn fetch_string_lit_multi_indent(&mut self) -> u32 {
+        let mut indent = 0;
         while self.first() == ' ' {
             self.bump();
-            self.indent += 1;
+            indent += 1;
         }
 
+        indent
+    }
+
+    /// Read the rest of a multi-line string literal
+    fn fetch_string_lit_multi(&mut self) -> TokenKind {
         loop {
             match self.bump() {
-                // Search for triple quotes "".to_string()"
-                Some('\"') => {
-                    if self.first() == '\"' && self.second() == '\"' {
-                        self.bump_bytes(2);
+                // Search for the closing triple quote
+                Some('"') => {
+                    if self.first() == '"' && self.second() == '"' {
+                        self.bump();
+                        self.bump();
                         return LiteralMultilineString {
                             indent: self.indent,
                         };
@@ -429,8 +384,11 @@ impl<'a> Lexer<'a> {
                 }
 
                 Some(_) => {}
+
                 None => {
-                    self.error(0, "unclosed multi-line string literal");
+                    // The literal runs to the end of the input; report it at its
+                    // opening quotes
+                    self.error_at(self.offset, 3, "unclosed multi-line string literal", vec![]);
                     return LiteralMultilineString {
                         indent: self.indent,
                     };
@@ -439,23 +397,23 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn eat_string_literal(&mut self) -> TokenKind {
+    /// Read the rest of a single-line string literal
+    fn fetch_string_lit_single(&mut self) -> TokenKind {
         loop {
-            if self.first() == '\n' {
-                self.error(0, "unclosed string literal");
+            // A single-line string may contain neither a newline nor an escaped
+            // newline
+            if self.first() == LF || self.is_at_end() {
+                self.error("missing string double quote closure");
                 return LiteralString;
             }
 
             match self.bump() {
-                // Search for triple quotes "".to_string()"
-                Some('\"') => {
-                    self.indent = 0;
-                    return LiteralString;
-                }
+                // Search for the closing quote
+                Some('"') => return LiteralString,
 
                 Some('\\') => {
-                    if self.first() == '\n' {
-                        self.error(0, "unclosed string literal");
+                    if self.first() == LF || self.is_at_end() {
+                        self.error("missing string double quote closure");
                         return LiteralString;
                     }
 
@@ -463,146 +421,140 @@ impl<'a> Lexer<'a> {
                     self.bump();
                 }
 
-                Some(_) => {}
-
-                None => {
-                    self.error(0, "unclosed string literal");
-                    return LiteralString;
-                }
+                _ => {}
             }
         }
     }
 
-    fn eat_number(&mut self, base: i32) -> TokenKind {
-        self.eat_while(|ch| -> bool { is_digit_in_base(ch, base) });
+    /// Read a number whose base is `base`
+    fn fetch_number(&mut self, base: u32) -> TokenKind {
+        self.eat_while(|ch| digit2int(ch, base).is_some());
 
         match self.first() {
             '.' if base == 10 => {
                 self.bump();
-                self.eat_fraction();
-                LiteralFloat
+                self.fetch_fraction()
             }
 
             // Exponential
-            'e' | 'E' => self.eat_fraction(),
+            'e' | 'E' if base == 10 => self.fetch_fraction(),
 
             _ => LiteralInt,
         }
     }
 
-    fn eat_to_next(&mut self) {
-        self.eat_while(is_identifier_rest)
-    }
+    /// Read the fractional part and exponent of a floating point number if one is
+    /// present
+    fn fetch_fraction(&mut self) -> TokenKind {
+        self.eat_while(|c| c.is_ascii_digit());
 
-    fn invalid_ident(&mut self) -> TokenKind {
-        // Start is already eaten, eat the rest of identifier.
-        self.eat_while(|c| {
-            const ZERO_WIDTH_JOINER: char = '\u{200d}';
-            is_id_continue(c) || (!c.is_ascii()) || c == ZERO_WIDTH_JOINER
-        });
-        Unknown
-    }
+        if matches!(self.first(), 'e' | 'E') {
+            let lookahead = match self.second() {
+                '+' | '-' => self.third(),
+                c => c,
+            };
 
-    fn eat_fraction(&mut self) -> TokenKind {
-        self.eat_while(is_base_10_digit);
-
-        match (self.first(), self.second()) {
-            ('e' | 'E', '0'..='9') => {
+            if lookahead.is_ascii_digit() {
                 self.bump();
-                self.eat_while(is_base_10_digit);
-                if is_identifier_first(self.first()) {
-                    self.error(0, "invalid literal number");
-                    self.eat_to_next();
+                if matches!(self.first(), '+' | '-') {
+                    self.bump();
                 }
 
-                LiteralFloat
+                self.eat_while(|c| c.is_ascii_digit());
             }
+        }
 
-            (c, _) if is_identifier_first(c) => {
-                self.error(0, "invalid literal number");
-                self.eat_to_next();
-                LiteralFloat
-            }
+        self.check_no_letter();
+        LiteralFloat
+    }
 
-            _ => LiteralFloat,
+    /// Check that no letter follows a floating point number
+    fn check_no_letter(&mut self) {
+        let ch = self.first();
+        if is_identifier_part(ch) && ch >= ' ' && !self.is_at_end() {
+            // Cover the literal and the letter that ends it
+            self.error_at(
+                self.offset,
+                self.pos - self.offset + ch.len_utf8(),
+                "invalid literal number",
+                vec![],
+            );
         }
     }
 
+    /// The text that remains to be read
     pub fn as_str(&self) -> &'a str {
         self.chars.as_str()
+    }
+
+    /// Peeks the character `n` positions ahead without consuming anything,
+    /// replacing CR;LF by LF.
+    /// If requested position doesn't exist, `EOF_CHAR` is returned.
+    fn peek_char(&self, n: usize) -> char {
+        let mut chars = self.chars.clone();
+        let mut ch = EOF_CHAR;
+        for _ in 0..=n {
+            ch = match chars.next() {
+                None => return EOF_CHAR,
+                Some(CR) if chars.as_str().starts_with(LF) => {
+                    chars.next();
+                    LF
+                }
+                Some(c) => c,
+            }
+        }
+
+        ch
     }
 
     /// Peeks the next symbol from the input stream without consuming it.
     /// If requested position doesn't exist, `EOF_CHAR` is returned.
     /// However, getting `EOF_CHAR` doesn't always mean actual end of file,
-    /// it should be checked with `is_eof` method.
+    /// it should be checked with the `is_at_end` method.
     pub fn first(&self) -> char {
-        // `.next()` optimizes better than `.nth(0)`
-        self.chars.clone().next().unwrap_or(EOF_CHAR)
+        self.peek_char(0)
     }
 
     /// Peeks the second symbol from the input stream without consuming it.
     pub fn second(&self) -> char {
-        // `.next()` optimizes better than `.nth(1)`
-        let mut iter = self.chars.clone();
-        iter.next();
-        iter.next().unwrap_or(EOF_CHAR)
+        self.peek_char(1)
     }
 
     /// Peeks the third symbol from the input stream without consuming it.
     pub fn third(&self) -> char {
-        // `.next()` optimizes better than `.nth(1)`
-        let mut iter = self.chars.clone();
-        iter.next();
-        iter.next();
-        iter.next().unwrap_or(EOF_CHAR)
+        self.peek_char(2)
     }
 
     /// Checks if there is nothing more to consume.
-    pub fn is_eof(&self) -> bool {
+    pub fn is_at_end(&self) -> bool {
         self.chars.as_str().is_empty()
     }
 
-    /// Resets the number of bytes consumed to 0.
+    /// Reset the per-token state for the token that starts at the current position
     fn reset_token(&mut self) {
+        self.offset = self.pos;
         self.indent = 0;
-        self.escaped_identifier = false;
+        self.reserved_word = false;
     }
 
-    /// Moves to the next character.
+    /// Advance one character; reducing CR;LF pairs to just LF
     fn bump(&mut self) -> Option<char> {
         let c = self.chars.next()?;
         self.pos += c.len_utf8();
 
-        Some(c)
-    }
+        if c == CR && self.chars.as_str().starts_with(LF) {
+            self.chars.next();
+            self.pos += LF.len_utf8();
+            return Some(LF);
+        }
 
-    /// Moves to a substring by a number of bytes.
-    fn bump_bytes(&mut self, n: usize) {
-        self.chars = self.as_str()[n..].chars();
-        self.pos += n;
+        Some(c)
     }
 
     /// Eats symbols while predicate returns true or until the end of file is reached.
     fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        // It was tried making optimized version of this for e.g. line comments, but
-        // LLVM can inline all of this and compile it down to fast iteration over bytes.
-        while predicate(self.first()) && !self.is_eof() {
+        while predicate(self.first()) && !self.is_at_end() {
             self.bump();
-        }
-    }
-
-    fn eat_until(&mut self, byte: u8) {
-        let b = self.as_str().as_bytes();
-        self.chars = match memchr::memchr(byte, b) {
-            Some(index) => {
-                self.pos += index;
-                self.as_str()[index..].chars()
-            }
-            None => {
-                self.pos += b.len();
-                "".chars()
-            }
         }
     }
 }

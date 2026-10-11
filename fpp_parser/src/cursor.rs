@@ -1,11 +1,22 @@
 use crate::error::{ParseError, ParseResult};
 use crate::token::Token;
 use fpp_core::{BytePos, Diagnostic, Level, SourceFile, Span, Spanned};
-use fpp_lexer::{Lexer, TokenKind};
+use fpp_lexer::{Lexer, LexerError, TokenKind};
 use std::collections::VecDeque;
 
+/// The cursor over the tokens of a file.
+///
+/// The cursor pulls the tokens of `fpp_lexer` through the rules for newlines:
+/// it drops whitespace and comments, folds a run of newlines into one
+/// end-of-line token, drops the newlines after a token that eats them and
+/// before a closing token, and gives each token its string value.
 pub struct Cursor<'a> {
-    lexer: Lexer<'a>,
+    /// The tokens the lexer produced for the whole file that have not been
+    /// pulled through the cursor
+    tokens: VecDeque<fpp_lexer::Token>,
+
+    /// The lexer errors that have not been emitted
+    errors: Vec<LexerError>,
 
     /// The lexer only tells us the length of the next tokens
     /// We need to track the current position in the file
@@ -31,26 +42,37 @@ pub struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
+    /// Lex the whole file and emit its lexer errors, so that they come before
+    /// any syntax error in the file
     pub(crate) fn new(
         source_file: SourceFile,
         content: &'a str,
         include_span: Option<Span>,
     ) -> Cursor<'a> {
-        Cursor {
-            lexer: Lexer::new(content),
+        let mut lexer = Lexer::new(content);
+        let tokens = lexer.by_ref().collect();
+        let errors = lexer.errors().cloned().collect();
+
+        let mut cursor = Cursor {
+            tokens,
+            errors,
             pos: 0,
             content,
             file: source_file,
             lookaheads: Default::default(),
-            last_consumed_span: Span::new(source_file, 1, 0, None),
+            last_consumed_span: Span::new(source_file, 0, 0, include_span),
             include_span,
             lookahead: None,
-        }
+        };
+
+        cursor.emit_errors();
+        cursor
     }
 
-    pub fn emit_errors(&self) {
-        self.lexer.errors().for_each(|err| {
-            Diagnostic::new(
+    /// Emit the lexer errors that have not been emitted
+    pub fn emit_errors(&mut self) {
+        for err in std::mem::take(&mut self.errors) {
+            let diagnostic = Diagnostic::new(
                 Span::new(
                     self.file,
                     err.pos as BytePos,
@@ -58,20 +80,32 @@ impl<'a> Cursor<'a> {
                     self.include_span,
                 ),
                 Level::Error,
-                "syntax error: invalid token",
-            )
-            .annotation(err.msg.clone())
-            .emit();
-        })
+                format!("invalid token: {}", err.msg),
+            );
+
+            err.notes
+                .into_iter()
+                .fold(diagnostic, |diagnostic, note| diagnostic.note(note))
+                .emit();
+        }
     }
 
-    /// Keep eating whitespace/comments/newlines until we reach another token
+    /// Read through all whitespace, comments, and newlines until another token is reached
+    /// This does not update any state of the current token
     /// Return the token we reached (or None if EOF)
     fn eat_newlines(&mut self) -> Option<fpp_lexer::Token> {
         loop {
-            let token = self.lexer.next()?;
+            let token = self.tokens.pop_front()?;
             match token.kind {
-                TokenKind::Eol | TokenKind::Comment | TokenKind::Whitespace => {
+                // Skip whitespace (a line continuation is whitespace that ends the run)
+                TokenKind::Eol => {
+                    self.pos += token.len;
+                }
+                TokenKind::Whitespace if !self.content[self.pos..].starts_with('\\') => {
+                    self.pos += token.len;
+                }
+                // Skip comments
+                TokenKind::Comment => {
                     self.pos += token.len;
                 }
                 _ => return Some(token),
@@ -83,33 +117,20 @@ impl<'a> Cursor<'a> {
         loop {
             let prev = self.pos;
             let tok = match self.lookahead.take() {
-                None => self.lexer.next()?,
+                None => self.tokens.pop_front()?,
                 Some(lookahead) => lookahead,
             };
 
             self.pos += tok.len;
             match tok.kind {
                 TokenKind::EOF => unreachable!(),
-                TokenKind::Unknown => {
-                    Diagnostic::new(
-                        Span::new(
-                            self.file,
-                            prev as BytePos,
-                            tok.len as BytePos,
-                            self.include_span,
-                        ),
-                        Level::Error,
-                        format!(
-                            "syntax error: invalid character {:#?}",
-                            self.content.as_bytes()[prev] as char
-                        ),
-                    )
-                    .emit();
-                }
+                // The lexer reported the invalid token
+                TokenKind::Unknown => {}
                 TokenKind::Whitespace => {}
+                // Newline (or line comment)
                 TokenKind::Eol | TokenKind::Comment => {
-                    // Check what comes after the EOL to see if this actually an EOL or
-                    // just whitespace
+                    // Check the next token
+                    // Some tokens eat newlines and others don't
                     return match self.eat_newlines() {
                         None => Some(Token::new(
                             TokenKind::Eol,
@@ -124,7 +145,7 @@ impl<'a> Cursor<'a> {
                                 TokenKind::RightParen
                                 | TokenKind::RightCurly
                                 | TokenKind::RightSquare => {
-                                    // Absorb all the previous whitespace before these closing tokens
+                                    // Fetch the next token to avoid this newline
                                     let lookahead_prev = self.pos;
                                     self.pos += lookahead.len;
                                     Some(Token::new(
@@ -175,11 +196,7 @@ impl<'a> Cursor<'a> {
                     self.lookahead = self.eat_newlines();
                     return Some(Token::new(
                         tok.kind,
-                        Some(
-                            self.content[prev + 2..=(prev + tok.len - 1)]
-                                .trim()
-                                .to_string(),
-                        ),
+                        Some(java_trim(&self.content[prev + 2..prev + tok.len]).to_string()),
                         self.file,
                         prev as BytePos,
                         tok.len as BytePos,
@@ -191,7 +208,7 @@ impl<'a> Cursor<'a> {
                     self.lookahead = self.eat_newlines();
                     return Some(Token::new(
                         tok.kind,
-                        Some(self.content[prev + 1..=prev + tok.len].trim().to_string()),
+                        Some(java_trim(&self.content[prev + 1..prev + tok.len]).to_string()),
                         self.file,
                         prev as BytePos,
                         tok.len as BytePos,
@@ -200,15 +217,12 @@ impl<'a> Cursor<'a> {
                 }
 
                 TokenKind::LiteralString => {
-                    let text = if tok.len >= 2 {
-                        self.content[prev + 1..(prev + 1 + tok.len - 2)].to_string()
-                    } else {
-                        "".to_string()
-                    };
+                    let raw = &self.content[prev + 1..prev + tok.len];
+                    let raw = raw.strip_suffix('"').unwrap_or(raw);
 
                     return Some(Token::new(
                         tok.kind,
-                        Some(text),
+                        Some(string_lit_single_value(raw)),
                         self.file,
                         prev as BytePos,
                         tok.len as BytePos,
@@ -217,21 +231,25 @@ impl<'a> Cursor<'a> {
                 }
 
                 TokenKind::LiteralMultilineString { indent } => {
-                    let text = if tok.len >= 6 {
-                        let raw_text = self.content[prev + 3..(prev + 3 + tok.len - 6)].to_string();
-                        let lines: Vec<_> = raw_text
-                            .split('\n')
-                            .map(|l| {
-                                if l.len() > indent as usize {
-                                    l[(indent as usize)..].to_string()
-                                } else {
-                                    "".to_string()
-                                }
-                            })
-                            .collect();
-                        lines.join("\n")
-                    } else {
-                        "".to_string()
+                    let raw = &self.content[prev + 3..prev + tok.len];
+                    let raw = raw.strip_suffix("\"\"\"").unwrap_or(raw);
+
+                    return Some(Token::new(
+                        tok.kind,
+                        Some(string_lit_multi_value(raw, indent)),
+                        self.file,
+                        prev as BytePos,
+                        tok.len as BytePos,
+                        self.include_span,
+                    ));
+                }
+
+                // Tokens that do not absorb newlines after and have text
+                TokenKind::LiteralInt => {
+                    let text = &self.content[prev..(prev + tok.len)];
+                    let text = match text.strip_prefix("0X") {
+                        Some(digits) => format!("0x{digits}"),
+                        None => text.to_string(),
                     };
 
                     return Some(Token::new(
@@ -244,8 +262,7 @@ impl<'a> Cursor<'a> {
                     ));
                 }
 
-                // Tokens that do not absorb newlines after and have text
-                TokenKind::LiteralFloat | TokenKind::LiteralInt => {
+                TokenKind::LiteralFloat => {
                     return Some(Token::new(
                         tok.kind,
                         Some(self.content[prev..(prev + tok.len)].to_string()),
@@ -262,7 +279,8 @@ impl<'a> Cursor<'a> {
                 | TokenKind::RightParen
                 | TokenKind::RightCurly
                 | TokenKind::RightSquare
-                | TokenKind::RightArrow => {
+                | TokenKind::ShiftLeft
+                | TokenKind::ShiftRight => {
                     return Some(Token::new(
                         tok.kind,
                         None,
@@ -277,9 +295,8 @@ impl<'a> Cursor<'a> {
                 TokenKind::Star
                 | TokenKind::Slash
                 | TokenKind::Minus
+                | TokenKind::RightArrow
                 | TokenKind::Plus
-                | TokenKind::ShiftLeft
-                | TokenKind::ShiftRight
                 | TokenKind::Equals
                 | TokenKind::Semi
                 | TokenKind::Comma
@@ -332,11 +349,37 @@ impl<'a> Cursor<'a> {
         self.last_consumed_span
     }
 
+    /// The location of the next token, or the end of the input if there is none.
+    /// An end-of-line token, which spans the run of newlines and comments it
+    /// stands for, is located where the run starts.
+    fn next_token_span(&mut self) -> Span {
+        let file = self.file;
+        let include_span = self.include_span;
+        match self.peek_internal(0) {
+            Some(tok) if tok.kind() == TokenKind::Eol => {
+                Span::new(file, tok.span().start().pos(), 0, include_span)
+            }
+            Some(tok) => tok.span(),
+            None => self.end_of_input_span(),
+        }
+    }
+
+    /// The empty span at the end of the input
+    fn end_of_input_span(&self) -> Span {
+        Span::new(
+            self.file,
+            self.content.len() as BytePos,
+            0,
+            self.include_span,
+        )
+    }
+
     /// Generate a new error while expecting a certain type of token
     /// Messages here are meant to only be simple literals, the full error message
     /// will be formatted given other context information.
+    /// The error is located at the next token.
     pub fn err_expected_token(
-        &self,
+        &mut self,
         msg: &'static str,
         expected: TokenKind,
         got: TokenKind,
@@ -344,43 +387,40 @@ impl<'a> Cursor<'a> {
         ParseError::ExpectedToken {
             expected,
             got,
-            last: self.last_consumed_span,
+            last: self.next_token_span(),
             msg,
         }
     }
 
-    /// Generate a generic syntax error
-    pub fn err(&self, msg: &'static str) -> ParseError {
+    /// Generate a generic syntax error located at the next token
+    pub fn err(&mut self, msg: &'static str) -> ParseError {
         ParseError::Syntax {
-            last: self.last_consumed_span,
+            last: self.next_token_span(),
             msg,
         }
     }
 
     pub fn err_unexpected_eof(&self) -> ParseError {
         ParseError::UnexpectedEof {
-            last: self.last_consumed_span,
+            last: self.end_of_input_span(),
         }
     }
-
-    // Insert a single token into the front of the queue to be pulled next
-    // pub fn insert(&mut self, token: Token) {
-    //     self.token_queue.push_front(token)
-    // }
 
     pub fn err_expected_one_of(
         &mut self,
         msg: &'static str,
         expected_one_of: Vec<TokenKind>,
     ) -> ParseError {
-        match self.peek_internal(0) {
-            None => self.err_unexpected_eof(),
-            Some(got) => ParseError::ExpectedOneOf {
-                expected: expected_one_of,
-                got_span: got.span,
-                got_kind: got.kind,
-                msg,
-            },
+        let (got_kind, got_span) = match self.peek_internal(0) {
+            None => (TokenKind::EOF, self.end_of_input_span()),
+            Some(got) => (got.kind, got.span),
+        };
+
+        ParseError::ExpectedOneOf {
+            expected: expected_one_of,
+            got_span,
+            got_kind,
+            msg,
         }
     }
 
@@ -414,11 +454,105 @@ impl<'a> Cursor<'a> {
     }
 }
 
+/// Remove the leading and trailing characters at or below the space character,
+/// the way Java's `String.trim` does
+fn java_trim(s: &str) -> &str {
+    s.trim_matches(|c: char| c <= ' ')
+}
+
+/// Append the character `ch` that follows a backslash in a string literal
+fn put_string_escape_char(out: &mut String, ch: char) {
+    match ch {
+        '\\' => out.push('\\'),
+        '"' => out.push('"'),
+        // TODO(tumbar) We could put in more string escape sequences
+        _ => out.push(ch),
+    }
+}
+
+/// The value of a single-line string literal whose text between the quotes
+/// is `raw`
+fn string_lit_single_value(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut chars = raw.chars();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\\' => {
+                if let Some(ch) = chars.next() {
+                    put_string_escape_char(&mut out, ch);
+                }
+            }
+            _ => out.push(ch),
+        }
+    }
+
+    out
+}
+
+/// The value of a multi-line string literal whose text between the quotes is
+/// `raw` and whose first line has an initial space indent of `full_indent`.
+/// Each line loses at most `full_indent` leading spaces.
+fn string_lit_multi_value(raw: &str, full_indent: u32) -> String {
+    // Skip the initial newline if it exists
+    let raw = raw
+        .strip_prefix("\r\n")
+        .or_else(|| raw.strip_prefix('\n'))
+        .unwrap_or(raw);
+
+    // Skip the initial space indent
+    let raw = raw.get(full_indent as usize..).unwrap_or("");
+
+    let mut out = String::with_capacity(raw.len());
+    let mut skip = 0;
+    let mut chars = raw.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            ' ' => {
+                if skip == 0 {
+                    out.push(' ');
+                } else {
+                    skip -= 1;
+                }
+            }
+            '\r' if chars.peek() == Some(&'\n') => {
+                chars.next();
+                out.push('\n');
+                skip = full_indent;
+            }
+            '\n' => {
+                out.push('\n');
+                skip = full_indent;
+            }
+            '\\' => {
+                match chars.next() {
+                    Some('\r') if chars.peek() == Some(&'\n') => {
+                        chars.next();
+                        put_string_escape_char(&mut out, '\n');
+                    }
+                    Some(ch) => put_string_escape_char(&mut out, ch),
+                    None => {}
+                }
+                skip = 0;
+            }
+            _ => {
+                out.push(ch);
+                skip = 0;
+            }
+        }
+    }
+
+    out
+}
+
+#[cfg(test)]
+mod lexer_spec;
+
 #[cfg(test)]
 mod test {
     use crate::cursor::Cursor;
+    use crate::error::ParseError;
     use crate::token::Token;
-    use fpp_core::SourceFile;
+    use fpp_core::{SourceFile, Spanned};
     use fpp_lexer::TokenKind::*;
     use fpp_lexer::{KeywordKind, TokenKind};
 
@@ -453,6 +587,14 @@ mod test {
 
             out
         })
+    }
+
+    /// The kinds and texts of the tokens of `content`
+    fn lex_texts(content: &str) -> Vec<(TokenKind, String)> {
+        lex(content)
+            .iter()
+            .map(|tok| (tok.kind(), tok.text().to_string()))
+            .collect()
     }
 
     fn assert_token_eq(token: &Token, kind: TokenKind, text: &str) {
@@ -504,12 +646,12 @@ mod test {
         assert_token_eq(&tokens[idx.next()], LiteralFloat, "10.3e3");
         assert_token_eq(&tokens[idx.next()], LiteralFloat, ".3e3");
         assert_token_eq(&tokens[idx.next()], LiteralString, "");
-        assert_token_eq(&tokens[idx.next()], LiteralString, "string \\\"");
+        assert_token_eq(&tokens[idx.next()], LiteralString, "string \"");
 
         assert_token_eq(
             &tokens[idx.next()],
             LiteralMultilineString { indent: 4 },
-            "\na multiline literal string with \\\"\\\"\\\" some \\escapes \" \"\n",
+            "a multiline literal string with \"\"\" some escapes \" \"\n",
         );
         assert_token_eq(
             &tokens[idx.next()],
@@ -517,6 +659,76 @@ mod test {
             "",
         );
         assert_eq!(tokens.len(), 12);
+    }
+
+    #[test]
+    fn escaped_strings() {
+        assert_eq!(
+            lex_texts(r#""\"" "\\" "\\\"" "\"\\" "x\qy" "i\nc.fppi" "{\}""#),
+            vec![
+                (LiteralString, "\"".to_string()),
+                (LiteralString, "\\".to_string()),
+                (LiteralString, "\\\"".to_string()),
+                (LiteralString, "\"\\".to_string()),
+                (LiteralString, "xqy".to_string()),
+                (LiteralString, "inc.fppi".to_string()),
+                (LiteralString, "{}".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn multiline_string_indent() {
+        // Each line loses at most the indent of the first line, and only spaces
+        let tokens = lex_texts(
+            "\"\"\"\n    abc\n  de\n      deep\n\t b\n    x\\\"y\n  \\\n   z\n    \"\"\"",
+        );
+        assert_eq!(
+            tokens,
+            vec![(
+                LiteralMultilineString { indent: 4 },
+                "abc\nde\n  deep\n\t b\nx\"y\n\n   z\n".to_string()
+            )]
+        );
+
+        // The first line need not start on a new line
+        assert_eq!(
+            lex_texts("\"\"\"  abc\n    def\n  \"\"\""),
+            vec![(
+                LiteralMultilineString { indent: 2 },
+                "abc\n  def\n".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn multiline_string_non_ascii() {
+        assert_eq!(
+            lex_texts("\"\"\"\n    x\nabc\u{e9}\n   \u{e9}\u{e9}\n    \"\"\""),
+            vec![(
+                LiteralMultilineString { indent: 4 },
+                "x\nabc\u{e9}\n\u{e9}\u{e9}\n".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn crlf() {
+        assert_eq!(
+            lex_texts("a = 1\r\n# c\r\nb \\\r\n  c\r\n@ d\r\n\"\"\"\r\n  x\r\n  y\r\n  \"\"\"\r\n"),
+            vec![
+                (Identifier, "a".to_string()),
+                (Equals, String::new()),
+                (LiteralInt, "1".to_string()),
+                (Eol, String::new()),
+                (Identifier, "b".to_string()),
+                (Identifier, "c".to_string()),
+                (Eol, String::new()),
+                (PreAnnotation, "d".to_string()),
+                (LiteralMultilineString { indent: 2 }, "x\ny\n".to_string()),
+                (Eol, String::new()),
+            ]
+        );
     }
 
     #[test]
@@ -530,6 +742,41 @@ mod test {
         assert_token_eq(&tokens[idx.next()], Identifier, "Some");
         assert_token_eq(&tokens[idx.next()], Identifier, "Identifiers");
         assert_token_eq(&tokens[idx.next()], PostAnnotation, "Post annotation");
+    }
+
+    #[test]
+    fn annotations_at_end_of_input() {
+        assert_eq!(lex_texts("@ x"), vec![(PreAnnotation, "x".to_string())]);
+        assert_eq!(
+            lex_texts("constant a = 1\n@"),
+            vec![
+                (Keyword(KeywordKind::Constant), String::new()),
+                (Identifier, "a".to_string()),
+                (Equals, String::new()),
+                (LiteralInt, "1".to_string()),
+                (Eol, String::new()),
+                (PreAnnotation, String::new()),
+            ]
+        );
+        assert_eq!(
+            lex_texts("a @<"),
+            vec![
+                (Identifier, "a".to_string()),
+                (PostAnnotation, String::new())
+            ]
+        );
+    }
+
+    #[test]
+    fn annotation_trim() {
+        // Trimming removes the characters at or below the space character
+        assert_eq!(
+            lex_texts("@ abc\u{a0}\n@ \u{1}def\u{1}\n"),
+            vec![
+                (PreAnnotation, "abc\u{a0}".to_string()),
+                (PreAnnotation, "def".to_string()),
+            ]
+        );
     }
 
     #[test]
@@ -549,6 +796,17 @@ mod test {
     }
 
     #[test]
+    fn hex_prefix() {
+        assert_eq!(
+            lex_texts("0X1F 0x1F"),
+            vec![
+                (LiteralInt, "0x1F".to_string()),
+                (LiteralInt, "0x1F".to_string()),
+            ]
+        );
+    }
+
+    #[test]
     fn escape_newline() {
         let tokens = lex(r#"escaped \
     newline"#);
@@ -559,20 +817,60 @@ mod test {
     }
 
     #[test]
+    fn escape_newline_before_closing_token() {
+        // A line continuation ends a run of newlines, so the newline before it is
+        // kept
+        assert_eq!(
+            lex_texts("(1\n\\\n)"),
+            vec![
+                (LeftParen, String::new()),
+                (LiteralInt, "1".to_string()),
+                (Eol, String::new()),
+                (RightParen, String::new()),
+            ]
+        );
+    }
+
+    #[test]
     fn invalid_tokens() {
         let tokens = lex(r#"1ee 	 $ 1e1e "
     ""#);
-        assert_eq!(tokens.len(), 5);
+        assert_eq!(tokens.len(), 7);
         let mut idx = Index(0);
-        assert_token_eq(&tokens[idx.next()], LiteralFloat, "1ee");
-        assert_token_eq(&tokens[idx.next()], LiteralFloat, "1e1e");
+        assert_token_eq(&tokens[idx.next()], LiteralFloat, "1");
+        assert_token_eq(&tokens[idx.next()], Identifier, "ee");
+        assert_token_eq(&tokens[idx.next()], LiteralFloat, "1e1");
+        assert_token_eq(&tokens[idx.next()], Identifier, "e");
         assert_token_eq(&tokens[idx.next()], LiteralString, "");
         assert_token_eq(&tokens[idx.next()], Eol, "");
         assert_token_eq(&tokens[idx.next()], LiteralString, "");
 
         let tokens = lex(r#"""" asdaldkasl"#);
         assert_eq!(tokens.len(), 1);
-        // assert_token_eq(&tokens[0], Error("unclosed multi-line string literal"), "");
+        assert_token_eq(
+            &tokens[0],
+            LiteralMultilineString { indent: 1 },
+            "asdaldkasl",
+        );
+    }
+
+    #[test]
+    fn unclosed_non_ascii_strings() {
+        assert_eq!(
+            lex_texts("\"caf\u{e9}\nconstant"),
+            vec![
+                (LiteralString, "caf\u{e9}".to_string()),
+                (Eol, String::new()),
+                (Keyword(KeywordKind::Constant), String::new()),
+            ]
+        );
+        assert_eq!(
+            lex_texts("\"\"\"\u{e9}\u{e9}\u{e9}"),
+            vec![(
+                LiteralMultilineString { indent: 0 },
+                "\u{e9}\u{e9}\u{e9}".to_string()
+            )]
+        );
     }
 
     #[test]
@@ -582,11 +880,6 @@ mod test {
         assert_eq!(tokens.len(), 2);
         let mut idx = Index(0);
         assert_token_eq(&tokens[idx.next()], Identifier, "escaped");
-        // assert_token_eq(
-        //     &tokens[idx.next()],
-        //     Error("Non whitespace character illegal after line continuation"),
-        //     "",
-        // );
         assert_token_eq(&tokens[idx.next()], Identifier, "newline");
     }
 
@@ -600,7 +893,7 @@ mod test {
 
         } []
 
-        ] -> - + ; / *
+        ] - + ; / *
 
         1
 
@@ -610,7 +903,7 @@ mod test {
 
         ]"#);
 
-        assert_eq!(tokens.len(), 25);
+        assert_eq!(tokens.len(), 24);
         let mut idx = Index(0);
         assert_token_eq(&tokens[idx.next()], Colon, "");
         assert_token_eq(&tokens[idx.next()], Dot, "");
@@ -625,7 +918,6 @@ mod test {
         assert_token_eq(&tokens[idx.next()], LeftSquare, "");
         assert_token_eq(&tokens[idx.next()], RightSquare, "");
         assert_token_eq(&tokens[idx.next()], RightSquare, "");
-        assert_token_eq(&tokens[idx.next()], RightArrow, "");
         assert_token_eq(&tokens[idx.next()], Minus, "");
         assert_token_eq(&tokens[idx.next()], Plus, "");
         assert_token_eq(&tokens[idx.next()], Semi, "");
@@ -637,5 +929,94 @@ mod test {
         assert_token_eq(&tokens[idx.next()], RightCurly, "");
         assert_token_eq(&tokens[idx.next()], LiteralInt, "1");
         assert_token_eq(&tokens[idx.next()], RightSquare, "");
+    }
+
+    #[test]
+    fn newline_suppression() {
+        // `->` absorbs the newlines after it; `<<` and `>>` do not
+        let kinds = |s: &str| lex(s).iter().map(|t| t.kind()).collect::<Vec<_>>();
+        assert_eq!(kinds("a ->\n  b"), vec![Identifier, RightArrow, Identifier]);
+        assert_eq!(
+            kinds("1 <<\n  2"),
+            vec![LiteralInt, ShiftLeft, Eol, LiteralInt]
+        );
+        assert_eq!(
+            kinds("1 >>\n  2"),
+            vec![LiteralInt, ShiftRight, Eol, LiteralInt]
+        );
+    }
+
+    /// Run `f` on a cursor over `content`
+    fn with_cursor<T>(content: &str, f: impl FnOnce(&mut Cursor) -> T) -> T {
+        let mut diagnostics_str = vec![];
+        let mut ctx =
+            fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics_str));
+
+        fpp_core::run(&mut ctx, || {
+            let file = SourceFile::new("<stdin>", content.to_string());
+            let mut cursor = Cursor::new(file, content, None);
+            f(&mut cursor)
+        })
+    }
+
+    #[test]
+    fn errors_are_located_at_the_next_token() {
+        with_cursor("a b", |cursor| {
+            let b = cursor.peek_span(1).unwrap();
+            cursor.next();
+
+            match cursor.consume(Equals) {
+                Err(ParseError::ExpectedToken { last, got, .. }) => {
+                    assert_eq!(last, b);
+                    assert_eq!(got, Identifier);
+                }
+                other => panic!("{other:?}"),
+            }
+
+            match cursor.err("syntax") {
+                ParseError::Syntax { last, .. } => assert_eq!(last, b),
+                other => panic!("{other:?}"),
+            }
+        });
+
+        // Before the first token
+        with_cursor("# comment\n\nb", |cursor| {
+            let b = cursor.peek_span(1).unwrap();
+            assert_eq!(cursor.peek(1), Identifier);
+
+            match cursor.consume(Identifier) {
+                Err(ParseError::ExpectedToken { last, got, .. }) => {
+                    assert_eq!(got, Eol);
+                    assert_eq!(last.start().line(), 0);
+                }
+                other => panic!("{other:?}"),
+            }
+
+            cursor.next();
+            assert_eq!(cursor.next().unwrap().span(), b);
+        });
+    }
+
+    #[test]
+    fn end_of_input_errors_keep_the_expectation() {
+        with_cursor("a", |cursor| {
+            cursor.next();
+
+            match cursor.err_expected_one_of("expression expected", vec![LiteralInt]) {
+                ParseError::ExpectedOneOf {
+                    got_kind,
+                    got_span,
+                    msg,
+                    expected,
+                } => {
+                    assert_eq!(got_kind, EOF);
+                    assert_eq!(msg, "expression expected");
+                    assert_eq!(expected, vec![LiteralInt]);
+                    assert_eq!(got_span.start().pos(), 1);
+                    assert!(got_span.is_empty());
+                }
+                other => panic!("{other:?}"),
+            }
+        });
     }
 }

@@ -1,12 +1,35 @@
  --> [ local path prefix ]/illegal-character.fpp:1:1
   |
 1 | %
-  | ^ syntax error: invalid character '%'
+  | ^ invalid token: unicode value 37, hex 0x25
 
  --> [ local path prefix ]/illegal-character.fpp:2:1
   |
 2 |     
-  | ^^^^ syntax error: invalid character '\t'
+  | ^^^^ invalid token: unicode value 9, hex 0x9
+  |
+  = note: embedded tab characters are not allowed in FPP source files
+  = note: try configuring your editor to convert tabs to spaces
+
+ --> [ local path prefix ]/illegal-character.fpp:4:8
+  |
+4 | tok2 \ illegal
+  |        ^^^^^^^ invalid token: expected line continuation
+
+ --> [ local path prefix ]/illegal-character.fpp:5:1
+  |
+5 | > < >
+  | ^ invalid token: '>'
+
+ --> [ local path prefix ]/illegal-character.fpp:5:3
+  |
+5 | > < >
+  |   ^ invalid token: '<'
+
+ --> [ local path prefix ]/illegal-character.fpp:5:5
+  |
+5 | > < >
+  |     ^ invalid token: '>'
 
  --> [ local path prefix ]/illegal-character.fpp:3:1
   |
@@ -15,11 +38,4 @@
   |
   = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate, expand
   = note: got identifier
-
- --> [ local path prefix ]/illegal-character.fpp:4:8
-  |
-4 | tok2 \ illegal
-  |        ^^^^^^^ syntax error: invalid token
-  |
-  = error: non whitespace character illegal after line continuation
 

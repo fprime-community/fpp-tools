@@ -1,3 +1,4 @@
+mod chars;
 mod lexer;
 mod token;
 

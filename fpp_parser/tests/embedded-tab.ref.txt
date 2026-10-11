@@ -1,5 +1,8 @@
  --> [ local path prefix ]/embedded-tab.fpp:1:1
   |
 1 |     
-  | ^^^^ syntax error: invalid character '\t'
+  | ^^^^ invalid token: unicode value 9, hex 0x9
+  |
+  = note: embedded tab characters are not allowed in FPP source files
+  = note: try configuring your editor to convert tabs to spaces
 

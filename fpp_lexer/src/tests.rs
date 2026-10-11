@@ -6,15 +6,47 @@ use pretty_assertions::assert_eq;
 #[derive(Debug, PartialEq)]
 struct TokenStr<'a>(pub &'a str, pub TokenKind);
 
-fn lex(content: &'_ str) -> Vec<TokenStr<'_>> {
+/// A lexer error as the text it covers and its message
+type ErrorStr = (String, String);
+
+/// Lex `content` into its tokens and errors
+fn lex_with_errors(content: &'_ str) -> (Vec<TokenStr<'_>>, Vec<ErrorStr>) {
     let mut out = Vec::new();
     let mut offset: usize = 0;
-    for token in crate::Lexer::new(content) {
+    let mut lexer = crate::Lexer::new(content);
+    for token in lexer.by_ref() {
         out.push(TokenStr(&content[offset..(offset + token.len)], token.kind));
         offset += token.len;
     }
 
-    out
+    let errors = lexer
+        .errors()
+        .map(|err| {
+            (
+                content[err.pos..err.pos + err.len].to_string(),
+                err.msg.clone(),
+            )
+        })
+        .collect();
+    (out, errors)
+}
+
+/// Lex `content`, which must lex without errors
+fn lex(content: &'_ str) -> Vec<TokenStr<'_>> {
+    let (tokens, errors) = lex_with_errors(content);
+    assert_eq!(errors, vec![], "unexpected lexer errors");
+    tokens
+}
+
+fn errors(content: &str) -> Vec<ErrorStr> {
+    lex_with_errors(content).1
+}
+
+fn expected_errors(errors: &[(&str, &str)]) -> Vec<ErrorStr> {
+    errors
+        .iter()
+        .map(|(text, msg)| (text.to_string(), msg.to_string()))
+        .collect()
 }
 
 #[test]
@@ -86,6 +118,118 @@ fn literals() {
 }
 
 #[test]
+fn float_literals() {
+    for s in [
+        "123.456", "123.", "456.", "123e10", "123e-10", "1.5E+3", "1E+5", ".5e-2", "1.e5",
+    ] {
+        assert_eq!(lex(s), vec![TokenStr(s, LiteralFloat)], "{s}");
+    }
+}
+
+#[test]
+fn int_literals() {
+    for s in ["123456", "0x123456ABCD", "0X1f", "0", "007"] {
+        assert_eq!(lex(s), vec![TokenStr(s, LiteralInt)], "{s}");
+    }
+}
+
+#[test]
+fn exponent_without_digits() {
+    // The exponent letter is not part of the literal
+    assert_eq!(
+        lex_with_errors("1e-x").0,
+        vec![
+            TokenStr("1", LiteralFloat),
+            TokenStr("e", Identifier),
+            TokenStr("-", Minus),
+            TokenStr("x", Identifier),
+        ]
+    );
+    assert_eq!(
+        errors("1e-x"),
+        expected_errors(&[("1e", "invalid literal number")])
+    );
+}
+
+#[test]
+fn letter_after_int_literal() {
+    // A digit outside the base ends the literal
+    for (s, int, rest) in [
+        ("15a", "15", "a"),
+        ("9A", "9", "A"),
+        ("0x1g", "0x1", "g"),
+        ("0x1G", "0x1", "G"),
+    ] {
+        assert_eq!(
+            lex(s),
+            vec![TokenStr(int, LiteralInt), TokenStr(rest, Identifier)],
+            "{s}"
+        );
+    }
+}
+
+#[test]
+fn hex_prefix_without_digits() {
+    for s in ["0x", "0X", "0xg", "0xG1"] {
+        assert_eq!(
+            errors(s),
+            expected_errors(&[(&s[..2], "invalid literal number")]),
+            "{s}"
+        );
+    }
+}
+
+#[test]
+fn letter_after_float_literal() {
+    assert_eq!(
+        lex_with_errors("1ee 1.5x 1e1e").0,
+        vec![
+            TokenStr("1", LiteralFloat),
+            TokenStr("ee", Identifier),
+            TokenStr(" ", Whitespace),
+            TokenStr("1.5", LiteralFloat),
+            TokenStr("x", Identifier),
+            TokenStr(" ", Whitespace),
+            TokenStr("1e1", LiteralFloat),
+            TokenStr("e", Identifier),
+        ]
+    );
+    assert_eq!(
+        errors("1ee 1.5x 1e1e"),
+        expected_errors(&[
+            ("1e", "invalid literal number"),
+            ("1.5x", "invalid literal number"),
+            ("1e1e", "invalid literal number"),
+        ])
+    );
+}
+
+#[test]
+fn identifier_part_after_float_literal() {
+    // An identifier-ignorable character ends the literal with an error, and
+    // then is an invalid character of its own
+    for s in ["1.5\u{ad}", "1.5\u{85}", "1.5\u{200b}"] {
+        let ch = &s[3..];
+        let code = ch.chars().next().unwrap() as u32;
+        assert_eq!(
+            errors(s),
+            expected_errors(&[
+                (s, "invalid literal number"),
+                (ch, &format!("unicode value {code}, hex 0x{code:x}")),
+            ]),
+            "{s:?}"
+        );
+    }
+
+    // A character outside the Basic Multilingual Plane is not part of an
+    // identifier, even if it is a letter
+    assert_eq!(
+        errors("1.5\u{1d400}"),
+        expected_errors(&[("\u{1d400}", "unicode value 119808, hex 0x1d400")])
+    );
+}
+
+#[test]
 fn annotations() {
     let tokens = lex(r#"@ Pre annotation
         Some Identifiers @< Post annotation"#);
@@ -129,101 +273,234 @@ fn identifiers_and_keywords() {
     );
 }
 
-// #[test]
-// fn escape_newline() {
-//     let tokens = lex(r#"escaped \
-//     newline"#);
-//     assert_eq!(tokens.len(), 2);
-//     let mut idx = Index(0);
-//     assert_token_eq(&tokens[idx.next()], Identifier, "escaped");
-//     assert_token_eq(&tokens[idx.next()], Identifier, "newline");
-// }
+#[test]
+fn keyword_spellings() {
+    for (text, kind) in crate::token::KEYWORDS {
+        assert_eq!(lex(text), vec![TokenStr(text, Keyword(kind))]);
+        assert_eq!(kind.as_str(), text);
+        assert_eq!(KeywordKind::get(text), Some(kind));
+    }
+
+    assert_eq!(KeywordKind::U32.to_string(), "U32");
+    assert_eq!(KeywordKind::String_.to_string(), "string");
+    assert_eq!(KeywordKind::get("u32"), None);
+}
 
 #[test]
-fn invalid_tokens() {
-    let tokens = lex(r#"1ee 	 $ ™™ 1e1e "
-    ""#);
+fn escape_newline() {
+    let tokens = lex("escaped \\  \n    newline");
     assert_eq!(
         tokens,
         vec![
-            TokenStr("1ee", LiteralFloat),
+            TokenStr("escaped", Identifier),
             TokenStr(" ", Whitespace),
-            TokenStr("	", Unknown),
-            TokenStr(" ", Whitespace),
-            TokenStr("$", Unknown),
-            TokenStr(" ", Whitespace),
-            TokenStr("™™", Unknown),
-            TokenStr(" ", Whitespace),
-            TokenStr("1e1e", LiteralFloat),
-            TokenStr(" ", Whitespace),
-            TokenStr("\"", LiteralString),
-            TokenStr("\n", Eol),
+            TokenStr("\\  \n", Whitespace),
             TokenStr("    ", Whitespace),
-            TokenStr("\"", LiteralString),
+            TokenStr("newline", Identifier),
         ]
     );
 }
 
-// #[test]
-// fn escape_newline_error() {
-//     let tokens = lex(r#"escaped \hello
-//     newline"#);
-//     assert_eq!(tokens.len(), 2);
-//     let mut idx = Index(0);
-//     assert_token_eq(&tokens[idx.next()], Identifier, "escaped");
-//     // assert_token_eq(
-//     //     &tokens[idx.next()],
-//     //     Error("Non whitespace character illegal after line continuation"),
-//     //     "",
-//     // );
-//     assert_token_eq(&tokens[idx.next()], Identifier, "newline");
-// }
+#[test]
+fn escape_newline_error() {
+    let (tokens, _) = lex_with_errors("escaped \\hello\n    newline");
+    assert_eq!(
+        tokens,
+        vec![
+            TokenStr("escaped", Identifier),
+            TokenStr(" ", Whitespace),
+            TokenStr("\\hello\n", Whitespace),
+            TokenStr("    ", Whitespace),
+            TokenStr("newline", Identifier),
+        ]
+    );
+    assert_eq!(
+        errors("escaped \\hello\n    newline"),
+        expected_errors(&[("hello", "expected line continuation")])
+    );
 
-// #[test]
-// fn symbols() {
-//     let tokens = lex(r#": . ,
+    // A backslash that ends the input
+    assert_eq!(
+        errors("a \\"),
+        expected_errors(&[("\\", "expected line continuation")])
+    );
+}
 
-//         = ()
+#[test]
+fn invalid_tokens() {
+    let content = "\t $ ™™ < > %";
+    let (tokens, _) = lex_with_errors(content);
+    assert_eq!(
+        tokens,
+        vec![
+            TokenStr("\t", Unknown),
+            TokenStr(" ", Whitespace),
+            TokenStr("$", Unknown),
+            TokenStr(" ", Whitespace),
+            TokenStr("™", Unknown),
+            TokenStr("™", Unknown),
+            TokenStr(" ", Whitespace),
+            TokenStr("<", Unknown),
+            TokenStr(" ", Whitespace),
+            TokenStr(">", Unknown),
+            TokenStr(" ", Whitespace),
+            TokenStr("%", Unknown),
+        ]
+    );
+    assert_eq!(
+        errors(content),
+        expected_errors(&[
+            ("\t", "unicode value 9, hex 0x9"),
+            ("$", "invalid usage of '$', expected identifier"),
+            ("™", "unicode value 8482, hex 0x2122"),
+            ("™", "unicode value 8482, hex 0x2122"),
+            ("<", "'<'"),
+            (">", "'>'"),
+            ("%", "unicode value 37, hex 0x25"),
+        ])
+    );
 
-//         ) {}
+    let mut lexer = crate::Lexer::new("\t");
+    lexer.by_ref().for_each(drop);
+    assert_eq!(
+        lexer.errors().next().unwrap().notes,
+        vec![
+            "embedded tab characters are not allowed in FPP source files",
+            "try configuring your editor to convert tabs to spaces",
+        ]
+    );
+}
 
-//         } []
+#[test]
+fn unclosed_strings() {
+    let content = "\"abc\n    \"\n\"de\\\nf\"";
+    let (tokens, _) = lex_with_errors(content);
+    assert_eq!(
+        tokens,
+        vec![
+            TokenStr("\"abc", LiteralString),
+            TokenStr("\n", Eol),
+            TokenStr("    ", Whitespace),
+            TokenStr("\"", LiteralString),
+            TokenStr("\n", Eol),
+            TokenStr("\"de\\", LiteralString),
+            TokenStr("\n", Eol),
+            TokenStr("f", Identifier),
+            TokenStr("\"", LiteralString),
+        ]
+    );
+    assert_eq!(
+        errors(content),
+        expected_errors(&[
+            ("\"abc", "missing string double quote closure"),
+            ("\"", "missing string double quote closure"),
+            ("\"de\\", "missing string double quote closure"),
+            ("\"", "missing string double quote closure"),
+        ])
+    );
 
-//         ] -> - + ; / *
+    let content = "\"\"\" asdaldkasl\nmore";
+    assert_eq!(
+        lex_with_errors(content).0,
+        vec![TokenStr(content, LiteralMultilineString { indent: 1 })]
+    );
+    assert_eq!(
+        errors(content),
+        expected_errors(&[("\"\"\"", "unclosed multi-line string literal")])
+    );
+}
 
-//         1
+/// The spec allows any character but a newline after a backslash in a
+/// single-line string literal
+#[test]
+fn backslash_newline_in_string_is_unclosed() {
+    assert_eq!(
+        errors("\"ab\\\ncd\""),
+        expected_errors(&[
+            ("\"ab\\", "missing string double quote closure"),
+            ("\"", "missing string double quote closure"),
+        ])
+    );
+}
 
-//         )1
+/// The spec allows no whitespace character other than the space
+#[test]
+fn form_feed_is_not_whitespace() {
+    assert_eq!(
+        errors("a\u{c}b"),
+        expected_errors(&[("\u{c}", "unicode value 12, hex 0xc")])
+    );
+}
 
-//         }1
+/// An end-of-input character in the source is an invalid character
+#[test]
+fn substitute_character_is_invalid() {
+    assert_eq!(
+        errors("a\u{1a}b"),
+        expected_errors(&[("\u{1a}", "unicode value 26, hex 0x1a")])
+    );
+}
 
-//         ]"#);
+#[test]
+fn crlf_is_a_newline() {
+    let content = "@ a\r\n# b\r\nc \\\r\nd\r\n\r\n\"\"\"\r\n  e\r\n  \"\"\"";
+    assert_eq!(
+        lex(content),
+        vec![
+            TokenStr("@ a", PreAnnotation),
+            TokenStr("\r\n", Eol),
+            TokenStr("# b", Comment),
+            TokenStr("\r\n", Eol),
+            TokenStr("c", Identifier),
+            TokenStr(" ", Whitespace),
+            TokenStr("\\\r\n", Whitespace),
+            TokenStr("d", Identifier),
+            TokenStr("\r\n\r\n", Eol),
+            TokenStr(
+                "\"\"\"\r\n  e\r\n  \"\"\"",
+                LiteralMultilineString { indent: 2 }
+            ),
+        ]
+    );
 
-//     assert_eq!(tokens.len(), 25);
-//     let mut idx = Index(0);
-//     assert_token_eq(&tokens[idx.next()], Colon, "");
-//     assert_token_eq(&tokens[idx.next()], Dot, "");
-//     assert_token_eq(&tokens[idx.next()], Comma, "");
-//     assert_token_eq(&tokens[idx.next()], Equals, "");
-//     assert_token_eq(&tokens[idx.next()], LeftParen, "");
-//     assert_token_eq(&tokens[idx.next()], RightParen, "");
-//     assert_token_eq(&tokens[idx.next()], RightParen, "");
-//     assert_token_eq(&tokens[idx.next()], LeftCurly, "");
-//     assert_token_eq(&tokens[idx.next()], RightCurly, "");
-//     assert_token_eq(&tokens[idx.next()], RightCurly, "");
-//     assert_token_eq(&tokens[idx.next()], LeftSquare, "");
-//     assert_token_eq(&tokens[idx.next()], RightSquare, "");
-//     assert_token_eq(&tokens[idx.next()], RightSquare, "");
-//     assert_token_eq(&tokens[idx.next()], RightArrow, "");
-//     assert_token_eq(&tokens[idx.next()], Minus, "");
-//     assert_token_eq(&tokens[idx.next()], Plus, "");
-//     assert_token_eq(&tokens[idx.next()], Semi, "");
-//     assert_token_eq(&tokens[idx.next()], Slash, "");
-//     assert_token_eq(&tokens[idx.next()], Star, "");
-//     assert_token_eq(&tokens[idx.next()], LiteralInt, "1");
-//     assert_token_eq(&tokens[idx.next()], RightParen, "");
-//     assert_token_eq(&tokens[idx.next()], LiteralInt, "1");
-//     assert_token_eq(&tokens[idx.next()], RightCurly, "");
-//     assert_token_eq(&tokens[idx.next()], LiteralInt, "1");
-//     assert_token_eq(&tokens[idx.next()], RightSquare, "");
-// }
+    // A carriage return on its own is an invalid character
+    assert_eq!(
+        errors("a\rb"),
+        expected_errors(&[("\r", "unicode value 13, hex 0xd")])
+    );
+}
+
+#[test]
+fn symbols() {
+    let tokens = lex(r#": . , = () ) {} } [] ] -> - + ; / * << >>"#);
+
+    assert_eq!(
+        tokens
+            .into_iter()
+            .filter(|t| t.1 != Whitespace)
+            .collect::<Vec<_>>(),
+        vec![
+            TokenStr(":", Colon),
+            TokenStr(".", Dot),
+            TokenStr(",", Comma),
+            TokenStr("=", Equals),
+            TokenStr("(", LeftParen),
+            TokenStr(")", RightParen),
+            TokenStr(")", RightParen),
+            TokenStr("{", LeftCurly),
+            TokenStr("}", RightCurly),
+            TokenStr("}", RightCurly),
+            TokenStr("[", LeftSquare),
+            TokenStr("]", RightSquare),
+            TokenStr("]", RightSquare),
+            TokenStr("->", RightArrow),
+            TokenStr("-", Minus),
+            TokenStr("+", Plus),
+            TokenStr(";", Semi),
+            TokenStr("/", Slash),
+            TokenStr("*", Star),
+            TokenStr("<<", ShiftLeft),
+            TokenStr(">>", ShiftRight),
+        ]
+    );
+}
