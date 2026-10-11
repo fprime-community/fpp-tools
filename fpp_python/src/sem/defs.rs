@@ -66,6 +66,7 @@ fpp_python_macros::fpp_sem_bindings! {
             get_nonnegative_big_int_value(node: node, loc: span) throws(SemanticError) -> i128,
             get_nonnegative_big_int_value_opt(expr: ref opt(astnode(Expr))) throws(SemanticError) -> opt(i128),
             get_nonnegative_int_value(node: node, loc: span) throws(SemanticError) -> i128,
+            get_nonnegative_int_value_opt(expr: ref opt(astnode(Expr))) throws(SemanticError) -> opt(i128),
             get_qualified_name(symbol: ref union(Symbol)) -> str,
             get_reason_for_non_displayable_type_at(node: node) -> list(tuple(span, str)),
             get_represented_component_instance(id: node) throws(SemanticError) -> opt(rewrap(InterfaceInstance::Component)),
@@ -627,7 +628,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Connection native fpp_analysis::semantics::Connection {
+    entity Connection native fpp_analysis::semantics::Connection repr display {
         fields {
             from: entity(Endpoint),
             to: entity(Endpoint),
@@ -684,7 +685,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Endpoint native fpp_analysis::semantics::Endpoint {
+    entity Endpoint native fpp_analysis::semantics::Endpoint repr display {
         fields {
             loc: span,
             port: entity(PortInstanceIdentifier),
@@ -1033,12 +1034,12 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    entity Topology native fpp_analysis::semantics::Topology repr name(unqualified_name) {
+    entity Topology native fpp_analysis::semantics::Topology repr name(get_qualified_name) {
         fields {
             symbol: union(Symbol),
             qualified_name: str,
-            direct_component_instances: map(union(Symbol), span),
             direct_topologies: map(union(Symbol), span),
+            direct_component_instances: map(union(Symbol), span),
             direct_template_args: map(union(Symbol), span),
             transitive_import_set: list(union(Symbol)),
             instance_map: map(union(InterfaceInstance), span),
@@ -1049,6 +1050,7 @@ fpp_python_macros::fpp_sem_bindings! {
             port_interface: entity(PortInterface),
             pattern_map: map(leaf(crate::ast::ConnectionPatternKind), entity(ConnectionPattern)),
             connection_map: map(str, list(entity(Connection))),
+            unmatched_connection_set: list(entity(Connection)),
             local_connection_map: map(str, list(entity(Connection))),
             output_connection_map: map(entity(PortInstanceIdentifier), list(entity(Connection))),
             input_connection_map: map(entity(PortInstanceIdentifier), list(entity(Connection))),
@@ -1066,6 +1068,7 @@ fpp_python_macros::fpp_sem_bindings! {
             get_imported_topology_symbols(a: analysis) -> list(union(Symbol)),
             get_name -> ref str,
             get_port_number(pi: ref union(PortInstance), c: ref entity(Connection)) -> opt(i128),
+            get_qualified_name -> ref str,
             get_used_port_numbers(pi: ref union(PortInstance), cs: ref list(entity(Connection))) -> list(i128),
             look_up_instance_at(instance: ref union(InterfaceInstance), loc: span) throws(SemanticError) -> unit,
             node -> ref astdef(DefTopology),
