@@ -2,6 +2,7 @@ use fpp_core::{Diagnostic, Level, Span};
 use fpp_lexer::TokenKind;
 use std::fmt::Formatter;
 
+/// A syntax error
 #[derive(Debug)]
 pub(crate) enum ParseError {
     ExpectedOneOf {
@@ -27,25 +28,23 @@ pub(crate) enum ParseError {
         got_kind: TokenKind,
         got_span: Span,
     },
+}
 
+/// An include error
+#[derive(Debug)]
+pub(crate) enum IncludeError {
     /// Include cycle, through the files in `paths`: each one includes the
     /// next, and the last is the first
-    IncludeCycle {
-        span: Span,
-        paths: Vec<String>,
-    },
+    Cycle { loc: Span, paths: Vec<String> },
+}
 
+/// A file error
+#[derive(Debug)]
+pub(crate) enum FileError {
     /// Cannot open file
-    CannotOpen {
-        span: Span,
-        name: String,
-    },
-
+    CannotOpen { loc: Span, name: String },
     /// Cannot resolve path
-    CannotResolvePath {
-        span: Span,
-        name: String,
-    },
+    CannotResolvePath { loc: Span, name: String },
 }
 
 struct TokenList(Vec<TokenKind>);
@@ -91,21 +90,35 @@ impl From<ParseError> for Diagnostic {
                 Diagnostic::new(got_span, Level::Error, "syntax error: unexpected token")
                     .note(format!("got {}", got_kind))
             }
-            ParseError::IncludeCycle { span, paths } => {
+        }
+    }
+}
+
+impl From<IncludeError> for Diagnostic {
+    fn from(value: IncludeError) -> Diagnostic {
+        match value {
+            IncludeError::Cycle { loc, paths } => {
                 let last = paths.len() - 1;
                 paths.into_iter().enumerate().fold(
-                    Diagnostic::new(span, Level::Error, "include cycle:"),
+                    Diagnostic::new(loc, Level::Error, "include cycle:"),
                     |diag, (i, path)| match i == last {
                         true => diag.note(path),
                         false => diag.note(format!("{path} includes")),
                     },
                 )
             }
-            ParseError::CannotOpen { span, name } => {
-                Diagnostic::new(span, Level::Error, format!("cannot open file {name}"))
+        }
+    }
+}
+
+impl From<FileError> for Diagnostic {
+    fn from(value: FileError) -> Diagnostic {
+        match value {
+            FileError::CannotOpen { loc, name } => {
+                Diagnostic::new(loc, Level::Error, format!("cannot open file {name}"))
             }
-            ParseError::CannotResolvePath { span, name } => {
-                Diagnostic::new(span, Level::Error, format!("cannot resolve path {name}"))
+            FileError::CannotResolvePath { loc, name } => {
+                Diagnostic::new(loc, Level::Error, format!("cannot resolve path {name}"))
             }
         }
     }

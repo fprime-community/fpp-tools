@@ -105,13 +105,13 @@ fn connection_ok() {
 
 #[test]
 fn def_abs_type_ok() {
-    parse_all_ok(|p| p.abs_type(), &["type t"]);
+    parse_all_ok(|p| p.def_abs_type(), &["type t"]);
 }
 
 #[test]
 fn def_alias_type_ok() {
     parse_all_ok(
-        |p| p.alias_type(),
+        |p| p.def_alias_type(),
         &["type a = U32", "type a = F32", "dictionary type a = string"],
     );
 }
@@ -386,7 +386,7 @@ fn def_topology_ok() {
 #[test]
 fn expression_ok() {
     parse_all_ok(
-        |p| p.expr(),
+        |p| p.expr_node(),
         &[
             "-1",
             "1+1",
@@ -445,13 +445,13 @@ fn expression_ok() {
 
 #[test]
 fn expression_error() {
-    parse_all_error(|p| p.expr(), &["a.", "bool"]);
+    parse_all_error(|p| p.expr_node(), &["a.", "bool"]);
 }
 
 #[test]
 #[ignore = "the cursor panics on a pre-annotation at the end of the input"]
 fn expression_error_annotation() {
-    parse_all_error(|p| p.expr(), &["@"]);
+    parse_all_error(|p| p.expr_node(), &["@"]);
 }
 
 #[test]
@@ -808,7 +808,7 @@ fn spec_tlm_channel_ok() {
 
 #[test]
 fn spec_import_ok() {
-    parse_all_ok(|p| p.spec_import_interface(), &["import a", "import a.b"]);
+    parse_all_ok(|p| p.spec_import(), &["import a", "import a.b"]);
 }
 
 #[test]
