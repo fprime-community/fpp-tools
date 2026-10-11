@@ -57,7 +57,7 @@ impl CheckSemantics {
         CheckComponentInstanceDefs::check_id_ranges(a);
         CheckStateMachineDefs.visit_trans_units(a, tul())?;
         CheckTopologyInstances.visit_trans_units(a, tul())?;
-        CheckTopologyDefs.resolve_all(a);
+        CheckTopologyDefs.visit_trans_units(a, tul())?;
         CheckTemplateInterfaceArgs.check(a);
         BuildSpecLocMap.visit_trans_units(a, tul())?;
         CheckSpecLocs.visit_trans_units(a, tul())?;

@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/top_import/include_order.fpp:11:5
+   |
+11 |     B.b -> c.pIn
+   |     ^^^ instance B is not a member of topology A
+

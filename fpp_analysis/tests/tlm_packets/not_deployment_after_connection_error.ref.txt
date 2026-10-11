@@ -1,0 +1,23 @@
+  --> [ local path prefix ]/tlm_packets/not_deployment_after_connection_error.fpp:10:5
+   |
+10 |     c.pIn -> c.pOut
+   |     ^^^^^ invalid directions input -> output (should be output -> input)
+   |
+  ::: [ local path prefix ]/tlm_packets/not_deployment_after_connection_error.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/tlm_packets/not_deployment_after_connection_error.fpp:4:3
+   |
+ 4 |   output port pOut: P
+   |   ------------------- to port is specified here
+
+  --> [ local path prefix ]/tlm_packets/not_deployment_after_connection_error.fpp:12:3
+   |
+12 | /   telemetry packets S {
+13 | |   }
+   | |___^ invalid telemetry packet set S
+   |
+   = note: only a deployment topology may specify a telemetry packet set
+

@@ -201,8 +201,14 @@ pub mod semantics {
     mod topology;
     pub use topology::*;
 
-    mod system;
-    pub use system::*;
+    mod topology_port;
+    pub use topology_port::*;
+
+    mod connection_pattern;
+    pub use connection_pattern::*;
+
+    mod fpp_system;
+    pub use fpp_system::*;
 
     mod tlm_channel_identifier;
     pub use tlm_channel_identifier::*;
@@ -220,7 +226,6 @@ pub mod semantics {
     pub use construct_dictionary::*;
 
     pub mod resolve_topology;
-    pub use resolve_topology::*;
 
     mod connection;
     pub use connection::*;

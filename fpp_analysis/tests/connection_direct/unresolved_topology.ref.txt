@@ -1,0 +1,13 @@
+  --> [ local path prefix ]/connection_direct/unresolved_topology.fpp:10:5
+   |
+10 |       B.b -> c.pIn
+   |       ^ invalid use of symbol B: this topology could not be resolved before it was used here
+   |
+  ::: [ local path prefix ]/connection_direct/unresolved_topology.fpp:13:1
+   |
+13 | / topology B {
+14 | |   instance c
+15 | |   port b = c.pOut
+16 | | }
+   | |_- symbol is defined here
+

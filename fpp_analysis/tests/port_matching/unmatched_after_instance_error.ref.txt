@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/port_matching/unmatched_after_instance_error.fpp:14:16
+   |
+14 |     c1.pOut -> c3.pIn
+   |                ^^^^^^ instance c3 is not a member of topology T
+

@@ -1,20 +1,17 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::visit_expansion;
-use crate::errors::SemanticError;
-use crate::semantics::{FppSystem, Symbol, SymbolInterface};
+use crate::errors::{SemanticError, SemanticResult};
+use crate::semantics::{FppSystem, Symbol, SymbolInterface, Topology};
 use fpp_ast::{AstNode, DefModule, DefSystem, SpecTemplateExpand, Visitor, Walkable};
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-/// Check system definitions:
-///   - a model may have at most one system definition;
-///   - the named topology must resolve to a topology symbol;
-///   - that topology must be a deployment topology.
+/// Check system definitions
 pub struct CheckSystemDefs;
 
 impl CheckSystemDefs {
-    fn check_no_duplicate_def(a: &Analysis, symbol: &Symbol) -> Result<(), SemanticError> {
+    fn check_no_duplicate_def(a: &Analysis, symbol: &Symbol) -> SemanticResult {
         match a.system_map.keys().next() {
             None => Ok(()),
             Some(prev_symbol) => Err(SemanticError::DuplicateSystemDefinition {
@@ -22,6 +19,41 @@ impl CheckSystemDefs {
                 prev_loc: prev_symbol.node().span(),
             }),
         }
+    }
+
+    fn check_deployment_topology(ss: &Symbol, t: &Topology) -> SemanticResult {
+        let loc = ss.node().span();
+        if t.node().is_deployment {
+            Ok(())
+        } else {
+            Err(SemanticError::InvalidSymbol {
+                symbol_name: t.get_name().to_string(),
+                msg: "topology used here must be a deployment topology".to_string(),
+                loc,
+                def_loc: t.get_loc(),
+            })
+        }
+    }
+
+    /// Check a system definition and build the system it defines. Returns
+    /// `None` if the topology use is unresolved (already reported).
+    fn def_system(a: &Analysis, node: &DefSystem) -> SemanticResult<Option<(Symbol, FppSystem)>> {
+        let id = node.topology.id();
+        let ss = Symbol::System(Arc::new(node.clone()));
+        Self::check_no_duplicate_def(a, &ss)?;
+        let Some(t) = a.get_topology(id)? else {
+            return Ok(None);
+        };
+        Self::check_deployment_topology(&ss, &t)?;
+        let Some(d) = a.get_dictionary(id)? else {
+            return Ok(None);
+        };
+        let system = FppSystem {
+            node: Arc::new(node.clone()),
+            topology: t,
+            dictionary: d,
+        };
+        Ok(Some((ss, system)))
     }
 }
 
@@ -52,59 +84,13 @@ impl<'ast> Visitor<'ast> for CheckSystemDefs {
         a: &mut Self::State,
         node: &'ast DefSystem,
     ) -> ControlFlow<Self::Break> {
-        let symbol = Symbol::System(Arc::new(node.clone()));
-
-        // At most one system definition per model.
-        if let Err(err) = Self::check_no_duplicate_def(a, &symbol) {
-            err.emit();
-            return ControlFlow::Continue(());
+        match Self::def_system(a, node) {
+            Ok(Some((ss, system))) => {
+                a.system_map.insert(ss, system);
+            }
+            Ok(None) => {}
+            Err(err) => err.emit(),
         }
-
-        // The named topology must resolve to a topology symbol.
-        let topology_symbol = match a.get_topology_symbol(node.topology.id()) {
-            Ok(Some(sym)) => sym,
-            Ok(None) => return ControlFlow::Continue(()),
-            Err(err) => {
-                err.emit();
-                return ControlFlow::Continue(());
-            }
-        };
-
-        // That topology must be a deployment topology.
-        if let Symbol::Topology(def) = &topology_symbol
-            && !def.is_deployment
-        {
-            SemanticError::InvalidSymbol {
-                symbol_name: def.name.data.clone(),
-                msg: "topology used here must be a deployment topology".to_string(),
-                loc: symbol.node().span(),
-                def_loc: def.node_id.span(),
-            }
-            .emit();
-            return ControlFlow::Continue(());
-        }
-
-        let topology = a
-            .topology_map
-            .get(&topology_symbol)
-            .cloned()
-            .expect("every topology is resolved by CheckTopologyDefs");
-        let dictionary = match a.get_dictionary(node.topology.id()) {
-            Ok(Some(d)) => d,
-            Ok(None) => return ControlFlow::Continue(()),
-            Err(err) => {
-                err.emit();
-                return ControlFlow::Continue(());
-            }
-        };
-        a.system_map.insert(
-            symbol,
-            FppSystem {
-                node: Arc::new(node.clone()),
-                topology,
-                dictionary,
-            },
-        );
         ControlFlow::Continue(())
     }
 }

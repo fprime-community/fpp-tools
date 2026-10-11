@@ -1,0 +1,13 @@
+ --> [ local path prefix ]/invalid_symbols/module_as_implemented_interface.fpp:2:25
+  |
+2 |     topology T implements M {
+  |                           ^ invalid use of symbol M: not a interface symbol
+  |
+ ::: [ local path prefix ]/invalid_symbols/module_as_implemented_interface.fpp:1:1
+  |
+1 | / module M {
+2 | |   topology T implements M {
+3 | |   }
+4 | | }
+  | |_- symbol is defined here
+

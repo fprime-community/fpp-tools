@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/connection_direct/graph_order.fpp:14:16
+   |
+14 |     c1.pOut -> c2.pIn
+   |                ^^^^^^ instance c2 is not a member of topology T
+

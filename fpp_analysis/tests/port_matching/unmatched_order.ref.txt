@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/port_matching/unmatched_order.fpp:15:15
+   |
+15 |     unmatched c1.qOut -> c2.qIn
+   |               ^^^^^^^ unmatched connection must go from or to a matched port
+

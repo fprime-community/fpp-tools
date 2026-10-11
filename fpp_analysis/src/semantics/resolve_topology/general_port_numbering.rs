@@ -1,9 +1,8 @@
-use super::for_each_port;
+//! Apply general port numbering
+
 use super::port_numbering_state::PortNumberingState;
 use crate::Analysis;
-use crate::semantics::{Direction, PortInstanceIdentifier, Topology};
-
-// Apply general port numbering
+use crate::semantics::{Direction, InterfaceInstance, PortInstanceIdentifier, Topology};
 
 // Number an input port array
 fn number_input_port_array(t: &mut Topology, pii: &PortInstanceIdentifier) {
@@ -37,11 +36,21 @@ fn number_output_port_array(t: &mut Topology, pii: &PortInstanceIdentifier) {
 /// Apply general numbering
 pub fn apply(a: &Analysis, t: &mut Topology) {
     // Fold over instances and ports
-    for pii in for_each_port(a, t) {
-        match pii.port_instance.get_direction() {
-            Some(Direction::Input) => number_input_port_array(t, &pii),
-            Some(Direction::Output) => number_output_port_array(t, &pii),
-            None => {}
+    for ci in t.component_instance_map().into_keys() {
+        // An instance whose component failed to check has no port interface
+        let Some(port_interface) = ci.get_interface(a) else {
+            continue;
+        };
+        for pi in port_interface.port_map.values() {
+            let pii = PortInstanceIdentifier {
+                interface_instance: InterfaceInstance::from_component_instance(ci.clone()),
+                port_instance: pi.clone(),
+            };
+            match pi.get_direction() {
+                Some(Direction::Input) => number_input_port_array(t, &pii),
+                Some(Direction::Output) => number_output_port_array(t, &pii),
+                None => {}
+            }
         }
     }
 }

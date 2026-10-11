@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/invalid_symbols/module_as_interface_param_type.fpp:4:31
+  |
+4 | module template T(instance i: M) {
+  |                               ^ invalid use of symbol M: not a interface symbol
+  |
+ ::: [ local path prefix ]/invalid_symbols/module_as_interface_param_type.fpp:1:1
+  |
+1 | module M {}
+  | ----------- symbol is defined here
+

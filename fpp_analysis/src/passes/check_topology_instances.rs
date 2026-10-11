@@ -1,19 +1,56 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::visit_expansion;
-use crate::errors::SemanticError;
 use crate::semantics::{Symbol, Topology};
 use fpp_ast::{
     AstNode, DefModule, DefTopology, SpecDirectConnectionGraph, SpecInstance,
-    SpecPatternConnectionGraph, SpecTemplateExpand, SpecTlmPacketSet, SpecTopPort, Visitor,
-    Walkable,
+    SpecPatternConnectionGraph, SpecTemplateExpand, SpecTopPort, Visitor, Walkable,
 };
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-/// Check topology instances: build the partial topology map with the component
-/// instances and imported topologies declared in each topology.
+/// Check topology instances
 pub struct CheckTopologyInstances;
+
+impl CheckTopologyInstances {
+    /// Visit a topology definition: enter its instances and its imported
+    /// topologies into the partial topology map, then do the same for the
+    /// topologies it imports.
+    ///
+    /// The visitor hook calls this for the topologies of the model, and this
+    /// calls itself for each imported topology through the definition its
+    /// symbol holds, which has the same node identities as the one in the model.
+    fn def_topology(&self, a: &mut Analysis, node: &DefTopology) -> ControlFlow<()> {
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
+        if a.partial_topology_map.contains_key(&symbol) {
+            // Topology is already in the map: nothing to do
+            return ControlFlow::Continue(());
+        }
+        // Topology is not in the map: visit it
+        let name = a.get_qualified_name(&symbol);
+        let prev = a.topology.replace(Topology::new(symbol.clone(), name));
+        // Visit topology members and compute unresolved top
+        let result = node.walk(a, self);
+        let top = a
+            .topology
+            .take()
+            .expect("the topology under construction is set");
+        a.topology = prev;
+        result?;
+        // Resolve topologies directly imported by top, updating a
+        let tops: Vec<Symbol> = top.direct_topologies.keys().cloned().collect();
+        for symbol in tops {
+            let Symbol::Topology(def) = symbol else {
+                unreachable!("a directly imported topology has a topology symbol");
+            };
+            self.def_topology(a, &def)?;
+        }
+        a.partial_topology_map.insert(symbol, top);
+        ControlFlow::Continue(())
+    }
+}
 
 impl<'ast> Visitor<'ast> for CheckTopologyInstances {
     type Break = ();
@@ -42,21 +79,17 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         a: &mut Self::State,
         node: &'ast DefTopology,
     ) -> ControlFlow<Self::Break> {
-        let Some(symbol) = a.get_symbol(node) else {
-            return ControlFlow::Continue(());
-        };
-        // Topology is already in the map: nothing to do.
-        if a.partial_topology_map.contains_key(&symbol) {
-            return ControlFlow::Continue(());
+        self.def_topology(a, node)
+    }
+
+    fn visit_spec_top_port(
+        &self,
+        a: &mut Self::State,
+        node: &'ast SpecTopPort,
+    ) -> ControlFlow<Self::Break> {
+        if let Some(top) = a.topology.as_mut() {
+            top.add_port_node(Arc::new(node.clone()));
         }
-        let name = a.get_qualified_name(&symbol);
-        let prev = a.topology.take();
-        a.topology = Some(Topology::new(symbol.clone(), name));
-        let _ = node.walk(a, self);
-        if let Some(top) = a.topology.take() {
-            a.partial_topology_map.insert(symbol, top);
-        }
-        a.topology = prev;
         ControlFlow::Continue(())
     }
 
@@ -65,12 +98,16 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         a: &mut Self::State,
         node: &'ast SpecInstance,
     ) -> ControlFlow<Self::Break> {
-        // An instance/import reference resolves to a component instance symbol
-        // (for `instance c`) or a topology symbol (for `import A`). Undefined
-        // references are already reported by CheckUses.
-        if let Some(symbol) = a.use_def_map.get(&node.instance.id()).cloned()
-            && let Some(mut top) = a.topology.take()
-        {
+        let symbol = match a.get_interface_instance_symbol(node.instance.id()) {
+            Ok(Some(symbol)) => symbol,
+            // The use is unresolved: CheckUses reported it
+            Ok(None) => return ControlFlow::Continue(()),
+            Err(err) => {
+                err.emit();
+                return ControlFlow::Continue(());
+            }
+        };
+        if let Some(mut top) = a.topology.take() {
             if let Err(err) = top.add_instance_symbol(a, symbol, node.span()) {
                 err.emit();
             }
@@ -79,6 +116,8 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         ControlFlow::Continue(())
     }
 
+    /// Record the direct connection graph for the tools that read
+    /// [`Topology::raw_direct_graphs`]
     fn visit_spec_direct_connection_graph(
         &self,
         a: &mut Self::State,
@@ -90,6 +129,8 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         ControlFlow::Continue(())
     }
 
+    /// Record the pattern connection graph for the tools that read
+    /// [`Topology::raw_patterns`]
     fn visit_spec_pattern_connection_graph(
         &self,
         a: &mut Self::State,
@@ -97,37 +138,6 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
     ) -> ControlFlow<Self::Break> {
         if let Some(top) = a.topology.as_mut() {
             top.raw_patterns.push(Arc::new(node.clone()));
-        }
-        ControlFlow::Continue(())
-    }
-
-    fn visit_spec_tlm_packet_set(
-        &self,
-        a: &mut Self::State,
-        node: &'ast SpecTlmPacketSet,
-    ) -> ControlFlow<Self::Break> {
-        // Only a deployment topology may specify a telemetry packet set.
-        if let Some(top) = a.topology.as_ref()
-            && let Symbol::Topology(def) = &top.symbol
-            && !def.is_deployment
-        {
-            SemanticError::InvalidTlmPacketSet {
-                loc: node.span(),
-                name: node.name.data.clone(),
-                msg: "only a deployment topology may specify a telemetry packet set".to_string(),
-            }
-            .emit();
-        }
-        ControlFlow::Continue(())
-    }
-
-    fn visit_spec_top_port(
-        &self,
-        a: &mut Self::State,
-        node: &'ast SpecTopPort,
-    ) -> ControlFlow<Self::Break> {
-        if let Some(top) = a.topology.as_mut() {
-            top.add_port_node(Arc::new(node.clone()));
         }
         ControlFlow::Continue(())
     }

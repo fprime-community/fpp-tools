@@ -3,26 +3,24 @@ use fpp_ast::DefSystem;
 use fpp_core::{Span, Spanned};
 use std::sync::Arc;
 
-/// An FPP system.
-///
-/// Records the system definition and the deployment topology it names.
+/// An FPP system
 #[derive(Debug, Clone)]
 pub struct FppSystem {
-    /// The AST node defining the system.
+    /// The AST node defining the system
     pub node: Arc<DefSystem>,
-    /// The deployment topology named by the system.
+    /// The deployment topology named by the system
     pub topology: Topology,
-    /// The dictionary of the deployment topology.
+    /// The dictionary of the deployment topology
     pub dictionary: Dictionary,
 }
 
 impl FppSystem {
-    /// Gets the name of the system.
+    /// Gets the name of the system
     pub fn get_name(&self) -> &str {
         &self.node.name.data
     }
 
-    /// Gets the location of the system.
+    /// Gets the location of the system
     pub fn get_loc(&self) -> Span {
         self.node.span()
     }

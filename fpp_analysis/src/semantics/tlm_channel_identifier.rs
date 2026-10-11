@@ -47,7 +47,8 @@ impl TlmChannelIdentifier {
     }
 
     /// Gets a numeric channel identifier from an AST node. Returns `None` if
-    /// the component instance is unresolved (already reported by CheckUses).
+    /// the component instance use is unresolved, or names an instance whose
+    /// definition failed to check (both already reported).
     pub fn get_numeric_id_for_node(
         a: &Analysis,
         d: &Dictionary,
@@ -61,12 +62,14 @@ impl TlmChannelIdentifier {
     }
 
     /// Creates a telemetry channel identifier from an AST node. Returns `None`
-    /// if the component instance is unresolved (already reported by CheckUses).
+    /// if the component instance use is unresolved, or names an instance whose
+    /// definition failed to check (both already reported).
     pub fn from_node(
         a: &Analysis,
         node: &ast::TlmChannelIdentifier,
     ) -> SemanticResult<Option<TlmChannelIdentifier>> {
-        let Some(component_instance) = a.get_component_instance(node.component_instance.id())?
+        let Some(component_instance) =
+            a.get_represented_component_instance(node.component_instance.id())?
         else {
             return Ok(None);
         };

@@ -1,0 +1,32 @@
+  --> [ local path prefix ]/connection_direct/include_first_error.fpp:10:5
+   |
+10 |     c.pIn -> c.pIn
+   |     ^^^^^ invalid directions input -> input (should be output -> input)
+   |
+  ::: [ local path prefix ]/connection_direct/include_first_error.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/connection_direct/include_first_error.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- to port is specified here
+
+ --> [ local path prefix ]/connection_direct/include_first_error.fppi:4:5
+  |
+4 |     c.pIn -> c.pOut
+  |     ^^^^^ invalid directions input -> output (should be output -> input)
+  |
+  = note: included from [ local path prefix ]/connection_direct/include_first_error.fpp:13:9
+  |
+ ::: [ local path prefix ]/connection_direct/include_first_error.fpp:3:3
+  |
+3 |   sync input port pIn: P
+  |   ---------------------- from port is specified here
+  |
+ ::: [ local path prefix ]/connection_direct/include_first_error.fpp:4:3
+  |
+4 |   output port pOut: P
+  |   ------------------- to port is specified here
+

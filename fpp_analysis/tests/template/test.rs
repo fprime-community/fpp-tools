@@ -1,4 +1,4 @@
-use crate::run_test;
+use crate::{run_test, run_test_unconnected, run_test_with};
 
 #[test]
 fn alias_array_param_ok() {
@@ -162,7 +162,7 @@ fn expand_not_a_template_qualified() {
 
 #[test]
 fn import_two_expansions_ok() {
-    run_test("template/import_two_expansions_ok")
+    run_test_unconnected("template/import_two_expansions_ok")
 }
 
 #[test]
@@ -207,7 +207,7 @@ fn interfaces_invalid_port_instance_name_aliased() {
 
 #[test]
 fn interfaces_pattern_explicit_target_ok() {
-    run_test("template/interfaces_pattern_explicit_target_ok")
+    run_test_unconnected("template/interfaces_pattern_explicit_target_ok")
 }
 
 #[test]
@@ -222,12 +222,12 @@ fn interfaces_topology_arg_deployment() {
 
 #[test]
 fn interfaces_topology_arg_ok() {
-    run_test("template/interfaces_topology_arg_ok")
+    run_test_unconnected("template/interfaces_topology_arg_ok")
 }
 
 #[test]
 fn interfaces_topology_arg_order_ok() {
-    run_test("template/interfaces_topology_arg_order_ok")
+    run_test_unconnected("template/interfaces_topology_arg_order_ok")
 }
 
 #[test]
@@ -418,4 +418,25 @@ fn type_arg_string_size_negative() {
 #[test]
 fn type_arg_string_size_sizeof() {
     run_test("template/type_arg_string_size_sizeof")
+}
+
+#[test]
+fn expanded_topology_order() {
+    run_test("template/expanded_topology_order")
+}
+
+#[test]
+fn expanded_topology_import_order() {
+    run_test("template/expanded_topology_import_order")
+}
+
+#[test]
+fn interface_arg_file_order() {
+    run_test_with(
+        &[
+            "template/interface_arg_file_order_common",
+            "template/interface_arg_file_order_z",
+        ],
+        "template/interface_arg_file_order_a",
+    )
 }

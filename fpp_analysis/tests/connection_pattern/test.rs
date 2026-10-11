@@ -164,3 +164,13 @@ fn target_not_component_instance() {
 fn undef_source_and_target() {
     run_test("connection_pattern/undef_source_and_target")
 }
+
+#[test]
+fn pattern_before_direct() {
+    run_test("connection_pattern/pattern_before_direct")
+}
+
+#[test]
+fn pattern_order() {
+    run_test("connection_pattern/pattern_order")
+}

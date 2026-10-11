@@ -13,6 +13,60 @@ pub(crate) fn run_test(file_path: &str) {
 /// tests directory and have no extension; the last file named is the one whose
 /// `.ref.txt` is compared.
 pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
+    run(dep_paths, file_path, false)
+}
+
+/// Run a test and also compare the unconnected port report that `fpp-check -u`
+/// writes against `<file_path>-unconnected.ref.txt`.
+///
+/// The report lists, for each topology that has unconnected ports, the
+/// qualified names of those ports. fpp-check writes the topologies in the
+/// order of its topology map, which is not observable here, so the comparison
+/// treats the report as a set of per-topology blocks.
+pub(crate) fn run_test_unconnected(file_path: &str) {
+    run(&[], file_path, true)
+}
+
+/// Write the unconnected port report the way `fpp-check -u` does: one block per
+/// topology with unconnected ports, holding the topology's qualified name and
+/// the sorted qualified names of its unconnected ports, followed by a blank
+/// line. The blocks are in topology name order.
+fn unconnected_port_report(a: &Analysis) -> String {
+    let mut blocks: Vec<String> = a
+        .topology_map
+        .iter()
+        .filter(|(_, t)| !t.unconnected_port_set.is_empty())
+        .map(|(s, t)| {
+            let mut ports: Vec<String> = t
+                .unconnected_port_set
+                .iter()
+                .map(|pii| pii.qualified_name())
+                .collect();
+            ports.sort();
+            let mut block = format!("Topology {}:\n", a.get_qualified_name(s));
+            for port in ports {
+                block.push_str(&format!("  {}\n", port));
+            }
+            block.push('\n');
+            block
+        })
+        .collect();
+    blocks.sort();
+    blocks.concat()
+}
+
+/// Split an unconnected port report into its per-topology blocks, sorted
+fn unconnected_report_blocks(report: &str) -> Vec<String> {
+    let mut blocks: Vec<String> = report
+        .split("\n\n")
+        .map(|block| block.trim().to_string())
+        .filter(|block| !block.is_empty())
+        .collect();
+    blocks.sort();
+    blocks
+}
+
+fn run(dep_paths: &[&str], file_path: &str, unconnected: bool) {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
 
@@ -36,6 +90,7 @@ pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
 
     let file_reader = FsReader {};
 
+    let mut report = None;
     let mut diagnostics_str = vec![];
     let mut ctx =
         fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics_str));
@@ -53,7 +108,9 @@ pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
         let mut asts: Vec<_> = dep_files.iter().map(parse).collect();
         asts.push(parse(&fpp_file));
         let mut a = Analysis::new();
-        let _ = CheckSemantics::tu_list(&mut a, FsReader {}, &mut asts);
+        if CheckSemantics::tu_list(&mut a, FsReader {}, &mut asts).is_continue() && unconnected {
+            report = Some(unconnected_port_report(&a));
+        }
     });
 
     let output = String::from_utf8(diagnostics_str)
@@ -69,6 +126,33 @@ pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
             // Read and compare against the ref file
             let ref_txt = fs::read_to_string(ref_file).expect("failed to read ref.txt");
             assert_eq!(ref_txt, output)
+        }
+    }
+
+    if unconnected {
+        let report = report.expect("the analysis ran to completion");
+        let mut report_file = path.clone();
+        report_file.push(format!("{file_path}-unconnected"));
+        report_file.set_extension("ref.txt");
+        match env::var("FPP_UPDATE_REF") {
+            Ok(_) => {
+                // Keep a ref whose blocks match, since it may list them in
+                // fpp-check's order
+                let expected = fs::read_to_string(&report_file).ok();
+                if expected.as_deref().map(unconnected_report_blocks)
+                    != Some(unconnected_report_blocks(&report))
+                {
+                    fs::write(report_file, report).expect("failed to write the report ref")
+                }
+            }
+            Err(_) => {
+                let expected =
+                    fs::read_to_string(&report_file).expect("failed to read the report ref");
+                assert_eq!(
+                    unconnected_report_blocks(&expected),
+                    unconnected_report_blocks(&report)
+                )
+            }
         }
     }
 }

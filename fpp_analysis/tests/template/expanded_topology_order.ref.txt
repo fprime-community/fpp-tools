@@ -1,0 +1,32 @@
+  --> [ local path prefix ]/template/expanded_topology_order.fpp:18:5
+   |
+18 |     c.pIn -> c.pIn
+   |     ^^^^^ invalid directions input -> input (should be output -> input)
+   |
+  ::: [ local path prefix ]/template/expanded_topology_order.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/template/expanded_topology_order.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- to port is specified here
+
+  --> [ local path prefix ]/template/expanded_topology_order.fpp:11:7
+   |
+11 |       c.pIn -> c.pOut
+   |       ^^^^^ invalid directions input -> output (should be output -> input)
+   |
+   = note: expanded at [ local path prefix ]/template/expanded_topology_order.fpp:21:1
+   |
+  ::: [ local path prefix ]/template/expanded_topology_order.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/template/expanded_topology_order.fpp:4:3
+   |
+ 4 |   output port pOut: P
+   |   ------------------- to port is specified here
+

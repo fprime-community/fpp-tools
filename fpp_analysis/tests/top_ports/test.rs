@@ -74,3 +74,13 @@ fn implements_missing_port_import_order() {
 fn implements_missing_port_beyond_four() {
     run_test("top_ports/implements_missing_port_beyond_four")
 }
+
+#[test]
+fn unresolved_topology() {
+    run_test("top_ports/unresolved_topology")
+}
+
+#[test]
+fn port_order() {
+    run_test("top_ports/port_order")
+}
