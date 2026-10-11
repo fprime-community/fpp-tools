@@ -2,125 +2,35 @@ use crate::analyzers::state_machine::state_machine_use_analyzer::state_machine_u
 use crate::analyzers::state_machine::{
     SmResult, StateMachineAnalysisVisitor, StateMachineUseAnalyzer, state_analyzer,
 };
-use crate::errors::{SemanticError, SemanticResult};
+use crate::errors::SemanticResult;
+use crate::passes::CheckUsesHelpers;
+use crate::semantics::QualifiedName;
 use crate::semantics::state_machine::{
-    StateMachineAnalysis, StateMachineNameGroup, StateMachineSymbol,
+    SmNameSymbolMap, StateMachineAnalysis, StateMachineNameGroup, StateMachineNameGroupMap,
+    StateMachineSymbol,
 };
-use crate::semantics::{QualifiedName, SymbolInterface};
-use fpp_ast::{AstNode, DefState, Ident, QualIdent};
-use fpp_core::Spanned;
+use fpp_ast::{DefState, Ident, QualIdent};
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
 /// Match uses to their definitions
 pub struct CheckStateMachineUses;
 
+/// The check uses helpers for the state machine analysis
+const HELPERS: CheckUsesHelpers<
+    StateMachineAnalysis,
+    StateMachineNameGroup,
+    StateMachineSymbol,
+    StateMachineNameGroupMap<SmNameSymbolMap>,
+> = CheckUsesHelpers {
+    get_nested_scope_symbol: |sma, is_absolute, ng, name| {
+        sma.nested_scope.get(is_absolute, ng, name)
+    },
+    get_symbol_scope: |sma, symbol| sma.symbol_scope_map.get(symbol),
+    get_use_def_map: |sma| &mut sma.use_def_map,
+};
+
 impl CheckStateMachineUses {
-    /// Get the symbol for a name from the environment
-    fn get_symbol_for_name(
-        ng: StateMachineNameGroup,
-        mapping: impl FnOnce(&str) -> Option<StateMachineSymbol>,
-        id: fpp_core::Node,
-        name: &str,
-    ) -> SemanticResult<StateMachineSymbol> {
-        mapping(name).ok_or_else(|| SemanticError::UndefinedSymbol {
-            ng: ng.to_string(),
-            name: name.to_string(),
-            loc: id.span(),
-        })
-    }
-
-    /// Visit an identifier node and check a use
-    fn visit_ident_node(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        ng: StateMachineNameGroup,
-        node: &Ident,
-    ) -> SmResult {
-        self.visit_unqualified_name(sma, ng, node.id(), node, false)
-    }
-
-    /// Visit a qualified identifier node and check a use
-    fn visit_qual_ident_node(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        ng: StateMachineNameGroup,
-        node: &QualIdent,
-    ) -> SmResult {
-        match node {
-            QualIdent::Unqualified(unqualified) => self.visit_unqualified_name(
-                sma,
-                ng,
-                node.id(),
-                &unqualified.name,
-                unqualified.is_absolute,
-            ),
-            QualIdent::Qualified(qualified) => {
-                self.visit_qualified_name(sma, ng, node.id(), &qualified.qualifier, &qualified.name)
-            }
-        }
-    }
-
-    fn visit_unqualified_name(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        ng: StateMachineNameGroup,
-        id: fpp_core::Node,
-        name: &Ident,
-        is_absolute: bool,
-    ) -> SmResult {
-        let mapping = |name: &str| sma.nested_scope.get(is_absolute, ng, name);
-        match Self::get_symbol_for_name(ng, mapping, id, &name.data) {
-            Ok(symbol) => {
-                sma.use_def_map.insert(id, symbol);
-            }
-            Err(err) => {
-                // Blocking: later passes read this use out of `use_def_map`.
-                err.emit();
-                sma.blocking_error = true;
-            }
-        }
-        ControlFlow::Continue(())
-    }
-
-    fn visit_qualified_name(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        ng: StateMachineNameGroup,
-        id: fpp_core::Node,
-        qualifier: &QualIdent,
-        name: &Ident,
-    ) -> SmResult {
-        self.visit_qual_ident_node(sma, ng, qualifier)?;
-        // If the qualifier itself did not resolve, its (blocking) error was
-        // already emitted; we cannot resolve the member, so stop here.
-        let Some(symbol) = sma.use_def_map.get(&qualifier.id()).cloned() else {
-            return ControlFlow::Continue(());
-        };
-        let Some(scope) = sma.symbol_scope_map.get(&symbol) else {
-            SemanticError::InvalidSymbol {
-                symbol_name: symbol.get_unqualified_name().to_string(),
-                loc: id.span(),
-                msg: "not a qualifier".to_string(),
-                def_loc: symbol.get_loc(),
-            }
-            .emit();
-            sma.blocking_error = true;
-            return ControlFlow::Continue(());
-        };
-        let mapping = |name: &str| scope.get(ng, name);
-        match Self::get_symbol_for_name(ng, mapping, name.id(), &name.data) {
-            Ok(symbol) => {
-                sma.use_def_map.insert(id, symbol);
-            }
-            Err(err) => {
-                err.emit();
-                sma.blocking_error = true;
-            }
-        }
-        ControlFlow::Continue(())
-    }
-
     /// Analyze a state machine definition
     pub fn def_state_machine(
         sma: &mut StateMachineAnalysis,
@@ -128,19 +38,32 @@ impl CheckStateMachineUses {
     ) -> SmResult {
         StateMachineAnalysisVisitor::def_state_machine(&CheckStateMachineUses, sma, node)
     }
+
+    /// Report the error of a use that does not resolve. The error is blocking:
+    /// the later passes read each use out of the use-def map.
+    fn check_use(sma: &mut StateMachineAnalysis, result: SemanticResult) -> SmResult {
+        if let Err(err) = result {
+            err.emit();
+            sma.blocking_error = true;
+        }
+        ControlFlow::Continue(())
+    }
 }
 
 impl StateMachineUseAnalyzer for CheckStateMachineUses {
     fn action_use(&self, sma: &mut StateMachineAnalysis, node: &Ident, _name: &str) -> SmResult {
-        self.visit_ident_node(sma, StateMachineNameGroup::Action, node)
+        let result = HELPERS.visit_ident_node(StateMachineNameGroup::Action, sma, node, false);
+        Self::check_use(sma, result)
     }
 
     fn guard_use(&self, sma: &mut StateMachineAnalysis, node: &Ident, _name: &str) -> SmResult {
-        self.visit_ident_node(sma, StateMachineNameGroup::Guard, node)
+        let result = HELPERS.visit_ident_node(StateMachineNameGroup::Guard, sma, node, false);
+        Self::check_use(sma, result)
     }
 
     fn signal_use(&self, sma: &mut StateMachineAnalysis, node: &Ident, _name: &str) -> SmResult {
-        self.visit_ident_node(sma, StateMachineNameGroup::Signal, node)
+        let result = HELPERS.visit_ident_node(StateMachineNameGroup::Signal, sma, node, false);
+        Self::check_use(sma, result)
     }
 
     fn state_or_choice_use(
@@ -149,7 +72,8 @@ impl StateMachineUseAnalyzer for CheckStateMachineUses {
         node: &QualIdent,
         _name: QualifiedName,
     ) -> SmResult {
-        self.visit_qual_ident_node(sma, StateMachineNameGroup::State, node)
+        let result = HELPERS.visit_qual_ident_node(StateMachineNameGroup::State, sma, node);
+        Self::check_use(sma, result)
     }
 }
 
