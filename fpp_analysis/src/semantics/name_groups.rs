@@ -15,21 +15,6 @@ pub enum NameGroup {
     Value,
 }
 
-impl NameGroup {
-    /// The name groups a module symbol is entered into. A module is not in the
-    /// system name group.
-    pub const GROUPS: [NameGroup; 8] = [
-        NameGroup::Component,
-        NameGroup::Port,
-        NameGroup::StateMachine,
-        NameGroup::PortInterfaceInstance,
-        NameGroup::PortInterface,
-        NameGroup::Template,
-        NameGroup::Type,
-        NameGroup::Value,
-    ];
-}
-
 impl Display for NameGroup {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let name = match self {
