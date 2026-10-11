@@ -696,26 +696,11 @@ impl<'ast> CheckExprTypes<'ast> {
             return ControlFlow::Continue(());
         }
 
-        match a.use_def_map.get(&node.node_id) {
-            // A use of a constant symbol whose definition failed to type check
-            Some(
-                Symbol::Constant(_) | Symbol::EnumConstant(_) | Symbol::TemplateConstantArg { .. },
-            ) => {
-                return ControlFlow::Continue(());
-            }
-            // A dot expression that names a symbol of another kind, such as a
-            // type with a scope, is not a constant use
-            Some(symbol) => {
-                SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
-                    msg: "not a constant symbol".to_string(),
-                    loc: node.span(),
-                    def_loc: symbol.node().span(),
-                }
-                .emit();
-                return ControlFlow::Break(());
-            }
-            None => {}
+        // A dot expression that is a use is a constant use, which
+        // constant_use has typed; one with no type is a use of a constant
+        // whose definition failed to type check
+        if a.use_def_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
         }
 
         // The type was not resolved, this is some sort of member selection
