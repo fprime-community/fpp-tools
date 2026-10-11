@@ -125,7 +125,6 @@ impl Type {
     /// Get the array size
     pub fn array_size(&self) -> Option<usize> {
         match self {
-            Type::Alias(ty) => ty.alias_type.array_size(),
             Type::AnonArray(arr) => arr.size,
             Type::Array(arr) => arr.anon_array.size,
             _ => None,
@@ -160,6 +159,9 @@ impl Type {
     }
 
     /// Does this type have numeric members?
+    ///
+    /// A type has numeric members if its underlying type does (spec, Types
+    /// with Numeric Members), so this predicate looks through an alias type.
     pub fn has_numeric_members(&self) -> bool {
         match self {
             Type::Alias(ty) => ty.alias_type.has_numeric_members(),
@@ -181,7 +183,6 @@ impl Type {
     /// Is this type convertible to a numeric type?
     pub fn is_convertible_to_numeric(&self) -> bool {
         match self {
-            Type::Alias(ty) => ty.alias_type.is_convertible_to_numeric(),
             Type::Enum(_) => true,
             _ => self.is_numeric(),
         }
@@ -190,7 +191,6 @@ impl Type {
     /// Is this type promotable to an array type?
     pub fn is_promotable_to_array(&self) -> bool {
         match self {
-            Type::Alias(ty) => ty.alias_type.is_promotable_to_array(),
             Type::String(_) => true,
             Type::Boolean => true,
             Type::Enum(_) => true,
@@ -224,11 +224,7 @@ impl Type {
 
     /// Is this type a float type?
     pub fn is_float(&self) -> bool {
-        match self {
-            Type::Alias(ty) => ty.alias_type.is_float(),
-            Type::Float(_) => true,
-            _ => false,
-        }
+        matches!(self, Type::Float(_))
     }
 
     /// Best-effort serialized size, in bytes, for framework-independent types.
@@ -343,23 +339,12 @@ impl Type {
 
     /// Is this type an int type?
     pub fn is_int(&self) -> bool {
-        match self {
-            Type::Alias(ty) => ty.alias_type.is_int(),
-            Type::PrimitiveInt(_) => true,
-            Type::Integer => true,
-            _ => false,
-        }
+        matches!(self, Type::PrimitiveInt(_) | Type::Integer)
     }
 
     /// Is this type a primitive type?
     pub fn is_primitive(&self) -> bool {
-        match self {
-            Type::Alias(ty) => ty.alias_type.is_primitive(),
-            Type::PrimitiveInt(_) => true,
-            Type::Float(_) => true,
-            Type::Boolean => true,
-            _ => false,
-        }
+        matches!(self, Type::PrimitiveInt(_) | Type::Float(_) | Type::Boolean)
     }
 
     /// Is this type a canonical (non-aliased) type?
@@ -374,10 +359,7 @@ impl Type {
 
     /// Is this type numeric?
     pub fn is_numeric(&self) -> bool {
-        match self {
-            Type::Alias(ty) => ty.alias_type.is_numeric(),
-            _ => self.is_int() || self.is_float(),
-        }
+        self.is_int() || self.is_float()
     }
 
     /// Is `from` convertible to `to`?

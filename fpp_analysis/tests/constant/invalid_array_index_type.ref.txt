@@ -1,7 +1,5 @@
  --> [ local path prefix ]/constant/invalid_array_index_type.fpp:1:26
   |
 1 | constant f = [ 1, 2, 3 ][false]
-  |                          ^^^^^ cannot convert expression to integer
-  |
-  = note: boolean cannot be converted to Integer
+  |                          ^^^^^ cannot convert boolean to a numeric type
 

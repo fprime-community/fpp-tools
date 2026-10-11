@@ -1,9 +1,7 @@
  --> [ local path prefix ]/event/bad_throttle.fpp:3:52
   |
 3 |   event E severity activity low format "" throttle "abc"
-  |                                                    ^^^^^ cannot convert expression to integer
-  |
-  = note: string cannot be converted to Integer
+  |                                                    ^^^^^ cannot convert string to a numeric type
 
  --> [ local path prefix ]/event/bad_throttle.fpp:3:3
   |

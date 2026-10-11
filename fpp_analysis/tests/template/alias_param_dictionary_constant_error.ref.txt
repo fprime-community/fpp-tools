@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/template/alias_param_dictionary_constant_error.fpp:4:5
+  |
+4 |     dictionary constant k = c
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^ dictionary constant must have a numeric, Boolean, string, or enum type
+  |
+  = note: expanded at [ local path prefix ]/template/alias_param_dictionary_constant_error.fpp:7:5
+

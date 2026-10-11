@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/expr/add_enum_error.fpp:4:25
+  |
+4 | array X = [2] E default d
+  |                         ^ default value cannot be converted to X
+  |
+  = note: single element could not be promoted to array
+  = note: Integer cannot be converted to E
+

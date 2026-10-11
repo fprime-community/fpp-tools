@@ -229,6 +229,11 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
         if a.value_map.contains_key(&node.node_id) {
             return ControlFlow::Continue(());
         }
+        // An expression with no type failed to type check, and that error is
+        // already reported, so it has no value
+        if !a.type_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
 
         self.super_visit(a, Node::Expr(node))?;
 
@@ -325,13 +330,27 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                 let val = match op {
                     Binop::LShift | Binop::RShift => {
                         // A shift checks its amount before applying the operator.
-                        // Both operands must be integers; a non-integer operand has
-                        // already been reported by the type checker.
-                        let (Some(_), Some(shift)) =
-                            (left_val.as_shift_int(), right_val.as_shift_int())
-                        else {
-                            return ControlFlow::Continue(());
-                        };
+                        // An operand whose type is an integer or enum type may
+                        // still hold a floating-point value: negating a value of
+                        // an alias of a floating-point type yields Integer.
+                        let mut shift = 0;
+                        for (operand, v) in [(left, left_val), (right, right_val)] {
+                            match v.as_shift_int() {
+                                Some(n) => shift = n,
+                                None => {
+                                    SemanticError::InvalidType {
+                                        loc: operand.span(),
+                                        msg: format!(
+                                            "{} is not an integer or enum type",
+                                            v.get_type()
+                                        ),
+                                        notes: vec![],
+                                    }
+                                    .emit();
+                                    return ControlFlow::Break(());
+                                }
+                            }
+                        }
 
                         if !(0..=255).contains(&shift) {
                             SemanticError::InvalidShiftAmount { loc: right.span() }.emit();

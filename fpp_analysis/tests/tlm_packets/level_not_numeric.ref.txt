@@ -1,7 +1,5 @@
  --> [ local path prefix ]/tlm_packets/level_not_numeric.fpp:5:21
   |
 5 |     packet P1 group "abc" {
-  |                     ^^^^^ cannot convert expression to integer
-  |
-  = note: string cannot be converted to Integer
+  |                     ^^^^^ cannot convert string to a numeric type
 

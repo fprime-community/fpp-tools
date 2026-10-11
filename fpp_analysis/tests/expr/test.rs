@@ -16,6 +16,11 @@ fn neg_error() {
 }
 
 #[test]
+fn neg_enum_error() {
+    run_test("expr/neg_enum_error")
+}
+
+#[test]
 fn div_by_zero() {
     run_test("expr/div_by_zero")
 }
@@ -28,6 +33,11 @@ fn div_by_near_zero_float() {
 #[test]
 fn add_ok() {
     run_test("expr/add_ok")
+}
+
+#[test]
+fn add_enum_error() {
+    run_test("expr/add_enum_error")
 }
 
 #[test]
@@ -68,6 +78,11 @@ fn array_error() {
 #[test]
 fn neg_ok() {
     run_test("expr/neg_ok")
+}
+
+#[test]
+fn neg_enum_ok() {
+    run_test("expr/neg_enum_ok")
 }
 
 #[test]

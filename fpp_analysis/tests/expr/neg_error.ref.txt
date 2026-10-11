@@ -1,7 +1,5 @@
- --> [ local path prefix ]/expr/neg_error.fpp:1:16
+ --> [ local path prefix ]/expr/neg_error.fpp:1:14
   |
 1 | constant a = - { x = 1 }
-  |                ^^^^^^^^^ cannot convert expression to integer
-  |
-  = note: anonymous struct { x: Integer } cannot be converted to Integer
+  |              ^^^^^^^^^^^ cannot convert anonymous struct { x: Integer } to a numeric type
 

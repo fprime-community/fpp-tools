@@ -1,6 +1,21 @@
 use crate::run_test;
 
 #[test]
+fn alias_param_arith_ok() {
+    run_test("template/alias_param_arith_ok")
+}
+
+#[test]
+fn alias_param_dictionary_constant_error() {
+    run_test("template/alias_param_dictionary_constant_error")
+}
+
+#[test]
+fn alias_param_neg_float_shift_error() {
+    run_test("template/alias_param_neg_float_shift_error")
+}
+
+#[test]
 fn arg_kind_constant_param_instance_arg() {
     run_test("template/arg_kind_constant_param_instance_arg")
 }
