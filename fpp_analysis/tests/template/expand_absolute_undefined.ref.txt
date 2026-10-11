@@ -1,5 +1,5 @@
- --> [ local path prefix ]/template/expand_absolute_undefined.fpp:4:11
+ --> [ local path prefix ]/template/expand_absolute_undefined.fpp:4:10
   |
 4 |   expand .T
-  |           ^ cannot find template `T` in scope
+  |          ^^ cannot find template `T` in scope
 
