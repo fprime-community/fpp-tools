@@ -74,3 +74,9 @@ fn dictionary_alias_template_error() {
 fn dictionary_ok() {
     run_test("constant/dictionary_ok")
 }
+
+#[test]
+#[ignore = "needs dictionary definitions in state machines to parse"]
+fn dictionary_state_machine_ok() {
+    run_test("constant/dictionary_state_machine_ok")
+}
