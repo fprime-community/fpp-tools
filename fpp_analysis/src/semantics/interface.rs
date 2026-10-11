@@ -44,10 +44,13 @@ pub enum PortInstanceType {
 }
 
 impl PortInstanceType {
-    /// Show a type option.
-    pub fn show(ty: &Option<PortInstanceType>) -> String {
+    /// Show a type option. A defined port shows as the qualified name of its
+    /// definition.
+    pub fn show(a: &Analysis, ty: &Option<PortInstanceType>) -> String {
         match ty {
-            Some(PortInstanceType::DefPort(port)) => port.name.data.clone(),
+            Some(PortInstanceType::DefPort(port)) => {
+                a.get_qualified_name(&Symbol::Port(port.clone()))
+            }
             Some(PortInstanceType::Serial) => "serial".to_string(),
             None => "none".to_string(),
         }
@@ -68,6 +71,15 @@ impl PortInstanceType {
         match self {
             PortInstanceType::DefPort(def) => def.return_type.as_ref().map(|_| def.span()),
             _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for PortInstanceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PortInstanceType::DefPort(port) => f.write_str(&port.name.data),
+            PortInstanceType::Serial => f.write_str("serial"),
         }
     }
 }
@@ -1003,7 +1015,7 @@ pub fn resolve_interface(
 
 #[cfg(test)]
 mod tests {
-    use super::{Direction, PortInstance, PortInterface};
+    use super::{Direction, PortInstance, PortInstanceType, PortInterface};
     use crate::semantics::{Component, SymbolInterface, Topology};
     use crate::{Analysis, add_state_enums, check_semantics, resolve_templates};
     use fpp_ast::SpecialPortInstanceKind;
@@ -1220,6 +1232,54 @@ module M {
                 ]
             );
         })
+    }
+
+    /// A port type shows as the qualified name of its definition, so two port
+    /// definitions with the same unqualified name are told apart in a type
+    /// mismatch; the type's Display is the unqualified name.
+    #[test]
+    fn port_types_show_their_qualified_names() {
+        const PORTS: &str = r#"
+module M { port P }
+module N { port P }
+
+passive component C1 { output port pOut: M.P }
+passive component C2 { sync input port pIn: N.P }
+
+instance c1: C1 base id 0x100
+instance c2: C2 base id 0x200
+
+topology T {
+  instance c1
+  instance c2
+  connections X { c1.pOut -> c2.pIn }
+}
+"#;
+        let mut diagnostics = vec![];
+        let mut ctx =
+            fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
+        fpp_core::run(&mut ctx, || {
+            let source = SourceFile::new("port_types.fpp", PORTS.to_string());
+            let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
+            let mut a = Analysis::new();
+            add_state_enums(&mut ast);
+            let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
+            let _ = check_semantics(&mut a, vec![&ast]);
+            let component = a
+                .component_map
+                .values()
+                .find(|c| c.node.name.data == "C1")
+                .expect("component C1 was resolved");
+            let ty = port(&component.port_interface, "pOut").get_type();
+            assert_eq!(PortInstanceType::show(&a, &ty), "M.P");
+            assert_eq!(ty.expect("pOut has a type").to_string(), "P");
+            assert_eq!(PortInstanceType::show(&a, &None), "none");
+        });
+        let output = String::from_utf8(diagnostics).expect("diagnostics are UTF-8");
+        assert!(
+            output.contains("cannot connect port types M.P and N.P"),
+            "unexpected diagnostics: {output}"
+        );
     }
 
     /// `Interface::imports_in_source_order` orders the imports by the location

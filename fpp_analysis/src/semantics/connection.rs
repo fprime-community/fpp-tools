@@ -563,8 +563,8 @@ impl Connection {
             is_unmatched: conn.is_unmatched,
         };
         connection.check_directions()?;
-        connection.check_types()?;
-        connection.check_serial_with_typed_input()?;
+        connection.check_types(a)?;
+        connection.check_serial_with_typed_input(a)?;
         if !connection.is_match_constrained(a) && connection.is_unmatched {
             return Err(SemanticError::MissingPortMatching {
                 loc: connection.get_loc(),
@@ -599,7 +599,7 @@ impl Connection {
     }
 
     /// Check that the connection's port types are compatible.
-    fn check_types(&self) -> SemanticResult {
+    fn check_types(&self, a: &Analysis) -> SemanticResult {
         let from_instance = &self.from.port.port_instance;
         let to_instance = &self.to.port.port_instance;
         let from_type = from_instance.get_type();
@@ -609,8 +609,8 @@ impl Connection {
         } else {
             let msg = format!(
                 "cannot connect port types {} and {}",
-                PortInstanceType::show(&from_type),
-                PortInstanceType::show(&to_type)
+                PortInstanceType::show(a, &from_type),
+                PortInstanceType::show(a, &to_type)
             );
             Err(SemanticError::InvalidConnection {
                 loc: self.get_loc(),
@@ -625,7 +625,7 @@ impl Connection {
 
     /// Check the case of a serial port connected to a typed port that returns a
     /// value, in either direction.
-    fn check_serial_with_typed_input(&self) -> SemanticResult {
+    fn check_serial_with_typed_input(&self, a: &Analysis) -> SemanticResult {
         let from_instance = &self.from.port.port_instance;
         let to_instance = &self.to.port.port_instance;
         let from_type = from_instance.get_type();
@@ -635,7 +635,7 @@ impl Connection {
                 if let Some(def_loc) = to_def.port_returns_value() {
                     let msg = format!(
                         "cannot connect serial output port to input port of type {}, which returns a value",
-                        PortInstanceType::show(&to_type)
+                        PortInstanceType::show(a, &to_type)
                     );
                     return Err(SemanticError::InvalidConnection {
                         loc: self.get_loc(),
@@ -651,7 +651,7 @@ impl Connection {
                 if let Some(def_loc) = from_def.port_returns_value() {
                     let msg = format!(
                         "cannot connect output port of type {}, which returns a value, to serial input port",
-                        PortInstanceType::show(&from_type)
+                        PortInstanceType::show(a, &from_type)
                     );
                     return Err(SemanticError::InvalidConnection {
                         loc: self.get_loc(),
