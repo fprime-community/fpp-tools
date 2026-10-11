@@ -131,6 +131,26 @@ fn duplicate_def() {
 }
 
 #[test]
+fn expand_absolute_global_template() {
+    run_test("template/expand_absolute_global_template")
+}
+
+#[test]
+fn expand_absolute_ok() {
+    run_test("template/expand_absolute_ok")
+}
+
+#[test]
+fn expand_absolute_qualified_ok() {
+    run_test("template/expand_absolute_qualified_ok")
+}
+
+#[test]
+fn expand_absolute_undefined() {
+    run_test("template/expand_absolute_undefined")
+}
+
+#[test]
 fn expand_before_invalid_composition() {
     run_test("template/expand_before_invalid_composition")
 }

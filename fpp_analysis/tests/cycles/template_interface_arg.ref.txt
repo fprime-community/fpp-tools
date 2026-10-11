@@ -1,0 +1,22 @@
+ --> [ local path prefix ]/cycles/template_interface_arg.fpp:5:1
+  |
+5 | topology A { instance X }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycles/template_interface_arg.fpp:5:23
+  |
+5 | topology A { instance X }
+  |                       - use X refers to definition X
+  |
+ ::: [ local path prefix ]/cycles/template_interface_arg.fpp:3:25
+  |
+3 |   topology X { instance i }
+  |                         - use i refers to definition i
+  |
+  = note: expanded at [ local path prefix ]/cycles/template_interface_arg.fpp:6:1
+  |
+ ::: [ local path prefix ]/cycles/template_interface_arg.fpp:6:19
+  |
+6 | expand T(instance A)
+  |                   - use A refers to definition A
+
