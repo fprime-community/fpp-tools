@@ -10,8 +10,10 @@ ROOT@0..14
     WHITESPACE@11..12 " "
   ERROR@12..13
     LITERAL_INT@12..13 "1"
-  EOL@13..14 "\n"
+  ERROR@13..14
+    EOL@13..14 "\n"
 error 0..0: module member expected
-error 8..8: expected `;`
+error 8..8: unexpected token
 error 10..10: module member expected
-error 12..12: expected `;`
+error 12..12: unexpected token
+error 13..13: module member expected

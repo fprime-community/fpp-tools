@@ -45,8 +45,8 @@ module StateMachines {
         state Waiting {
             @ Choice definition
             choice CheckCondition {
-                if isReady enter Active else enter Idle @< choice transition annotation
-            }
+                if isReady enter Active else enter Idle
+            } @< choice transition annotation
 
             @ Transition to choice
             on tick enter CheckCondition

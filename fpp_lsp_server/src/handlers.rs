@@ -231,10 +231,8 @@ pub fn handle_dump_syntax_tree(state: &mut GlobalState, param: UriRequest) -> Re
         fpp_parser::IncludeParentKind::TlmPacket => fpp_lsp_parser::TopEntryPoint::TlmPacket,
         fpp_parser::IncludeParentKind::TlmPacketSet => fpp_lsp_parser::TopEntryPoint::TlmPacketSet,
         fpp_parser::IncludeParentKind::Topology => fpp_lsp_parser::TopEntryPoint::Topology,
-        // The lossless parser has no state machine or state member entry point
-        fpp_parser::IncludeParentKind::StateMachine | fpp_parser::IncludeParentKind::State => {
-            fpp_lsp_parser::TopEntryPoint::Module
-        }
+        fpp_parser::IncludeParentKind::StateMachine => fpp_lsp_parser::TopEntryPoint::StateMachine,
+        fpp_parser::IncludeParentKind::State => fpp_lsp_parser::TopEntryPoint::State,
     };
 
     eprintln!(
@@ -267,10 +265,8 @@ fn parse_text_document(
         fpp_parser::IncludeParentKind::TlmPacket => fpp_lsp_parser::TopEntryPoint::TlmPacket,
         fpp_parser::IncludeParentKind::TlmPacketSet => fpp_lsp_parser::TopEntryPoint::TlmPacketSet,
         fpp_parser::IncludeParentKind::Topology => fpp_lsp_parser::TopEntryPoint::Topology,
-        // The lossless parser has no state machine or state member entry point
-        fpp_parser::IncludeParentKind::StateMachine | fpp_parser::IncludeParentKind::State => {
-            fpp_lsp_parser::TopEntryPoint::Module
-        }
+        fpp_parser::IncludeParentKind::StateMachine => fpp_lsp_parser::TopEntryPoint::StateMachine,
+        fpp_parser::IncludeParentKind::State => fpp_lsp_parser::TopEntryPoint::State,
     };
 
     let parse = fpp_lsp_parser::parse(&text, entry_kind);
@@ -867,10 +863,8 @@ pub fn handle_completion(
         fpp_parser::IncludeParentKind::TlmPacket => fpp_lsp_parser::TopEntryPoint::TlmPacket,
         fpp_parser::IncludeParentKind::TlmPacketSet => fpp_lsp_parser::TopEntryPoint::TlmPacketSet,
         fpp_parser::IncludeParentKind::Topology => fpp_lsp_parser::TopEntryPoint::Topology,
-        // The lossless parser has no state machine or state member entry point
-        fpp_parser::IncludeParentKind::StateMachine | fpp_parser::IncludeParentKind::State => {
-            fpp_lsp_parser::TopEntryPoint::Module
-        }
+        fpp_parser::IncludeParentKind::StateMachine => fpp_lsp_parser::TopEntryPoint::StateMachine,
+        fpp_parser::IncludeParentKind::State => fpp_lsp_parser::TopEntryPoint::State,
     };
 
     let parse = fpp_lsp_parser::parse(&text, entry_kind);

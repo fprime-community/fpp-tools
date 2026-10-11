@@ -1,0 +1,17 @@
+ROOT@0..56
+  PRE_ANNOTATION@0..19 "@ Included constant"
+  EOL@19..20 "\n"
+  DEF_CONSTANT@20..34
+    CONSTANT_KW@20..28 "constant"
+    WHITESPACE@28..29 " "
+    NAME@29..30
+      IDENT@29..30 "x"
+    WHITESPACE@30..31 " "
+    EQUALS@31..32 "="
+    WHITESPACE@32..33 " "
+    EXPR@33..34
+      EXPR_LITERAL@33..34
+        LITERAL_INT@33..34 "0"
+  EOL@34..35 "\n"
+  POST_ANNOTATION@35..55 "@< Included constant"
+  EOL@55..56 "\n"

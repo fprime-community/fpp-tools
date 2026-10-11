@@ -37,4 +37,7 @@ constant  off = false
 
   @ String literal constant
   constant   greeting  =  "hello"
+
+  @ Member selection on an integer literal
+  constant member = 1 .x
 }

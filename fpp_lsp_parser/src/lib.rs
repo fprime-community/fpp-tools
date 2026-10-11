@@ -39,7 +39,8 @@ pub use crate::{
 ///   * Parsing an `.fppi` file.
 ///
 /// Normal `.fpp` files have `Module` entrypoint. The other entry-points
-/// come from `include` specifiers.
+/// come from `include` specifiers: a fragment is parsed with the members of
+/// the construct that includes it.
 ///
 ///
 /// [`TopEntryPoint::parse`] makes a guarantee that
@@ -52,6 +53,8 @@ pub enum TopEntryPoint {
     Topology,
     TlmPacket,
     TlmPacketSet,
+    StateMachine,
+    State,
 }
 
 impl TopEntryPoint {
@@ -67,6 +70,8 @@ impl TopEntryPoint {
             "tlm-packet-set" | "tlm_packet_set" | "tlmPacketSet" => {
                 Some(TopEntryPoint::TlmPacketSet)
             }
+            "state-machine" | "state_machine" | "stateMachine" => Some(TopEntryPoint::StateMachine),
+            "state" => Some(TopEntryPoint::State),
             _ => None,
         }
     }
@@ -78,6 +83,8 @@ impl TopEntryPoint {
             TopEntryPoint::Topology => grammar::entry::topology_entry,
             TopEntryPoint::TlmPacket => grammar::entry::tlm_packet_entry,
             TopEntryPoint::TlmPacketSet => grammar::entry::tlm_packet_set_entry,
+            TopEntryPoint::StateMachine => grammar::entry::state_machine_entry,
+            TopEntryPoint::State => grammar::entry::state_entry,
         };
         let mut p = parser::Parser::new(input);
         entry_point(&mut p);
@@ -116,15 +123,21 @@ pub(crate) fn build_tree(
         ),
     });
 
-    let (node, mut errors) = builder.finish_raw();
-    for (i, err) in lexed.errors() {
-        let text_range = lexed.text_range(i);
-        let text_range = TextRange::new(
-            text_range.start.try_into().unwrap(),
-            text_range.end.try_into().unwrap(),
-        );
-        errors.push(SyntaxError::new(err, text_range))
-    }
+    // The lexer errors come first: the Scala parser reports them before it
+    // parses anything.
+    let (node, parse_errors) = builder.finish_raw();
+    let mut errors: Vec<SyntaxError> = lexed
+        .errors()
+        .map(|(i, err)| {
+            let text_range = lexed.text_range(i);
+            let text_range = TextRange::new(
+                text_range.start.try_into().unwrap(),
+                text_range.end.try_into().unwrap(),
+            );
+            SyntaxError::new(err, text_range)
+        })
+        .collect();
+    errors.extend(parse_errors);
 
     (node, errors, is_eof)
 }

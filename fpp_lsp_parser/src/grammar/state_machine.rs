@@ -12,6 +12,7 @@ const STATE_MACHINE_MEMBER_RECOVERY_SET: TokenSet = TokenSet::new(&[
     TYPE_KW,
     ARRAY_KW,
     CONSTANT_KW,
+    DICTIONARY_KW,
     ENUM_KW,
     STRUCT_KW,
     INCLUDE_KW,
@@ -26,10 +27,7 @@ pub(super) fn def_state_machine(p: &mut Parser) {
     let m = p.start();
     p.bump(STATE_KW);
     p.expect(MACHINE_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
     if p.at(LEFT_CURLY) {
         member_list(
             p,
@@ -38,19 +36,24 @@ pub(super) fn def_state_machine(p: &mut Parser) {
             state_machine_member,
             SEMI,
             STATE_MACHINE_MEMBER_LIST,
-            "expected state machine member",
+            "state machine member expected",
         )
     }
 
     m.complete(p, DEF_STATE_MACHINE);
 }
 
-fn state_machine_member(p: &mut Parser) {
+pub(super) fn state_machine_member(p: &mut Parser) {
     match p.current() {
+        DICTIONARY_KW if p.nth_at(1, TYPE_KW) => types::type_alias_or_abstract(p),
         TYPE_KW => types::type_alias_or_abstract(p),
+        DICTIONARY_KW if p.nth_at(1, ARRAY_KW) => types::def_array(p),
         ARRAY_KW => types::def_array(p),
+        DICTIONARY_KW if p.nth_at(1, CONSTANT_KW) => module::def_constant(p),
         CONSTANT_KW => module::def_constant(p),
+        DICTIONARY_KW if p.nth_at(1, ENUM_KW) => types::def_enum(p),
         ENUM_KW => types::def_enum(p),
+        DICTIONARY_KW if p.nth_at(1, STRUCT_KW) => types::def_struct(p),
         STRUCT_KW => types::def_struct(p),
         INCLUDE_KW => spec_include(p),
         INITIAL_KW => spec_initial_transition(p),
@@ -61,7 +64,7 @@ fn state_machine_member(p: &mut Parser) {
         CHOICE_KW => def_choice(p),
         _ => {
             p.err_recover(
-                "expected state machine member",
+                "state machine member expected",
                 STATE_MACHINE_MEMBER_RECOVERY_SET,
             );
         }
@@ -80,10 +83,7 @@ fn def_state(p: &mut Parser) {
     assert!(p.at(STATE_KW));
     let m = p.start();
     p.bump(STATE_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
 
     if p.at(LEFT_CURLY) {
         member_list(
@@ -93,14 +93,14 @@ fn def_state(p: &mut Parser) {
             state_member,
             SEMI,
             STATE_MEMBER_LIST,
-            "expected state member",
+            "state member expected",
         );
     }
 
     m.complete(p, DEF_STATE);
 }
 
-fn state_member(p: &mut Parser) {
+pub(super) fn state_member(p: &mut Parser) {
     match p.current() {
         CHOICE_KW => def_choice(p),
         STATE_KW => def_state(p),
@@ -110,7 +110,7 @@ fn state_member(p: &mut Parser) {
         INCLUDE_KW => spec_include(p),
         ON_KW => spec_state_transition(p),
         _ => {
-            p.err_recover("expected state machine member", STATE_MEMBER_RECOVERY_SET);
+            p.err_recover("state member expected", STATE_MEMBER_RECOVERY_SET);
         }
     }
 }
@@ -173,12 +173,6 @@ fn def_choice(p: &mut Parser) {
     }
 
     p.expect(LEFT_CURLY);
-
-    // Skip any EOL tokens after the opening brace (formatter adds newline after {)
-    while p.at(EOL) {
-        p.bump_any();
-    }
-
     p.expect(IF_KW);
     name_ref(p);
 
@@ -195,11 +189,6 @@ fn def_choice(p: &mut Parser) {
         m.complete(p, ELSE_CLAUSE);
     }
 
-    // Skip EOL before closing brace
-    while p.at(EOL) {
-        p.bump_any();
-    }
-
     p.expect(RIGHT_CURLY);
 
     m.complete(p, DEF_CHOICE);
@@ -212,7 +201,7 @@ fn spec_state_entry(p: &mut Parser) {
     if p.at(DO_KW) {
         do_expr(p);
     } else {
-        p.error("expected do expression");
+        p.error("do expected");
         m.abandon(p);
         return;
     }
@@ -227,7 +216,7 @@ fn spec_state_exit(p: &mut Parser) {
     if p.at(DO_KW) {
         do_expr(p);
     } else {
-        p.error("expected do expression");
+        p.error("do expected");
         m.abandon(p);
         return;
     }
@@ -266,7 +255,7 @@ fn transition_or_do(p: &mut Parser) {
         m.complete(p, TRANSITION_EXPR);
     } else {
         m.abandon(p);
-        p.error("expected transition or do expression")
+        p.error("enter or do expected")
     }
 }
 
@@ -296,10 +285,10 @@ fn do_expr(p: &mut Parser) {
             name_ref,
             COMMA,
             DO_EXPR_MEMBER_LIST,
-            "expected action name",
+            "identifier expected",
         )
     } else {
-        p.error("expected '{'")
+        p.error("{ expected")
     }
 
     m.complete(p, DO_EXPR);

@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use fpp_lsp_parser::{SyntaxKind::*, SyntaxNode, TopEntryPoint, parse};
 
-use crate::{FormatError, FormatOptions, Formatter};
+use crate::{FormatError, FormatOptions, Formatter, restore_line_endings};
 
 /// A single file processed by [`format_file_recursive`].
 #[derive(Debug)]
@@ -44,8 +44,7 @@ impl FormattedUnit {
 /// reachable through `include` specifiers.
 ///
 /// The returned units are ordered root-first (pre-order over the include tree),
-/// with each file appearing exactly once. Includes whose context has no
-/// standalone entrypoint (e.g. state-machine members) are left unformatted.
+/// with each file appearing exactly once.
 pub fn format_file_recursive(
     path: &Path,
     entry: TopEntryPoint,
@@ -93,7 +92,7 @@ fn format_recursive_inner(
         return Err(FormatError::ParseError(errors));
     }
     let root = parse.syntax_node();
-    let formatted = Formatter::new(options.clone()).format(&root);
+    let formatted = restore_line_endings(&original, Formatter::new(options.clone()).format(&root));
 
     results.push(FormattedUnit {
         path: path.to_path_buf(),
@@ -105,8 +104,7 @@ fn format_recursive_inner(
     let dir = path.parent().unwrap_or_else(|| Path::new("."));
     chain.push(canon);
     for spec in root.descendants().filter(|n| n.kind() == SPEC_INCLUDE) {
-        let Some((rel, inc_entry)) = include_target(&spec) else {
-            // No standalone entrypoint for this context (e.g. state machine).
+        let Some((rel, inc_entry)) = include_target(&spec, entry) else {
             continue;
         };
         let resolved = dir.join(&rel);
@@ -118,9 +116,10 @@ fn format_recursive_inner(
 }
 
 /// The include path string and the entrypoint derived from its context, or
-/// `None` when the context has no standalone entrypoint.
-fn include_target(spec: &SyntaxNode) -> Option<(String, TopEntryPoint)> {
-    let entry = context_entry(spec)?;
+/// `None` when the include has no path. `file_entry` is the entrypoint of the
+/// file that contains the include.
+fn include_target(spec: &SyntaxNode, file_entry: TopEntryPoint) -> Option<(String, TopEntryPoint)> {
+    let entry = context_entry(spec, file_entry);
     let lit = spec
         .children_with_tokens()
         .filter_map(|e| e.into_token())
@@ -129,26 +128,25 @@ fn include_target(spec: &SyntaxNode) -> Option<(String, TopEntryPoint)> {
 }
 
 /// Walk up the ancestors of a `SPEC_INCLUDE` to find the enclosing member list
-/// and map it to the parser entrypoint used for that kind of fragment.
-fn context_entry(spec: &SyntaxNode) -> Option<TopEntryPoint> {
+/// and map it to the parser entrypoint used for that kind of fragment. An
+/// include with no enclosing member list is a member of the file that
+/// contains it, so its fragment has the same entrypoint as that file.
+fn context_entry(spec: &SyntaxNode, file_entry: TopEntryPoint) -> TopEntryPoint {
     let mut node = spec.parent();
     while let Some(n) = node {
         match n.kind() {
-            MODULE_MEMBER_LIST => return Some(TopEntryPoint::Module),
-            COMPONENT_MEMBER_LIST | INTERFACE_MEMBER_LIST => {
-                return Some(TopEntryPoint::Component);
-            }
-            TOPOLOGY_MEMBER_LIST => return Some(TopEntryPoint::Topology),
-            TLM_PACKET_MEMBER_LIST => return Some(TopEntryPoint::TlmPacket),
-            TLM_PACKET_SET_MEMBER_LIST => return Some(TopEntryPoint::TlmPacketSet),
-            // State-machine includes have no standalone entrypoint.
-            STATE_MACHINE_MEMBER_LIST | STATE_MEMBER_LIST => return None,
+            MODULE_MEMBER_LIST => return TopEntryPoint::Module,
+            COMPONENT_MEMBER_LIST => return TopEntryPoint::Component,
+            TOPOLOGY_MEMBER_LIST => return TopEntryPoint::Topology,
+            TLM_PACKET_MEMBER_LIST => return TopEntryPoint::TlmPacket,
+            TLM_PACKET_SET_MEMBER_LIST => return TopEntryPoint::TlmPacketSet,
+            STATE_MACHINE_MEMBER_LIST => return TopEntryPoint::StateMachine,
+            STATE_MEMBER_LIST => return TopEntryPoint::State,
             _ => {}
         }
         node = n.parent();
     }
-    // A top-level include (no enclosing member list) is a module fragment.
-    Some(TopEntryPoint::Module)
+    file_entry
 }
 
 /// Strip the surrounding quotes from an FPP string literal.

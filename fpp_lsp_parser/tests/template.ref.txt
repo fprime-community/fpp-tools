@@ -126,17 +126,13 @@ ROOT@0..457
             IDENT@407..411 "Type"
       COMMA@411..412 ","
       WHITESPACE@412..413 " "
-      TEMPLATE_ARG@413..422
+      TEMPLATE_ARG@413..432
         INSTANCE_KW@413..421 "instance"
         WHITESPACE@421..422 " "
-      ERROR@422..423
-        DOT@422..423 "."
-      ERROR@423..432
-        IDENT@423..432 "instance1"
+        QUAL_IDENT@422..432
+          DOT@422..423 "."
+          IDENT@423..432 "instance1"
       RIGHT_PAREN@432..433 ")"
   EOL@433..434 "\n"
   POST_ANNOTATION@434..456 "@< Expansion specifier"
   EOL@456..457 "\n"
-error 421..422: expected QUAL_IDENT
-error 422..422: expected `COMMA`
-error 423..423: expected template argument

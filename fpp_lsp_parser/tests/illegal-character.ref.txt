@@ -1,9 +1,7 @@
 ROOT@0..37
-  ERROR@0..1
-    UNKNOWN@0..1 "%"
+  UNKNOWN@0..1 "%"
   EOL@1..2 "\n"
-  ERROR@2..3
-    UNKNOWN@2..3 "\t"
+  UNKNOWN@2..3 "\t"
   EOL@3..4 "\n"
   ERROR@4..7
     IDENT@4..7 "tok"
@@ -11,21 +9,23 @@ ROOT@0..37
   WHITESPACE@8..15 "\\     \n"
   ERROR@15..19
     IDENT@15..19 "tok2"
-  WHITESPACE@19..20 " "
-  WHITESPACE@20..30 "\\ illegal\n"
-  ERROR@30..31
+  ERROR@19..37
+    WHITESPACE@19..20 " "
+    WHITESPACE@20..30 "\\ illegal\n"
     UNKNOWN@30..31 ">"
-  WHITESPACE@31..32 " "
-  ERROR@32..33
+    WHITESPACE@31..32 " "
     UNKNOWN@32..33 "<"
-  WHITESPACE@33..34 " "
-  ERROR@34..35
+    WHITESPACE@33..34 " "
     UNKNOWN@34..35 ">"
-  EOL@35..37 "\n\n"
-error 0..0: module member expected
-error 2..2: module member expected
+    EOL@35..37 "\n\n"
+error 0..1: invalid token: unicode value 37, hex 0x25
+error 2..3: invalid token: unicode value 9, hex 0x9
+note: embedded tab characters are not allowed in FPP source files
+try configuring your editor to convert tabs to spaces
+error 20..30: invalid token: expected line continuation
+error 30..31: invalid token: '>'
+error 32..33: invalid token: '<'
+error 34..35: invalid token: '>'
 error 4..4: module member expected
-error 15..15: expected `;`
-error 30..30: module member expected
-error 32..32: expected `;`
-error 34..34: module member expected
+error 15..15: unexpected token
+error 19..19: module member expected

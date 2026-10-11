@@ -6,12 +6,16 @@ use super::*;
 pub(super) fn type_alias_or_abstract(p: &mut Parser) {
     assert!(p.at(TYPE_KW) || p.at(DICTIONARY_KW));
     let m = p.start();
-    p.eat(DICTIONARY_KW);
+    let is_dictionary_def = p.eat(DICTIONARY_KW);
     p.bump(TYPE_KW);
     name_r(p, MEMBER_RECOVERY_SET);
     if p.at(EQUALS) {
         p.bump(EQUALS);
         type_name(p);
+        m.complete(p, DEF_ALIAS_TYPE);
+    } else if is_dictionary_def {
+        // Only an alias type may be a dictionary definition
+        p.expect(EQUALS);
         m.complete(p, DEF_ALIAS_TYPE);
     } else {
         m.complete(p, DEF_ABSTRACT_TYPE);
@@ -26,13 +30,13 @@ pub(super) fn def_array(p: &mut Parser) {
     name_r(p, MEMBER_RECOVERY_SET);
 
     if !p.eat(EQUALS) {
-        p.error("expected `=`");
+        p.error("= expected");
     }
 
     if p.at(LEFT_SQUARE) {
         index_or_size(p);
     } else {
-        p.err_and_bump("expected `[`")
+        p.err_and_bump("[ expected")
     }
 
     type_name(p);
@@ -58,10 +62,10 @@ pub(super) fn def_struct(p: &mut Parser) {
             struct_field,
             COMMA,
             STRUCT_MEMBER_LIST,
-            "expected struct member",
+            "identifier expected",
         );
     } else {
-        p.error("expected `{`");
+        p.error("{ expected");
     }
 
     expr_opt(p, DEFAULT_KW, DEFAULT);
@@ -81,7 +85,7 @@ pub(super) fn struct_field(p: &mut Parser) {
         m.complete(p, STRUCT_MEMBER);
     } else {
         m.abandon(p);
-        p.err_and_bump("expected struct field declaration");
+        p.err_and_bump("identifier expected");
     }
 }
 
@@ -106,10 +110,10 @@ pub(super) fn def_enum(p: &mut Parser) {
             enum_member,
             COMMA,
             ENUM_MEMBER_LIST,
-            "expected enum member",
+            "identifier expected",
         );
     } else {
-        p.error("expected `{`");
+        p.error("{ expected");
     }
 
     expr_opt(p, DEFAULT_KW, DEFAULT);
@@ -127,7 +131,7 @@ pub(super) fn enum_member(p: &mut Parser) {
         m.complete(p, DEF_ENUM_CONSTANT);
     } else {
         m.abandon(p);
-        p.err_and_bump("expected enum variant");
+        p.err_and_bump("identifier expected");
     }
 }
 
@@ -144,7 +148,7 @@ pub(super) fn type_name(p: &mut Parser) {
                 expr::expr(p)
             }
         }
-        IDENT => qual_ident(p),
+        _ if at_name_start(p) => qual_ident(p),
         _ => {
             m.abandon(p);
             p.expect(TYPE_NAME);

@@ -161,6 +161,9 @@ impl Formatter {
                     parts.push(sep_doc(p, &f));
                 }
                 parts.push(self.lower(n));
+                if is_eol_separated_element(n) {
+                    parts.push(Doc::text(","));
+                }
                 if let Some(l) = last_token(n) {
                     prev = Some(l);
                 }
@@ -628,7 +631,11 @@ fn flat_sep(prev: &SyntaxToken, cur: &SyntaxToken) -> &'static str {
     if cur.kind() == POST_ANNOTATION {
         return "  ";
     }
-    if prev.kind() == DOT || cur.kind() == DOT {
+    if cur.kind() == DOT && prev.kind() == LITERAL_INT && !is_hex_literal(prev) {
+        // `1 .x` selects a member of 1; `1.x` would lex as a float literal
+        return " ";
+    }
+    if prev.kind() == DOT || (cur.kind() == DOT && !is_absolute_name_dot(cur)) {
         return "";
     }
     // The enum representation-type colon (`enum E : U8`) takes a leading space,
@@ -668,6 +675,37 @@ fn flat_sep(prev: &SyntaxToken, cur: &SyntaxToken) -> &'static str {
         return "";
     }
     " "
+}
+
+/// Whether `tok` is the leading dot of an absolute name (`.a`, `.M.T`), which
+/// is spaced like the name it begins.
+fn is_absolute_name_dot(tok: &SyntaxToken) -> bool {
+    tok.prev_sibling_or_token().is_none()
+        && tok.parent().is_some_and(|p| match p.kind() {
+            QUAL_IDENT | EXPR_IDENT | PORT_INSTANCE_IDENTIFIER | TLM_CHANNEL_IDENTIFIER => true,
+            _ => false,
+        })
+}
+
+/// Whether `node` is an element of an `implements` list that only an end of
+/// line separates from the next element. The formatter drops that end of
+/// line, so it writes a comma there instead.
+fn is_eol_separated_element(node: &SyntaxNode) -> bool {
+    if node.kind() != QUAL_IDENT || node.parent().is_none_or(|p| p.kind() != IMPLEMENTS_CLAUSE) {
+        return false;
+    }
+    let mut next = node.next_sibling_or_token();
+    while let Some(el) = next {
+        match el.kind() {
+            WHITESPACE | EOL | COMMENT => next = el.next_sibling_or_token(),
+            kind => return kind == QUAL_IDENT,
+        }
+    }
+    false
+}
+
+fn is_hex_literal(tok: &SyntaxToken) -> bool {
+    tok.text().starts_with("0x") || tok.text().starts_with("0X")
 }
 
 fn is_unary(tok: &SyntaxToken) -> bool {
