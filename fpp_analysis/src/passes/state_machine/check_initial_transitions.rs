@@ -1,5 +1,6 @@
 use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor, state_analyzer};
 use crate::errors::{SemanticError, SemanticResult};
+use crate::semantics::SymbolInterface;
 use crate::semantics::state_machine::{StateMachineAnalysis, StateMachineSymbol};
 use fpp_ast::{
     AstNode, DefState, DefStateMachine, SpecInitialTransition, StateMachineMember, StateMember,
@@ -75,7 +76,7 @@ impl StateMachineAnalysisVisitor for CheckInitialTransitions {
                     "initial transition of state machine may not go to a state or choice defined in a substate"
                 }
             };
-            let path: Vec<Span> = symbols.iter().rev().map(|s| s.get_span()).collect();
+            let path: Vec<Span> = symbols.iter().rev().map(|s| s.get_loc()).collect();
             SemanticError::InvalidInitialTransition {
                 loc,
                 msg: msg_head.to_string(),

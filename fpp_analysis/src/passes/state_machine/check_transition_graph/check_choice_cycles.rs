@@ -1,5 +1,6 @@
 use crate::analyzers::state_machine::SmResult;
 use crate::errors::SemanticError;
+use crate::semantics::SymbolInterface;
 use crate::semantics::state_machine::transition_graph::{Arc as TgArc, Node as TgNode};
 use crate::semantics::state_machine::{StateMachineAnalysis, StateMachineSymbol, StateOrChoice};
 use rustc_hash::FxHashSet as HashSet;
@@ -124,7 +125,7 @@ impl Cycle {
             })
             .collect();
         SemanticError::ChoiceCycle {
-            loc: self.choice.get_span(),
+            loc: self.choice.get_loc(),
             path,
         }
     }
