@@ -10,5 +10,10 @@ passive component C {
     }
 }
 
+state machine M {
+    dictionary constant d = [1, 2]
+    dictionary type U = U16
+}
+
 locate dictionary constant c at "c.fpp"
 locate dictionary type T at "t.fpp"

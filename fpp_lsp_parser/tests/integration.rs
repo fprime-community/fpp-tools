@@ -85,6 +85,11 @@ fn comments() {
 }
 
 #[test]
+fn crlf() {
+    run_test_from_fpp_parser("crlf")
+}
+
+#[test]
 fn cycle_1() {
     run_test_from_fpp_parser("cycle-1")
 }
@@ -97,6 +102,11 @@ fn cycle_2() {
 #[test]
 fn cycle_3() {
     run_test_from_fpp_parser("cycle-3")
+}
+
+#[test]
+fn dictionary_specifier() {
+    run_test_from_fpp_parser("dictionary-specifier")
 }
 
 #[test]
@@ -145,6 +155,11 @@ fn include_parse_error() {
 }
 
 #[test]
+fn include_state_machine() {
+    run_test_from_fpp_parser("include-state-machine")
+}
+
+#[test]
 fn include_subdir() {
     run_test_from_fpp_parser("include-subdir")
 }
@@ -152,6 +167,11 @@ fn include_subdir() {
 #[test]
 fn include_topology() {
     run_test_from_fpp_parser("include-topology")
+}
+
+#[test]
+fn numeric_shift() {
+    run_test_from_fpp_parser("numeric-shift")
 }
 
 // The fragments that the include tests include, each parsed as the members
@@ -196,6 +216,24 @@ fn fragment_packet() {
 #[test]
 fn fragment_channel() {
     run_fragment_test_from_fpp_parser("channel.fppi", TopEntryPoint::TlmPacket, "fragment-channel")
+}
+
+#[test]
+fn fragment_state_in_state_machine() {
+    run_fragment_test_from_fpp_parser(
+        "subdir/state.fppi",
+        TopEntryPoint::StateMachine,
+        "fragment-state-state-machine",
+    )
+}
+
+#[test]
+fn fragment_state_in_state() {
+    run_fragment_test_from_fpp_parser(
+        "subdir/state.fppi",
+        TopEntryPoint::State,
+        "fragment-state-state",
+    )
 }
 
 #[test]

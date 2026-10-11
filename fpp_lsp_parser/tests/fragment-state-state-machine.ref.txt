@@ -1,0 +1,145 @@
+ROOT@0..214
+  DEF_STATE@0..213
+    STATE_KW@0..5 "state"
+    WHITESPACE@5..6 " "
+    NAME@6..8
+      IDENT@6..8 "S1"
+    WHITESPACE@8..9 " "
+    STATE_MEMBER_LIST@9..213
+      LEFT_CURLY@9..10 "{"
+      EOL@10..11 "\n"
+      WHITESPACE@11..15 "    "
+      SPEC_STATE_ENTRY@15..34
+        ENTRY_KW@15..20 "entry"
+        WHITESPACE@20..21 " "
+        DO_EXPR@21..34
+          DO_KW@21..23 "do"
+          WHITESPACE@23..24 " "
+          DO_EXPR_MEMBER_LIST@24..34
+            LEFT_CURLY@24..25 "{"
+            WHITESPACE@25..26 " "
+            NAME_REF@26..28
+              IDENT@26..28 "a1"
+            COMMA@28..29 ","
+            WHITESPACE@29..30 " "
+            NAME_REF@30..32
+              IDENT@30..32 "a2"
+            WHITESPACE@32..33 " "
+            RIGHT_CURLY@33..34 "}"
+      EOL@34..35 "\n"
+      WHITESPACE@35..39 "    "
+      SPEC_STATE_EXIT@39..57
+        EXIT_KW@39..43 "exit"
+        WHITESPACE@43..44 " "
+        DO_EXPR@44..57
+          DO_KW@44..46 "do"
+          WHITESPACE@46..47 " "
+          DO_EXPR_MEMBER_LIST@47..57
+            LEFT_CURLY@47..48 "{"
+            WHITESPACE@48..49 " "
+            NAME_REF@49..51
+              IDENT@49..51 "a1"
+            COMMA@51..52 ","
+            WHITESPACE@52..53 " "
+            NAME_REF@53..55
+              IDENT@53..55 "a2"
+            WHITESPACE@55..56 " "
+            RIGHT_CURLY@56..57 "}"
+      EOL@57..59 "\n\n"
+      WHITESPACE@59..63 "    "
+      PRE_ANNOTATION@63..83 "@ Initial transition"
+      EOL@83..84 "\n"
+      WHITESPACE@84..88 "    "
+      SPEC_INITIAL_TRANSITION@88..118
+        INITIAL_KW@88..95 "initial"
+        WHITESPACE@95..96 " "
+        TRANSITION_EXPR@96..118
+          DO_EXPR@96..109
+            DO_KW@96..98 "do"
+            WHITESPACE@98..99 " "
+            DO_EXPR_MEMBER_LIST@99..109
+              LEFT_CURLY@99..100 "{"
+              WHITESPACE@100..101 " "
+              NAME_REF@101..103
+                IDENT@101..103 "a1"
+              COMMA@103..104 ","
+              WHITESPACE@104..105 " "
+              NAME_REF@105..107
+                IDENT@105..107 "a2"
+              WHITESPACE@107..108 " "
+              RIGHT_CURLY@108..109 "}"
+          WHITESPACE@109..110 " "
+          ENTER_KW@110..115 "enter"
+          WHITESPACE@115..116 " "
+          QUAL_IDENT@116..118
+            IDENT@116..118 "S3"
+      EOL@118..120 "\n\n"
+      WHITESPACE@120..124 "    "
+      PRE_ANNOTATION@124..134 "@ Choice C"
+      EOL@134..135 "\n"
+      WHITESPACE@135..139 "    "
+      DEF_CHOICE@139..211
+        CHOICE_KW@139..145 "choice"
+        WHITESPACE@145..146 " "
+        NAME@146..147
+          IDENT@146..147 "C"
+        WHITESPACE@147..148 " "
+        LEFT_CURLY@148..149 "{"
+        WHITESPACE@149..150 " "
+        IF_KW@150..152 "if"
+        WHITESPACE@152..153 " "
+        NAME_REF@153..155
+          IDENT@153..155 "g1"
+        WHITESPACE@155..156 " "
+        THEN_CLAUSE@156..178
+          TRANSITION_EXPR@156..178
+            DO_EXPR@156..169
+              DO_KW@156..158 "do"
+              WHITESPACE@158..159 " "
+              DO_EXPR_MEMBER_LIST@159..169
+                LEFT_CURLY@159..160 "{"
+                WHITESPACE@160..161 " "
+                NAME_REF@161..163
+                  IDENT@161..163 "a1"
+                COMMA@163..164 ","
+                WHITESPACE@164..165 " "
+                NAME_REF@165..167
+                  IDENT@165..167 "a2"
+                WHITESPACE@167..168 " "
+                RIGHT_CURLY@168..169 "}"
+            WHITESPACE@169..170 " "
+            ENTER_KW@170..175 "enter"
+            WHITESPACE@175..176 " "
+            QUAL_IDENT@176..178
+              IDENT@176..178 "S1"
+        WHITESPACE@178..179 " "
+        ELSE_KW@179..183 "else"
+        WHITESPACE@183..184 " "
+        ELSE_CLAUSE@184..209
+          TRANSITION_EXPR@184..209
+            DO_EXPR@184..197
+              DO_KW@184..186 "do"
+              WHITESPACE@186..187 " "
+              DO_EXPR_MEMBER_LIST@187..197
+                LEFT_CURLY@187..188 "{"
+                WHITESPACE@188..189 " "
+                NAME_REF@189..191
+                  IDENT@189..191 "a2"
+                COMMA@191..192 ","
+                WHITESPACE@192..193 " "
+                NAME_REF@193..195
+                  IDENT@193..195 "a3"
+                WHITESPACE@195..196 " "
+                RIGHT_CURLY@196..197 "}"
+            WHITESPACE@197..198 " "
+            ENTER_KW@198..203 "enter"
+            WHITESPACE@203..204 " "
+            QUAL_IDENT@204..209
+              IDENT@204..206 "S2"
+              DOT@206..207 "."
+              IDENT@207..209 "S3"
+        WHITESPACE@209..210 " "
+        RIGHT_CURLY@210..211 "}"
+      EOL@211..212 "\n"
+      RIGHT_CURLY@212..213 "}"
+  EOL@213..214 "\n"

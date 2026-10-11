@@ -1,4 +1,4 @@
-use fpp_format::{FormatOptions, Formatter};
+use fpp_format::FormatOptions;
 use fpp_lsp_parser::{TopEntryPoint, parse};
 use pretty_assertions::assert_eq;
 use std::path::PathBuf;
@@ -9,13 +9,7 @@ fn format_src(
     entry: TopEntryPoint,
     options: FormatOptions,
 ) -> Result<String, fpp_format::FormatError> {
-    let parse = parse(text, entry);
-    let errors = parse.errors();
-    if !errors.is_empty() {
-        return Err(fpp_format::FormatError::ParseError(errors));
-    }
-    let root = parse.syntax_node();
-    Ok(Formatter::new(options).format(&root))
+    fpp_format::format_text(text, entry, options)
 }
 
 /// The AST that fpp_parser builds for `text`, serialized without spans, so
@@ -153,6 +147,7 @@ fmt_test!(blank_lines, "blank-lines");
 fmt_test!(absolute_names, "absolute-names");
 fmt_test!(component_dictionary, "component-dictionary");
 fmt_test!(float_literals, "float-literals");
+fmt_test!(crlf, "crlf");
 fmt_test!(implements_list, "implements-list");
 fmt_test!(
     multiline_string_trailing_space,

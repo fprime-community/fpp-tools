@@ -1,0 +1,57 @@
+ROOT@0..151
+  DEF_STATE_MACHINE@0..150
+    STATE_KW@0..5 "state"
+    WHITESPACE@5..6 " "
+    MACHINE_KW@6..13 "machine"
+    WHITESPACE@13..14 " "
+    NAME@14..15
+      IDENT@14..15 "M"
+    WHITESPACE@15..16 " "
+    STATE_MACHINE_MEMBER_LIST@16..150
+      LEFT_CURLY@16..17 "{"
+      PRE_ANNOTATION@17..28 "@ Action a1"
+      EOL@28..29 "\n"
+      WHITESPACE@29..31 "  "
+      DEF_ACTION@31..40
+        ACTION_KW@31..37 "action"
+        WHITESPACE@37..38 " "
+        NAME@38..40
+          IDENT@38..40 "a1"
+      EOL@40..42 "\n\n"
+      WHITESPACE@42..44 "  "
+      PRE_ANNOTATION@44..55 "@ Action a2"
+      EOL@55..56 "\n"
+      WHITESPACE@56..58 "  "
+      DEF_ACTION@58..67
+        ACTION_KW@58..64 "action"
+        WHITESPACE@64..65 " "
+        NAME@65..67
+          IDENT@65..67 "a2"
+      EOL@67..69 "\n\n"
+      WHITESPACE@69..71 "  "
+      SPEC_INCLUDE@71..98
+        INCLUDE_KW@71..78 "include"
+        WHITESPACE@78..79 " "
+        LITERAL_STRING@79..98 "\"subdir/state.fppi\""
+      EOL@98..100 "\n\n"
+      WHITESPACE@100..102 "  "
+      DEF_STATE@102..148
+        STATE_KW@102..107 "state"
+        WHITESPACE@107..108 " "
+        NAME@108..110
+          IDENT@108..110 "S2"
+        WHITESPACE@110..111 " "
+        STATE_MEMBER_LIST@111..148
+          LEFT_CURLY@111..112 "{"
+          EOL@112..113 "\n"
+          WHITESPACE@113..117 "    "
+          SPEC_INCLUDE@117..144
+            INCLUDE_KW@117..124 "include"
+            WHITESPACE@124..125 " "
+            LITERAL_STRING@125..144 "\"subdir/state.fppi\""
+          EOL@144..145 "\n"
+          WHITESPACE@145..147 "  "
+          RIGHT_CURLY@147..148 "}"
+      EOL@148..149 "\n"
+      RIGHT_CURLY@149..150 "}"
+  EOL@150..151 "\n"

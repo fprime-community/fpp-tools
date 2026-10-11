@@ -1,0 +1,67 @@
+ROOT@0..165
+  PRE_ANNOTATION@0..10 "@ A module"
+  EOL@10..12 "\r\n"
+  DEF_MODULE@12..163
+    MODULE_KW@12..18 "module"
+    WHITESPACE@18..19 " "
+    NAME@19..20
+      IDENT@19..20 "M"
+    WHITESPACE@20..21 " "
+    MODULE_MEMBER_LIST@21..163
+      LEFT_CURLY@21..22 "{"
+      EOL@22..26 "\r\n\r\n"
+      WHITESPACE@26..28 "  "
+      COMMENT@28..39 "# A comment"
+      EOL@39..41 "\r\n"
+      WHITESPACE@41..43 "  "
+      DEF_CONSTANT@43..68
+        CONSTANT_KW@43..51 "constant"
+        WHITESPACE@51..52 " "
+        NAME@52..53
+          IDENT@52..53 "a"
+        WHITESPACE@53..54 " "
+        EQUALS@54..55 "="
+        WHITESPACE@55..56 " "
+        EXPR@56..68
+          EXPR_BINARY@56..68
+            EXPR_LITERAL@56..57
+              LITERAL_INT@56..57 "1"
+            WHITESPACE@57..58 " "
+            WHITESPACE@58..61 "\\\r\n"
+            WHITESPACE@61..65 "    "
+            BINARY_OP@65..67
+              PLUS@65..66 "+"
+              WHITESPACE@66..67 " "
+            EXPR_LITERAL@67..68
+              LITERAL_INT@67..68 "2"
+      WHITESPACE@68..69 " "
+      POST_ANNOTATION@69..76 "@< Post"
+      EOL@76..80 "\r\n\r\n"
+      WHITESPACE@80..82 "  "
+      DEF_CONSTANT@82..133
+        CONSTANT_KW@82..90 "constant"
+        WHITESPACE@90..91 " "
+        NAME@91..92
+          IDENT@91..92 "s"
+        WHITESPACE@92..93 " "
+        EQUALS@93..94 "="
+        WHITESPACE@94..95 " "
+        EXPR@95..133
+          EXPR_LITERAL@95..133
+            LITERAL_STRING@95..133 "\"\"\"\r\n    line 1\r\n     ..."
+      EOL@133..137 "\r\n\r\n"
+      WHITESPACE@137..139 "  "
+      DEF_CONSTANT@139..158
+        CONSTANT_KW@139..147 "constant"
+        WHITESPACE@147..148 " "
+        NAME@148..149
+          IDENT@148..149 "t"
+        WHITESPACE@149..150 " "
+        EQUALS@150..151 "="
+        WHITESPACE@151..152 " "
+        EXPR@152..158
+          EXPR_LITERAL@152..158
+            LITERAL_STRING@152..158 "\"x\\\"y\""
+      EOL@158..162 "\r\n\r\n"
+      RIGHT_CURLY@162..163 "}"
+  EOL@163..165 "\r\n"

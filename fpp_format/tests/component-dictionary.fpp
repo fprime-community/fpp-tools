@@ -6,5 +6,10 @@ passive component C {
   dictionary struct S { x: U32 }
 }
 
+state machine M {
+  dictionary   constant d = [ 1, 2 ]
+  dictionary type U = U16
+}
+
 locate dictionary constant c at "c.fpp"
 locate   dictionary type T at "t.fpp"
