@@ -601,3 +601,51 @@ fn locs_mode_resolves_uses_through_symlinked_root() {
         "the use of `A` in `constant B = A` was not resolved"
     );
 }
+
+/// The analysis that the server runs reaches every pass on a model that
+/// resolves includes, absolute names and template expansions: the model has no
+/// diagnostics, and the constants of an expansion are evaluated.
+#[test]
+fn analysis_resolves_includes_absolute_names_and_templates() {
+    let dir = fixture_dir("ws_analysis_smoke");
+    std::fs::write(dir.join("Defs.fppi"), "constant A = 1\n").unwrap();
+    std::fs::write(
+        dir.join("Body.fppi"),
+        "constant D = c + .M.B\narray Arr = [2] t\n",
+    )
+    .unwrap();
+    let text = "\
+module M {
+  include \"Defs.fppi\"
+  constant B = .M.A
+  module template T(constant c: U32, type t) {
+    include \"Body.fppi\"
+  }
+  module N {
+    expand .M.T(constant 2, type U8)
+  }
+}
+module M {
+  constant E = N.D + .M.N.D
+  array Arrs = [3] .M.N.Arr
+}
+";
+    let (state, _) = state_with_open_document(&dir, text);
+
+    assert_eq!(state.diagnostics.all(), Default::default());
+    let analysis = state.snapshot_analysis();
+    let m = analysis
+        .global_scope
+        .get(NameGroup::Value, "M")
+        .and_then(|m| analysis.symbol_scope_map.get(&m).cloned())
+        .expect("module `M` should have a scope");
+    let e = m
+        .get_group(NameGroup::Value)
+        .get("E")
+        .expect("constant `E` should be in module `M`'s scope");
+    assert_eq!(analysis.get_int_value(e.node()), Some(6));
+    assert!(
+        m.get_group(NameGroup::Type).get("Arrs").is_some(),
+        "array `Arrs` should be in module `M`'s scope"
+    );
+}
