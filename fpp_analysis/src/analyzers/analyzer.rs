@@ -28,8 +28,9 @@ impl<'ast, V: Visitor<'ast>> Analyzer<'ast, V> for DefaultAnalyzer {
     }
 }
 
-/// The state of the analysis that the analyzers keep: the symbols of the
-/// definitions, the implied uses, and the template expansion being analyzed
+/// Accessors of the analysis state that the analyzers and the passes built on
+/// them read and update: the symbols of the definitions, the nested scope, the
+/// implied uses, and the template expansion being analyzed
 pub trait NestedScopeState {
     /// Look up a symbol given a node defining the symbol
     fn get_symbol<N: AstNode>(&self, node: &N) -> Option<Symbol>;
