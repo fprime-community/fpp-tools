@@ -17,8 +17,9 @@ use rustc_hash::FxHashSet as HashSet;
 use std::ops::ControlFlow;
 use std::path::PathBuf;
 
-/// Parse, expand templates and check semantics, then hand the analysis and the
-/// expanded translation unit to `f`. Panics if any step produced a diagnostic.
+/// Resolve includes, expand templates, and check semantics, then hand the
+/// analysis and the expanded translation unit to `f`. Panics if any step
+/// produced a diagnostic.
 fn with_analysis<R>(src: &str, f: impl FnOnce(&Analysis, &TransUnit) -> R) -> R {
     let mut diagnostics = vec![];
     let mut ctx = fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
@@ -192,6 +193,10 @@ fn qualified_names(a: &Analysis) -> HashSet<String> {
         .map(|s| a.get_qualified_name(s))
         .collect()
 }
+
+// The content of an expansion: an expansion introduces the definitions of
+// the template body at the expansion site, once per expansion, and a use of
+// a parameter inside the body resolves to the bound parameter.
 
 const MODEL: &str = "\
 module template T(constant c: U32, type Ty) {
