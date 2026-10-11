@@ -2,23 +2,23 @@ use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::basic_use_analyzer::{UseAnalysisPass, visit_template_arg};
 use crate::analyzers::use_analyzer::UseAnalyzer;
-use crate::errors::SemanticError;
+use crate::errors::{SemanticError, SemanticResult};
 use crate::passes::FinalizeTypeDefs;
 use crate::semantics::{
     AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue, FloatValue,
-    IntegerValue, MathError, PrimitiveIntegerValue, QualifiedName, SerializedSizeError,
-    StringValue, StructValue, Symbol, SymbolInterface, Type, Value,
+    IntegerValue, QualifiedName, SerializedSizeError, StringValue, StructValue, Symbol,
+    SymbolInterface, Type, Value,
 };
 use fpp_ast::{
-    Binop, DefConstant, DefEnum, DefEnumConstant, Expr, ExprKind, Node, TransUnit, Unop, Visitable,
-    Visitor, Walkable,
+    Binop, DefConstant, DefEnum, DefEnumConstant, Expr, ExprKind, Ident, Node, StructExprMember,
+    TransUnit, TypeName, Visitable, Visitor,
 };
-use fpp_core::Spanned;
+use fpp_core::{Span, Spanned};
 use rustc_hash::FxHashMap as HashMap;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
-/// Compute the values of constant symbols and expressions
+/// Compute the values of constants symbols and expressions
 pub struct EvalConstantExprs<'ast> {
     super_: UseAnalyzer<'ast, Self>,
 }
@@ -63,7 +63,7 @@ impl<'ast> EvalConstantExprs<'ast> {
         };
 
         if let Some(value) = a.value_map.get(&symbol.node()).cloned() {
-            a.value_map.insert(node, value);
+            a.assign_value(node, value);
         }
 
         ControlFlow::Continue(())
@@ -121,6 +121,358 @@ impl<'ast> EvalConstantExprs<'ast> {
 
         ControlFlow::Continue(())
     }
+
+    fn expr_array_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        elts: &'ast [Expr],
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        let elt_type = match a.type_map[&node.node_id].deref() {
+            Type::AnonArray(anon_array) => anon_array.elt_type.clone(),
+            // A named array type here means the array expression is
+            // the argument bound to a constant template parameter,
+            // whose type is the one declared in the parameter
+            Type::Array(array) => array.anon_array.elt_type.clone(),
+            _ => panic!("element type of array expression should be AnonArray or Array"),
+        };
+        let mut values = Vec::with_capacity(elts.len());
+        for elt in elts {
+            // An element with no value failed to evaluate
+            match a
+                .value_map
+                .get(&elt.node_id)
+                .and_then(|v| v.convert(&elt_type))
+            {
+                Some(v) => values.push(v),
+                None => return ControlFlow::Continue(()),
+            }
+        }
+        a.assign_value(node.node_id, Value::AnonArray(AnonArrayValue::new(values)));
+        ControlFlow::Continue(())
+    }
+
+    fn expr_array_subscript_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e1: &'ast Expr,
+        e2: &'ast Expr,
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+
+        let anon_array = match a.value_map.get(&e1.node_id) {
+            Some(Value::AnonArray(anon_array))
+            | Some(Value::Array(ArrayValue { anon_array, .. })) => anon_array,
+            _ => return ControlFlow::Continue(()),
+        };
+
+        // The index is converted to Integer (spec, Array Subscript Expressions)
+        let index = match a
+            .value_map
+            .get(&e2.node_id)
+            .and_then(|v| v.convert(&Arc::new(Type::Integer)))
+        {
+            Some(Value::Integer(IntegerValue(index))) => index,
+            _ => return ControlFlow::Continue(()),
+        };
+
+        // Check if the index is in bounds
+        // If the size of the array is not yet known, then we can check only the
+        // lower bound here
+        if index < 0 {
+            SemanticError::InvalidIntValue {
+                loc: e2.span(),
+                v: Some(index),
+                msg: "value may not be negative".to_string(),
+            }
+            .emit();
+            return ControlFlow::Break(());
+        } else if anon_array.scalar.is_none() && index >= anon_array.elements.len() as i128 {
+            // Compare in i128: narrowing the index to usize first would
+            // accept any index congruent to an in-bounds one modulo the
+            // pointer width.
+            SemanticError::InvalidIntValue {
+                loc: e2.span(),
+                v: Some(index),
+                msg: format!(
+                    "index value is not in the range [0, {}]",
+                    anon_array.elements.len().saturating_sub(1)
+                ),
+            }
+            .emit();
+            return ControlFlow::Break(());
+        }
+
+        let v = match &anon_array.scalar {
+            Some(scalar) => scalar.deref().clone(),
+            None => anon_array.get(index as usize).expect("in bounds").clone(),
+        };
+        a.assign_value(node.node_id, v);
+        ControlFlow::Continue(())
+    }
+
+    fn expr_binop_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e1: &'ast Expr,
+        op: &Binop,
+        e2: &'ast Expr,
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        // An operand with no value failed to evaluate
+        if !a.value_map.contains_key(&e1.node_id) || !a.value_map.contains_key(&e2.node_id) {
+            return ControlFlow::Continue(());
+        }
+        let (id1, id2, loc) = (e1.node_id, e2.node_id, node.span());
+        let v = match op {
+            Binop::Add => a.add(id1, id2, loc),
+            Binop::Div => a.div(id1, id2, loc),
+            Binop::Mul => a.mul(id1, id2, loc),
+            Binop::Sub => a.sub(id1, id2, loc),
+            Binop::LShift => a.lshift(id1, id2, loc),
+            Binop::RShift => a.rshift(id1, id2, loc),
+        };
+        Self::assign_value_result(a, node, v)
+    }
+
+    fn expr_literal_bool_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        b: bool,
+    ) -> ControlFlow<()> {
+        let v = Value::Boolean(BooleanValue(b));
+        a.assign_value(node.node_id, v);
+        ControlFlow::Continue(())
+    }
+
+    fn expr_literal_float_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        value: &str,
+    ) -> ControlFlow<()> {
+        let value: f64 = match value.parse() {
+            Ok(value) => value,
+            Err(err) => {
+                SemanticError::InvalidIntValue {
+                    loc: node.span(),
+                    v: None,
+                    msg: format!("failed to parse floating value: {}", err),
+                }
+                .emit();
+                return ControlFlow::Break(());
+            }
+        };
+        let v = Value::Float(FloatValue {
+            value,
+            kind: fpp_ast::FloatKind::F64,
+        });
+        a.assign_value(node.node_id, v);
+        ControlFlow::Continue(())
+    }
+
+    /// Integer values are `i128`, so a literal that does not fit is an error
+    fn expr_literal_int_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        value: &str,
+    ) -> ControlFlow<()> {
+        let int_value = if value.starts_with("0x") || value.starts_with("0X") {
+            match i128::from_str_radix(&value[2..], 16) {
+                Ok(v) => v,
+                Err(err) => {
+                    SemanticError::InvalidIntValue {
+                        loc: node.span(),
+                        v: None,
+                        msg: format!("failed to parse hexadecimal integral value: {}", err),
+                    }
+                    .emit();
+                    return ControlFlow::Break(());
+                }
+            }
+        } else {
+            match value.parse() {
+                Ok(v) => v,
+                Err(err) => {
+                    SemanticError::InvalidIntValue {
+                        loc: node.span(),
+                        v: None,
+                        msg: format!("failed to parse integral value: {}", err),
+                    }
+                    .emit();
+                    return ControlFlow::Break(());
+                }
+            }
+        };
+        a.assign_value(node.node_id, Value::Integer(IntegerValue(int_value)));
+        ControlFlow::Continue(())
+    }
+
+    fn expr_literal_string_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        value: &str,
+    ) -> ControlFlow<()> {
+        let v = Value::String(StringValue(value.to_string()));
+        a.assign_value(node.node_id, v);
+        ControlFlow::Continue(())
+    }
+
+    fn expr_paren_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e: &'ast Expr,
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        if let Some(v) = a.value_map.get(&e.node_id).cloned() {
+            a.assign_value(node.node_id, v);
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn expr_size_of_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        type_name: &'ast TypeName,
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        // Finalize the type so we can compute the size
+        if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
+            self.finalize_if_needed(a, &ty)?;
+        }
+        // A `string size N` type name has no definition to evaluate,
+        // but its size still has to be resolved into the type.
+        FinalizeTypeDefs::new().ty(a, type_name)?;
+        if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
+            // Get the finalized type. For a type with a definition,
+            // the finalized type is mapped to the definition in the
+            // type map; otherwise the type is already the finalized
+            // type.
+            let finalized = match ty.def_node_id() {
+                Some(def_node) => a.type_map.get(&def_node).cloned().unwrap_or(ty),
+                None => ty,
+            };
+            // Use the finalized type to compute the size
+            match finalized.serialized_size(a) {
+                Ok(size) => {
+                    a.assign_value(node.node_id, Value::Integer(IntegerValue(size)));
+                }
+                // The size is unknown here; a type whose size is never
+                // knowable is reported by `CheckExprTypes`
+                Err(SerializedSizeError::Unavailable) => {}
+                Err(SerializedSizeError::TooLarge) => {
+                    SemanticError::InvalidIntValue {
+                        loc: node.span(),
+                        v: None,
+                        msg: "serialized size is too large to represent".to_string(),
+                    }
+                    .emit();
+                    return ControlFlow::Break(());
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn expr_struct_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        members: &'ast [StructExprMember],
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        let mut member_values = HashMap::default();
+        for member in members {
+            match a.value_map.get(&member.value.node_id) {
+                Some(v) => {
+                    member_values.insert(member.name.data.clone(), v.clone());
+                }
+                // A member with no value failed to evaluate
+                None => return ControlFlow::Continue(()),
+            }
+        }
+        let v = Value::AnonStruct(AnonStructValue {
+            members: member_values,
+        });
+        a.assign_value(node.node_id, v);
+        ControlFlow::Continue(())
+    }
+
+    fn expr_unop_node(&self, a: &mut Analysis, node: &'ast Expr, e: &'ast Expr) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        if !a.value_map.contains_key(&e.node_id) {
+            return ControlFlow::Continue(());
+        }
+        let v = a.neg(e.node_id, node.span());
+        Self::assign_value_result(a, node, v)
+    }
+
+    fn expr_dot_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e: &'ast Expr,
+        id: &'ast Ident,
+    ) -> ControlFlow<()> {
+        // Ensure that the parent selector has a type
+        self.super_visit(a, Node::Expr(node))?;
+
+        // Get the value of the selected member
+        if a.value_map.contains_key(&node.node_id) {
+            // If the entire dot expression was already resolved by
+            // a constant_use, the value will already be in this map
+            return ControlFlow::Continue(());
+        }
+        // The value is not already resolved, this is some sort of
+        // member selection.
+        let member_value = match a.value_map.get(&e.node_id) {
+            None => return ControlFlow::Continue(()),
+            Some(Value::AnonStruct(anon_struct))
+            | Some(Value::Struct(StructValue { anon_struct, .. })) => {
+                anon_struct.members.get(&id.data).cloned()
+            }
+            Some(v) => {
+                SemanticError::InvalidTypeForMemberSelection {
+                    member_name: id.data.clone(),
+                    loc: id.span(),
+                    type_name: v.get_type().to_string(),
+                }
+                .emit();
+                return ControlFlow::Break(());
+            }
+        };
+        if let Some(v) = member_value {
+            a.assign_value(node.node_id, v);
+        }
+        ControlFlow::Continue(())
+    }
+
+    /// Record the value of an expression, or report the error that computing
+    /// it raised
+    fn assign_value_result(
+        a: &mut Analysis,
+        node: &'ast Expr,
+        v: SemanticResult<Value>,
+    ) -> ControlFlow<()> {
+        match v {
+            Ok(v) => {
+                a.assign_value(node.node_id, v);
+                ControlFlow::Continue(())
+            }
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
+        }
+    }
 }
 
 impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
@@ -131,15 +483,19 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
         self.super_.visit(self, a, node)
     }
 
-    fn visit_trans_unit(
+    fn visit_trans_units(
         &self,
         a: &mut Self::State,
-        node: &'ast TransUnit,
+        i: impl Iterator<Item = &'ast TransUnit>,
     ) -> ControlFlow<Self::Break> {
-        // Reset the visited-symbol set so on-demand type finalization (for
-        // `sizeof`) can run; it is repopulated by `FinalizeTypeDefs` afterward.
+        // The visited symbol set records the type definitions that this pass
+        // finalizes on demand. CheckUseDefCycles leaves the symbols it visits
+        // in the set, so the pass starts with an empty set.
         a.visited_symbol_set.clear();
-        node.walk(a, self)
+        for tu in i {
+            self.visit_trans_unit(a, tu)?;
+        }
+        ControlFlow::Continue(())
     }
 
     fn visit_def_constant(
@@ -152,37 +508,43 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
         }
 
         self.super_visit(a, Node::DefConstant(node))?;
-        match a.value_map.get(&node.value.node_id) {
-            None => {}
-            Some(value) => {
-                a.value_map.insert(node.node_id, value.clone());
-            }
+        if let Some(v) = a.value_map.get(&node.value.node_id).cloned() {
+            a.assign_value(node.node_id, v);
         }
 
         ControlFlow::Continue(())
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        self.super_visit(a, Node::DefEnum(node))?;
-
-        // Check for duplicate values
-        let mut values: HashMap<i128, fpp_core::Span> = HashMap::default();
-        for constant in &node.constants {
-            if let Some(Value::EnumConstant(EnumConstantValue { value, .. })) =
-                a.value_map.get(&constant.node_id)
-                && let Some(old) = values.insert(value.1, constant.span())
-            {
-                SemanticError::DuplicateEnumValue {
-                    value: value.1.to_string(),
-                    loc: constant.span(),
-                    prev_loc: old,
+        fn check_for_duplicate_value(
+            a: &Analysis,
+            constants: &[DefEnumConstant],
+        ) -> SemanticResult {
+            let mut values: HashMap<i128, Span> = HashMap::default();
+            for constant in constants {
+                // A constant with no value failed to evaluate
+                if let Some(Value::EnumConstant(EnumConstantValue { value, .. })) =
+                    a.value_map.get(&constant.node_id)
+                    && let Some(prev_loc) = values.insert(value.1, constant.span())
+                {
+                    return Err(SemanticError::DuplicateEnumValue {
+                        value: value.1.to_string(),
+                        loc: constant.span(),
+                        prev_loc,
+                    });
                 }
-                .emit();
-                return ControlFlow::Break(());
             }
+            Ok(())
         }
 
-        ControlFlow::Continue(())
+        self.super_visit(a, Node::DefEnum(node))?;
+        match check_for_duplicate_value(a, &node.constants) {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
+        }
     }
 
     fn visit_def_enum_constant(
@@ -193,39 +555,34 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
         if a.value_map.contains_key(&node.node_id) {
             return ControlFlow::Continue(());
         }
+        // An implied enum constant with no value belongs to an enum whose
+        // constants are invalid, and that error is already reported
+        let Some(e) = &node.value else {
+            return ControlFlow::Continue(());
+        };
 
         self.super_visit(a, Node::DefEnumConstant(node))?;
-
-        fn apply_value(a: &mut Analysis, node: &DefEnumConstant) -> Option<()> {
-            let value_expr = node.value.as_ref()?;
-
-            let value = match a
-                .value_map
-                .get(&value_expr.node_id)?
-                .convert(&Arc::new(Type::Integer))?
-            {
-                Value::Integer(IntegerValue(value)) => value,
-                _ => panic!("expected integer value"),
-            };
-
-            let Type::Enum(ty) = a.type_map.get(&node.node_id)?.deref().clone() else {
-                return None;
-            };
-            a.value_map.insert(
-                node.node_id,
-                Value::EnumConstant(EnumConstantValue::new(node.name.data.clone(), value, ty)),
-            );
-
-            Some(())
-        }
-
-        let _ = apply_value(a, node);
+        // A value that does not convert to Integer does not have a numeric
+        // type, and that error is already reported
+        let int_value = match a
+            .value_map
+            .get(&e.node_id)
+            .and_then(|v| v.convert(&Arc::new(Type::Integer)))
+        {
+            Some(Value::Integer(IntegerValue(int_value))) => int_value,
+            _ => return ControlFlow::Continue(()),
+        };
+        let enum_type = match a.type_map.get(&node.node_id).map(|t| t.deref()) {
+            Some(Type::Enum(enum_type)) => enum_type.clone(),
+            _ => return ControlFlow::Continue(()),
+        };
+        let enum_value = EnumConstantValue::new(node.name.data.clone(), int_value, enum_type);
+        a.assign_value(node.node_id, Value::EnumConstant(enum_value));
         ControlFlow::Continue(())
     }
 
     fn visit_expr(&self, a: &mut Self::State, node: &'ast Expr) -> ControlFlow<Self::Break> {
-        // An expression that already has a value has been evaluated, so do not
-        // evaluate it again. Mirrors `EvalConstantExprs.exprNode`.
+        // If we've already visited the expression, don't analyze it again
         if a.value_map.contains_key(&node.node_id) {
             return ControlFlow::Continue(());
         }
@@ -235,353 +592,22 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
             return ControlFlow::Continue(());
         }
 
-        self.super_visit(a, Node::Expr(node))?;
-
         match &node.kind {
-            ExprKind::Array(e) => {
-                let elt_type = match a.type_map.get(&node.node_id) {
-                    None => return ControlFlow::Continue(()),
-                    Some(ty) => match ty.deref() {
-                        Type::AnonArray(arr) => arr.elt_type.clone(),
-                        // A named array type here means the array expression is
-                        // the argument bound to a constant template parameter,
-                        // whose type is the one declared in the parameter
-                        Type::Array(arr) => arr.anon_array.elt_type.clone(),
-                        _ => panic!("type of array expression should be AnonArray or Array"),
-                    },
-                };
-
-                let mut out = vec![];
-                for element in e {
-                    // Look up the value and convert it to the element type
-                    let val = match a.value_map.get(&element.node_id) {
-                        None => return ControlFlow::Continue(()),
-                        Some(val) => match val.convert(&elt_type) {
-                            None => return ControlFlow::Continue(()),
-                            Some(val) => val,
-                        },
-                    };
-
-                    out.push(val.clone())
-                }
-
-                a.value_map
-                    .insert(node.node_id, Value::AnonArray(AnonArrayValue::new(out)));
-            }
-            ExprKind::ArraySubscript { e1, e2 } => {
-                let anon_array = match a.value_map.get(&e1.node_id) {
-                    Some(Value::AnonArray(anon_array))
-                    | Some(Value::Array(ArrayValue { anon_array, .. })) => anon_array,
-                    _ => return ControlFlow::Continue(()),
-                };
-
-                let index = match a.value_map.get(&e2.node_id) {
-                    None => return ControlFlow::Continue(()),
-                    Some(Value::PrimitiveInteger(PrimitiveIntegerValue { value, .. })) => *value,
-                    Some(Value::Integer(IntegerValue(value))) => *value,
-                    _ => return ControlFlow::Continue(()),
-                };
-
-                // Check if the index is in bounds. If the size of the array is
-                // not yet known, then only the lower bound can be checked here;
-                // `FinalizeConstantExprs` checks the upper bound once it is.
-                if index < 0 {
-                    SemanticError::InvalidIntValue {
-                        loc: e2.span(),
-                        v: Some(index),
-                        msg: "value may not be negative".to_string(),
-                    }
-                    .emit();
-                    return ControlFlow::Break(());
-                } else if anon_array.scalar.is_none() && index >= anon_array.elements.len() as i128
-                {
-                    // Compare in i128: narrowing the index to usize first would
-                    // accept any index congruent to an in-bounds one modulo the
-                    // pointer width.
-                    SemanticError::InvalidIntValue {
-                        loc: e2.span(),
-                        v: Some(index),
-                        msg: format!(
-                            "index value is not in the range [0, {}]",
-                            anon_array.elements.len().saturating_sub(1)
-                        ),
-                    }
-                    .emit();
-                    return ControlFlow::Break(());
-                } else {
-                    let element = match &anon_array.scalar {
-                        Some(scalar) => scalar.deref().clone(),
-                        None => anon_array.get(index as usize).expect("in bounds").clone(),
-                    };
-                    a.value_map.insert(node.node_id, element);
-                }
-            }
-            ExprKind::Binop { left, right, op } => {
-                let left_val = match a.value_map.get(&left.node_id) {
-                    None => return ControlFlow::Continue(()),
-                    Some(v) => v,
-                };
-
-                let right_val = match a.value_map.get(&right.node_id) {
-                    None => return ControlFlow::Continue(()),
-                    Some(v) => v,
-                };
-
-                let val = match op {
-                    Binop::LShift | Binop::RShift => {
-                        // A shift checks its amount before applying the operator.
-                        // An operand whose type is an integer or enum type may
-                        // still hold a floating-point value: negating a value of
-                        // an alias of a floating-point type yields Integer.
-                        let mut shift = 0;
-                        for (operand, v) in [(left, left_val), (right, right_val)] {
-                            match v.as_shift_int() {
-                                Some(n) => shift = n,
-                                None => {
-                                    SemanticError::InvalidType {
-                                        loc: operand.span(),
-                                        msg: format!(
-                                            "{} is not an integer or enum type",
-                                            v.get_type()
-                                        ),
-                                        notes: vec![],
-                                    }
-                                    .emit();
-                                    return ControlFlow::Break(());
-                                }
-                            }
-                        }
-
-                        if !(0..=255).contains(&shift) {
-                            SemanticError::InvalidShiftAmount { loc: right.span() }.emit();
-                            return ControlFlow::Break(());
-                        }
-
-                        match op {
-                            Binop::LShift => left_val.shl(right_val),
-                            _ => left_val.shr(right_val),
-                        }
-                    }
-                    Binop::Add => left_val.add(right_val),
-                    Binop::Div => left_val.div(right_val),
-                    Binop::Mul => left_val.mul(right_val),
-                    Binop::Sub => left_val.sub(right_val),
-                };
-
-                match val {
-                    Ok(val) => {
-                        a.value_map.insert(node.node_id, val);
-                    }
-                    Err(MathError::DivByZero) => {
-                        SemanticError::DivisionByZero { loc: right.span() }.emit();
-                        return ControlFlow::Break(());
-                    }
-                    Err(MathError::ShiftOverflow) => {
-                        SemanticError::InvalidIntValue {
-                            loc: node.span(),
-                            v: None,
-                            msg: "shift result is too large to represent".to_string(),
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    }
-                    Err(MathError::Overflow) => {
-                        SemanticError::InvalidIntValue {
-                            loc: node.span(),
-                            v: None,
-                            msg: "arithmetic result is too large to represent".to_string(),
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    }
-                    // The operands are not numeric, which `CheckExprTypes` has
-                    // already reported and stopped on
-                    Err(MathError::InvalidInputs) => {}
-                }
-            }
-            ExprKind::Dot { e, id } => {
-                match a.value_map.get(&node.node_id) {
-                    None => {
-                        // The value is not in the map already
-                        // This must either be a member select of `e` or the entire
-                        // constant use is invalid
-
-                        let e_val = match a.value_map.get(&e.node_id) {
-                            None => return ControlFlow::Continue(()),
-                            Some(v) => v,
-                        };
-
-                        let member_val = match e_val {
-                            Value::Struct(StructValue { anon_struct, .. })
-                            | Value::AnonStruct(anon_struct) => {
-                                match anon_struct.members.get(&id.data) {
-                                    None => return ControlFlow::Continue(()),
-                                    Some(v) => v,
-                                }
-                            }
-                            _ => return ControlFlow::Continue(()),
-                        };
-
-                        a.value_map.insert(node.node_id, member_val.clone());
-                    }
-                    Some(_) => {
-                        // If the entire dot expression was already resolved by
-                        // a constant_use, the value will already be in this map
-                        // No further work is needed
-                    }
-                }
-            }
-            ExprKind::Ident { .. } => {}
-            ExprKind::LiteralBool(v) => {
-                a.value_map
-                    .insert(node.node_id, Value::Boolean(BooleanValue(*v)));
-            }
-            ExprKind::LiteralInt(v) => {
-                let vi: i128 = if v.starts_with("0x") || v.starts_with("0X") {
-                    // Hexadecimal integer literal
-                    match i128::from_str_radix(&v[2..], 16) {
-                        Ok(v) => v,
-                        Err(err) => {
-                            SemanticError::InvalidIntValue {
-                                loc: node.span(),
-                                v: None,
-                                msg: format!("failed to parse hexadecimal integral value: {}", err),
-                            }
-                            .emit();
-                            return ControlFlow::Break(());
-                        }
-                    }
-                } else {
-                    // Decimal integer literal
-                    match v.parse() {
-                        Ok(v) => v,
-                        Err(err) => {
-                            SemanticError::InvalidIntValue {
-                                loc: node.span(),
-                                v: None,
-                                msg: format!("failed to parse integral value: {}", err),
-                            }
-                            .emit();
-                            return ControlFlow::Break(());
-                        }
-                    }
-                };
-
-                a.value_map
-                    .insert(node.node_id, Value::Integer(IntegerValue(vi)));
-            }
-            ExprKind::LiteralFloat(v) => {
-                let vf: f64 = match v.parse() {
-                    Ok(v) => v,
-                    Err(err) => {
-                        SemanticError::InvalidIntValue {
-                            loc: node.span(),
-                            v: None,
-                            msg: format!("failed to parse floating value: {}", err),
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    }
-                };
-
-                a.value_map.insert(
-                    node.node_id,
-                    Value::Float(FloatValue {
-                        value: vf,
-                        kind: fpp_ast::FloatKind::F64,
-                    }),
-                );
-            }
-            ExprKind::LiteralString(v) => {
-                a.value_map
-                    .insert(node.node_id, Value::String(StringValue(v.clone())));
-            }
-            ExprKind::Paren(v) => match a.value_map.get(&v.node_id) {
-                None => {}
-                Some(v) => {
-                    a.value_map.insert(node.node_id, v.clone());
-                }
-            },
-            ExprKind::SizeOf(type_name) => {
-                // Evaluate and finalize the referenced type definition on demand
-                if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
-                    self.finalize_if_needed(a, &ty)?;
-                }
-                // A `string size N` type name has no definition to evaluate,
-                // but its size still has to be resolved into the type.
-                FinalizeTypeDefs::new().ty(a, type_name)?;
-                if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
-                    // Get the finalized type. For a type with a definition,
-                    // the finalized type is mapped to the definition in the
-                    // type map; otherwise the type is already the finalized
-                    // type.
-                    let finalized = match ty.def_node_id() {
-                        Some(def_node) => a.type_map.get(&def_node).cloned().unwrap_or(ty),
-                        None => ty,
-                    };
-                    // Use the finalized type to compute the size
-                    match finalized.serialized_size(a) {
-                        Ok(size) => {
-                            a.value_map
-                                .insert(node.node_id, Value::Integer(IntegerValue(size)));
-                        }
-                        // The size is unknown here; a type whose size is never
-                        // knowable is reported by `CheckExprTypes`
-                        Err(SerializedSizeError::Unavailable) => {}
-                        Err(SerializedSizeError::TooLarge) => {
-                            SemanticError::InvalidIntValue {
-                                loc: node.span(),
-                                v: None,
-                                msg: "serialized size is too large to represent".to_string(),
-                            }
-                            .emit();
-                            return ControlFlow::Break(());
-                        }
-                    }
-                }
-            }
-            ExprKind::Struct(struct_expr) => {
-                a.value_map.insert(
-                    node.node_id,
-                    Value::AnonStruct(AnonStructValue {
-                        members: HashMap::from_iter(struct_expr.iter().filter_map(|member| {
-                            Some((
-                                member.name.data.clone(),
-                                a.value_map.get(&member.value.node_id)?.clone(),
-                            ))
-                        })),
-                    }),
-                );
-            }
-            ExprKind::Unop { op, e } => {
-                // Negation preserves the operand's kind
-                if let (Unop::Minus, Some(v)) = (op, a.value_map.get(&e.node_id)) {
-                    match v.negate() {
-                        Ok(v) => {
-                            a.value_map.insert(node.node_id, v);
-                        }
-                        Err(MathError::InvalidInputs) => {}
-                        Err(MathError::Overflow) => {
-                            SemanticError::InvalidIntValue {
-                                loc: node.span(),
-                                v: None,
-                                msg: "arithmetic result is too large to represent".to_string(),
-                            }
-                            .emit();
-                            return ControlFlow::Break(());
-                        }
-                        Err(MathError::DivByZero) => {
-                            panic!("unexpected div by zero")
-                        }
-                        Err(MathError::ShiftOverflow) => {
-                            panic!("unexpected shift overflow")
-                        }
-                    }
-                }
-            }
+            ExprKind::Array(elts) => self.expr_array_node(a, node, elts),
+            ExprKind::ArraySubscript { e1, e2 } => self.expr_array_subscript_node(a, node, e1, e2),
+            ExprKind::Binop { left, op, right } => self.expr_binop_node(a, node, left, op, right),
+            ExprKind::Dot { e, id } => self.expr_dot_node(a, node, e, id),
+            // An identifier is a constant use, evaluated by constant_use
+            ExprKind::Ident { .. } => self.super_visit(a, Node::Expr(node)),
+            ExprKind::LiteralBool(b) => self.expr_literal_bool_node(a, node, *b),
+            ExprKind::LiteralFloat(value) => self.expr_literal_float_node(a, node, value),
+            ExprKind::LiteralInt(value) => self.expr_literal_int_node(a, node, value),
+            ExprKind::LiteralString(value) => self.expr_literal_string_node(a, node, value),
+            ExprKind::Paren(e) => self.expr_paren_node(a, node, e),
+            ExprKind::SizeOf(type_name) => self.expr_size_of_node(a, node, type_name),
+            ExprKind::Struct(members) => self.expr_struct_node(a, node, members),
+            ExprKind::Unop { e, .. } => self.expr_unop_node(a, node, e),
         }
-
-        ControlFlow::Continue(())
     }
 }
 
@@ -622,12 +648,8 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for EvalConstantExprs<'ast> {
         if let Some(ty) = a.type_map.get(&param_def.type_name.node_id).cloned() {
             self.finalize_if_needed(a, &ty)?;
         }
+        let ty = FinalizeTypeDefs::new().ty(a, &param_def.type_name)?;
 
-        // Read the type back through its definition: the type-name use node
-        // still holds the type as it was before finalization
-        let Some(ty) = a.get_finalized_type(param_def.type_name.node_id) else {
-            return ControlFlow::Continue(());
-        };
         let Some(v) = a.value_map.get(&value.node_id).cloned() else {
             return ControlFlow::Continue(());
         };

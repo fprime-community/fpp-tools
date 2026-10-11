@@ -101,6 +101,11 @@ fn constant_param_array_promote_bad_subscript() {
 }
 
 #[test]
+fn constant_param_string_size_order() {
+    run_test("template/constant_param_string_size_order")
+}
+
+#[test]
 fn constant_with_default() {
     run_test("template/constant_with_default")
 }

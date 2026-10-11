@@ -41,6 +41,16 @@ fn array_index_out_of_bounds() {
 }
 
 #[test]
+fn array_index_enum_ok() {
+    run_test("constant/array_index_enum_ok")
+}
+
+#[test]
+fn array_index_float_ok() {
+    run_test("constant/array_index_float_ok")
+}
+
+#[test]
 fn array_common_type_conversion() {
     run_test("constant/array_common_type_conversion")
 }

@@ -5,7 +5,7 @@ use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::SemanticError;
 use crate::semantics::{
     AnonArrayType, AnonArrayValue, AnonStructType, AnonStructValue, ArrayValue, IntegerValue,
-    PrimitiveIntegerValue, QualifiedName, StructValue, Symbol, SymbolInterface, Type, Value,
+    QualifiedName, StructValue, Symbol, SymbolInterface, Type, Value,
 };
 use fpp_ast::{DefConstant, Expr, ExprKind, Node, Visitable, Visitor};
 use fpp_core::Spanned;
@@ -33,6 +33,46 @@ impl<'ast> FinalizeConstantExprs<'ast> {
         Self {
             super_: UseAnalyzer::new(),
         }
+    }
+
+    /// Recompute the type and value of a use of a constant symbol
+    fn constant_use_node(&self, a: &mut Analysis, node: fpp_core::Node) -> ControlFlow<()> {
+        let Some(symbol) = a.use_def_map.get(&node).cloned() else {
+            return ControlFlow::Continue(());
+        };
+        match &symbol {
+            // Constant symbol: visit the constant definition to recompute its
+            // type and value
+            Symbol::Constant(def) => {
+                def.visit(a, self)?;
+            }
+            // Enum symbol: if this is in scope, then we are in the enum
+            // definition, so it already has a type and value
+            Symbol::EnumConstant(_) => {}
+            Symbol::TemplateConstantArg { .. } => {
+                self.template_constant_arg(a, &symbol)?;
+            }
+            // Invalid use of a symbol in an expression
+            _ => {
+                SemanticError::InvalidSymbol {
+                    symbol_name: symbol.name().data.clone(),
+                    msg: "not a constant symbol".to_string(),
+                    loc: node.span(),
+                    def_loc: symbol.node().span(),
+                }
+                .emit();
+                return ControlFlow::Break(());
+            }
+        }
+
+        let id = symbol.node();
+        if let Some(ty) = a.type_map.get(&id).cloned() {
+            a.assign_type(node, ty);
+        }
+        if let Some(v) = a.value_map.get(&id).cloned() {
+            a.assign_value(node, v);
+        }
+        ControlFlow::Continue(())
     }
 
     /// Recompute the type and value of an array expression
@@ -109,9 +149,13 @@ impl<'ast> FinalizeConstantExprs<'ast> {
             _ => return ControlFlow::Continue(()),
         };
 
-        let index = match a.value_map.get(&e2.node_id) {
-            Some(Value::PrimitiveInteger(PrimitiveIntegerValue { value, .. })) => *value,
-            Some(Value::Integer(IntegerValue(value))) => *value,
+        // The index is converted to Integer (spec, Array Subscript Expressions)
+        let index = match a
+            .value_map
+            .get(&e2.node_id)
+            .and_then(|v| v.convert(&Arc::new(Type::Integer)))
+        {
+            Some(Value::Integer(IntegerValue(index))) => index,
             _ => return ControlFlow::Continue(()),
         };
 
@@ -272,32 +316,16 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for FinalizeConstantExprs<'ast> {
         node: &'ast Expr,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        let Some(symbol) = a.use_def_map.get(&node.node_id).cloned() else {
-            return ControlFlow::Continue(());
-        };
-        match &symbol {
-            // Constant symbol: visit the constant definition to recompute its
-            // type and value
-            Symbol::Constant(def) => {
-                def.visit(a, self)?;
-            }
-            // Enum symbol: if this is in scope, then we are in the enum
-            // definition, so it already has a type and value
-            Symbol::EnumConstant(_) => {}
-            Symbol::TemplateConstantArg { .. } => {
-                self.template_constant_arg(a, &symbol)?;
-            }
-            _ => return ControlFlow::Continue(()),
-        }
+        self.constant_use_node(a, node.node_id)
+    }
 
-        let id = symbol.node();
-        if let Some(ty) = a.type_map.get(&id).cloned() {
-            a.assign_type(node.node_id, ty);
-        }
-        if let Some(v) = a.value_map.get(&id).cloned() {
-            a.assign_value(node.node_id, v);
-        }
-        ControlFlow::Continue(())
+    fn implied_constant_use(
+        &self,
+        a: &mut Analysis,
+        node: &Expr,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.constant_use_node(a, node.node_id)
     }
 
     fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
@@ -310,7 +338,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for FinalizeConstantExprs<'ast> {
 
         visit_template_arg(self, a, arg)?;
 
-        let Some(ty) = a.get_finalized_type(param_def.type_name.node_id) else {
+        let Some(ty) = a.type_map.get(&param_def.type_name.node_id).cloned() else {
             return ControlFlow::Continue(());
         };
         let Some(v) = a.value_map.get(&value.node_id).cloned() else {
