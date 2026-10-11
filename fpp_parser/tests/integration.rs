@@ -64,6 +64,11 @@ fn comments() {
 }
 
 #[test]
+fn crlf() {
+    run_test("crlf")
+}
+
+#[test]
 fn cycle_1() {
     run_test("cycle-1")
 }
@@ -131,6 +136,11 @@ fn include_subdir() {
 #[test]
 fn include_topology() {
     run_test("include-topology")
+}
+
+#[test]
+fn numeric_shift() {
+    run_test("numeric-shift")
 }
 
 #[test]

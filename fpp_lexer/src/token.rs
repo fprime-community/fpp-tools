@@ -120,9 +120,150 @@ pub enum KeywordKind {
     Yellow,
 }
 
+/// The keywords, sorted by spelling
+pub(crate) const KEYWORDS: [(&str, KeywordKind); 118] = [
+    ("F32", KeywordKind::F32),
+    ("F64", KeywordKind::F64),
+    ("I16", KeywordKind::I16),
+    ("I32", KeywordKind::I32),
+    ("I64", KeywordKind::I64),
+    ("I8", KeywordKind::I8),
+    ("U16", KeywordKind::U16),
+    ("U32", KeywordKind::U32),
+    ("U64", KeywordKind::U64),
+    ("U8", KeywordKind::U8),
+    ("action", KeywordKind::Action),
+    ("active", KeywordKind::Active),
+    ("activity", KeywordKind::Activity),
+    ("always", KeywordKind::Always),
+    ("array", KeywordKind::Array),
+    ("assert", KeywordKind::Assert),
+    ("async", KeywordKind::Async),
+    ("at", KeywordKind::At),
+    ("base", KeywordKind::Base),
+    ("block", KeywordKind::Block),
+    ("bool", KeywordKind::Bool),
+    ("change", KeywordKind::Change),
+    ("choice", KeywordKind::Choice),
+    ("command", KeywordKind::Command),
+    ("component", KeywordKind::Component),
+    ("connections", KeywordKind::Connections),
+    ("constant", KeywordKind::Constant),
+    ("container", KeywordKind::Container),
+    ("cpu", KeywordKind::Cpu),
+    ("default", KeywordKind::Default),
+    ("deployment", KeywordKind::Deployment),
+    ("diagnostic", KeywordKind::Diagnostic),
+    ("dictionary", KeywordKind::Dictionary),
+    ("do", KeywordKind::Do),
+    ("drop", KeywordKind::Drop),
+    ("else", KeywordKind::Else),
+    ("enter", KeywordKind::Enter),
+    ("entry", KeywordKind::Entry),
+    ("enum", KeywordKind::Enum),
+    ("event", KeywordKind::Event),
+    ("every", KeywordKind::Every),
+    ("exit", KeywordKind::Exit),
+    ("expand", KeywordKind::Expand),
+    ("external", KeywordKind::External),
+    ("false", KeywordKind::False),
+    ("fatal", KeywordKind::Fatal),
+    ("format", KeywordKind::Format),
+    ("get", KeywordKind::Get),
+    ("group", KeywordKind::Group),
+    ("guard", KeywordKind::Guard),
+    ("guarded", KeywordKind::Guarded),
+    ("health", KeywordKind::Health),
+    ("high", KeywordKind::High),
+    ("hook", KeywordKind::Hook),
+    ("id", KeywordKind::Id),
+    ("if", KeywordKind::If),
+    ("implements", KeywordKind::Implements),
+    ("import", KeywordKind::Import),
+    ("include", KeywordKind::Include),
+    ("initial", KeywordKind::Initial),
+    ("input", KeywordKind::Input),
+    ("instance", KeywordKind::Instance),
+    ("interface", KeywordKind::Interface),
+    ("internal", KeywordKind::Internal),
+    ("locate", KeywordKind::Locate),
+    ("low", KeywordKind::Low),
+    ("machine", KeywordKind::Machine),
+    ("match", KeywordKind::Match),
+    ("module", KeywordKind::Module),
+    ("omit", KeywordKind::Omit),
+    ("on", KeywordKind::On),
+    ("opcode", KeywordKind::Opcode),
+    ("orange", KeywordKind::Orange),
+    ("output", KeywordKind::Output),
+    ("packet", KeywordKind::Packet),
+    ("packets", KeywordKind::Packets),
+    ("param", KeywordKind::Param),
+    ("passive", KeywordKind::Passive),
+    ("phase", KeywordKind::Phase),
+    ("port", KeywordKind::Port),
+    ("priority", KeywordKind::Priority),
+    ("product", KeywordKind::Product),
+    ("queue", KeywordKind::Queue),
+    ("queued", KeywordKind::Queued),
+    ("record", KeywordKind::Record),
+    ("recv", KeywordKind::Recv),
+    ("red", KeywordKind::Red),
+    ("ref", KeywordKind::Ref),
+    ("reg", KeywordKind::Reg),
+    ("request", KeywordKind::Request),
+    ("resp", KeywordKind::Resp),
+    ("save", KeywordKind::Save),
+    ("send", KeywordKind::Send),
+    ("serial", KeywordKind::Serial),
+    ("set", KeywordKind::Set),
+    ("severity", KeywordKind::Severity),
+    ("signal", KeywordKind::Signal),
+    ("size", KeywordKind::Size),
+    ("sizeof", KeywordKind::Sizeof),
+    ("stack", KeywordKind::Stack),
+    ("state", KeywordKind::State),
+    ("string", KeywordKind::String_),
+    ("struct", KeywordKind::Struct),
+    ("sync", KeywordKind::Sync),
+    ("system", KeywordKind::System),
+    ("telemetry", KeywordKind::Telemetry),
+    ("template", KeywordKind::Template),
+    ("text", KeywordKind::Text),
+    ("throttle", KeywordKind::Throttle),
+    ("time", KeywordKind::Time),
+    ("topology", KeywordKind::Topology),
+    ("true", KeywordKind::True),
+    ("type", KeywordKind::Type),
+    ("unmatched", KeywordKind::Unmatched),
+    ("update", KeywordKind::Update),
+    ("warning", KeywordKind::Warning),
+    ("with", KeywordKind::With),
+    ("yellow", KeywordKind::Yellow),
+];
+
+impl KeywordKind {
+    /// The source spelling of the keyword
+    pub fn as_str(&self) -> &'static str {
+        KEYWORDS
+            .iter()
+            .find(|(_, kind)| kind == self)
+            .map(|(text, _)| *text)
+            .expect("every keyword is in the keyword table")
+    }
+
+    /// The keyword spelled `text`, if there is one
+    pub fn get(text: &str) -> Option<KeywordKind> {
+        KEYWORDS
+            .binary_search_by_key(&text, |(text, _)| text)
+            .ok()
+            .map(|i| KEYWORDS[i].1)
+    }
+}
+
 impl std::fmt::Display for KeywordKind {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "{}", format!("{:?}", self).to_lowercase())
+        formatter.write_str(self.as_str())
     }
 }
 
@@ -176,7 +317,7 @@ pub enum TokenKind {
 impl std::fmt::Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            TokenKind::EOF => "eof",
+            TokenKind::EOF => "end of input",
             TokenKind::Whitespace => "<whitespace>",
             TokenKind::Unknown => "<unknown>",
             TokenKind::Comment => "comment",

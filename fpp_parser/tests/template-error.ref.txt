@@ -12,7 +12,7 @@
   |          ^^^ syntax error: template argument expected
   |
   = note: expected one of constant, type, instance
-  = note: got u32
+  = note: got U32
 
  --> [ local path prefix ]/template-error.fpp:4:22
   |
@@ -30,10 +30,10 @@
   = note: expected one of [, {, (, identifier, ., true, false, sizeof, literal float, literal integer, literal string
   = note: got )
 
-  --> [ local path prefix ]/template-error.fpp:10:1
+  --> [ local path prefix ]/template-error.fpp:10:7
    |
 10 | expand
-   | ^^^^^^ syntax error: unexpected token
+   |       ^ syntax error: unexpected token
    |
    = note: expected identifier
    = note: got end of line
@@ -46,26 +46,26 @@
    = note: expected one of constant, type, instance
    = note: got identifier
 
-  --> [ local path prefix ]/template-error.fpp:16:29
+  --> [ local path prefix ]/template-error.fpp:16:30
    |
 16 | module template T2(constant c) {}
-   |                             ^ syntax error: unexpected token
+   |                              ^ syntax error: unexpected token
    |
    = note: expected :
    = note: got )
 
-  --> [ local path prefix ]/template-error.fpp:19:29
+  --> [ local path prefix ]/template-error.fpp:19:30
    |
 19 | module template T3(instance i) {}
-   |                             ^ syntax error: unexpected token
+   |                              ^ syntax error: unexpected token
    |
    = note: expected :
    = note: got )
 
-  --> [ local path prefix ]/template-error.fpp:22:25
+  --> [ local path prefix ]/template-error.fpp:22:27
    |
 22 | module template T4(type Ty: U32) {}
-   |                         ^^ syntax error: unexpected token
+   |                           ^ syntax error: unexpected token
    |
    = note: expected ,
    = note: got :

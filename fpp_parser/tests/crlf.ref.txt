@@ -1,0 +1,112 @@
+TransUnit(
+    [
+        DefModule {
+            name: Name {
+                data: "M",
+                node_id: Span {
+                    start: [ local path prefix ]/crlf.fpp:2:8,
+                    end: [ local path prefix ]/crlf.fpp:2:9,
+                },
+            },
+            members: [
+                DefConstant {
+                    name: Name {
+                        data: "a",
+                        node_id: Span {
+                            start: [ local path prefix ]/crlf.fpp:5:12,
+                            end: [ local path prefix ]/crlf.fpp:5:13,
+                        },
+                    },
+                    value: Expr {
+                        kind: Binop {
+                            left: Expr {
+                                kind: LiteralInt(
+                                    "1",
+                                ),
+                                node_id: Span {
+                                    start: [ local path prefix ]/crlf.fpp:5:16,
+                                    end: [ local path prefix ]/crlf.fpp:5:17,
+                                },
+                            },
+                            op: Add,
+                            right: Expr {
+                                kind: LiteralInt(
+                                    "2",
+                                ),
+                                node_id: Span {
+                                    start: [ local path prefix ]/crlf.fpp:6:7,
+                                    end: [ local path prefix ]/crlf.fpp:6:8,
+                                },
+                            },
+                        },
+                        node_id: Span {
+                            start: [ local path prefix ]/crlf.fpp:5:16,
+                            end: [ local path prefix ]/crlf.fpp:6:8,
+                        },
+                    },
+                    is_dictionary_def: false,
+                    node_id: Span {
+                        start: [ local path prefix ]/crlf.fpp:5:3,
+                        end: [ local path prefix ]/crlf.fpp:6:8,
+                    },
+                    post_annotation: [
+                        "Post",
+                    ],
+                },
+                DefConstant {
+                    name: Name {
+                        data: "s",
+                        node_id: Span {
+                            start: [ local path prefix ]/crlf.fpp:8:12,
+                            end: [ local path prefix ]/crlf.fpp:8:13,
+                        },
+                    },
+                    value: Expr {
+                        kind: LiteralString(
+                            "line 1\n  line 2\n",
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/crlf.fpp:8:16,
+                            end: [ local path prefix ]/crlf.fpp:11:8,
+                        },
+                    },
+                    is_dictionary_def: false,
+                    node_id: Span {
+                        start: [ local path prefix ]/crlf.fpp:8:3,
+                        end: [ local path prefix ]/crlf.fpp:11:8,
+                    },
+                },
+                DefConstant {
+                    name: Name {
+                        data: "t",
+                        node_id: Span {
+                            start: [ local path prefix ]/crlf.fpp:13:12,
+                            end: [ local path prefix ]/crlf.fpp:13:13,
+                        },
+                    },
+                    value: Expr {
+                        kind: LiteralString(
+                            "x\"y",
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/crlf.fpp:13:16,
+                            end: [ local path prefix ]/crlf.fpp:13:22,
+                        },
+                    },
+                    is_dictionary_def: false,
+                    node_id: Span {
+                        start: [ local path prefix ]/crlf.fpp:13:3,
+                        end: [ local path prefix ]/crlf.fpp:13:22,
+                    },
+                },
+            ],
+            node_id: Span {
+                start: [ local path prefix ]/crlf.fpp:2:1,
+                end: [ local path prefix ]/crlf.fpp:15:2,
+            },
+            pre_annotation: [
+                "A module",
+            ],
+        },
+    ],
+)

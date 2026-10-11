@@ -2837,6 +2837,8 @@ impl<'a> Parser<'a> {
         })
     }
 
+    /// Parse a string literal. Its `inner_span` covers the source text between
+    /// the quotes, before any escape or indent is removed from it.
     fn lit_string(&mut self) -> ParseResult<LitString> {
         let (tok, inner_span) = match self.peek(0) {
             LiteralString => {
@@ -2844,7 +2846,7 @@ impl<'a> Parser<'a> {
                 let inner_span = fpp_core::Span::new(
                     token.span.file(),
                     token.span.start().pos() + 1,
-                    token.text().len() as BytePos,
+                    (token.span.len() as BytePos).saturating_sub(2),
                     token.span.including_span(),
                 );
 
@@ -2855,7 +2857,7 @@ impl<'a> Parser<'a> {
                 let inner_span = fpp_core::Span::new(
                     token.span.file(),
                     token.span.start().pos() + 3,
-                    token.text().len() as BytePos,
+                    (token.span.len() as BytePos).saturating_sub(6),
                     token.span.including_span(),
                 );
 

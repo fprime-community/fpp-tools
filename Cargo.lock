@@ -441,7 +441,6 @@ dependencies = [
 name = "fpp_lexer"
 version = "0.0.0"
 dependencies = [
- "memchr",
  "pretty_assertions",
  "unicode-ident",
 ]
