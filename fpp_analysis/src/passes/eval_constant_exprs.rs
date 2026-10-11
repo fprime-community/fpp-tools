@@ -109,8 +109,7 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
         i: impl Iterator<Item = &'ast TransUnit>,
     ) -> ControlFlow<Self::Break> {
         // The visited symbol set records the type definitions that this pass
-        // finalizes on demand. CheckUseDefCycles leaves the symbols it visits
-        // in the set, so the pass starts with an empty set.
+        // finalizes on demand, so the pass starts with an empty set
         a.visited_symbol_set.clear();
         for tu in i {
             self.visit_trans_unit(a, tu)?;
@@ -426,7 +425,7 @@ impl<'ast> EvalConstantExprs<'ast> {
         node: &'ast Expr,
         value: &str,
     ) -> ControlFlow<()> {
-        let int_value = if value.starts_with("0x") || value.starts_with("0X") {
+        let int_value = if value.starts_with("0x") {
             match i128::from_str_radix(&value[2..], 16) {
                 Ok(v) => v,
                 Err(err) => {

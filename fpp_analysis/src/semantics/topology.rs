@@ -207,7 +207,7 @@ impl Topology {
     ) -> SemanticResult {
         match self.pattern_map.get(kind) {
             Some(prev_pattern) => Err(SemanticError::DuplicatePattern {
-                kind: pattern_kind_str(kind),
+                kind: kind.to_string(),
                 loc: pattern.get_loc(),
                 prev_loc: prev_pattern.get_loc(),
             }),
@@ -429,20 +429,6 @@ impl Topology {
         pairs.sort_by(|(_, a), (_, b)| a.cmp(b));
         pairs.into_iter().map(|(c, _)| c).collect()
     }
-}
-
-/// The name of a connection pattern kind, as written in FPP
-pub fn pattern_kind_str(kind: &ConnectionPatternKind) -> String {
-    match kind {
-        ConnectionPatternKind::Command => "command",
-        ConnectionPatternKind::Event => "event",
-        ConnectionPatternKind::Health => "health",
-        ConnectionPatternKind::Param => "param",
-        ConnectionPatternKind::Telemetry => "telemetry",
-        ConnectionPatternKind::TextEvent => "text event",
-        ConnectionPatternKind::Time => "time",
-    }
-    .to_string()
 }
 
 #[cfg(test)]
