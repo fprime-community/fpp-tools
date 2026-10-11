@@ -1,6 +1,11 @@
 use crate::run_test;
 
 #[test]
+fn alias_array_param_ok() {
+    run_test("template/alias_array_param_ok")
+}
+
+#[test]
 fn alias_param_arith_ok() {
     run_test("template/alias_param_arith_ok")
 }

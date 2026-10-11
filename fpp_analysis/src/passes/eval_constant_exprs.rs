@@ -281,11 +281,12 @@ impl<'ast> EvalConstantExprs<'ast> {
         elts: &'ast [Expr],
     ) -> ControlFlow<()> {
         self.super_visit(a, Node::Expr(node))?;
-        let elt_type = match a.type_map[&node.node_id].deref() {
+        let elt_type = match Type::underlying_type(&a.type_map[&node.node_id]).deref() {
             Type::AnonArray(anon_array) => anon_array.elt_type.clone(),
             // A named array type here means the array expression is
             // the argument bound to a constant template parameter,
-            // whose type is the one declared in the parameter
+            // whose type is the one declared in the parameter, possibly
+            // through an alias type
             Type::Array(array) => array.anon_array.elt_type.clone(),
             _ => panic!("element type of array expression should be AnonArray or Array"),
         };
