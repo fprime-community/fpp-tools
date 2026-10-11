@@ -834,7 +834,6 @@ fn missing_include_input() {
 }
 
 #[test]
-#[ignore = "needs the include specifiers in state machines to be resolved"]
 fn include_in_state_machine() {
     run_test(
         "-i include_in_state_machine_output.out.txt",
@@ -844,7 +843,6 @@ fn include_in_state_machine() {
 }
 
 #[test]
-#[ignore = "needs include paths resolved without resolving symbolic links"]
 fn symlink_include() {
     let link = Path::new(env!("CARGO_TARGET_TMPDIR")).join("fpp_depend_link");
     let _ = fs::remove_file(&link);

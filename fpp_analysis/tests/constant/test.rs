@@ -101,7 +101,6 @@ fn absolute_undef() {
 }
 
 #[test]
-#[ignore = "needs dictionary definitions in state machines to parse"]
 fn dictionary_state_machine_ok() {
     run_test("constant/dictionary_state_machine_ok")
 }

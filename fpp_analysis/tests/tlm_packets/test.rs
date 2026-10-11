@@ -213,6 +213,14 @@ fn shadowed_instance_error() {
     )
 }
 
+#[test]
+fn shadowed_instance_ok() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/shadowed_instance_ok",
+    )
+}
+
 // Rust-only: the order in which the channels of a packet set are checked
 #[test]
 fn channel_order_instances() {
@@ -220,7 +228,6 @@ fn channel_order_instances() {
 }
 
 #[test]
-#[ignore = "needs Component::tlm_channel_map in declaration order"]
 fn channel_order_ids() {
     run_test("tlm_packets/channel_order_ids")
 }

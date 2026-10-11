@@ -46,24 +46,10 @@ fn error() {
 #[test]
 fn ok() {
     for file in input_files("ok") {
-        // ok_literals checks literals.fpp
-        if file.file_name().unwrap() == "literals.fpp" {
-            continue;
-        }
         let text = fs::read_to_string(&file).unwrap();
         let errors = lexer_errors(&text);
         assert!(errors.is_empty(), "{}: {:?}", file.display(), errors);
     }
-}
-
-#[test]
-#[ignore = "fpp_lexer rejects signed exponents such as 123e-10"]
-fn ok_literals() {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("tests/lexer/ok/literals.fpp");
-    let text = fs::read_to_string(&path).unwrap();
-    let errors = lexer_errors(&text);
-    assert!(errors.is_empty(), "{:?}", errors);
 }
 
 /// Each malformed input is rejected with an `invalid token` error.
