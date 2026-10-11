@@ -74,3 +74,18 @@ fn invalid_constants() {
 fn dictionary_ok() {
     run_test("enums/dictionary_ok")
 }
+
+#[test]
+fn default_shadowed_error() {
+    run_test("enums/default_shadowed_error")
+}
+
+#[test]
+fn default_shadowed_ok() {
+    run_test("enums/default_shadowed_ok")
+}
+
+#[test]
+fn rep_type_string_size_scope() {
+    run_test("enums/rep_type_string_size_scope")
+}

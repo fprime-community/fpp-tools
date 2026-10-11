@@ -1,25 +1,20 @@
  --> [ local path prefix ]/cycles/interface.fpp:1:1
   |
 1 | interface A { import B }
-  | ^^^^^^^^^^^^^^^^^^^^^^^^ encountered symbol use-definition cycle
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ encountered a use-def cycle
   |
- ::: [ local path prefix ]/cycles/interface.fpp:2:11
+ ::: [ local path prefix ]/cycles/interface.fpp:1:22
   |
-2 | interface B { import C }
-  |           - defined here
+1 | interface A { import B }
+  |                      - use B refers to definition B
   |
  ::: [ local path prefix ]/cycles/interface.fpp:2:22
   |
 2 | interface B { import C }
-  |                      - used here
-  |
- ::: [ local path prefix ]/cycles/interface.fpp:3:11
-  |
-3 | interface C { import A }
-  |           - defined here
+  |                      - use C refers to definition C
   |
  ::: [ local path prefix ]/cycles/interface.fpp:3:22
   |
 3 | interface C { import A }
-  |                      - used here
+  |                      - use A refers to definition A
 

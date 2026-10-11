@@ -1,4 +1,5 @@
 use crate::Analysis;
+use crate::errors::{SemanticResult, annotate_emitted_errors, annotate_result};
 use crate::semantics::QualifiedName;
 use fpp_core::Spanned;
 
@@ -147,7 +148,11 @@ impl ImpliedUse {
         fpp_core::Node::new(id.span())
     }
 
-    fn as_expr_impl(&self, pred: fn(fpp_core::Node) -> fpp_core::Node) -> fpp_ast::Expr {
+    fn as_expr_impl(
+        &self,
+        pred: fn(fpp_core::Node) -> fpp_core::Node,
+        is_absolute: bool,
+    ) -> fpp_ast::Expr {
         let mut tail = self.name.to_ident_list();
         let head = tail.pop_front().unwrap();
         tail.into_iter().fold(
@@ -155,7 +160,7 @@ impl ImpliedUse {
                 node_id: pred(self.id),
                 kind: fpp_ast::ExprKind::Ident {
                     value: head,
-                    is_absolute: false,
+                    is_absolute,
                 },
             },
             |e1, s| fpp_ast::Expr {
@@ -171,37 +176,59 @@ impl ImpliedUse {
         )
     }
 
+    /// The implied use as an expression. The name is absolute, and every node of
+    /// the expression has the id of the implied use.
     pub fn as_expr(&self) -> fpp_ast::Expr {
-        self.as_expr_impl(|node| node)
+        self.as_expr_impl(|node| node, true)
     }
 
     pub fn as_unique_expr(&self) -> fpp_ast::Expr {
-        self.as_expr_impl(ImpliedUse::replicate_id)
+        self.as_expr_impl(ImpliedUse::replicate_id, false)
     }
 
+    /// The implied use as an absolute qualified identifier.
+    ///
+    /// Only the outermost node has the id of the implied use; each qualifier
+    /// and identifier gets a new id at the same location. A use records its
+    /// definition under the id of each level it resolves, so the entry under
+    /// the id of the implied use is always the symbol of the full name.
     pub fn as_qual_ident(&self) -> fpp_ast::QualIdent {
-        let mut tail = self.name.to_ident_list();
-        let head = tail.pop_front().unwrap();
-        tail.into_iter().fold(
-            fpp_ast::QualIdent::Unqualified(fpp_ast::Unqualified {
-                name: fpp_ast::Ident {
-                    data: head,
-                    node_id: self.id,
-                },
-                is_absolute: false,
-                node_id: self.id,
-            }),
-            |e1: fpp_ast::QualIdent, s| {
-                fpp_ast::QualIdent::Qualified(fpp_ast::Qualified {
-                    qualifier: Box::new(e1),
-                    name: fpp_ast::Ident {
-                        data: s,
-                        node_id: self.id,
-                    },
-                    node_id: self.id,
-                })
-            },
-        )
+        let node_list = self
+            .name
+            .to_ident_list()
+            .into_iter()
+            .map(|data| fpp_ast::Ident {
+                node_id: ImpliedUse::replicate_id(self.id),
+                data,
+            })
+            .collect();
+        let mut qual_ident = fpp_ast::QualIdent::from_node_list(node_list, true);
+        match &mut qual_ident {
+            fpp_ast::QualIdent::Unqualified(unqualified) => unqualified.node_id = self.id,
+            fpp_ast::QualIdent::Qualified(qualified) => qualified.node_id = self.id,
+        }
+        qual_ident
+    }
+
+    /// The notes for an error at the point of this implied use
+    fn notes(&self) -> Vec<String> {
+        let mut notes = vec![format!(
+            "the symbol {} has an implied use at the point of the error",
+            self.name
+        )];
+        notes.extend(self.annotations.iter().cloned());
+        notes
+    }
+
+    /// Annotates an error result with the notes of this implied use
+    pub fn annotate_result<T>(&self, r: SemanticResult<T>) -> SemanticResult<T> {
+        annotate_result(r, &self.notes())
+    }
+
+    /// Runs `f`, annotating every error that `f` emits with the notes of this
+    /// implied use. See [`annotate_emitted_errors`].
+    pub fn annotate_emitted_errors<T>(&self, f: impl FnOnce() -> T) -> T {
+        annotate_emitted_errors(self.notes(), f)
     }
 
     pub fn as_type_name(&self) -> fpp_ast::TypeName {

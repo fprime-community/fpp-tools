@@ -65,6 +65,9 @@ pub mod passes {
     pub(crate) mod check_uses;
     pub use check_uses::*;
 
+    mod check_uses_helpers;
+    pub use check_uses_helpers::*;
+
     mod check_template_uses;
     pub use check_template_uses::*;
 

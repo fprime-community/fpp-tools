@@ -24,3 +24,13 @@ fn basic() {
 fn deployment_topology() {
     run_test("top_import/deployment_topology")
 }
+
+#[test]
+fn shadowed_error() {
+    run_test("top_import/shadowed_error")
+}
+
+#[test]
+fn shadowed_ok() {
+    run_test("top_import/shadowed_ok")
+}

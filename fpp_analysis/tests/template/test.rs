@@ -319,3 +319,13 @@ fn use_before_expand() {
 fn use_before_expand_ok() {
     run_test("template/use_before_expand_ok")
 }
+
+#[test]
+fn parameter_shadow_error() {
+    run_test("template/parameter_shadow_error")
+}
+
+#[test]
+fn parameter_shadow_ok() {
+    run_test("template/parameter_shadow_ok")
+}

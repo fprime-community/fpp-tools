@@ -1,25 +1,20 @@
  --> [ local path prefix ]/cycles/enum.fpp:1:1
   |
 1 | enum A: B { }
-  | ^^^^^^^^^^^^^ encountered symbol use-definition cycle
+  | ^^^^^^^^^^^^^ encountered a use-def cycle
   |
- ::: [ local path prefix ]/cycles/enum.fpp:2:6
+ ::: [ local path prefix ]/cycles/enum.fpp:1:9
   |
-2 | enum B: C { }
-  |      - defined here
+1 | enum A: B { }
+  |         - use B refers to definition B
   |
  ::: [ local path prefix ]/cycles/enum.fpp:2:9
   |
 2 | enum B: C { }
-  |         - used here
-  |
- ::: [ local path prefix ]/cycles/enum.fpp:3:6
-  |
-3 | enum C: A { }
-  |      - defined here
+  |         - use C refers to definition C
   |
  ::: [ local path prefix ]/cycles/enum.fpp:3:9
   |
 3 | enum C: A { }
-  |         - used here
+  |         - use A refers to definition A
 

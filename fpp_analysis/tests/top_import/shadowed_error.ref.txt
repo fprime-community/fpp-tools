@@ -1,0 +1,14 @@
+  --> [ local path prefix ]/top_import/shadowed_error.fpp:7:3
+   |
+ 7 | /   topology T {
+ 8 | |
+ 9 | |     import T
+10 | |
+11 | |   }
+   | |___^ encountered a use-def cycle
+   |
+  ::: [ local path prefix ]/top_import/shadowed_error.fpp:9:12
+   |
+ 9 |       import T
+   |              - use T refers to definition T
+

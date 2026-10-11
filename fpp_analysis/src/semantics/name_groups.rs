@@ -15,6 +15,23 @@ pub enum NameGroup {
     Value,
 }
 
+impl NameGroup {
+    /// The name groups of a module. A module is not in the system name group.
+    pub fn groups() -> impl Iterator<Item = NameGroup> {
+        [
+            NameGroup::Component,
+            NameGroup::Port,
+            NameGroup::StateMachine,
+            NameGroup::PortInterfaceInstance,
+            NameGroup::PortInterface,
+            NameGroup::Template,
+            NameGroup::Type,
+            NameGroup::Value,
+        ]
+        .into_iter()
+    }
+}
+
 impl Display for NameGroup {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let name = match self {

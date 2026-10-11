@@ -5,7 +5,6 @@ use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::SemanticError;
 use crate::semantics::{QualifiedName, Symbol, SymbolInterface, UseDefMatching};
 use fpp_ast::*;
-use fpp_core::Spanned;
 use std::ops::ControlFlow;
 
 /// Check for use-def cycles
@@ -73,6 +72,14 @@ impl<'ast> CheckUseDefCycles<'ast> {
         result
     }
 
+    fn error(&self, a: &Analysis, symbol: &Symbol) {
+        SemanticError::UseDefCycle {
+            loc: symbol.get_loc(),
+            use_def_matching_list: a.use_def_matching_list.clone(),
+        }
+        .emit();
+    }
+
     /// The use-def graph node for a symbol whose definition is not an AST
     /// subtree of its own, so `visit` supplies the descent
     fn visit_def_post_with(
@@ -82,11 +89,9 @@ impl<'ast> CheckUseDefCycles<'ast> {
         visit: impl FnOnce(&Self, &mut Analysis) -> ControlFlow<()>,
     ) -> ControlFlow<()> {
         if a.use_def_symbol_set.contains(&symbol) {
-            SemanticError::UseDefCycle {
-                loc: symbol.node().span(),
-                cycle: a.use_def_matching_list.iter().map(|m| m.into()).collect(),
-            }
-            .emit();
+            self.error(a, &symbol);
+            // A use-def cycle would make the later passes recurse forever, so
+            // the analysis stops here
             ControlFlow::Break(())
         } else if !a.visited_symbol_set.contains(&symbol) {
             a.use_def_symbol_set.insert(symbol.clone());
@@ -99,36 +104,16 @@ impl<'ast> CheckUseDefCycles<'ast> {
         }
     }
 
-    fn visit_def_post<T: Walkable<'ast, Self>>(
+    fn visit_def_post(
         &self,
         a: &mut Analysis,
         symbol: Option<Symbol>,
-        node: &'ast T,
+        node: Node<'ast>,
     ) -> ControlFlow<()> {
         let Some(symbol) = symbol else {
             return ControlFlow::Continue(());
         };
-
-        if a.use_def_symbol_set.contains(&symbol) {
-            SemanticError::UseDefCycle {
-                loc: symbol.node().span(),
-                cycle: a.use_def_matching_list.iter().map(|m| m.into()).collect(),
-            }
-            .emit();
-
-            // This is one of the rare cases where we need to stop analysis
-            // This pass checks for use-def cycles which will cause infinite recursion
-            // in later stages of the analysis.
-            ControlFlow::Break(())
-        } else if !a.visited_symbol_set.contains(&symbol) {
-            a.use_def_symbol_set.insert(symbol.clone());
-            node.walk(a, self)?;
-            a.use_def_symbol_set.remove(&symbol);
-            a.visited_symbol_set.insert(symbol);
-            ControlFlow::Continue(())
-        } else {
-            ControlFlow::Continue(())
-        }
+        self.visit_def_post_with(a, symbol, |s, a| s.super_visit(a, node))
     }
 }
 
@@ -146,7 +131,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefAliasType,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, node)
+        self.visit_def_post(a, symbol, Node::DefAliasType(node))
     }
 
     fn visit_def_array(
@@ -155,7 +140,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefArray,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, node)
+        self.visit_def_post(a, symbol, Node::DefArray(node))
     }
 
     fn visit_def_constant(
@@ -164,12 +149,12 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefConstant,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, node)
+        self.visit_def_post(a, symbol, Node::DefConstant(node))
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, node)
+        self.visit_def_post(a, symbol, Node::DefEnum(node))
     }
 
     fn visit_def_enum_constant(
@@ -178,7 +163,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefEnumConstant,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, node)
+        self.visit_def_post(a, symbol, Node::DefEnumConstant(node))
     }
 
     fn visit_def_struct(
@@ -187,7 +172,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefStruct,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, node)
+        self.visit_def_post(a, symbol, Node::DefStruct(node))
     }
 
     fn visit_def_topology(
@@ -196,7 +181,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefTopology,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, node)
+        self.visit_def_post(a, symbol, Node::DefTopology(node))
     }
 
     fn visit_def_interface(
@@ -205,7 +190,7 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         node: &'ast DefInterface,
     ) -> ControlFlow<Self::Break> {
         let symbol = a.get_symbol(node);
-        self.visit_def_post(a, symbol, node)
+        self.visit_def_post(a, symbol, Node::DefInterface(node))
     }
 }
 
@@ -222,7 +207,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUseDefCycles<'ast> {
     fn constant_use(
         &self,
         a: &mut Analysis,
-        node: &'ast Expr,
+        node: &Expr,
         name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.visit_use(a, node.id(), name)
@@ -241,24 +226,6 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUseDefCycles<'ast> {
         &self,
         a: &mut Analysis,
         node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.visit_use(a, node.id(), name)
-    }
-
-    fn implied_type_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.visit_use(a, node.id(), name)
-    }
-
-    fn implied_constant_use(
-        &self,
-        a: &mut Analysis,
-        node: &Expr,
         name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.visit_use(a, node.id(), name)

@@ -1,7 +1,7 @@
  --> [ local path prefix ]/invalid_symbols/topology_as_qualifier.fpp:3:10
   |
 3 |     import M.T
-  |            ^ invalid use of symbol M: not a qualifier
+  |            ^^^ invalid use of symbol M: not a qualifier
   |
  ::: [ local path prefix ]/invalid_symbols/topology_as_qualifier.fpp:1:1
   |

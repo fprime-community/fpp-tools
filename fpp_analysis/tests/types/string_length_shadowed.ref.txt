@@ -1,10 +1,8 @@
  --> [ local path prefix ]/types/string_length_shadowed.fpp:7:12
   |
 7 |   type T = string
-  |            ^^^^^^ invalid use of symbol M.FW_FIXED_LENGTH_STRING_SIZE: it shadows FW_FIXED_LENGTH_STRING_SIZE here
+  |            ^^^^^^ cannot find constant `FW_FIXED_LENGTH_STRING_SIZE` in scope
   |
- ::: [ local path prefix ]/types/string_length_shadowed.fpp:5:3
-  |
-5 |   constant FW_FIXED_LENGTH_STRING_SIZE = 100
-  |   ------------------------------------------ symbol is defined here
+  = note: the symbol FW_FIXED_LENGTH_STRING_SIZE has an implied use at the point of the error
+  = note: use of a string type with default size requires this definition
 

@@ -1,11 +1,6 @@
-use crate::semantics::TypeConversionError;
-use fpp_core::{Diagnostic, Level, Span};
-
-#[derive(Debug)]
-pub struct SymbolUse {
-    pub def_loc: Span,
-    pub use_loc: Span,
-}
+use crate::semantics::{TypeConversionError, UseDefMatching};
+use fpp_core::{Diagnostic, Level, Span, Spanned};
+use std::cell::RefCell;
 
 /// A semantic error
 #[derive(Debug)]
@@ -28,7 +23,14 @@ pub enum SemanticError {
     /// Use-def cycle
     UseDefCycle {
         loc: Span,
-        cycle: Vec<SymbolUse>,
+        /// The use-def matchings on the path that closes the cycle, in the
+        /// order they were followed
+        use_def_matching_list: Vec<UseDefMatching>,
+    },
+    /// An error with notes
+    AnnotatedError {
+        error: Box<SemanticError>,
+        notes: Vec<String>,
     },
     /// Invalid symbol
     InvalidSymbol {
@@ -536,10 +538,61 @@ pub enum SemanticError {
 /// The result of a compilation step
 pub type SemanticResult<T = ()> = Result<T, SemanticError>;
 
+/// Wraps error as an AnnotatedError with notes
+pub fn annotate_result<T>(r: SemanticResult<T>, notes: &[String]) -> SemanticResult<T> {
+    match r {
+        Err(error) if !notes.is_empty() => Err(SemanticError::AnnotatedError {
+            error: Box::new(error),
+            notes: notes.to_vec(),
+        }),
+        r => r,
+    }
+}
+
+thread_local! {
+    /// The notes of the [`annotate_emitted_errors`] calls in progress on this
+    /// thread, outermost first
+    static EMISSION_NOTES: RefCell<Vec<Vec<String>>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Runs `f`, annotating every error that `f` emits with `notes`, as
+/// [`annotate_result`] annotates an error result.
+///
+/// A pass emits an error where it finds it and goes on, rather than returning
+/// it to the step that started the work. So to annotate the errors of a step,
+/// the notes are attached when an error is emitted during the step. Calls
+/// nest: an error emitted inside several of them carries the notes of the
+/// innermost call first.
+pub fn annotate_emitted_errors<T>(notes: Vec<String>, f: impl FnOnce() -> T) -> T {
+    /// Removes the notes of a call when the call ends, even by unwinding
+    struct Guard;
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            EMISSION_NOTES.with_borrow_mut(|stack| stack.pop());
+        }
+    }
+
+    if notes.is_empty() {
+        return f();
+    }
+    EMISSION_NOTES.with_borrow_mut(|stack| stack.push(notes));
+    let _guard = Guard;
+    f()
+}
+
 impl SemanticError {
     /// Print the error
     pub fn emit(self) {
-        Into::<Diagnostic>::into(self).emit();
+        let error = EMISSION_NOTES.with_borrow(|stack| {
+            stack
+                .iter()
+                .rev()
+                .fold(self, |error, notes| SemanticError::AnnotatedError {
+                    error: Box::new(error),
+                    notes: notes.clone(),
+                })
+        });
+        Into::<Diagnostic>::into(error).emit();
     }
 }
 
@@ -572,16 +625,18 @@ impl From<SemanticError> for Diagnostic {
                 format!("invalid use of symbol {}: {}", symbol_name, msg),
             )
             .span_note(def_loc, "symbol is defined here"),
-            SemanticError::UseDefCycle { loc, cycle } => cycle.iter().enumerate().fold(
-                Diagnostic::new(loc, Level::Error, "encountered symbol use-definition cycle"),
-                |out, (i, suse)| match i {
-                    0 => out.span_note(suse.def_loc, "defined here"),
-                    _ if i == cycle.len() - 1 => out.span_note(suse.use_loc, "used here"),
-                    _ => out
-                        .span_note(suse.use_loc, "used here")
-                        .span_note(suse.def_loc, "defined here"),
-                },
+            SemanticError::UseDefCycle {
+                loc,
+                use_def_matching_list,
+            } => use_def_matching_list.iter().fold(
+                Diagnostic::new(loc, Level::Error, "encountered a use-def cycle"),
+                // Each definition on the path holds the next use, and the last
+                // one is the location of the error, so the notes show the uses
+                |out, m| out.span_note(m.node.span(), m.to_string()),
             ),
+            SemanticError::AnnotatedError { error, notes } => notes
+                .into_iter()
+                .fold(Diagnostic::from(*error), |out, note| out.note(note)),
             SemanticError::InvalidType { loc, msg, notes } => notes
                 .into_iter()
                 .fold(Diagnostic::new(loc, Level::Error, msg), |diag, (loc, note)| {

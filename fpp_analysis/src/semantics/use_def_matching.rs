@@ -1,6 +1,5 @@
-use crate::errors::SymbolUse;
 use crate::semantics::{QualifiedName, Symbol, SymbolInterface};
-use fpp_core::Spanned;
+use std::fmt::{Display, Formatter};
 
 /// A matching between a use and its definition
 #[derive(Debug, Clone)]
@@ -13,11 +12,15 @@ pub struct UseDefMatching {
     pub symbol: Symbol,
 }
 
-impl From<&UseDefMatching> for SymbolUse {
-    fn from(value: &UseDefMatching) -> Self {
-        SymbolUse {
-            def_loc: value.symbol.name().span(),
-            use_loc: value.node.span(),
-        }
+/// The text names the use and the definition. Their locations are not part of
+/// it: a diagnostic shows them as the spans it annotates.
+impl Display for UseDefMatching {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "use {} refers to definition {}",
+            self.qualified_name,
+            self.symbol.name().data
+        )
     }
 }

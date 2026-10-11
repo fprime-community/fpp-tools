@@ -1,0 +1,20 @@
+ --> [ local path prefix ]/cycles/topology_implements.fpp:2:1
+  |
+2 | interface I { import J }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycles/topology_implements.fpp:1:23
+  |
+1 | topology T implements I { }
+  |                       - use I refers to definition I
+  |
+ ::: [ local path prefix ]/cycles/topology_implements.fpp:2:22
+  |
+2 | interface I { import J }
+  |                      - use J refers to definition J
+  |
+ ::: [ local path prefix ]/cycles/topology_implements.fpp:3:22
+  |
+3 | interface J { import I }
+  |                      - use I refers to definition I
+

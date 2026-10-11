@@ -64,3 +64,23 @@ fn module_as_state_machine() {
 fn module_as_component_instance() {
     run_test("invalid_symbols/module_as_component_instance")
 }
+
+#[test]
+fn enum_as_qualified_constant() {
+    run_test("invalid_symbols/enum_as_qualified_constant")
+}
+
+#[test]
+fn state_machine_as_qualified_constant() {
+    run_test("invalid_symbols/state_machine_as_qualified_constant")
+}
+
+#[test]
+fn module_as_qualified_constant() {
+    run_test("invalid_symbols/module_as_qualified_constant")
+}
+
+#[test]
+fn enum_constant_as_qualifier() {
+    run_test("invalid_symbols/enum_constant_as_qualifier")
+}

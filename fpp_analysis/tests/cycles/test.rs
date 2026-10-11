@@ -54,3 +54,8 @@ fn sizeof_string_1() {
 fn sizeof_string_2() {
     run_test("cycles/sizeof_string_2")
 }
+
+#[test]
+fn topology_implements() {
+    run_test("cycles/topology_implements")
+}

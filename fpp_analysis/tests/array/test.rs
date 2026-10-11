@@ -154,3 +154,13 @@ fn no_default_ok() {
 fn size_out_of_range() {
     run_test("array/size_out_of_range")
 }
+
+#[test]
+fn default_shadowed_error() {
+    run_test("array/default_shadowed_error")
+}
+
+#[test]
+fn default_shadowed_ok() {
+    run_test("array/default_shadowed_ok")
+}

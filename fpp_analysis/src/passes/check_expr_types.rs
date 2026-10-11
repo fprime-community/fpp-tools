@@ -683,7 +683,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
     fn constant_use(
         &self,
         a: &mut Analysis,
-        node: &'ast Expr,
+        node: &Expr,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let symbol = match a.use_def_map.get(&node.node_id) {

@@ -19,3 +19,13 @@ fn ok() {
 fn duplicate_instance() {
     run_test("instance_spec/duplicate_instance")
 }
+
+#[test]
+fn shadowed_error() {
+    run_test("instance_spec/shadowed_error")
+}
+
+#[test]
+fn shadowed_ok() {
+    run_test("instance_spec/shadowed_ok")
+}

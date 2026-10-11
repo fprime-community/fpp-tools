@@ -159,3 +159,8 @@ fn source_not_component_instance() {
 fn target_not_component_instance() {
     run_test("connection_pattern/target_not_component_instance")
 }
+
+#[test]
+fn undef_source_and_target() {
+    run_test("connection_pattern/undef_source_and_target")
+}

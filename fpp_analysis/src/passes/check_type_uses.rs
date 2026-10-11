@@ -9,7 +9,7 @@ use crate::semantics::{
 };
 use fpp_ast::*;
 use fpp_core::Spanned;
-use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
@@ -30,6 +30,21 @@ impl<'ast> CheckTypeUses<'ast> {
     pub fn new() -> CheckTypeUses<'ast> {
         Self {
             super_: UseAnalyzer::new(),
+        }
+    }
+}
+
+/// Check for duplicate struct members, reporting each duplicate
+fn check_for_duplicate_struct_member(members: &[StructTypeMember]) {
+    let mut member_locs: HashMap<&str, fpp_core::Span> = HashMap::default();
+    for member in members {
+        if let Some(prev_loc) = member_locs.insert(member.name.data.as_str(), member.span()) {
+            SemanticError::DuplicateStructMember {
+                name: member.name.data.clone(),
+                loc: member.span(),
+                prev_loc,
+            }
+            .emit();
         }
     }
 }
@@ -173,28 +188,24 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
             return ControlFlow::Continue(());
         }
 
+        // The member names are checked before the member types, which may
+        // reach definitions with errors of their own
+        check_for_duplicate_struct_member(&node.members);
+
         // Visit all the members to resolve type info
         node.walk(a, self)?;
 
-        let mut member_locs = HashMap::default();
+        let mut member_names = HashSet::default();
         let mut anon_ty = AnonStructType {
             members: Default::default(),
         };
 
         for member in &node.members {
-            match member_locs.insert(member.name.data.clone(), member.span()) {
-                None => {
-                    let member_ty = a.type_map.get(&member.type_name.node_id).unwrap().clone();
-                    anon_ty.members.push((member.name.data.clone(), member_ty));
-                }
-                Some(old) => {
-                    SemanticError::DuplicateStructMember {
-                        name: member.name.data.clone(),
-                        loc: member.span(),
-                        prev_loc: old,
-                    }
-                    .emit();
-                }
+            // A duplicate member has been reported, and the first member of
+            // the name gives the type
+            if member_names.insert(member.name.data.as_str()) {
+                let member_ty = a.type_map.get(&member.type_name.node_id).unwrap().clone();
+                anon_ty.members.push((member.name.data.clone(), member_ty));
             }
         }
 

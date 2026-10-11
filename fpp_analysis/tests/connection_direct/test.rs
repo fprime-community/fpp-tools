@@ -54,3 +54,23 @@ fn instance_not_in_topology() {
 fn internal_port() {
     run_test("connection_direct/internal_port")
 }
+
+#[test]
+fn shadowed_instance_error() {
+    run_test("connection_direct/shadowed_instance_error")
+}
+
+#[test]
+fn shadowed_instance_ok() {
+    run_test("connection_direct/shadowed_instance_ok")
+}
+
+#[test]
+fn shadowed_port_error() {
+    run_test("connection_direct/shadowed_port_error")
+}
+
+#[test]
+fn shadowed_port_ok() {
+    run_test("connection_direct/shadowed_port_ok")
+}

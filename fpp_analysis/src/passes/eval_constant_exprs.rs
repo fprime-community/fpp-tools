@@ -570,7 +570,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for EvalConstantExprs<'ast> {
     fn constant_use(
         &self,
         a: &mut Analysis,
-        node: &'ast Expr,
+        node: &Expr,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.eval_constant_use(a, node.node_id)

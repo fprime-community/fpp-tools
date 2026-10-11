@@ -695,9 +695,23 @@ impl Analysis {
         }
     }
 
+    /// Get a relative or absolute symbol from the nested scope. A relative name
+    /// is looked up from the innermost scope outwards; an absolute name only in
+    /// the outermost (global) scope.
+    pub fn nested_scope_get(
+        &self,
+        is_absolute: bool,
+        name_group: NameGroup,
+        name: &str,
+    ) -> Option<Symbol> {
+        self.nested_scope.get(is_absolute, |owner| {
+            self.get_scope(owner).get(name_group, name)
+        })
+    }
+
+    /// Get a relative symbol from the nested scope
     pub fn symbol_get(&self, name_group: NameGroup, name: &str) -> Option<Symbol> {
-        self.nested_scope
-            .search(|s| self.get_scope(s).get(name_group, name))
+        self.nested_scope_get(false, name_group, name)
     }
 
     pub fn symbol_put(&mut self, name_group: NameGroup, symbol: Symbol) -> SemanticResult {

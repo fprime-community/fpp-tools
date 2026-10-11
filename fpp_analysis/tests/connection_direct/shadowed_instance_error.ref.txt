@@ -1,0 +1,15 @@
+  --> [ local path prefix ]/connection_direct/shadowed_instance_error.fpp:36:7
+   |
+36 |       c1.p -> c2.p
+   |       ^^^^ cannot connect port types P and P
+   |
+  ::: [ local path prefix ]/connection_direct/shadowed_instance_error.fpp:5:3
+   |
+ 5 |   output port p: P
+   |   ---------------- from port is specified here
+   |
+  ::: [ local path prefix ]/connection_direct/shadowed_instance_error.fpp:24:5
+   |
+24 |     sync input port p: P
+   |     -------------------- to port is specified here
+

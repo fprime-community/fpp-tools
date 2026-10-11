@@ -211,7 +211,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
                 a.symbol_scope_map.insert(sym.clone(), Scope::new());
 
                 if name_is_free {
-                    for ng in NameGroup::all() {
+                    for ng in NameGroup::groups() {
                         match a.symbol_put(ng, sym.clone()) {
                             Ok(_) => {}
                             Err(err) => err.emit(),

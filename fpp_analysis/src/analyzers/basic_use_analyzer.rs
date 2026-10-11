@@ -1,7 +1,7 @@
 use crate::analyzers::NestedScopeState;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
-use crate::semantics::{QualifiedName, Symbol};
+use crate::semantics::{ImpliedUse, ImpliedUseKind, QualifiedName, Symbol};
 use fpp_ast::*;
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
@@ -36,10 +36,13 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
     }
 
     /// A use of a constant definition or enumerated constant definition
+    ///
+    /// The expression of an implied constant use is built for the visit, so
+    /// `node` need not be part of the model.
     fn constant_use(
         &self,
         a: &mut Self::State,
-        node: &'ast Expr,
+        node: &Expr,
         name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
@@ -61,7 +64,8 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         ControlFlow::Continue(())
     }
 
-    /// An implied use of a port definition (from a special port instance)
+    /// An implied port use: a use of the port definition named by the
+    /// qualified identifier of the implied use
     fn implied_port_use(
         &self,
         a: &mut Self::State,
@@ -71,30 +75,38 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         self.port_use(a, node, name)
     }
 
-    /// An implied use of a type definition (e.g. `FwSizeStoreType` for strings)
+    /// An implied type use: a use of the type definition named by the
+    /// qualified identifier of the implied use
     fn implied_type_use(
         &self,
         a: &mut Self::State,
         node: &QualIdent,
         name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        let _ = a;
-        let _ = node;
-        let _ = name;
-        ControlFlow::Continue(())
+        self.type_use(a, node, name)
     }
 
-    /// An implied use of a constant definition (e.g. `FW_FIXED_LENGTH_STRING_SIZE`
-    /// for default-size strings)
+    /// An implied constant use: a use of the constant definition named by the
+    /// expression of the implied use
     fn implied_constant_use(
         &self,
         a: &mut Self::State,
         node: &Expr,
         name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
+        self.constant_use(a, node, name)
+    }
+
+    /// An implied use. It is visited after the use of the definition it names.
+    fn implied_use(
+        &self,
+        a: &mut Self::State,
+        iu: &ImpliedUse,
+        kind: ImpliedUseKind,
+    ) -> ControlFlow<Self::Break> {
         let _ = a;
-        let _ = node;
-        let _ = name;
+        let _ = iu;
+        let _ = kind;
         ControlFlow::Continue(())
     }
 
@@ -252,55 +264,81 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
         }
     }
 
-    /// Dispatch the implied constant uses recorded at an AST node
+    /// An implied constant use
+    fn implied_constant_use(
+        &self,
+        visitor: &V,
+        a: &mut V::State,
+        iu: &ImpliedUse,
+    ) -> ControlFlow<V::Break> {
+        iu.annotate_emitted_errors(|| {
+            visitor.implied_constant_use(a, &iu.as_expr(), iu.name().clone())?;
+            visitor.implied_use(a, iu, ImpliedUseKind::Constant)
+        })
+    }
+
+    /// An implied port use
+    fn implied_port_use(
+        &self,
+        visitor: &V,
+        a: &mut V::State,
+        iu: &ImpliedUse,
+    ) -> ControlFlow<V::Break> {
+        iu.annotate_emitted_errors(|| {
+            visitor.implied_port_use(a, &iu.as_qual_ident(), iu.name().clone())?;
+            visitor.implied_use(a, iu, ImpliedUseKind::Port)
+        })
+    }
+
+    /// An implied type use
+    fn implied_type_use(
+        &self,
+        visitor: &V,
+        a: &mut V::State,
+        iu: &ImpliedUse,
+    ) -> ControlFlow<V::Break> {
+        iu.annotate_emitted_errors(|| {
+            visitor.implied_type_use(a, &iu.as_qual_ident(), iu.name().clone())?;
+            visitor.implied_use(a, iu, ImpliedUseKind::Type)
+        })
+    }
+
     fn visit_implied_constant_uses(
         &self,
         visitor: &V,
         a: &mut V::State,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
-        if let Some(uses) = a.implied_uses(id) {
-            for iu in &uses.constants {
-                let e = iu.as_expr();
-                visitor.implied_constant_use(a, &e, iu.name().clone())?;
-            }
+        for iu in a.get_implied_uses(ImpliedUseKind::Constant, id) {
+            self.implied_constant_use(visitor, a, &iu)?;
         }
         ControlFlow::Continue(())
     }
 
-    /// Dispatch the implied port uses recorded at an AST node
     fn visit_implied_port_uses(
         &self,
         visitor: &V,
         a: &mut V::State,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
-        if let Some(uses) = a.implied_uses(id) {
-            for iu in &uses.ports {
-                let qi = iu.as_qual_ident();
-                visitor.implied_port_use(a, &qi, iu.name().clone())?;
-            }
+        for iu in a.get_implied_uses(ImpliedUseKind::Port, id) {
+            self.implied_port_use(visitor, a, &iu)?;
         }
         ControlFlow::Continue(())
     }
 
-    /// Dispatch the implied type uses recorded at an AST node
     fn visit_implied_type_uses(
         &self,
         visitor: &V,
         a: &mut V::State,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
-        if let Some(uses) = a.implied_uses(id) {
-            for iu in &uses.types {
-                let qi = iu.as_qual_ident();
-                visitor.implied_type_use(a, &qi, iu.name().clone())?;
-            }
+        for iu in a.get_implied_uses(ImpliedUseKind::Type, id) {
+            self.implied_type_use(visitor, a, &iu)?;
         }
         ControlFlow::Continue(())
     }
 
-    /// Dispatch every implied use recorded at an AST node
     fn visit_implied_uses(
         &self,
         visitor: &V,
@@ -397,25 +435,22 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                 si.walk(a, visitor)
             }
             Node::SpecPatternConnectionGraph(cg) => {
+                visitor.interface_instance_use(a, &cg.source, (&cg.source).into())?;
                 for target in &cg.targets {
                     visitor.interface_instance_use(a, target, target.into())?;
                 }
-
-                visitor.interface_instance_use(a, &cg.source, (&cg.source).into())?;
-
-                self.super_.visit(visitor, a, node)
+                ControlFlow::Continue(())
             }
             Node::SpecGeneralPortInstance(pi) => {
-                match &pi.port {
-                    None => ControlFlow::Continue(()),
-                    Some(pqi) => visitor.port_use(a, pqi, pqi.into()),
-                }?;
-
-                self.super_.visit(visitor, a, node)
+                pi.size.visit(a, visitor)?;
+                if let Some(port) = &pi.port {
+                    visitor.port_use(a, port, port.into())?;
+                }
+                pi.priority.visit(a, visitor)
             }
             Node::SpecSpecialPortInstance(pi) => {
-                self.visit_implied_port_uses(visitor, a, pi.node_id)?;
-                self.super_.visit(visitor, a, node)
+                pi.priority.visit(a, visitor)?;
+                self.visit_implied_port_uses(visitor, a, pi.node_id)
             }
             Node::PortInstanceIdentifier(pii) => visitor.interface_instance_use(
                 a,

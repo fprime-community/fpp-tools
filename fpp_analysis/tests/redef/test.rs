@@ -164,3 +164,8 @@ fn module_members_after_collision() {
 fn module_scope_after_collision() {
     run_test("redef/module_scope_after_collision")
 }
+
+#[test]
+fn module_and_system_ok() {
+    run_test("redef/module_and_system_ok")
+}

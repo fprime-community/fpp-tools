@@ -1,0 +1,10 @@
+  --> [ local path prefix ]/dictionary_implied_uses/missing_user_data_size.fpp:26:1
+   |
+26 | / deployment topology T {
+27 | |   
+28 | | }
+   | |_^ cannot find constant `CONTAINER_USER_DATA_SIZE` in scope
+   |
+   = note: the symbol Fw.DpCfg.CONTAINER_USER_DATA_SIZE has an implied use at the point of the error
+   = note: this implied use occurs when constructing a dictionary
+
