@@ -90,7 +90,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         })()
         .unwrap_or_else(|err| err.emit());
 
-        a.symbol_scope_map.insert(symbol.clone(), Scope::new());
+        a.symbol_scope_map.insert(symbol.clone(), Scope::empty());
         a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
 
         let parent_symbol = a.parent_symbol.clone();
@@ -137,7 +137,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
         })()
         .unwrap_or_else(|err| err.emit());
 
-        a.symbol_scope_map.insert(symbol.clone(), Scope::new());
+        a.symbol_scope_map.insert(symbol.clone(), Scope::empty());
         a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
 
         let parent_symbol = a.parent_symbol.clone();
@@ -226,7 +226,7 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
 
         // A state machine opens a scope for its nested definitions
         // (types, constants, etc.).
-        a.symbol_scope_map.insert(symbol.clone(), Scope::new());
+        a.symbol_scope_map.insert(symbol.clone(), Scope::empty());
         a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
 
         let parent_symbol = a.parent_symbol.clone();

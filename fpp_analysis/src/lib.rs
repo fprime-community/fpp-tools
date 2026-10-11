@@ -254,11 +254,17 @@ pub mod semantics {
     mod scope;
     pub use scope::*;
 
+    mod nested_scope;
+    pub use nested_scope::*;
+
+    mod name_symbol_map;
+    pub use name_symbol_map::*;
+
     mod template_expansion;
     pub use template_expansion::*;
 
-    mod name_groups;
-    pub use name_groups::*;
+    mod name_group;
+    pub use name_group::*;
 
     mod use_def_matching;
     pub use use_def_matching::*;
@@ -278,9 +284,8 @@ pub mod semantics {
     pub mod interned_def;
     pub use interned_def::*;
 
-    mod generic_name_symbol_map;
-    mod generic_nested_scope;
     mod generic_scope;
+    pub(crate) use generic_scope::{GenericNameSymbolMap, GenericNestedScope, GenericScope};
 
     #[cfg(test)]
     mod format_spec;

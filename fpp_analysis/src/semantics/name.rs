@@ -1,14 +1,37 @@
 use std::collections::VecDeque;
 use std::fmt::{Debug, Display, Formatter};
 
+/// An unqualified name
+pub type Unqualified = String;
+
 /// A qualified or unqualified name
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct QualifiedName {
-    qualifier: VecDeque<String>,
-    base: String,
+    qualifier: VecDeque<Unqualified>,
+    base: Unqualified,
 }
 
 impl QualifiedName {
+    /// Create a qualified name A.B.C from an identifier list [ A, B, C ]
+    pub fn from_ident_list(il: Vec<Unqualified>) -> QualifiedName {
+        let mut qualifier: VecDeque<Unqualified> = il.into();
+        let base = qualifier.pop_back().expect("empty identifier list");
+        QualifiedName { qualifier, base }
+    }
+
+    /// Create a qualified name from an identifier
+    pub fn from_ident(id: Unqualified) -> QualifiedName {
+        QualifiedName {
+            qualifier: VecDeque::new(),
+            base: id,
+        }
+    }
+
+    /// Create a qualified name from a qualified identifier
+    pub fn from_qual_ident(qual_ident: &fpp_ast::QualIdent) -> QualifiedName {
+        QualifiedName::from_ident_list(qual_ident.to_ident_list())
+    }
+
     /// The qualifier of the name
     pub fn qualifier(&self) -> &VecDeque<String> {
         &self.qualifier
@@ -28,10 +51,12 @@ impl QualifiedName {
 
     /// Computes a short qualified name. Deletes the longest prefix provided by
     /// the enclosing scope.
+    ///
+    /// The base of the name is never deleted: when the enclosing scope provides
+    /// the whole name, the short name is the base.
     pub fn short_name(&self, enclosing_names: &[String]) -> QualifiedName {
         let ident_list = self.to_ident_list();
         let mut skip = 0;
-        // Never delete the base of the name
         while skip < enclosing_names.len()
             && skip + 1 < ident_list.len()
             && enclosing_names[skip] == ident_list[skip]
@@ -49,18 +74,14 @@ impl QualifiedName {
 /// Create a qualified name from an identifier
 impl From<String> for QualifiedName {
     fn from(value: String) -> Self {
-        QualifiedName {
-            qualifier: VecDeque::new(),
-            base: value,
-        }
+        QualifiedName::from_ident(value)
     }
 }
 
 /// Create a qualified name A.B.C from an identifier list [ A, B, C ]
 impl From<Vec<String>> for QualifiedName {
     fn from(value: Vec<String>) -> Self {
-        let inter: VecDeque<String> = value.into();
-        inter.into()
+        QualifiedName::from_ident_list(value)
     }
 }
 
@@ -78,7 +99,7 @@ impl From<VecDeque<String>> for QualifiedName {
 /// Create a qualified name from a qualified identifier
 impl From<&fpp_ast::QualIdent> for QualifiedName {
     fn from(value: &fpp_ast::QualIdent) -> Self {
-        value.to_ident_list().into()
+        QualifiedName::from_qual_ident(value)
     }
 }
 

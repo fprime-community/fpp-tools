@@ -155,7 +155,7 @@ impl Analysis {
             dictionary_generation: false,
             include_dictionary_deps: false,
             nested_scope: NestedScope::empty(),
-            global_scope: Scope::new(),
+            global_scope: Scope::empty(),
             parent_symbol: None,
             parent_symbol_map: Default::default(),
             symbol_scope_map: Default::default(),
@@ -1092,7 +1092,7 @@ impl Analysis {
 
     /// Put a name and symbol into the innermost scope of the nested scope
     pub fn symbol_put(&mut self, name_group: NameGroup, symbol: Symbol) -> SemanticResult {
-        let owner = self.nested_scope.current().clone();
+        let owner = self.nested_scope.inner_scope().clone();
         self.get_scope_mut(&owner).put(name_group, symbol)
     }
 

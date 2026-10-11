@@ -99,8 +99,8 @@ impl EnterTemplateExpansionSymbols {
                 def_node: tmpl.clone(),
                 expansion: Arc::new(node.clone()),
                 params: params.clone(),
-                param_scope: Scope::new(),
-                scope: Scope::new(),
+                param_scope: Scope::empty(),
+                scope: Scope::empty(),
                 local_scope_map: HashMap::default(),
             },
         );
@@ -149,7 +149,7 @@ impl EnterTemplateExpansionSymbols {
         }
 
         // Duplicate the symbols entries into the outer scope
-        let owner = a.nested_scope.current().clone();
+        let owner = a.nested_scope.inner_scope().clone();
         let mut dest = a.get_scope(&owner).clone();
         let result = Self::merge_scope(a, &mut dest, &template_scope);
         *a.get_scope_mut(&owner) = dest;
@@ -273,12 +273,12 @@ impl EnterTemplateExpansionSymbols {
             .symbol_scope_map
             .get(prev_symbol)
             .cloned()
-            .unwrap_or_else(Scope::new);
+            .unwrap_or_else(Scope::empty);
         let scope = a
             .symbol_scope_map
             .get(symbol)
             .cloned()
-            .unwrap_or_else(Scope::new);
+            .unwrap_or_else(Scope::empty);
         let mut merged_scope = prev_scope;
         Self::merge_scope(a, &mut merged_scope, &scope)?;
         // Both symbols denote the same module, so both must see all its members

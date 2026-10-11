@@ -13,7 +13,7 @@ impl StateMachineNestedScope {
     /// Create an empty NestedScope
     pub fn empty() -> StateMachineNestedScope {
         StateMachineNestedScope {
-            scopes: vec![StateMachineScope::new()],
+            scopes: vec![StateMachineScope::empty()],
         }
     }
 
