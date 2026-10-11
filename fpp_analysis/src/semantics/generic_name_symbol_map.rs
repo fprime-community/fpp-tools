@@ -41,4 +41,9 @@ impl<S: SymbolInterface> GenericNameSymbolMap<S> {
     pub fn iter(&self) -> impl Iterator<Item = (&String, &S)> {
         self.0.iter()
     }
+
+    /// Whether the map holds no name
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }

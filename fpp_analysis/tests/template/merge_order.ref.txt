@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/template/merge_order.fpp:7:3
+  |
+7 |   constant c = 3
+  |   ^^^^^^^^^^^^^^ redefinition of symbol c
+  |
+  = note: expanded at [ local path prefix ]/template/merge_order.fpp:11:1
+  |
+ ::: [ local path prefix ]/template/merge_order.fpp:5:1
+  |
+5 | constant c = 0
+  | -------------- previous definition is here
+

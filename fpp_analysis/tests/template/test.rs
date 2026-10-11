@@ -246,6 +246,16 @@ fn module_merge_ok() {
 }
 
 #[test]
+fn merge_group_order() {
+    run_test("template/merge_group_order")
+}
+
+#[test]
+fn merge_order() {
+    run_test("template/merge_order")
+}
+
+#[test]
 fn nested_scope_resolution() {
     run_test("template/nested_scope_resolution")
 }
