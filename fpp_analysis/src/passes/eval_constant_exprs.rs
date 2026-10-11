@@ -425,8 +425,8 @@ impl<'ast> EvalConstantExprs<'ast> {
         node: &'ast Expr,
         value: &str,
     ) -> ControlFlow<()> {
-        let int_value = if value.starts_with("0x") {
-            match i128::from_str_radix(&value[2..], 16) {
+        let int_value = if let Some(hex) = value.strip_prefix("0x") {
+            match i128::from_str_radix(hex, 16) {
                 Ok(v) => v,
                 Err(err) => {
                     SemanticError::InvalidIntValue {
