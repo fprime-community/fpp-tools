@@ -1,23 +1,13 @@
 use crate::run_test;
 
 #[test]
-fn action_undef_type() {
-    run_test("state_machine/types/action_undef_type")
-}
-
-#[test]
-fn signal_undef_type() {
-    run_test("state_machine/types/signal_undef_type")
-}
-
-#[test]
-fn guard_undef_type() {
-    run_test("state_machine/types/guard_undef_type")
-}
-
-#[test]
 fn abs_type_ok() {
     run_test("state_machine/types/abs_type_ok")
+}
+
+#[test]
+fn action_undef_type() {
+    run_test("state_machine/types/action_undef_type")
 }
 
 #[test]
@@ -71,6 +61,26 @@ fn enum_undef_type() {
 }
 
 #[test]
+fn guard_undef_type() {
+    run_test("state_machine/types/guard_undef_type")
+}
+
+#[test]
+fn shadowed_error() {
+    run_test("state_machine/types/shadowed_error")
+}
+
+#[test]
+fn signal_undef_type() {
+    run_test("state_machine/types/signal_undef_type")
+}
+
+#[test]
+fn state_enum_ok() {
+    run_test("state_machine/types/state_enum_ok")
+}
+
+#[test]
 fn struct_alias_format_not_numeric() {
     run_test("state_machine/types/struct_alias_format_not_numeric")
 }
@@ -98,9 +108,4 @@ fn struct_undef_constant() {
 #[test]
 fn struct_undef_type() {
     run_test("state_machine/types/struct_undef_type")
-}
-
-#[test]
-fn state_enum_ok() {
-    run_test("state_machine/types/state_enum_ok")
 }

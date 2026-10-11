@@ -238,11 +238,9 @@ mod template {
 }
 
 mod state_machine {
-    mod constants {
-        mod test;
-    }
+    mod test;
 
-    mod types {
+    mod constants {
         mod test;
     }
 
@@ -250,7 +248,7 @@ mod state_machine {
         mod test;
     }
 
-    mod transition_graph {
+    mod redef {
         mod test;
     }
 
@@ -258,11 +256,15 @@ mod state_machine {
         mod test;
     }
 
-    mod redef {
+    mod transition_graph {
         mod test;
     }
 
     mod typed_elements {
+        mod test;
+    }
+
+    mod types {
         mod test;
     }
 

@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/state_machine/constants/shadowed_error.fpp:7:21
+  |
+7 |   constant b = [ a, 1 ]
+  |                     ^ cannot find common type between Integer and boolean
+

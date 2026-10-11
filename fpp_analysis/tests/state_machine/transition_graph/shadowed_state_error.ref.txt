@@ -1,0 +1,18 @@
+ --> [ local path prefix ]/state_machine/transition_graph/shadowed_state_error.fpp:4:5
+  |
+4 |       initial enter .S
+  |       ^^^^^^^^^^^^^^^^ initial transition of state must go to state or choice defined in the same state
+  |
+ ::: [ local path prefix ]/state_machine/transition_graph/shadowed_state_error.fpp:3:3
+  |
+3 | /   state S {
+4 | |     initial enter .S
+5 | |     state S
+6 | |   }
+  | |___- transition path goes here
+
+ --> [ local path prefix ]/state_machine/transition_graph/shadowed_state_error.fpp:5:5
+  |
+5 |     state S
+  |     ^^^^^^^ state S is unreachable
+
