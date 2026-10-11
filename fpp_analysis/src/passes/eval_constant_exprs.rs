@@ -7,7 +7,7 @@ use crate::passes::FinalizeTypeDefs;
 use crate::semantics::{
     AliasType, AnonArrayValue, AnonStructValue, ArrayType, ArrayValue, BooleanValue,
     EnumConstantValue, EnumType, FloatValue, IntegerValue, QualifiedName, SerializedSizeError,
-    StringValue, StructType, StructValue, Symbol, SymbolInterface, Type, Value,
+    StringValue, StructType, StructValue, Symbol, SymbolInterface, Type, TypeVisitor, Value,
 };
 use fpp_ast::{
     Binop, DefConstant, DefEnum, DefEnumConstant, Expr, ExprKind, Ident, Node, StructExprMember,
@@ -618,15 +618,13 @@ impl<'ast> EvalConstantExprs<'ast> {
 // The FinalizeTypeDefs methods update the visited symbol set
 struct FinalizeType<'p, 'ast>(&'p EvalConstantExprs<'ast>);
 
-impl<'p, 'ast> FinalizeType<'p, 'ast> {
-    fn ty(&self, a: &mut Analysis, t: &Arc<Type>) -> ControlFlow<()> {
-        match t.deref() {
-            Type::Alias(t) => self.alias_type(a, t),
-            Type::Array(t) => self.array(a, t),
-            Type::Enum(t) => self.enumeration(a, t),
-            Type::Struct(t) => self.struct_(a, t),
-            _ => ControlFlow::Continue(()),
-        }
+impl<'p, 'ast> TypeVisitor for FinalizeType<'p, 'ast> {
+    type In<'a> = &'a mut Analysis;
+
+    type Out = ControlFlow<()>;
+
+    fn default(&self, _: &mut Analysis, _: &Type) -> ControlFlow<()> {
+        ControlFlow::Continue(())
     }
 
     fn alias_type(&self, a: &mut Analysis, t: &AliasType) -> ControlFlow<()> {
@@ -636,20 +634,20 @@ impl<'p, 'ast> FinalizeType<'p, 'ast> {
         FinalizeTypeDefs::new().visit_def_alias_type(a, &node)
     }
 
-    fn array(&self, a: &mut Analysis, t: &ArrayType) -> ControlFlow<()> {
+    fn array(&self, a: &mut Analysis, t: &Arc<ArrayType>) -> ControlFlow<()> {
         let node = t.node.clone();
         self.0.visit_def_array(a, &node)?;
         self.finalize_if_needed(a, &t.anon_array.elt_type)?;
         FinalizeTypeDefs::new().visit_def_array(a, &node)
     }
 
-    fn enumeration(&self, a: &mut Analysis, t: &EnumType) -> ControlFlow<()> {
+    fn enumeration(&self, a: &mut Analysis, t: &Arc<EnumType>) -> ControlFlow<()> {
         let node = t.node.clone();
         self.0.visit_def_enum(a, &node)?;
         FinalizeTypeDefs::new().visit_def_enum(a, &node)
     }
 
-    fn struct_(&self, a: &mut Analysis, t: &StructType) -> ControlFlow<()> {
+    fn struct_(&self, a: &mut Analysis, t: &Arc<StructType>) -> ControlFlow<()> {
         let node = t.node.clone();
         self.0.visit_def_struct(a, &node)?;
         for (_, t1) in &t.anon_struct.members {
@@ -657,12 +655,14 @@ impl<'p, 'ast> FinalizeType<'p, 'ast> {
         }
         FinalizeTypeDefs::new().visit_def_struct(a, &node)
     }
+}
 
+impl<'p, 'ast> FinalizeType<'p, 'ast> {
     // Query whether a type is finalized
     // A type is finalized if (1) it has a definition symbol S
     // and S is in the visited symbol set; or (2)
     // it has no definition symbol
-    fn type_is_finalized(a: &Analysis, t: &Arc<Type>) -> bool {
+    fn type_is_finalized(a: &Analysis, t: &Type) -> bool {
         match t.def_symbol() {
             Some(sym) => a.visited_symbol_set.contains(&sym),
             None => true,
@@ -670,7 +670,7 @@ impl<'p, 'ast> FinalizeType<'p, 'ast> {
     }
 
     // Finalize a type if not already finalized
-    fn finalize_if_needed(&self, a: &mut Analysis, t: &Arc<Type>) -> ControlFlow<()> {
+    fn finalize_if_needed(&self, a: &mut Analysis, t: &Type) -> ControlFlow<()> {
         if !Self::type_is_finalized(a, t) {
             self.ty(a, t)
         } else {

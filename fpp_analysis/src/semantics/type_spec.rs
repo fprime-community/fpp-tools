@@ -721,6 +721,15 @@ fn node_id_memo_identity() {
     });
 }
 
+/// Two string types are not identical, whatever their sizes, so the common
+/// type of two strings of the same size is the unsized string type.
+#[test]
+fn identical_strings_are_not_identical() {
+    assert!(!Type::identical(&string_with_size(8), &string_with_size(8)));
+    let ct = Type::common_type(&string_with_size(8), &string_with_size(8));
+    assert_common_type_eq(&ct, &string(None));
+}
+
 use crate::semantics::Value;
 
 #[test]

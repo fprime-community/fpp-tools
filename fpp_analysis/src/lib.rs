@@ -242,6 +242,9 @@ pub mod semantics {
     mod types;
     pub use types::*;
 
+    mod type_visitor;
+    pub(crate) use type_visitor::*;
+
     mod value;
     pub use value::*;
 

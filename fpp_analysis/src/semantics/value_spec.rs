@@ -1018,6 +1018,105 @@ fn value_binop_integer_and_float_left() {
     });
 }
 
+/// An array default holds `size` references to one element value, so a
+/// nested array default costs the SUM of the nested sizes and not their
+/// PRODUCT.
+///
+/// The pointer-identity assertions are what bound the memory: with an
+/// independent copy per element, `array Inner = [n] U8` +
+/// `array Outer = [n] Inner` would build n^2 values, which at the size bound
+/// (n = 2^31-1) cannot complete.
+#[test]
+fn array_default_shares_its_repeated_element() {
+    const N: usize = 2000;
+
+    let inner = anon_array(Some(N), u8());
+    let outer = anon_array(Some(N), inner);
+
+    let Some(Value::AnonArray(outer_default)) = outer.default_value() else {
+        panic!("expected an anonymous array default");
+    };
+    assert_eq!(outer_default.elements.len(), N);
+
+    // Every element of the outer array is the one shared inner array
+    let first = &outer_default.elements[0];
+    assert!(
+        outer_default.elements.iter().all(|e| Arc::ptr_eq(e, first)),
+        "the outer array's elements are not shared"
+    );
+
+    // ... and that inner array shares its own repeated element in turn, so
+    // the whole default holds 2N references to 2 distinct values
+    let Value::AnonArray(inner_default) = first.as_ref() else {
+        panic!("expected an anonymous array element");
+    };
+    assert_eq!(inner_default.elements.len(), N);
+    let inner_first = &inner_default.elements[0];
+    assert!(
+        inner_default
+            .elements
+            .iter()
+            .all(|e| Arc::ptr_eq(e, inner_first)),
+        "the inner array's elements are not shared"
+    );
+    assert!(values_eq(inner_first, &create_u8(0)));
+
+    // Reading the value is unaffected by the sharing
+    assert_eq!(inner_default.iter().count(), N);
+    assert!(inner_default.iter().all(|e| e.to_string() == "0: U8"));
+    assert!(inner_default.get(N - 1).is_some());
+    assert!(inner_default.get(N).is_none());
+}
+
+/// A scalar promoted to an array of known size shares the promoted element
+/// too, and an array of unknown size records it as the array's scalar.
+#[test]
+fn promoted_scalar_shares_its_element() {
+    const N: usize = 1000;
+    let scalar = create_u32(7);
+
+    let u32_array = |size| anon_array(size, u32());
+    let Some(Value::AnonArray(promoted)) = scalar.convert(&u32_array(Some(N))) else {
+        panic!("expected an anonymous array");
+    };
+    assert_eq!(promoted.elements.len(), N);
+    let first = &promoted.elements[0];
+    assert!(promoted.elements.iter().all(|e| Arc::ptr_eq(e, first)));
+
+    // Unknown size: no elements, and the value is kept as the scalar
+    let Some(Value::AnonArray(unsized_array)) = scalar.convert(&u32_array(None)) else {
+        panic!("expected an anonymous array");
+    };
+    assert!(unsized_array.elements.is_empty());
+    assert!(unsized_array.scalar.is_some());
+}
+
+/// Converting and truncating an array preserve the sharing, so neither turns
+/// a shared default back into one copy per element.
+#[test]
+fn array_conversion_preserves_sharing() {
+    const N: usize = 2000;
+    let u8_array = anon_array(Some(N), u8());
+    let u32_array = anon_array(Some(N), u32());
+    let value = u8_array.default_value().expect("an array default");
+
+    for converted in [
+        value.convert(&u32_array),
+        value.truncate().convert(&u8_array),
+        Some(value.truncate()),
+    ] {
+        let Some(Value::AnonArray(a)) = converted else {
+            panic!("expected an anonymous array");
+        };
+        assert_eq!(a.elements.len(), N);
+        let first = &a.elements[0];
+        assert!(
+            a.elements.iter().all(|e| Arc::ptr_eq(e, first)),
+            "sharing was not preserved"
+        );
+    }
+}
+
 /// `Display` for every `Value` variant: the Scala `Value.toString`.
 #[test]
 fn value_display() {
