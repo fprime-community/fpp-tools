@@ -107,7 +107,8 @@ impl Span {
 
     /// Get the directory path associated with the location
     ///
-    /// For standard input, this is the current working directory.
+    /// For standard input, this is the current working directory. For a file
+    /// named by a `file://` URI, it is the directory of the path the URI names.
     pub fn get_dir_path(&self) -> PathBuf {
         self.file().get_dir_path()
     }
