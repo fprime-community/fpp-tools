@@ -119,3 +119,13 @@ fn duplicate_id_explicit() {
 fn format_two_bad_fields() {
     run_test("event/format_two_bad_fields")
 }
+
+#[test]
+fn duplicate_name_descending_ids() {
+    run_test("event/duplicate_name_descending_ids")
+}
+
+#[test]
+fn id_overflow() {
+    run_test("event/id_overflow")
+}

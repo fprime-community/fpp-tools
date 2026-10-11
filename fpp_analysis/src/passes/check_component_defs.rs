@@ -3,22 +3,23 @@ use crate::analyzers::analyzer::visit_expansion;
 use crate::errors::SemanticResult;
 use crate::semantics::{
     Command, Component, Container, Event, Param, PortInstance, Record, StateMachineInstance,
-    Symbol, TlmChannel,
+    TlmChannel,
 };
 use fpp_ast::{
     AstNode, DefComponent, DefModule, SpecCommand, SpecContainer, SpecEvent,
-    SpecGeneralPortInstance, SpecInterfaceImport, SpecInternalPort, SpecParam, SpecPortMatching,
-    SpecRecord, SpecSpecialPortInstance, SpecStateMachineInstance, SpecTemplateExpand,
-    SpecTlmChannel, Visitor, Walkable,
+    SpecGeneralPortInstance, SpecInterfaceImport, SpecInternalPort, SpecParam, SpecPortInstance,
+    SpecPortMatching, SpecRecord, SpecSpecialPortInstance, SpecStateMachineInstance,
+    SpecTemplateExpand, SpecTlmChannel, Visitor, Walkable,
 };
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-/// Check component definitions.
+/// Check component definitions
 pub struct CheckComponentDefs;
 
-/// Run a builder that produces an updated component, emitting any error and
-/// marking the component as broken (so subsequent members are skipped) on error.
+/// Runs a builder that updates the component under construction. On error,
+/// emits it and drops the component, so the rest of its members are skipped
+/// and it never reaches the component map.
 fn update(a: &mut Analysis, f: impl FnOnce(&Analysis, &mut Component) -> SemanticResult<()>) {
     let Some(mut component) = a.component.take() else {
         return;
@@ -43,6 +44,7 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         visit_expansion(self, a, node)
     }
 
+    /// Visit translation unit members and module members
     fn visit_def_module(
         &self,
         a: &mut Self::State,
@@ -80,9 +82,9 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecCommand,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let opcode = a.get_nonnegative_big_int_value_opt(&node.opcode)?;
+            let opcode_opt = a.get_nonnegative_big_int_value_opt(&node.opcode)?;
             let command = Command::from_spec_command(a, node)?;
-            component.add_command(opcode, command)
+            component.add_command(opcode_opt, command)
         });
         ControlFlow::Continue(())
     }
@@ -93,9 +95,9 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecContainer,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let id = a.get_nonnegative_big_int_value_opt(&node.id)?;
-            let container = Container::from_spec(a, node)?;
-            component.add_container(id, container)
+            let id_opt = a.get_nonnegative_big_int_value_opt(&node.id)?;
+            let container = Container::from_spec_container(a, node)?;
+            component.add_container(id_opt, container)
         });
         ControlFlow::Continue(())
     }
@@ -106,9 +108,9 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecEvent,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let id = a.get_nonnegative_big_int_value_opt(&node.id)?;
-            let event = Event::from_spec(a, node)?;
-            component.add_event(id, event)
+            let id_opt = a.get_nonnegative_big_int_value_opt(&node.id)?;
+            let event = Event::from_spec_event(a, node)?;
+            component.add_event(id_opt, event)
         });
         ControlFlow::Continue(())
     }
@@ -119,8 +121,8 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecInternalPort,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let instance = PortInstance::from_internal(a, node)?;
-            component.add_port_instance(instance)
+            let instance = PortInstance::from_spec_internal_port(a, node)?;
+            component.add_port_instance(PortInstance::Internal(instance))
         });
         ControlFlow::Continue(())
     }
@@ -131,10 +133,11 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecParam,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let id = a.get_nonnegative_big_int_value_opt(&node.id)?;
-            let (param, default_opcode) = Param::from_spec(a, node, component.default_opcode)?;
+            let id_opt = a.get_nonnegative_big_int_value_opt(&node.id)?;
+            let (param, default_opcode) =
+                Param::from_spec_param(a, node, component.default_opcode)?;
             component.default_opcode = default_opcode;
-            component.add_param(id, param)
+            component.add_param(id_opt, param)
         });
         ControlFlow::Continue(())
     }
@@ -145,7 +148,8 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecGeneralPortInstance,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let instance = PortInstance::from_general(a, node)?;
+            let instance =
+                PortInstance::from_spec_port_instance(a, &SpecPortInstance::General(node.clone()))?;
             component.add_port_instance(instance)
         });
         ControlFlow::Continue(())
@@ -157,7 +161,8 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecSpecialPortInstance,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let instance = PortInstance::from_special(a, node)?;
+            let instance =
+                PortInstance::from_spec_port_instance(a, &SpecPortInstance::Special(node.clone()))?;
             component.add_port_instance(instance)
         });
         ControlFlow::Continue(())
@@ -169,15 +174,10 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecInterfaceImport,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let symbol = match a.use_def_map.get(&node.interface.id()) {
-                Some(symbol @ Symbol::Interface(_)) => symbol.clone(),
-                _ => return Ok(()),
+            let Some(iface) = a.get_interface(node.interface.id())? else {
+                return Ok(());
             };
-            let interface = match a.interface_map.get(&symbol) {
-                Some(iface) => iface.clone(),
-                None => return Ok(()),
-            };
-            component.add_imported_interface(&interface, node.node_id)
+            component.add_imported_interface(&iface, node.node_id)
         });
         ControlFlow::Continue(())
     }
@@ -188,7 +188,9 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecPortMatching,
     ) -> ControlFlow<Self::Break> {
         update(a, |_a, component| {
-            component.add_spec_port_matching(Arc::new(node.clone()));
+            component
+                .spec_port_matching_list
+                .insert(0, Arc::new(node.clone()));
             Ok(())
         });
         ControlFlow::Continue(())
@@ -200,9 +202,9 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecRecord,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let id = a.get_nonnegative_big_int_value_opt(&node.id)?;
-            let record = Record::from_spec(a, node)?;
-            component.add_record(id, record)
+            let id_opt = a.get_nonnegative_big_int_value_opt(&node.id)?;
+            let record = Record::from_spec_record(a, node)?;
+            component.add_record(id_opt, record)
         });
         ControlFlow::Continue(())
     }
@@ -212,12 +214,15 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         a: &mut Self::State,
         node: &'ast SpecStateMachineInstance,
     ) -> ControlFlow<Self::Break> {
-        update(a, |a, component| {
-            match StateMachineInstance::from_spec(a, node)? {
-                Some(instance) => component.add_state_machine_instance(instance),
+        update(
+            a,
+            |a, component| match StateMachineInstance::from_spec_state_machine(a, node)? {
+                Some(state_machine_instance) => {
+                    component.add_state_machine_instance(state_machine_instance)
+                }
                 None => Ok(()),
-            }
-        });
+            },
+        );
         ControlFlow::Continue(())
     }
 
@@ -227,9 +232,9 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecTlmChannel,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let id = a.get_nonnegative_big_int_value_opt(&node.id)?;
-            let channel = TlmChannel::from_spec(a, node)?;
-            component.add_tlm_channel(id, channel)
+            let id_opt = a.get_nonnegative_big_int_value_opt(&node.id)?;
+            let tlm_channel = TlmChannel::from_spec_tlm_channel(a, node)?;
+            component.add_tlm_channel(id_opt, tlm_channel)
         });
         ControlFlow::Continue(())
     }

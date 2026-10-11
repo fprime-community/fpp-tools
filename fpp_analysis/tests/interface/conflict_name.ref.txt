@@ -1,7 +1,12 @@
- --> [ local path prefix ]/interface/conflict_name.fpp:4:5
+ --> [ local path prefix ]/interface/conflict_name.fpp:9:5
+  |
+9 |     import I
+  |     ^^^^^^^^ failed to import interface
+  |
+ ::: [ local path prefix ]/interface/conflict_name.fpp:4:5
   |
 4 |     async input port P: P
-  |     ^^^^^^^^^^^^^^^^^^^^^ duplicate port instance P
+  |     --------------------- duplicate port instance P
   |
  ::: [ local path prefix ]/interface/conflict_name.fpp:9:5
   |
@@ -12,9 +17,4 @@
   |
 8 |     output port P: P
   |     ---------------- previous instance is here
-  |
- ::: [ local path prefix ]/interface/conflict_name.fpp:9:5
-  |
-9 |     import I
-  |     -------- failed to import interface here
 

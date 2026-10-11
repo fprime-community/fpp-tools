@@ -59,3 +59,8 @@ fn missing_product_send_port() {
 fn duplicate_id_explicit() {
     run_test("container/duplicate_id_explicit")
 }
+
+#[test]
+fn missing_record_order() {
+    run_test("container/missing_record_order")
+}

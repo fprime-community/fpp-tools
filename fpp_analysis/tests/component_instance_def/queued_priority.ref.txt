@@ -1,5 +1,5 @@
   --> [ local path prefix ]/component_instance_def/queued_priority.fpp:11:12
    |
 11 |   priority 10
-   |            ^^ invalid instance c: queued component may not have priority
+   |            ^^ invalid component instance definition c: queued component may not have priority
 

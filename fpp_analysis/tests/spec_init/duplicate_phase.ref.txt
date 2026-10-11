@@ -3,7 +3,7 @@
 10 | /   phase 0 """
 11 | |   c phase 0
 12 | |   """
-   | |_____^ duplicate init specifier for phase 0
+   | |_____^ duplicate initialization for phase 0
    |
   ::: [ local path prefix ]/spec_init/duplicate_phase.fpp:7:3
    |

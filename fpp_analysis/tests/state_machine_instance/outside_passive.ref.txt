@@ -1,5 +1,5 @@
  --> [ local path prefix ]/state_machine_instance/outside_passive.fpp:5:3
   |
 5 |   state machine instance s1: S
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ passive component may not have state machine instances
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ passive component may not have a state machine instance
 

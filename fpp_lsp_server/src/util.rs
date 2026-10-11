@@ -966,7 +966,7 @@ pub(crate) fn port_instance_at_position<'a>(
 /// signature + annotation format used by the port completion items.
 pub fn hover_for_port_instance(state: &GlobalState, hover_node: Node, pi: &PortInstance) -> Hover {
     let direction = Direction::show(&pi.get_direction());
-    let port_ty = PortInstanceType::show(&pi.get_type());
+    let port_ty = PortInstanceType::show(&state.analysis, &pi.get_type());
     let signature = port_signature(state, pi).unwrap_or_default();
 
     let node_data = state.context.node_get(&pi.get_node_id());
@@ -1425,7 +1425,7 @@ fn completion_items_for_ports(
         })
         .map(|pi| {
             let direction = Direction::show(&pi.get_direction());
-            let port_ty = PortInstanceType::show(&pi.get_type());
+            let port_ty = PortInstanceType::show(&state.analysis, &pi.get_type());
             let signature = port_signature(state, pi);
 
             // The annotation on the port instance definition, if any.

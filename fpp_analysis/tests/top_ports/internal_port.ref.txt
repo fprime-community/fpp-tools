@@ -6,5 +6,5 @@
   ::: [ local path prefix ]/top_ports/internal_port.fpp:7:3
    |
  7 |   internal port P(x: U32)
-   |   ----------------------- defined here
+   |   ----------------------- port definition is here
 

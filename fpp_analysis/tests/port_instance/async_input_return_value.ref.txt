@@ -3,8 +3,8 @@
 5 |   async input port p: P
   |   ^^^^^^^^^^^^^^^^^^^^^ async input port may not return a value
   |
- ::: [ local path prefix ]/port_instance/async_input_return_value.fpp:1:6
+ ::: [ local path prefix ]/port_instance/async_input_return_value.fpp:1:1
   |
 1 | port P -> U32
-  |      - defined here
+  | ------------- port definition is here
 

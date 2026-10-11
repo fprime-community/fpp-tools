@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/event/duplicate_name_descending_ids.fpp:5:3
+  |
+5 |   event E severity activity low id 1 format ""
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ duplicate event name E
+  |
+ ::: [ local path prefix ]/event/duplicate_name_descending_ids.fpp:3:3
+  |
+3 |   event E severity activity low id 5 format ""
+  |   -------------------------------------------- previous occurrence is here
+

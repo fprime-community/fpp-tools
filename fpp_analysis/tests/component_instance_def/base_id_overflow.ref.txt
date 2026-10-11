@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/component_instance_def/base_id_overflow.fpp:22:23
+   |
+22 | instance c: C base id 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the ID range starting at base ID 170141183460469231731687303715884105727 is out of range
+

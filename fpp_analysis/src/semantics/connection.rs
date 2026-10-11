@@ -563,8 +563,8 @@ impl Connection {
             is_unmatched: conn.is_unmatched,
         };
         connection.check_directions()?;
-        connection.check_types()?;
-        connection.check_serial_with_typed_input()?;
+        connection.check_types(a)?;
+        connection.check_serial_with_typed_input(a)?;
         if !connection.is_match_constrained(a) && connection.is_unmatched {
             return Err(SemanticError::MissingPortMatching {
                 loc: connection.get_loc(),
@@ -599,7 +599,7 @@ impl Connection {
     }
 
     /// Check that the connection's port types are compatible.
-    fn check_types(&self) -> SemanticResult {
+    fn check_types(&self, a: &Analysis) -> SemanticResult {
         let from_instance = &self.from.port.port_instance;
         let to_instance = &self.to.port.port_instance;
         let from_type = from_instance.get_type();
@@ -609,8 +609,8 @@ impl Connection {
         } else {
             let msg = format!(
                 "cannot connect port types {} and {}",
-                PortInstanceType::show(&from_type),
-                PortInstanceType::show(&to_type)
+                PortInstanceType::show(a, &from_type),
+                PortInstanceType::show(a, &to_type)
             );
             Err(SemanticError::InvalidConnection {
                 loc: self.get_loc(),
@@ -625,7 +625,7 @@ impl Connection {
 
     /// Check the case of a serial port connected to a typed port that returns a
     /// value, in either direction.
-    fn check_serial_with_typed_input(&self) -> SemanticResult {
+    fn check_serial_with_typed_input(&self, a: &Analysis) -> SemanticResult {
         let from_instance = &self.from.port.port_instance;
         let to_instance = &self.to.port.port_instance;
         let from_type = from_instance.get_type();
@@ -635,7 +635,7 @@ impl Connection {
                 if let Some(def_loc) = to_def.port_returns_value() {
                     let msg = format!(
                         "cannot connect serial output port to input port of type {}, which returns a value",
-                        PortInstanceType::show(&to_type)
+                        PortInstanceType::show(a, &to_type)
                     );
                     return Err(SemanticError::InvalidConnection {
                         loc: self.get_loc(),
@@ -651,7 +651,7 @@ impl Connection {
                 if let Some(def_loc) = from_def.port_returns_value() {
                     let msg = format!(
                         "cannot connect output port of type {}, which returns a value, to serial input port",
-                        PortInstanceType::show(&from_type)
+                        PortInstanceType::show(a, &from_type)
                     );
                     return Err(SemanticError::InvalidConnection {
                         loc: self.get_loc(),
@@ -707,7 +707,7 @@ impl Analysis {
                 .map(InterfaceInstance::from_topology),
             Some(Symbol::TemplateInterfaceArg { param_def, value }) => {
                 let instance = self.get_interface_instance(value.id())?;
-                let interface = self.get_interface(param_def.interface.id())?;
+                let interface = self.get_interface(param_def.interface.id()).ok()??;
                 Some(InterfaceInstance::from_template_arg(
                     param_def.clone(),
                     interface,
@@ -735,30 +735,6 @@ impl Analysis {
             }),
             // Unresolved use: CheckUses already reported the error.
             None => Ok(None),
-        }
-    }
-
-    /// Resolve a use node to an interface.
-    pub fn get_interface(&self, id: fpp_core::Node) -> Option<Interface> {
-        match self.use_def_map.get(&id) {
-            Some(symbol @ Symbol::Interface(_)) => self.interface_map.get(symbol).cloned(),
-            _ => None,
-        }
-    }
-
-    /// Whether a port instance is a general port with the given direction and
-    /// fully qualified port type name.
-    pub fn is_general_port(
-        &self,
-        pi: &PortInstance,
-        direction: Direction,
-        port_type_name: &str,
-    ) -> bool {
-        match (pi.get_type(), pi.get_direction()) {
-            (Some(PortInstanceType::DefPort(def)), Some(d)) => {
-                self.get_qualified_name(&Symbol::Port(def)) == port_type_name && d == direction
-            }
-            _ => false,
         }
     }
 }

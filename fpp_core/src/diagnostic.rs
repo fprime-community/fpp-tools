@@ -86,6 +86,18 @@ impl Diagnostic {
     diagnostic_child_methods!(span_annotation, annotation, DiagnosticMessageKind::Primary);
     diagnostic_child_methods!(span_note, note, DiagnosticMessageKind::Note);
 
+    /// Adds `inner` to `self` as the error that caused it: a note at the span of
+    /// `inner` carrying its message, followed by the child messages of `inner`.
+    pub fn span_note_diagnostic(mut self, inner: Diagnostic) -> Diagnostic {
+        self.children.push(DiagnosticMessage {
+            kind: DiagnosticMessageKind::Note,
+            message: inner.msg,
+            span: Some(inner.span),
+        });
+        self.children.extend(inner.children);
+        self
+    }
+
     /// Emit the diagnostic.
     pub fn emit(self) {
         with(|w| w.diagnostic_emit(self));

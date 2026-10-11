@@ -124,3 +124,18 @@ fn shadowed_type_error() {
 fn shadowed_type_ok() {
     run_test("component/shadowed_type_ok")
 }
+
+#[test]
+fn import_module() {
+    run_test("component/import_module")
+}
+
+#[test]
+fn passive_async_input_order() {
+    run_test("component/passive_async_input_order")
+}
+
+#[test]
+fn passive_async_command_order() {
+    run_test("component/passive_async_command_order")
+}

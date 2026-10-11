@@ -1,14 +1,15 @@
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
-    Component, ComponentInstance, Dictionary, FppSystem, FrameworkDefinitions, ImpliedUse,
-    ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, MathError, MathResult, NameGroup,
-    NestedScope, QualifiedName, Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion,
-    TlmPacketSet, Topology, Type, TypeConversionError, UseDefMatching, Value,
+    Component, ComponentInstance, Dictionary, Direction, FppSystem, FrameworkDefinitions,
+    ImpliedUse, ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, MathError, MathResult,
+    NameGroup, NestedScope, PortInstance, PortInstanceType, QualifiedName, Scope, ScopeOwner,
+    Symbol, SymbolInterface, TemplateExpansion, TlmPacketSet, Topology, Type, TypeConversionError,
+    UseDefMatching, Value,
     state_machine::StateMachine,
 };
 use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc};
 use fpp_core::{File, SourceFile, Span, Spanned};
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
 /// Whether to keep or omit a component prefix when computing a short name
@@ -83,8 +84,9 @@ pub struct Analysis {
     pub component_map: HashMap<Symbol, Component>,
     /// The component under construction
     pub(crate) component: Option<Component>,
-    /// The map from component instance symbols to component instances
-    pub component_instance_map: HashMap<Symbol, ComponentInstance>,
+    /// The map from component instance symbols to component instances, in
+    /// the order the instances were checked
+    pub component_instance_map: indexmap::IndexMap<Symbol, ComponentInstance, FxBuildHasher>,
     /// The component instance under construction
     pub(crate) component_instance: Option<ComponentInstance>,
     /// The map from interface symbols to interfaces
@@ -523,6 +525,13 @@ impl Analysis {
         }
     }
 
+    /// Gets an interface from the interface definition map
+    pub fn get_interface(&self, id: fpp_core::Node) -> SemanticResult<Option<Interface>> {
+        Ok(self
+            .get_interface_symbol(id)?
+            .and_then(|symbol| self.interface_map.get(&symbol).cloned()))
+    }
+
     /// Gets a topology symbol from the use-def map
     pub fn get_topology_symbol(&self, id: fpp_core::Node) -> SemanticResult<Option<Symbol>> {
         match self.use_def_map.get(&id) {
@@ -811,14 +820,23 @@ impl Analysis {
         get_loc: impl Fn(&T) -> Span,
     ) -> SemanticResult<i128> {
         match map.get(&id) {
+            // Element already there: report the error
             Some(prev) => Err(SemanticError::DuplicateIdValue {
                 value: Analysis::display_id_value(id),
                 loc: get_loc(&element),
                 prev_loc: get_loc(prev),
             }),
+            // New element: compute the new map and the new default ID
             None => {
+                let next = id
+                    .checked_add(1)
+                    .ok_or_else(|| SemanticError::InvalidIntValue {
+                        loc: get_loc(&element),
+                        v: None,
+                        msg: format!("the default identifier after {} is out of range", id),
+                    })?;
                 map.insert(id, element);
-                Ok(id + 1)
+                Ok(next)
             }
         }
     }
@@ -831,7 +849,7 @@ impl Analysis {
         get_loc: impl Fn(&T) -> Span,
     ) -> SemanticResult {
         let mut seen: HashMap<String, Span> = HashMap::default();
-        for value in dictionary.values_by_id() {
+        for value in dictionary.values_in_order() {
             let name = get_name(value);
             let loc = get_loc(value);
             if let Some(prev_loc) = seen.insert(name.clone(), loc) {
@@ -862,19 +880,34 @@ impl Analysis {
         }
     }
 
-    /// Check that a formal parameter list has no duplicate parameter names.
+    /// Check for duplicate parameter
     pub fn check_for_duplicate_parameter(params: &[FormalParam]) -> SemanticResult {
         let mut seen: HashMap<String, Span> = HashMap::default();
         for param in params {
-            if let Some(prev_loc) = seen.insert(param.name.data.clone(), param.name.span()) {
+            if let Some(prev_loc) = seen.insert(param.name.data.clone(), param.span()) {
                 return Err(SemanticError::DuplicateParameter {
                     name: param.name.data.clone(),
-                    loc: param.name.span(),
+                    loc: param.span(),
                     prev_loc,
                 });
             }
         }
         Ok(())
+    }
+
+    /// Checks whether a port instance is the specified general port
+    pub fn is_general_port(
+        &self,
+        pi: &PortInstance,
+        direction: Direction,
+        port_type_name: &str,
+    ) -> bool {
+        match (pi.get_type(), pi.get_direction()) {
+            (Some(PortInstanceType::DefPort(def)), Some(d)) => {
+                self.get_qualified_name(&Symbol::Port(def)) == port_type_name && d == direction
+            }
+            _ => false,
+        }
     }
 
     /// Gets the reason for a non-displayable type at an AST node id, as the
@@ -1107,8 +1140,10 @@ impl Analysis {
 pub trait IdMap<T> {
     fn get(&self, id: &i128) -> Option<&T>;
     fn insert(&mut self, id: i128, element: T);
-    /// The values of the map, in id order
-    fn values_by_id(&self) -> Vec<&T>;
+    /// The values of the map in the order [`Analysis::check_dictionary_names`]
+    /// visits them: insertion order for an insertion-ordered map, id order
+    /// otherwise
+    fn values_in_order(&self) -> Vec<&T>;
 }
 
 impl<T> IdMap<T> for HashMap<i128, T> {
@@ -1120,10 +1155,24 @@ impl<T> IdMap<T> for HashMap<i128, T> {
         HashMap::insert(self, id, element);
     }
 
-    fn values_by_id(&self) -> Vec<&T> {
+    fn values_in_order(&self) -> Vec<&T> {
         let mut ids: Vec<&i128> = self.keys().collect();
         ids.sort();
         ids.into_iter().map(|id| &self[id]).collect()
+    }
+}
+
+impl<T> IdMap<T> for indexmap::IndexMap<i128, T, FxBuildHasher> {
+    fn get(&self, id: &i128) -> Option<&T> {
+        indexmap::IndexMap::get(self, id)
+    }
+
+    fn insert(&mut self, id: i128, element: T) {
+        indexmap::IndexMap::insert(self, id, element);
+    }
+
+    fn values_in_order(&self) -> Vec<&T> {
+        self.values().collect()
     }
 }
 
@@ -1136,7 +1185,7 @@ impl<T> IdMap<T> for std::collections::BTreeMap<i128, T> {
         std::collections::BTreeMap::insert(self, id, element);
     }
 
-    fn values_by_id(&self) -> Vec<&T> {
+    fn values_in_order(&self) -> Vec<&T> {
         self.values().collect()
     }
 }

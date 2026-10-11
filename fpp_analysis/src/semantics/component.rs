@@ -1,664 +1,105 @@
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
-    Format, GeneralPortInstance, PortInstance, PortInterface, SpecialPortInstance, Symbol,
-    SymbolInterface, Type, Value, state_machine,
+    Command, Container, Event, GeneralPortInstance, Interface, NonParamKind, Param, ParamKind,
+    PortInstance, PortInterface, Record, SpecialPortInstance, StateMachineInstance, Symbol,
+    TlmChannel, state_machine,
 };
 use fpp_ast::{
-    AstNode, ComponentKind, DefComponent, Ident, InputPortKind, QueueFull, SpecCommand,
-    SpecContainer, SpecEvent, SpecParam, SpecPortMatching, SpecRecord, SpecStateMachineInstance,
-    SpecTlmChannel, SpecialPortInstanceKind, TlmChannelLimitKind, TlmChannelUpdate,
+    ComponentKind, DefComponent, Ident, InputPortKind, SpecPortMatching, SpecialPortInstanceKind,
 };
 use fpp_core::{Node, Span, Spanned};
-use rustc_hash::FxHashMap as HashMap;
+use indexmap::IndexMap;
+use rustc_hash::FxBuildHasher;
 use std::sync::Arc;
 
-/// An FPP command.
-#[derive(Debug, Clone)]
-pub enum Command {
-    /// A non-parameter command.
-    NonParam {
-        node: Arc<SpecCommand>,
-        kind: NonParamKind,
-    },
-    /// A parameter command, i.e. the set or save command implied by a
-    /// parameter specifier.
-    Param {
-        node: Arc<SpecParam>,
-        kind: ParamKind,
-    },
-}
-
-/// The kind of a non-parameter command.
-#[derive(Debug, Clone)]
-pub enum NonParamKind {
-    Async {
-        priority: Option<i128>,
-        queue_full: QueueFull,
-    },
-    Guarded,
-    Sync,
-}
-
-/// The kind of a parameter command.
-#[derive(Debug, Clone)]
-pub enum ParamKind {
-    Save,
-    Set,
-}
-
-impl Command {
-    /// Gets the location of the command.
-    pub fn get_loc(&self) -> Span {
-        match self {
-            Command::NonParam { node, .. } => node.span(),
-            Command::Param { node, .. } => node.span(),
-        }
-    }
-
-    /// Gets the name of the command.
-    pub fn get_name(&self) -> String {
-        match self {
-            Command::NonParam { node, .. } => node.name.data.clone(),
-            Command::Param { node, kind } => {
-                let param_name = node.name.data.to_uppercase();
-                match kind {
-                    ParamKind::Save => format!("{}_PRM_SAVE", param_name),
-                    ParamKind::Set => format!("{}_PRM_SET", param_name),
-                }
-            }
-        }
-    }
-
-    pub fn is_async(&self) -> bool {
-        matches!(
-            self,
-            Command::NonParam {
-                kind: NonParamKind::Async { .. },
-                ..
-            }
-        )
-    }
-
-    /// Creates a command from a command specifier.
-    pub fn from_spec_command(a: &Analysis, node: &SpecCommand) -> SemanticResult<Command> {
-        let loc = node.span();
-        if !matches!(node.kind, InputPortKind::Async) {
-            if let Some(priority) = &node.priority {
-                return Err(SemanticError::InvalidPriority {
-                    loc: priority.span(),
-                });
-            }
-            if let Some(queue_full) = &node.queue_full {
-                return Err(SemanticError::InvalidQueueFull {
-                    loc: queue_full.span(),
-                });
-            }
-        }
-        let priority = a.get_big_int_value_opt(&node.priority);
-        Analysis::check_for_duplicate_parameter(&node.params)?;
-        if Analysis::get_num_ref_params(&node.params) != 0 {
-            return Err(SemanticError::InvalidCommand {
-                loc,
-                msg: "command may not have ref parameters".to_string(),
-            });
-        }
-        a.check_displayable_params(&node.params, "type of command parameter is not displayable")?;
-        let kind = match node.kind {
-            InputPortKind::Async => NonParamKind::Async {
-                priority,
-                queue_full: Analysis::get_specified_queue_full(&node.queue_full),
-            },
-            InputPortKind::Guarded => NonParamKind::Guarded,
-            InputPortKind::Sync => NonParamKind::Sync,
-        };
-        Ok(Command::NonParam {
-            node: Arc::new(node.clone()),
-            kind,
-        })
-    }
-}
-
-/// A map from limit kinds to the node and value of the limit.
-pub type Limits = HashMap<TlmChannelLimitKind, (Node, Value)>;
-
-/// A telemetry channel.
-#[derive(Debug, Clone)]
-pub struct TlmChannel {
-    pub node: Arc<SpecTlmChannel>,
-    pub channel_type: Arc<Type>,
-    pub update: TlmChannelUpdate,
-    pub format: Option<Format>,
-    pub low_limits: Limits,
-    pub high_limits: Limits,
-}
-
-impl TlmChannel {
-    /// Gets the name of the channel.
-    pub fn get_name(&self) -> &str {
-        &self.node.name.data
-    }
-
-    /// Gets the location of the channel.
-    pub fn get_loc(&self) -> Span {
-        self.node.span()
-    }
-
-    /// Creates a telemetry channel from a telemetry channel specifier.
-    pub fn from_spec(a: &Analysis, node: &SpecTlmChannel) -> SemanticResult<TlmChannel> {
-        let channel_type = a.get_finalized_type(node.type_name.node_id).unwrap();
-        let update = node.update.clone().unwrap_or(TlmChannelUpdate::Always);
-        let format = node
-            .format
-            .as_ref()
-            .map(|format| Format::new(format, vec![(channel_type.clone(), node.type_name.span())]));
-        let low_limits = compute_limits(a, &node.low)?;
-        let high_limits = compute_limits(a, &node.high)?;
-        a.check_displayable_type(
-            node.type_name.node_id,
-            node.type_name.span(),
-            "type of telemetry channel is not displayable",
-        )?;
-        Ok(TlmChannel {
-            node: Arc::new(node.clone()),
-            channel_type,
-            update,
-            format,
-            low_limits,
-            high_limits,
-        })
-    }
-}
-
-/// Computes limits from AST limits.
-fn compute_limits(a: &Analysis, limits: &[fpp_ast::TlmChannelLimit]) -> SemanticResult<Limits> {
-    let mut result = Limits::default();
-    // The kinds seen so far. Kept separately from `result`, because a limit
-    // whose expression has no value is still a duplicate of one that does.
-    let mut seen: HashMap<TlmChannelLimitKind, Node> = HashMap::default();
-    for limit in limits {
-        if let Some(prev_node) = seen.insert(limit.kind.clone(), limit.node_id) {
-            return Err(SemanticError::DuplicateLimit {
-                loc: limit.span(),
-                prev_loc: prev_node.span(),
-            });
-        }
-        // A limit expression with no value had its error reported by an
-        // earlier pass; omit it from the map.
-        if let Some(value) = a.value_map.get(&limit.value.node_id) {
-            result.insert(limit.kind.clone(), (limit.node_id, value.clone()));
-        }
-    }
-    Ok(result)
-}
-
-/// A data product record.
-#[derive(Debug, Clone)]
-pub struct Record {
-    pub node: Arc<SpecRecord>,
-    pub record_type: Arc<Type>,
-    pub is_array: bool,
-}
-
-impl Record {
-    /// Gets the name of the record.
-    pub fn get_name(&self) -> &str {
-        &self.node.name.data
-    }
-
-    /// Gets the location of the record.
-    pub fn get_loc(&self) -> Span {
-        self.node.span()
-    }
-
-    /// Creates a record from a record specifier.
-    pub fn from_spec(a: &Analysis, node: &SpecRecord) -> SemanticResult<Record> {
-        let record_type = a.get_finalized_type(node.record_type.node_id).unwrap();
-        a.check_displayable_type(
-            node.record_type.node_id,
-            node.record_type.span(),
-            "type of record is not displayable",
-        )?;
-        Ok(Record {
-            node: Arc::new(node.clone()),
-            record_type,
-            is_array: node.is_array,
-        })
-    }
-}
-
-/// A data product container.
-#[derive(Debug, Clone)]
-pub struct Container {
-    pub node: Arc<SpecContainer>,
-    pub default_priority: Option<i128>,
-}
-
-impl Container {
-    /// Gets the name of the container.
-    pub fn get_name(&self) -> &str {
-        &self.node.name.data
-    }
-
-    /// Gets the location of the container.
-    pub fn get_loc(&self) -> Span {
-        self.node.span()
-    }
-
-    /// Creates a container from a container specifier.
-    pub fn from_spec(a: &Analysis, node: &SpecContainer) -> SemanticResult<Container> {
-        let default_priority = a.get_nonnegative_big_int_value_opt(&node.default_priority)?;
-        Ok(Container {
-            node: Arc::new(node.clone()),
-            default_priority,
-        })
-    }
-}
-
-/// A parameter.
-#[derive(Debug, Clone)]
-pub struct Param {
-    pub node: Arc<SpecParam>,
-    pub param_type: Arc<Type>,
-    pub default: Option<Value>,
-    pub set_opcode: i128,
-    pub save_opcode: i128,
-    pub is_external: bool,
-}
-
-impl Param {
-    /// Gets the name of the parameter.
-    pub fn get_name(&self) -> &str {
-        &self.node.name.data
-    }
-
-    /// Gets the location of the parameter.
-    pub fn get_loc(&self) -> Span {
-        self.node.span()
-    }
-
-    /// Create a parameter, returning it plus the updated default opcode.
-    pub fn from_spec(
-        a: &Analysis,
-        node: &SpecParam,
-        default_opcode: i128,
-    ) -> SemanticResult<(Param, i128)> {
-        let param_type = a.get_finalized_type(node.type_name.node_id).unwrap();
-        let mut default = None;
-        if let Some(default_node) = &node.default {
-            if let Some(default_ty) = a.type_map.get(&default_node.node_id)
-                && let Err(err) = Type::convert(default_ty, &param_type)
-            {
-                return Err(SemanticError::TypeMismatch {
-                    loc: default_node.span(),
-                    msg: format!("default value cannot be converted to {}", param_type),
-                    reason: Some(Box::new(err)),
-                });
-            }
-            default = a
-                .value_map
-                .get(&default_node.node_id)
-                .and_then(|v| v.convert(&param_type));
-        }
-        let set_opcode_opt = a.get_nonnegative_big_int_value_opt(&node.set_opcode)?;
-        let save_opcode_opt = a.get_nonnegative_big_int_value_opt(&node.save_opcode)?;
-        a.check_displayable_type(
-            node.type_name.node_id,
-            node.type_name.span(),
-            "type of parameter is not displayable",
-        )?;
-        let (set_opcode, default1) = compute_opcode(set_opcode_opt, default_opcode);
-        let (save_opcode, default2) = compute_opcode(save_opcode_opt, default1);
-        Ok((
-            Param {
-                node: Arc::new(node.clone()),
-                param_type,
-                default,
-                set_opcode,
-                save_opcode,
-                is_external: node.is_external,
-            },
-            default2,
-        ))
-    }
-}
-
-fn compute_opcode(int_opt: Option<i128>, default_opcode: i128) -> (i128, i128) {
-    match int_opt {
-        Some(i) => (i, default_opcode),
-        None => (default_opcode, default_opcode + 1),
-    }
-}
-
-/// A time interval, as used in an event throttle.
-#[derive(Debug, Clone)]
-pub struct TimeInterval {
-    pub seconds: i64,
-    pub useconds: i32,
-}
-
-/// An event throttle.
-#[derive(Debug, Clone)]
-pub struct Throttle {
-    pub count: i32,
-    pub every: Option<TimeInterval>,
-}
-
-/// An event.
-#[derive(Debug, Clone)]
-pub struct Event {
-    pub node: Arc<SpecEvent>,
-    pub format: Format,
-    pub throttle: Option<Throttle>,
-}
-
-impl Event {
-    /// Gets the name of the event.
-    pub fn get_name(&self) -> &str {
-        &self.node.name.data
-    }
-
-    /// Gets the location of the event.
-    pub fn get_loc(&self) -> Span {
-        self.node.span()
-    }
-
-    /// Creates an event from an event specifier.
-    pub fn from_spec(a: &Analysis, node: &SpecEvent) -> SemanticResult<Event> {
-        let loc = node.span();
-        if Analysis::get_num_ref_params(&node.params) != 0 {
-            return Err(SemanticError::InvalidEvent {
-                loc,
-                msg: "event may not have ref parameters".to_string(),
-            });
-        }
-        a.check_displayable_params(&node.params, "type of event is not displayable")?;
-        let types: Vec<(Arc<Type>, Span)> = node
-            .params
-            .iter()
-            .filter_map(|p| {
-                a.type_map
-                    .get(&p.type_name.node_id)
-                    .map(|t| (t.clone(), p.type_name.span()))
-            })
-            .collect();
-        let format = Format::new(&node.format, types);
-        let throttle = match &node.throttle {
-            Some(throttle) => Some(check_event_throttle(a, throttle, loc)?),
-            None => None,
-        };
-        Ok(Event {
-            node: Arc::new(node.clone()),
-            format,
-            throttle,
-        })
-    }
-}
-
-fn check_event_throttle(
-    a: &Analysis,
-    throttle: &fpp_ast::EventThrottle,
-    loc: Span,
-) -> SemanticResult<Throttle> {
-    let count = a.get_nonnegative_int_value(throttle.count.node_id, throttle.count.span())?;
-    if count == 0 {
-        return Err(SemanticError::InvalidEvent {
-            loc,
-            msg: "event throttle count must be greater than zero".to_string(),
-        });
-    }
-    let every = match &throttle.every {
-        Some(every) => check_throttle_interval(a, every)?,
-        None => None,
-    };
-    Ok(Throttle {
-        count: count as i32,
-        every,
-    })
-}
-
-/// Computes the time interval of an event throttle.
-///
-/// Returns `None` when the interval expression has no value of the shape
-/// `{ seconds: U32, useconds: U32 }`. That can only happen on an expression
-/// whose error CheckExprTypes already reported, so there is nothing to add here;
-/// the only diagnostics from here are the range checks.
-fn check_throttle_interval(
-    a: &Analysis,
-    every: &fpp_ast::Expr,
-) -> SemanticResult<Option<TimeInterval>> {
-    let loc = every.span();
-    use crate::semantics::{AnonStructType, StructValue};
-    let u32_ty = Arc::new(Type::PrimitiveInt(fpp_ast::IntegerKind::U32));
-    let interval_ty = Arc::new(Type::AnonStruct(AnonStructType {
-        members: vec![
-            ("seconds".to_string(), u32_ty.clone()),
-            ("useconds".to_string(), u32_ty.clone()),
-        ],
-    }));
-
-    let Some(value) = a.value_map.get(&every.node_id) else {
-        return Ok(None);
-    };
-    let interval = match value.convert(&interval_ty) {
-        Some(Value::Struct(StructValue { anon_struct, .. }))
-        | Some(Value::AnonStruct(anon_struct)) => anon_struct,
-        _ => return Ok(None),
-    };
-
-    let Some(seconds) = check_interval_member(&interval, "seconds", u32::MAX as i128, loc)? else {
-        return Ok(None);
-    };
-    let Some(useconds) = check_interval_member(&interval, "useconds", 999_999, loc)? else {
-        return Ok(None);
-    };
-    Ok(Some(TimeInterval {
-        seconds: seconds as i64,
-        useconds: useconds as i32,
-    }))
-}
-
-/// Checks one member of a throttle interval against its range. Returns `None`
-/// if the member is absent or not an integer; see `check_throttle_interval`.
-fn check_interval_member(
-    interval: &crate::semantics::AnonStructValue,
-    member: &str,
-    max_value: i128,
-    loc: Span,
-) -> SemanticResult<Option<i128>> {
-    use crate::semantics::{IntegerValue, PrimitiveIntegerValue};
-    let u32_ty = Arc::new(Type::PrimitiveInt(fpp_ast::IntegerKind::U32));
-    let v = match interval
-        .members
-        .get(member)
-        .and_then(|v| v.convert(&u32_ty))
-    {
-        Some(Value::PrimitiveInteger(PrimitiveIntegerValue { value, .. }))
-        | Some(Value::Integer(IntegerValue(value))) => value,
-        _ => return Ok(None),
-    };
-    if v < 0 || v > max_value {
-        return Err(SemanticError::InvalidIntValue {
-            loc,
-            v: Some(v),
-            msg: format!("{} must be in the range [0, {}]", member, max_value),
-        });
-    }
-    Ok(Some(v))
-}
-
-/// A state machine instance.
-#[derive(Debug, Clone)]
-pub struct StateMachineInstance {
-    pub node: Arc<SpecStateMachineInstance>,
-    pub state_machine: Arc<fpp_ast::DefStateMachine>,
-    pub priority: Option<i128>,
-    pub queue_full: QueueFull,
-}
-
-impl StateMachineInstance {
-    /// Gets the location of the state machine instance.
-    pub fn get_loc(&self) -> Span {
-        self.node.span()
-    }
-
-    /// Gets the node ID.
-    pub fn get_node_id(&self) -> Node {
-        self.node.node_id
-    }
-
-    /// Gets the name of the state machine instance.
-    pub fn get_name(&self) -> &str {
-        &self.node.name.data
-    }
-
-    /// Gets the symbol of the state machine this is an instance of.
-    pub fn symbol(&self) -> Symbol {
-        Symbol::StateMachine(self.state_machine.clone())
-    }
-
-    /// Gets the state machine kind.
-    pub fn get_sm_kind(&self) -> state_machine::Kind {
-        state_machine::StateMachine::get_symbol_kind(&self.state_machine)
-    }
-
-    pub fn from_spec(
-        a: &Analysis,
-        node: &SpecStateMachineInstance,
-    ) -> SemanticResult<Option<StateMachineInstance>> {
-        let priority = a.get_big_int_value_opt(&node.priority);
-        let queue_full = Analysis::get_queue_full(&node.queue_full);
-        let state_machine = match a.use_def_map.get(&node.state_machine.id()) {
-            Some(Symbol::StateMachine(sm)) => sm.clone(),
-            Some(symbol) => {
-                return Err(SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
-                    loc: node.state_machine.span(),
-                    msg: "not a state machine symbol".to_string(),
-                    def_loc: symbol.node().span(),
-                });
-            }
-            // Unresolved use: CheckUses already reported the error.
-            None => return Ok(None),
-        };
-        Ok(Some(StateMachineInstance {
-            node: Arc::new(node.clone()),
-            state_machine,
-            priority,
-            queue_full,
-        }))
-    }
-}
-
-/// An FPP component.
+/// An FPP component
 #[derive(Debug, Clone)]
 pub struct Component {
+    /// The symbol of the component
     pub symbol: Symbol,
-    /// The AST node defining the component.
+    /// The AST node defining the component
     pub node: Arc<DefComponent>,
-    /// The port interface of the component.
+    /// The port interface of the component
     pub port_interface: PortInterface,
-    /// The map from command opcodes to commands.
-    pub command_map: HashMap<i128, Command>,
-    /// The next default opcode.
+    /// The map from command opcodes to commands
+    pub command_map: IndexMap<i128, Command, FxBuildHasher>,
+    /// The next default opcode
     pub default_opcode: i128,
-    /// The map from telemetry channel IDs to channels.
-    pub tlm_channel_map: HashMap<i128, TlmChannel>,
-    /// The map from telemetry channel names to channels.
-    pub tlm_channel_name_map: HashMap<String, TlmChannel>,
-    /// The next default channel ID.
+    /// The map from telemetry channel IDs to channels
+    pub tlm_channel_map: IndexMap<i128, TlmChannel, FxBuildHasher>,
+    /// The map from telemetry channel names to channels
+    pub tlm_channel_name_map: IndexMap<String, TlmChannel, FxBuildHasher>,
+    /// The next default channel ID
     pub default_tlm_channel_id: i128,
-    /// The map from event IDs to events.
-    pub event_map: HashMap<i128, Event>,
-    /// The next default event ID.
+    /// The map from event IDs to events
+    pub event_map: IndexMap<i128, Event, FxBuildHasher>,
+    /// The next default event ID
     pub default_event_id: i128,
-    /// The map from parameter IDs to parameters.
-    pub param_map: HashMap<i128, Param>,
-    /// The next default parameter ID.
-    pub default_param_id: i128,
-    /// The map from container IDs to containers.
-    pub container_map: HashMap<i128, Container>,
-    /// The next default container ID.
-    pub default_container_id: i128,
-    /// The map from record IDs to records.
-    pub record_map: HashMap<i128, Record>,
-    /// The next default record ID.
-    pub default_record_id: i128,
-    /// The map from state machine instance names to state machine instances.
-    pub state_machine_instance_map: HashMap<String, StateMachineInstance>,
-    /// The list of port matching specifiers.
+    /// The map from parameter IDs to parameters
+    pub param_map: IndexMap<i128, Param, FxBuildHasher>,
+    /// The list of port matching specifiers, most recent first
     pub spec_port_matching_list: Vec<Arc<SpecPortMatching>>,
-    /// The resolved port matchings of this component. Populated with the
-    /// matched-port-numbering phase; empty otherwise.
+    /// The map from state machine instance names to state machine instances
+    pub state_machine_instance_map: IndexMap<String, StateMachineInstance, FxBuildHasher>,
+    /// The list of port matching constraints
     pub port_matching_list: Vec<PortMatching>,
-}
-
-/// A port matching. Only a general port may be matched.
-#[derive(Debug, Clone)]
-pub struct PortMatching {
-    pub node: Arc<SpecPortMatching>,
-    pub instance1: GeneralPortInstance,
-    pub instance2: GeneralPortInstance,
-}
-
-impl PortMatching {
-    /// Gets the location of the port matching.
-    pub fn get_loc(&self) -> Span {
-        self.node.span()
-    }
-
-    /// Whether the given port instance participates in this matching.
-    pub fn matches(&self, pi: &PortInstance) -> bool {
-        self.instance1.get_node_id() == pi.get_node_id()
-            || self.instance2.get_node_id() == pi.get_node_id()
-    }
-}
-
-impl std::fmt::Display for PortMatching {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "match {} with {}", self.instance1, self.instance2)
-    }
+    /// The next default parameter ID
+    pub default_param_id: i128,
+    /// The map from container ids to containers
+    pub container_map: IndexMap<i128, Container, FxBuildHasher>,
+    /// The next default container ID
+    pub default_container_id: i128,
+    /// The map from record ids to records
+    pub record_map: IndexMap<i128, Record, FxBuildHasher>,
+    /// The next default record ID
+    pub default_record_id: i128,
 }
 
 impl Component {
+    /// Creates a component with no members
     pub fn new(symbol: Symbol, node: Arc<DefComponent>) -> Component {
         Component {
             symbol,
             node,
             port_interface: PortInterface::new("component"),
-            command_map: HashMap::default(),
+            command_map: IndexMap::default(),
             default_opcode: 0,
-            tlm_channel_map: HashMap::default(),
-            tlm_channel_name_map: HashMap::default(),
+            tlm_channel_map: IndexMap::default(),
+            tlm_channel_name_map: IndexMap::default(),
             default_tlm_channel_id: 0,
-            event_map: HashMap::default(),
+            event_map: IndexMap::default(),
             default_event_id: 0,
-            param_map: HashMap::default(),
-            default_param_id: 0,
-            container_map: HashMap::default(),
-            default_container_id: 0,
-            record_map: HashMap::default(),
-            default_record_id: 0,
-            state_machine_instance_map: HashMap::default(),
+            param_map: IndexMap::default(),
             spec_port_matching_list: vec![],
+            state_machine_instance_map: IndexMap::default(),
             port_matching_list: vec![],
+            default_param_id: 0,
+            container_map: IndexMap::default(),
+            default_container_id: 0,
+            record_map: IndexMap::default(),
+            default_record_id: 0,
         }
     }
 
-    /// The map from port names to port instances.
-    pub fn port_map(&self) -> &HashMap<String, PortInstance> {
+    /// The map from port names to port instances
+    pub fn port_map(&self) -> &IndexMap<String, PortInstance, FxBuildHasher> {
         &self.port_interface.port_map
     }
 
-    /// The map from special port kinds to special port instances.
-    pub fn special_port_map(&self) -> &HashMap<SpecialPortInstanceKind, SpecialPortInstance> {
+    /// The map from special port kinds to special port instances
+    pub fn special_port_map(
+        &self,
+    ) -> &IndexMap<SpecialPortInstanceKind, SpecialPortInstance, FxBuildHasher> {
         &self.port_interface.special_port_map
     }
 
+    /// Gets the kind of the component
     fn kind(&self) -> &ComponentKind {
         &self.node.kind
     }
 
+    /// Gets the name of the component
     fn component_name(&self) -> &str {
         &self.node.name.data
     }
@@ -672,53 +113,48 @@ impl Component {
     pub fn has_parameters(&self) -> bool {
         !self.param_map.is_empty()
     }
+
     /// Query whether the component has external parameters
     pub fn has_external_parameters(&self) -> bool {
         self.param_map.values().any(|p| p.is_external)
     }
+
     /// Query whether the component has commands
     pub fn has_commands(&self) -> bool {
         !self.command_map.is_empty()
     }
+
     /// Query whether the component has events
     pub fn has_events(&self) -> bool {
         !self.event_map.is_empty()
     }
+
     /// Query whether the component has telemetry
     pub fn has_telemetry(&self) -> bool {
         !self.tlm_channel_map.is_empty()
     }
+
     /// Query whether the component has data products
     pub fn has_data_products(&self) -> bool {
         !self.record_map.is_empty() || !self.container_map.is_empty()
     }
+
     /// Query whether the component has state machine instances
     pub fn has_state_machine_instances(&self) -> bool {
         !self.state_machine_instance_map.is_empty()
     }
-    /// Query whether the component has state machine instances of the
-    /// specified kind
+
+    /// Query whether the component has state machine instances of
+    /// the specified kind
     pub fn has_state_machine_instances_of_kind(&self, kind: &state_machine::Kind) -> bool {
         self.state_machine_instance_map
             .values()
             .any(|i| &i.get_sm_kind() == kind)
     }
 
-    /// Gets a telemetry channel by name
-    pub fn get_tlm_channel_by_name(&self, name: &Ident) -> SemanticResult<TlmChannel> {
-        match self.tlm_channel_name_map.get(&name.data) {
-            Some(tlm_channel) => Ok(tlm_channel.clone()),
-            None => Err(SemanticError::InvalidTlmChannelName {
-                loc: name.span(),
-                name: name.data.clone(),
-                component_name: self.component_name().to_string(),
-            }),
-        }
-    }
-
     /// Gets the max identifier
     pub fn get_max_id(&self) -> i128 {
-        fn max_in_map<T>(map: &HashMap<i128, T>) -> i128 {
+        fn max_in_map<T>(map: &IndexMap<i128, T, FxBuildHasher>) -> i128 {
             map.keys().copied().max().unwrap_or(-1)
         }
         [
@@ -734,29 +170,49 @@ impl Component {
         .unwrap_or(-1)
     }
 
+    /// Gets a telemetry channel by name
+    pub fn get_tlm_channel_by_name(&self, name: &Ident) -> SemanticResult<TlmChannel> {
+        match self.tlm_channel_name_map.get(&name.data) {
+            Some(tlm_channel) => Ok(tlm_channel.clone()),
+            None => Err(SemanticError::InvalidTlmChannelName {
+                loc: name.span(),
+                name: name.data.clone(),
+                component_name: self.component_name().to_string(),
+            }),
+        }
+    }
+
     /// Add a command
     pub fn add_command(&mut self, opcode_opt: Option<i128>, command: Command) -> SemanticResult {
         let opcode = opcode_opt.unwrap_or(self.default_opcode);
-        if let Some(prev) = self.command_map.get(&opcode) {
+        if let Some(prev_command) = self.command_map.get(&opcode) {
             return Err(SemanticError::DuplicateOpcodeValue {
                 value: Analysis::display_id_value(opcode),
                 loc: command.get_loc(),
-                prev_loc: prev.get_loc(),
+                prev_loc: prev_command.get_loc(),
             });
         }
+        let default_opcode =
+            opcode
+                .checked_add(1)
+                .ok_or_else(|| SemanticError::InvalidIntValue {
+                    loc: command.get_loc(),
+                    v: None,
+                    msg: format!("the default opcode after {} is out of range", opcode),
+                })?;
         self.command_map.insert(opcode, command);
-        self.default_opcode = opcode + 1;
+        self.default_opcode = default_opcode;
         Ok(())
     }
 
     /// Add a state machine instance
     pub fn add_state_machine_instance(&mut self, instance: StateMachineInstance) -> SemanticResult {
         let name = instance.get_name().to_string();
-        if let Some(prev) = self.state_machine_instance_map.get(&name) {
+        if let Some(prev_instance) = self.state_machine_instance_map.get(&name) {
             return Err(SemanticError::DuplicateStateMachineInstance {
                 name,
                 loc: instance.get_loc(),
-                prev_loc: prev.get_loc(),
+                prev_loc: prev_instance.get_loc(),
             });
         }
         self.state_machine_instance_map.insert(name, instance);
@@ -765,54 +221,23 @@ impl Component {
 
     /// Add a data product container
     pub fn add_container(&mut self, id_opt: Option<i128>, container: Container) -> SemanticResult {
-        let next = Analysis::add_element_to_id_map(
+        self.default_container_id = Analysis::add_element_to_id_map(
             &mut self.container_map,
             id_opt.unwrap_or(self.default_container_id),
             container,
             Container::get_loc,
         )?;
-        self.default_container_id = next;
         Ok(())
     }
 
     /// Add an event
     pub fn add_event(&mut self, id_opt: Option<i128>, event: Event) -> SemanticResult {
-        let next = Analysis::add_element_to_id_map(
+        self.default_event_id = Analysis::add_element_to_id_map(
             &mut self.event_map,
             id_opt.unwrap_or(self.default_event_id),
             event,
             Event::get_loc,
         )?;
-        self.default_event_id = next;
-        Ok(())
-    }
-
-    /// Add a data product record
-    pub fn add_record(&mut self, id_opt: Option<i128>, record: Record) -> SemanticResult {
-        let next = Analysis::add_element_to_id_map(
-            &mut self.record_map,
-            id_opt.unwrap_or(self.default_record_id),
-            record,
-            Record::get_loc,
-        )?;
-        self.default_record_id = next;
-        Ok(())
-    }
-
-    /// Add a telemetry channel
-    pub fn add_tlm_channel(&mut self, id_opt: Option<i128>, channel: TlmChannel) -> SemanticResult {
-        let name = channel.get_name().to_string();
-        let next = Analysis::add_element_to_id_map(
-            &mut self.tlm_channel_map,
-            id_opt.unwrap_or(self.default_tlm_channel_id),
-            channel.clone(),
-            TlmChannel::get_loc,
-        )?;
-        // Add the channel to the channel name map. If there is a duplicate
-        // name, we will catch it later when we check all the dictionary
-        // elements.
-        self.tlm_channel_name_map.insert(name, channel);
-        self.default_tlm_channel_id = next;
         Ok(())
     }
 
@@ -820,7 +245,6 @@ impl Component {
     pub fn add_param(&mut self, id_opt: Option<i128>, param: Param) -> SemanticResult {
         let set_opcode = param.set_opcode;
         let save_opcode = param.save_opcode;
-        // The implicit set and save commands share the parameter's spec node.
         let set_command = Command::Param {
             node: param.node.clone(),
             kind: ParamKind::Set,
@@ -829,15 +253,14 @@ impl Component {
             node: param.node.clone(),
             kind: ParamKind::Save,
         };
-        // Update the parameter map and the default parameter ID.
-        let next = Analysis::add_element_to_id_map(
+        // Update the parameter map and the default parameter ID
+        self.default_param_id = Analysis::add_element_to_id_map(
             &mut self.param_map,
             id_opt.unwrap_or(self.default_param_id),
             param,
             Param::get_loc,
         )?;
-        self.default_param_id = next;
-        // Add the implicit set and save commands.
+        // Add the implicit set and save commands
         self.add_command(Some(set_opcode), set_command)?;
         self.add_command(Some(save_opcode), save_command)?;
         Ok(())
@@ -845,43 +268,205 @@ impl Component {
 
     /// Add a port instance
     pub fn add_port_instance(&mut self, instance: PortInstance) -> SemanticResult {
-        let pi = self.port_interface.add_port_instance(instance)?;
-        self.port_interface = pi;
+        self.port_interface = self.port_interface.add_port_instance(instance)?;
         Ok(())
     }
 
+    /// Add the ports of an imported interface
     pub fn add_imported_interface(
         &mut self,
-        interface: &crate::semantics::Interface,
-        import_node: Node,
+        interface: &Interface,
+        import_node_id: Node,
     ) -> SemanticResult {
-        let pi = self
+        self.port_interface = self
             .port_interface
-            .add_imported_interface(interface, import_node)?;
-        self.port_interface = pi;
+            .add_imported_interface(interface, import_node_id)?;
         Ok(())
     }
 
-    pub fn add_spec_port_matching(&mut self, node: Arc<SpecPortMatching>) {
-        self.spec_port_matching_list.insert(0, node);
+    /// Add a data product record
+    pub fn add_record(&mut self, id_opt: Option<i128>, record: Record) -> SemanticResult {
+        self.default_record_id = Analysis::add_element_to_id_map(
+            &mut self.record_map,
+            id_opt.unwrap_or(self.default_record_id),
+            record,
+            Record::get_loc,
+        )?;
+        Ok(())
     }
 
-    /// Complete a component definition.
-    pub fn complete(mut self) -> SemanticResult<Component> {
-        self.port_matching_list = self.construct_port_matching_list()?;
-        self.check_validity()?;
-        Ok(self)
+    /// Add a telemetry channel
+    pub fn add_tlm_channel(
+        &mut self,
+        id_opt: Option<i128>,
+        tlm_channel: TlmChannel,
+    ) -> SemanticResult {
+        let name = tlm_channel.get_name().to_string();
+        self.default_tlm_channel_id = Analysis::add_element_to_id_map(
+            &mut self.tlm_channel_map,
+            id_opt.unwrap_or(self.default_tlm_channel_id),
+            tlm_channel.clone(),
+            TlmChannel::get_loc,
+        )?;
+        // Add the channel to the channel name map. If there is a duplicate name,
+        // we will catch it later when we check all the dictionary elements.
+        self.tlm_channel_name_map.insert(name, tlm_channel);
+        Ok(())
     }
 
-    /// Checks whether a component is valid
-    fn check_validity(&self) -> SemanticResult {
-        self.check_no_duplicate_names()?;
-        match self.kind() {
-            ComponentKind::Passive => self.check_no_async_input()?,
-            _ => self.check_async_input()?,
+    /// Check that component provides ports required by dictionary
+    /// and data product specifiers
+    fn check_required_ports(&self) -> SemanticResult {
+        use SpecialPortInstanceKind::*;
+        let require_ports = |condition: bool,
+                             spec_msg: &str,
+                             port_kinds: &[SpecialPortInstanceKind]|
+         -> SemanticResult {
+            if condition {
+                for port_kind in port_kinds {
+                    if !self.special_port_map().contains_key(port_kind) {
+                        return Err(SemanticError::MissingPort {
+                            loc: self.get_loc(),
+                            spec_msg: spec_msg.to_string(),
+                            port_msg: format!("{} port", port_kind),
+                        });
+                    }
+                }
+            }
+            Ok(())
+        };
+        let require_product_get_or_request = || -> SemanticResult {
+            if self.has_data_products()
+                && !self.special_port_map().contains_key(&ProductGet)
+                && !self.special_port_map().contains_key(&ProductRequest)
+            {
+                Err(SemanticError::MissingPort {
+                    loc: self.get_loc(),
+                    spec_msg: "data product specifiers".to_string(),
+                    port_msg: "product get port or product request port".to_string(),
+                })
+            } else {
+                Ok(())
+            }
+        };
+        require_ports(
+            self.has_parameters(),
+            "parameter specifiers",
+            &[ParamGet, ParamSet, CommandRecv, CommandReg, CommandResp],
+        )?;
+        require_ports(
+            self.has_commands(),
+            "command specifiers",
+            &[CommandRecv, CommandReg, CommandResp],
+        )?;
+        require_ports(
+            self.has_events(),
+            "event specifiers",
+            &[Event, TextEvent, TimeGet],
+        )?;
+        require_ports(
+            self.has_telemetry(),
+            "telemetry specifiers",
+            &[Telemetry, TimeGet],
+        )?;
+        if self.has_data_products() {
+            require_product_get_or_request()?;
         }
-        self.check_required_ports()?;
-        self.check_data_products()?;
+        require_ports(
+            self.has_data_products(),
+            "data product specifiers",
+            &[ProductSend, TimeGet],
+        )?;
+        require_ports(
+            self.special_port_map().contains_key(&ProductRequest),
+            "product request specifier",
+            &[ProductRecv],
+        )?;
+        Ok(())
+    }
+
+    /// Check that if there are any data products, then there are both containers
+    /// and records
+    fn check_data_products(&self) -> SemanticResult {
+        match (self.record_map.first(), self.container_map.first()) {
+            (Some((_, record)), None) => Err(SemanticError::InvalidDataProducts {
+                loc: record.get_loc(),
+                msg: "component that specifies records must specify at least one container"
+                    .to_string(),
+            }),
+            (None, Some((_, container))) => Err(SemanticError::InvalidDataProducts {
+                loc: container.get_loc(),
+                msg: "component that specifies containers must specify at least one record"
+                    .to_string(),
+            }),
+            _ => Ok(()),
+        }
+    }
+
+    /// Checks that component has at least one async input port or async command
+    fn check_async_input(&self) -> SemanticResult {
+        match self.check_no_async_input() {
+            Err(_) => Ok(()),
+            Ok(()) => Err(SemanticError::MissingAsync {
+                kind: self.kind().to_string(),
+                loc: self.get_loc(),
+            }),
+        }
+    }
+
+    /// Checks that component has no async input ports
+    fn check_no_async_input(&self) -> SemanticResult {
+        let check_port_instances = || -> SemanticResult {
+            for instance in self.port_map().values() {
+                let error = || SemanticError::PassiveAsync {
+                    loc: instance.get_loc(),
+                    import_locs: instance.get_import_locs(),
+                };
+                match instance {
+                    PortInstance::General(general) => {
+                        if general.is_async_input() {
+                            return Err(error());
+                        }
+                    }
+                    PortInstance::Special(special) => {
+                        if matches!(special.node.input_kind, Some(InputPortKind::Async)) {
+                            return Err(error());
+                        }
+                    }
+                    PortInstance::Internal(_) => return Err(error()),
+                    PortInstance::Topology(_) => {
+                        unreachable!("topology port cannot exist in component")
+                    }
+                }
+            }
+            Ok(())
+        };
+        let check_commands = || -> SemanticResult {
+            for command in self.command_map.values() {
+                if let Command::NonParam {
+                    kind: NonParamKind::Async { .. },
+                    ..
+                } = command
+                {
+                    return Err(SemanticError::PassiveAsync {
+                        loc: command.get_loc(),
+                        import_locs: vec![],
+                    });
+                }
+            }
+            Ok(())
+        };
+        let check_state_machines = || -> SemanticResult {
+            match self.state_machine_instance_map.values().next() {
+                Some(instance) => Err(SemanticError::PassiveStateMachine {
+                    loc: instance.get_loc(),
+                }),
+                None => Ok(()),
+            }
+        };
+        check_port_instances()?;
+        check_commands()?;
+        check_state_machines()?;
         Ok(())
     }
 
@@ -926,144 +511,31 @@ impl Component {
         Ok(())
     }
 
-    /// Checks that component has at least one async input port or async command
-    fn check_async_input(&self) -> SemanticResult {
-        if self.check_no_async_input().is_err() {
-            Ok(())
-        } else {
-            Err(SemanticError::MissingAsync {
-                kind: self.kind().to_string(),
-                loc: self.get_loc(),
-            })
+    /// Checks whether a component is valid
+    fn check_validity(&self) -> SemanticResult {
+        self.check_no_duplicate_names()?;
+        match self.kind() {
+            ComponentKind::Passive => self.check_no_async_input()?,
+            _ => self.check_async_input()?,
         }
-    }
-
-    /// Checks that component has no async input ports
-    fn check_no_async_input(&self) -> SemanticResult {
-        for instance in self.port_map().values() {
-            if instance.is_async_input() {
-                return Err(SemanticError::PassiveAsync {
-                    loc: instance.get_loc(),
-                    import_locs: instance.get_import_locs().to_vec(),
-                });
-            }
-        }
-        for command in self.command_map.values() {
-            if command.is_async() {
-                return Err(SemanticError::PassiveAsync {
-                    loc: command.get_loc(),
-                    import_locs: vec![],
-                });
-            }
-        }
-        if let Some(instance) = self.state_machine_instance_map.values().next() {
-            return Err(SemanticError::PassiveStateMachine {
-                loc: instance.get_loc(),
-            });
-        }
+        self.check_required_ports()?;
+        self.check_data_products()?;
         Ok(())
     }
 
-    fn has_special_port(&self, kind: &SpecialPortInstanceKind) -> bool {
-        self.special_port_map().contains_key(kind)
-    }
-
-    /// Check that component provides ports required by dictionary
-    /// and data product specifiers
-    fn check_required_ports(&self) -> SemanticResult {
-        use SpecialPortInstanceKind::*;
-        let require = |condition: bool,
-                       spec_msg: &str,
-                       kinds: &[SpecialPortInstanceKind]|
-         -> SemanticResult {
-            if condition {
-                for kind in kinds {
-                    if !self.has_special_port(kind) {
-                        return Err(SemanticError::MissingPort {
-                            loc: self.get_loc(),
-                            spec_msg: spec_msg.to_string(),
-                            port_msg: format!("{} port", kind),
-                        });
-                    }
-                }
-            }
-            Ok(())
-        };
-        require(
-            self.has_parameters(),
-            "parameter specifiers",
-            &[ParamGet, ParamSet, CommandRecv, CommandReg, CommandResp],
-        )?;
-        require(
-            self.has_commands(),
-            "command specifiers",
-            &[CommandRecv, CommandReg, CommandResp],
-        )?;
-        require(
-            self.has_events(),
-            "event specifiers",
-            &[Event, TextEvent, TimeGet],
-        )?;
-        require(
-            self.has_telemetry(),
-            "telemetry specifiers",
-            &[Telemetry, TimeGet],
-        )?;
-        if self.has_data_products()
-            && !self.has_special_port(&ProductGet)
-            && !self.has_special_port(&ProductRequest)
-        {
-            return Err(SemanticError::MissingPort {
-                loc: self.get_loc(),
-                spec_msg: "data product specifiers".to_string(),
-                port_msg: "product get port or product request port".to_string(),
-            });
-        }
-        require(
-            self.has_data_products(),
-            "data product specifiers",
-            &[ProductSend, TimeGet],
-        )?;
-        require(
-            self.has_special_port(&ProductRequest),
-            "product request specifier",
-            &[ProductRecv],
-        )?;
-        Ok(())
-    }
-
-    /// Check that if there are any data products, then there are both containers
-    /// and records
-    fn check_data_products(&self) -> SemanticResult {
-        match (self.record_map.len(), self.container_map.len()) {
-            (0, 0) => Ok(()),
-            (_, 0) => {
-                let record = self.record_map.values().next().unwrap();
-                Err(SemanticError::InvalidDataProducts {
-                    loc: record.get_loc(),
-                    msg: "component that specifies records must specify at least one container"
-                        .to_string(),
-                })
-            }
-            (0, _) => {
-                let container = self.container_map.values().next().unwrap();
-                Err(SemanticError::InvalidDataProducts {
-                    loc: container.get_loc(),
-                    msg: "component that specifies containers must specify at least one record"
-                        .to_string(),
-                })
-            }
-            _ => Ok(()),
-        }
+    /// Complete a component definition
+    pub fn complete(mut self) -> SemanticResult<Component> {
+        self.port_matching_list = self.construct_port_matching_list()?;
+        self.check_validity()?;
+        Ok(self)
     }
 
     /// Construct the port matching list
     fn construct_port_matching_list(&self) -> SemanticResult<Vec<PortMatching>> {
-        let mut list = Vec::new();
-        for node in &self.spec_port_matching_list {
-            list.push(self.construct_port_matching(node)?);
-        }
-        Ok(list)
+        self.spec_port_matching_list
+            .iter()
+            .map(|node| self.construct_port_matching(node))
+            .collect()
     }
 
     /// Constructs a port matching from a specifier
@@ -1072,46 +544,80 @@ impl Component {
         node: &Arc<SpecPortMatching>,
     ) -> SemanticResult<PortMatching> {
         let loc = node.span();
-        let name1 = &node.port1.data;
-        let name2 = &node.port2.data;
-        if name1 == name2 {
-            return Err(SemanticError::InvalidPortMatching {
-                loc,
-                msg: format!("repeated name {}", name1),
-            });
-        }
-        let get = |name: &str, span: Span| -> SemanticResult<GeneralPortInstance> {
-            match self.port_map().get(name) {
-                Some(PortInstance::General(pi)) => Ok(pi.clone()),
-                Some(_) => Err(SemanticError::InvalidPortMatching {
-                    loc: span,
-                    msg: format!("{} is not a valid port instance for matching", name),
-                }),
-                None => Err(SemanticError::InvalidPortMatching {
-                    loc: span,
-                    msg: format!(
-                        "{} is not a port instance of component {}",
-                        name,
-                        self.component_name()
-                    ),
+        let check_names = |name1: &str, name2: &str| -> SemanticResult {
+            if name1 != name2 {
+                Ok(())
+            } else {
+                Err(SemanticError::InvalidPortMatching {
+                    loc,
+                    msg: format!("repeated name {}", name1),
+                })
+            }
+        };
+        let get_instance = |node: &Ident| -> SemanticResult<GeneralPortInstance> {
+            match self
+                .port_interface
+                .lookup_port_instance(node, self.component_name())?
+            {
+                PortInstance::General(general) => Ok(general),
+                _ => Err(SemanticError::InvalidPortMatching {
+                    loc: node.span(),
+                    msg: format!("{} is not a valid port instance for matching", node.data),
                 }),
             }
         };
-        let instance1 = get(name1, node.port1.span())?;
-        let instance2 = get(name2, node.port2.span())?;
-        let size1 = instance1.get_array_size();
-        let size2 = instance2.get_array_size();
-        if size1 != size2 {
-            return Err(SemanticError::InvalidPortMatching {
-                loc,
-                msg: format!("mismatched port sizes ({} vs. {})", size1, size2),
-            });
-        }
+        let check_sizes =
+            |instance1: &GeneralPortInstance, instance2: &GeneralPortInstance| -> SemanticResult {
+                let size1 = instance1.get_array_size();
+                let size2 = instance2.get_array_size();
+                if size1 == size2 {
+                    Ok(())
+                } else {
+                    Err(SemanticError::InvalidPortMatching {
+                        loc,
+                        msg: format!("mismatched port sizes ({} vs. {})", size1, size2),
+                    })
+                }
+            };
+        let port1 = &node.port1;
+        let port2 = &node.port2;
+        check_names(&port1.data, &port2.data)?;
+        let instance1 = get_instance(port1)?;
+        let instance2 = get_instance(port2)?;
+        check_sizes(&instance1, &instance2)?;
         Ok(PortMatching {
             node: node.clone(),
             instance1,
             instance2,
         })
+    }
+}
+
+/// A port matching
+#[derive(Debug, Clone)]
+pub struct PortMatching {
+    pub node: Arc<SpecPortMatching>,
+    pub instance1: GeneralPortInstance,
+    pub instance2: GeneralPortInstance,
+}
+
+impl PortMatching {
+    /// Gets the location of a port matching
+    pub fn get_loc(&self) -> Span {
+        self.node.span()
+    }
+
+    /// Whether the given port instance is one of the two ports of this
+    /// matching. Rust-only; Connection::is_match_constrained uses it.
+    pub fn matches(&self, pi: &PortInstance) -> bool {
+        self.instance1.get_node_id() == pi.get_node_id()
+            || self.instance2.get_node_id() == pi.get_node_id()
+    }
+}
+
+impl std::fmt::Display for PortMatching {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "match {} with {}", self.instance1, self.instance2)
     }
 }
 

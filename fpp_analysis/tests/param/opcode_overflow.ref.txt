@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/param/opcode_overflow.fpp:28:3
+   |
+28 |   param P: U32
+   |   ^^^^^^^^^^^^ the default opcode after 170141183460469231731687303715884105727 is out of range
+

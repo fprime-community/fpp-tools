@@ -1,7 +1,7 @@
   --> [ local path prefix ]/connection_direct/shadowed_port_error.fpp:31:5
    |
 31 |     c1.p -> M.c2.p
-   |     ^^^^ cannot connect port types P and P
+   |     ^^^^ cannot connect port types P and M.P
    |
   ::: [ local path prefix ]/connection_direct/shadowed_port_error.fpp:5:3
    |

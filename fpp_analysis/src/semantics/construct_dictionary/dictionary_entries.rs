@@ -3,7 +3,8 @@ use crate::semantics::{
     CommandEntry, Component, ComponentInstance, ContainerEntry, Dictionary, EventEntry, ParamEntry,
     RecordEntry, TlmChannelEntry, Topology,
 };
-use rustc_hash::FxHashMap as HashMap;
+use indexmap::IndexMap;
+use rustc_hash::FxBuildHasher;
 use std::collections::BTreeMap;
 
 /// Fills in the dictionary entries
@@ -77,7 +78,7 @@ impl<'a> DictionaryEntries<'a> {
 
     fn get_entry_map<S: Clone, E>(
         &self,
-        get_spec_map: impl Fn(&Component) -> &HashMap<i128, S>,
+        get_spec_map: impl Fn(&Component) -> &IndexMap<i128, S, FxBuildHasher>,
         construct_entry: impl Fn(ComponentInstance, S) -> E,
     ) -> BTreeMap<i128, E> {
         let mut entry_map = BTreeMap::new();

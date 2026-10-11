@@ -84,3 +84,13 @@ fn duplicate_opcode_implicit() {
 fn not_displayable() {
     run_test("command/not_displayable")
 }
+
+#[test]
+fn duplicate_name_descending_opcodes() {
+    run_test("command/duplicate_name_descending_opcodes")
+}
+
+#[test]
+fn opcode_overflow() {
+    run_test("command/opcode_overflow")
+}

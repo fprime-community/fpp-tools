@@ -124,3 +124,13 @@ fn queue_size_not_numeric() {
 fn cpu_not_numeric() {
     run_test("component_instance_def/cpu_not_numeric")
 }
+
+#[test]
+fn conflicting_ids_equal_base() {
+    run_test("component_instance_def/conflicting_ids_equal_base")
+}
+
+#[test]
+fn base_id_overflow() {
+    run_test("component_instance_def/base_id_overflow")
+}

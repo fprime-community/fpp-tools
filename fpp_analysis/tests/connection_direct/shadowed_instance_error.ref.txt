@@ -1,7 +1,7 @@
   --> [ local path prefix ]/connection_direct/shadowed_instance_error.fpp:36:7
    |
 36 |       c1.p -> c2.p
-   |       ^^^^ cannot connect port types P and P
+   |       ^^^^ cannot connect port types P and M.P
    |
   ::: [ local path prefix ]/connection_direct/shadowed_instance_error.fpp:5:3
    |
