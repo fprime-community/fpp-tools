@@ -96,6 +96,21 @@ fn dot_bad_expr() {
 }
 
 #[test]
+fn dot_struct_member_error() {
+    run_test("expr/dot_struct_member_error")
+}
+
+#[test]
+fn dot_anon_struct_member_error() {
+    run_test("expr/dot_anon_struct_member_error")
+}
+
+#[test]
+fn dot_anon_struct_literal_member_error() {
+    run_test("expr/dot_anon_struct_literal_member_error")
+}
+
+#[test]
 fn paren_ok() {
     run_test("expr/paren_ok")
 }
@@ -103,6 +118,11 @@ fn paren_ok() {
 #[test]
 fn struct_duplicate() {
     run_test("expr/struct_duplicate")
+}
+
+#[test]
+fn struct_duplicate_order_error() {
+    run_test("expr/struct_duplicate_order_error")
 }
 
 #[test]
@@ -178,6 +198,16 @@ fn binop_numeric_error() {
 #[test]
 fn subscript_order_error() {
     run_test("expr/subscript_order_error")
+}
+
+#[test]
+fn subscript_index_common_type_order_error() {
+    run_test("expr/subscript_index_common_type_order_error")
+}
+
+#[test]
+fn subscript_index_numeric_order_error() {
+    run_test("expr/subscript_index_numeric_order_error")
 }
 
 #[test]

@@ -7,11 +7,11 @@ use crate::semantics::{
     AnonArrayType, AnonStructType, QualifiedName, Symbol, SymbolInterface, Type,
 };
 use fpp_ast::{
-    DefAliasType, DefArray, DefConstant, DefEnum, DefEnumConstant, DefStruct, EventThrottle, Expr,
-    ExprKind, FloatKind, IntegerKind, Node, SpecCommand, SpecContainer, SpecEvent,
+    Binop, DefAliasType, DefArray, DefConstant, DefEnum, DefEnumConstant, DefStruct, EventThrottle,
+    Expr, ExprKind, FloatKind, Ident, IntegerKind, Node, SpecCommand, SpecContainer, SpecEvent,
     SpecGeneralPortInstance, SpecInit, SpecInternalPort, SpecParam, SpecRecord,
     SpecSpecialPortInstance, SpecStateMachineInstance, SpecTlmChannel, SpecTlmPacket,
-    StructTypeMember, TypeName, TypeNameKind, Visitable, Visitor,
+    StructExprMember, StructTypeMember, TypeName, TypeNameKind, Visitable, Visitor,
 };
 use fpp_core::{Span, Spanned};
 use rustc_hash::FxHashMap as HashMap;
@@ -181,6 +181,285 @@ impl<'ast> CheckExprTypes<'ast> {
     }
 }
 
+impl<'ast> CheckExprTypes<'ast> {
+    fn expr_array_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        elts: &'ast [Expr],
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        // An element with no type failed to type check
+        if elts.iter().any(|e| !a.type_map.contains_key(&e.node_id)) {
+            return ControlFlow::Continue(());
+        }
+        let empty_list_error = SemanticError::EmptyArray { loc: node.span() };
+        let ids: Vec<fpp_core::Node> = elts.iter().map(|e| e.node_id).collect();
+        match a.common_type(&ids, empty_list_error) {
+            Ok(t) => {
+                a.assign_type(
+                    node.node_id,
+                    Arc::new(Type::AnonArray(AnonArrayType {
+                        size: Some(elts.len()),
+                        elt_type: t,
+                    })),
+                );
+                ControlFlow::Continue(())
+            }
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    fn expr_array_subscript_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e1: &'ast Expr,
+        e2: &'ast Expr,
+    ) -> ControlFlow<()> {
+        // Visit e1 and check that it is an array before visiting e2
+        e1.visit(a, self)?;
+        let Some(t1) = a.type_map.get(&e1.node_id) else {
+            return ControlFlow::Continue(());
+        };
+        let elt_type = match Type::underlying_type(t1).as_anon_array() {
+            Some(anon_array) => anon_array.elt_type.clone(),
+            None => {
+                SemanticError::InvalidType {
+                    loc: e1.span(),
+                    msg: format!("{} is not an array type", Type::underlying_type(t1)),
+                    notes: vec![],
+                }
+                .emit();
+                return ControlFlow::Break(());
+            }
+        };
+        e2.visit(a, self)?;
+        if !a.type_map.contains_key(&e2.node_id) {
+            return ControlFlow::Continue(());
+        }
+        if Self::emit_error(Self::convert_node_to_numeric(a, e2)).is_some() {
+            a.assign_type(node.node_id, elt_type);
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn expr_binop_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e1: &'ast Expr,
+        op: &Binop,
+        e2: &'ast Expr,
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        // An operand with no type failed to type check
+        if !a.type_map.contains_key(&e1.node_id) || !a.type_map.contains_key(&e2.node_id) {
+            return ControlFlow::Continue(());
+        }
+        let loc = node.span();
+        let t = match op {
+            Binop::LShift | Binop::RShift => {
+                // Shift operation is special, for this we independently check
+                // for both operands to be integer
+                let ok1 = Self::emit_error(Self::check_integer_or_enum_type(a, e1));
+                let ok2 = Self::emit_error(Self::check_integer_or_enum_type(a, e2));
+                match (ok1, ok2) {
+                    (Some(()), Some(())) => Some(Arc::new(Type::Integer)),
+                    _ => None,
+                }
+            }
+            _ => {
+                let t = match a.common_type_of_pair(e1.node_id, e2.node_id, loc) {
+                    Ok(t) => t,
+                    Err(err) => {
+                        err.emit();
+                        return ControlFlow::Break(());
+                    }
+                };
+                // The type of the expression is the numeric type, or for
+                // addition the string type, that the common type converts to
+                // (spec, Type Checking, Arithmetic and Concatenation)
+                Self::emit_error(match op {
+                    Binop::Add => Self::convert_to_numeric_or_string(loc, &t),
+                    _ => Self::convert_to_numeric(loc, &t),
+                })
+            }
+        };
+        if let Some(t) = t {
+            a.assign_type(node.node_id, t);
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn expr_paren_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e: &'ast Expr,
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        if let Some(t) = a.type_map.get(&e.node_id).cloned() {
+            a.assign_type(node.node_id, t);
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn expr_size_of_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        type_name: &'ast TypeName,
+    ) -> ControlFlow<()> {
+        if let Some(t) = a.type_map.get(&type_name.node_id) {
+            let msg = format!("size of type {} is not known in the model", t);
+            let result = a.check_displayable_type(type_name.node_id, type_name.span(), &msg);
+            if Self::emit_error(result).is_none() {
+                return ControlFlow::Continue(());
+            }
+        }
+        self.super_visit(a, Node::Expr(node))?;
+        a.assign_type(node.node_id, Arc::new(Type::Integer));
+        ControlFlow::Continue(())
+    }
+
+    fn expr_struct_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        members: &'ast [StructExprMember],
+    ) -> ControlFlow<()> {
+        let no_duplicates = Self::emit_error(Self::check_for_duplicate_struct_member(members));
+        self.super_visit(a, Node::Expr(node))?;
+        if no_duplicates.is_none() {
+            return ControlFlow::Continue(());
+        }
+        let mut struct_members = Vec::with_capacity(members.len());
+        for member in members {
+            match a.type_map.get(&member.value.node_id) {
+                Some(t) => struct_members.push((member.name.data.clone(), t.clone())),
+                // A member with no type failed to type check
+                None => return ControlFlow::Continue(()),
+            }
+        }
+        a.assign_type(
+            node.node_id,
+            Arc::new(Type::AnonStruct(AnonStructType {
+                members: struct_members,
+            })),
+        );
+        ControlFlow::Continue(())
+    }
+
+    fn expr_unop_node(&self, a: &mut Analysis, node: &'ast Expr, e: &'ast Expr) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+        let loc = node.span();
+        if let Some(t1) = a.type_map.get(&e.node_id)
+            && let Some(t) = Self::emit_error(Self::convert_to_numeric(loc, t1))
+        {
+            a.assign_type(node.node_id, t);
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn expr_dot_node(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        e: &'ast Expr,
+        id: &'ast Ident,
+    ) -> ControlFlow<()> {
+        self.super_visit(a, Node::Expr(node))?;
+
+        // Type for this entire dot expression is already resolved
+        // This means it's actually a _use_ of some sort of symbol (constant/enum constant)
+        // We can just use the type that was already resolved
+        if a.type_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
+
+        match a.use_def_map.get(&node.node_id) {
+            // A use of a constant symbol whose definition failed to type check
+            Some(
+                Symbol::Constant(_) | Symbol::EnumConstant(_) | Symbol::TemplateConstantArg { .. },
+            ) => {
+                return ControlFlow::Continue(());
+            }
+            // A dot expression that names a symbol of another kind, such as a
+            // type with a scope, is not a constant use
+            Some(symbol) => {
+                SemanticError::InvalidSymbol {
+                    symbol_name: symbol.name().data.clone(),
+                    msg: "not a constant symbol".to_string(),
+                    loc: node.span(),
+                    def_loc: symbol.node().span(),
+                }
+                .emit();
+                return ControlFlow::Break(());
+            }
+            None => {}
+        }
+
+        // The type was not resolved, this is some sort of member selection
+        // Look at the left-hand side of the dot expression to determine the type
+        let Some(e_type) = a.type_map.get(&e.node_id) else {
+            return ControlFlow::Continue(());
+        };
+        let result = match Type::underlying_type(e_type).deref() {
+            Type::Struct(struct_type) => match struct_type.anon_struct.get_member(&id.data) {
+                Some(t) => Ok(t.clone()),
+                None => Err(SemanticError::InvalidStructMember {
+                    member_name: id.data.clone(),
+                    loc: id.span(),
+                    struct_type_name: struct_type.node.name.data.clone(),
+                    def_loc: struct_type.node.span(),
+                }),
+            },
+            Type::AnonStruct(anon_struct) => match anon_struct.get_member(&id.data) {
+                Some(t) => Ok(t.clone()),
+                None => Err(SemanticError::InvalidAnonStructMember {
+                    member_name: id.data.clone(),
+                    loc: id.span(),
+                    def_loc: a.use_def_map.get(&e.node_id).map(|s| s.node().span()),
+                }),
+            },
+            t => Err(SemanticError::InvalidTypeForMemberSelection {
+                member_name: id.data.clone(),
+                loc: id.span(),
+                type_name: t.to_string(),
+            }),
+        };
+        match result {
+            Ok(t) => {
+                a.assign_type(node.node_id, t);
+                ControlFlow::Continue(())
+            }
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    /// Check for duplicate struct member
+    fn check_for_duplicate_struct_member(members: &[StructExprMember]) -> SemanticResult {
+        let mut prev_locs: HashMap<&str, Span> = HashMap::default();
+        for member in members {
+            if let Some(prev_loc) = prev_locs.insert(&member.name.data, member.span()) {
+                return Err(SemanticError::DuplicateStructMember {
+                    name: member.name.data.clone(),
+                    loc: member.span(),
+                    prev_loc,
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
 impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
     type Break = ();
     type State = Analysis;
@@ -270,205 +549,34 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
     }
 
     fn visit_expr(&self, a: &mut Self::State, node: &'ast Expr) -> ControlFlow<Self::Break> {
-        self.super_visit(a, Node::Expr(node))?;
-
         match &node.kind {
-            ExprKind::Array(elts) => {
-                // An element with no type failed to type check
-                if elts.iter().any(|e| !a.type_map.contains_key(&e.node_id)) {
-                    return ControlFlow::Continue(());
-                }
-                let empty_list_error = SemanticError::EmptyArray { loc: node.span() };
-                let ids: Vec<fpp_core::Node> = elts.iter().map(|e| e.node_id).collect();
-                match a.common_type(&ids, empty_list_error) {
-                    Ok(t) => a.assign_type(
-                        node.node_id,
-                        Arc::new(Type::AnonArray(AnonArrayType {
-                            elt_type: t,
-                            size: Some(elts.len()),
-                        })),
-                    ),
-                    Err(err) => {
-                        err.emit();
-                        return ControlFlow::Break(());
-                    }
-                }
-            }
-            ExprKind::ArraySubscript { e1, e2 } => {
-                // Resolve the element type of e1 (and report "not an array type"
-                // on e1) before checking that e2 is numeric.
-                let arr_ty = match a.type_map.get(&e1.node_id) {
-                    None => return ControlFlow::Continue(()),
-                    Some(arr_ty) => Type::underlying_type(arr_ty),
-                };
-
-                let elt_ty = match arr_ty.as_anon_array() {
-                    Some(anon_array) => anon_array.elt_type.clone(),
-                    None => {
-                        let ty = arr_ty.deref();
-                        SemanticError::InvalidType {
-                            loc: e1.span(),
-                            msg: format!("{} is not an array type", ty),
-                            notes: vec![],
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    }
-                };
-
-                Self::emit_error(Self::convert_node_to_numeric(a, e2));
-
-                a.type_map.insert(node.node_id, elt_ty);
-            }
-            ExprKind::Binop { left, right, op } => match op {
-                fpp_ast::Binop::LShift | fpp_ast::Binop::RShift => {
-                    // Shift operation is special, for this we independently check
-                    // for both operands to be integer
-                    let left_ok = Self::emit_error(Self::check_integer_or_enum_type(a, left));
-                    let right_ok = Self::emit_error(Self::check_integer_or_enum_type(a, right));
-                    if left_ok.is_some() && right_ok.is_some() {
-                        a.assign_type(node.node_id, Arc::new(Type::Integer));
-                    }
-                }
-                _ => {
-                    // An operand with no type failed to type check
-                    if !a.type_map.contains_key(&left.node_id)
-                        || !a.type_map.contains_key(&right.node_id)
-                    {
-                        return ControlFlow::Continue(());
-                    }
-                    let ty = match a.common_type_of_pair(left.node_id, right.node_id, node.span()) {
-                        Ok(ty) => ty,
-                        Err(err) => {
-                            err.emit();
-                            return ControlFlow::Break(());
-                        }
-                    };
-
-                    // The type of the expression is the numeric type, or for
-                    // addition the string type, that the common type converts
-                    // to (spec, Type Checking, Arithmetic and Concatenation)
-                    let t = match op {
-                        fpp_ast::Binop::Add => Self::convert_to_numeric_or_string(node.span(), &ty),
-                        _ => Self::convert_to_numeric(node.span(), &ty),
-                    };
-                    if let Some(t) = Self::emit_error(t) {
-                        a.assign_type(node.node_id, t);
-                    }
-                }
-            },
-            ExprKind::SizeOf(type_name) => {
-                let ty = a.type_map.get(&type_name.node_id).unwrap();
-                if !ty.is_displayable() {
-                    SemanticError::InvalidType {
-                        loc: node.span(),
-                        msg: format!("size of type {} is not known in the model", ty),
-                        notes: vec![],
-                    }
-                    .emit();
-                }
-                a.type_map.insert(node.node_id, Arc::new(Type::Integer));
-            }
-            ExprKind::Dot { e, id } => {
-                if a.type_map.contains_key(&node.node_id) {
-                    // Type for this entire dot expression is already resolved
-                    // This means it's actually a _use_ of some sort of symbol (constant/enum constant)
-                    // We can just use the type that was already resolved
-                    return ControlFlow::Continue(());
-                }
-
-                // This is some member selection of a struct/anon struct
-                let e_ty = match a.type_map.get(&e.node_id) {
-                    Some(e_ty) => Type::underlying_type(e_ty),
-                    None => return ControlFlow::Continue(()),
-                };
-
-                match e_ty.as_anon_struct() {
-                    Some(anon_struct) => match anon_struct.get_member(&id.data) {
-                        None => {
-                            SemanticError::InvalidType {
-                                loc: id.span(),
-                                msg: format!("{} has no member `{}`", e_ty, id.data),
-                                notes: vec![],
-                            }
-                            .emit();
-                            return ControlFlow::Break(());
-                        }
-                        Some(member_ty) => {
-                            a.type_map.insert(node.node_id, member_ty.clone());
-                        }
-                    },
-                    None => {
-                        SemanticError::InvalidType {
-                            loc: e.span(),
-                            msg: format!("{} does not have members", e_ty),
-                            notes: vec![],
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    }
-                }
-            }
-            ExprKind::Ident { .. } => {} // already handled by constant_use
+            ExprKind::Array(elts) => self.expr_array_node(a, node, elts),
+            ExprKind::ArraySubscript { e1, e2 } => self.expr_array_subscript_node(a, node, e1, e2),
+            ExprKind::Binop { left, op, right } => self.expr_binop_node(a, node, left, op, right),
+            ExprKind::Dot { e, id } => self.expr_dot_node(a, node, e, id),
+            // An identifier is a constant use, typed by constant_use
+            ExprKind::Ident { .. } => self.super_visit(a, Node::Expr(node)),
             ExprKind::LiteralBool(_) => {
-                a.type_map.insert(node.node_id, Arc::new(Type::Boolean));
-            }
-            ExprKind::LiteralInt(_) => {
-                a.type_map.insert(node.node_id, Arc::new(Type::Integer));
+                a.assign_type(node.node_id, Arc::new(Type::Boolean));
+                ControlFlow::Continue(())
             }
             ExprKind::LiteralFloat(_) => {
-                a.type_map
-                    .insert(node.node_id, Arc::new(Type::Float(FloatKind::F64)));
+                a.assign_type(node.node_id, Arc::new(Type::Float(FloatKind::F64)));
+                ControlFlow::Continue(())
+            }
+            ExprKind::LiteralInt(_) => {
+                a.assign_type(node.node_id, Arc::new(Type::Integer));
+                ControlFlow::Continue(())
             }
             ExprKind::LiteralString(_) => {
-                a.type_map
-                    .insert(node.node_id, Arc::new(Type::String(None)));
+                a.assign_type(node.node_id, Arc::new(Type::String(None)));
+                ControlFlow::Continue(())
             }
-            ExprKind::Paren(e) => {
-                if let Some(ty) = a.type_map.get(&e.node_id) {
-                    a.type_map.insert(node.node_id, ty.clone());
-                }
-            }
-            ExprKind::Struct(struct_expr) => {
-                let mut members_out = Vec::default();
-                let mut member_locs = HashMap::default();
-
-                for member in struct_expr {
-                    match a.type_map.get(&member.value.node_id) {
-                        Some(member_ty) => {
-                            members_out.push((member.name.data.clone(), member_ty.clone()));
-                            if let Some(old_member) =
-                                member_locs.insert(member.name.data.clone(), member.value.span())
-                            {
-                                SemanticError::DuplicateStructMember {
-                                    name: member.name.data.clone(),
-                                    loc: member.span(),
-                                    prev_loc: old_member,
-                                }
-                                .emit();
-                            }
-                        }
-                        _ => return ControlFlow::Continue(()),
-                    }
-                }
-
-                a.type_map.insert(
-                    node.node_id,
-                    Arc::new(Type::AnonStruct(AnonStructType {
-                        members: members_out,
-                    })),
-                );
-            }
-            ExprKind::Unop { e, .. } => {
-                if let Some(t1) = a.type_map.get(&e.node_id)
-                    && let Some(t) = Self::emit_error(Self::convert_to_numeric(node.span(), t1))
-                {
-                    a.assign_type(node.node_id, t);
-                }
-            }
+            ExprKind::Paren(e) => self.expr_paren_node(a, node, e),
+            ExprKind::SizeOf(type_name) => self.expr_size_of_node(a, node, type_name),
+            ExprKind::Struct(members) => self.expr_struct_node(a, node, members),
+            ExprKind::Unop { e, .. } => self.expr_unop_node(a, node, e),
         }
-
-        ControlFlow::Continue(())
     }
 
     fn visit_spec_command(

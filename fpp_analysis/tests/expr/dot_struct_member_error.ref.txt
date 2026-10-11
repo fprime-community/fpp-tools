@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/expr/dot_struct_member_error.fpp:4:18
+  |
+4 |   constant c = p.y
+  |                  ^ no member y in struct type S
+  |
+  = note: expanded at [ local path prefix ]/expr/dot_struct_member_error.fpp:6:1
+  |
+ ::: [ local path prefix ]/expr/dot_struct_member_error.fpp:2:1
+  |
+2 | struct S { x: U32 }
+  | ------------------- symbol is defined here
+

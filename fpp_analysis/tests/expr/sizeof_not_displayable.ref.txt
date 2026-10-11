@@ -1,5 +1,15 @@
- --> [ local path prefix ]/expr/sizeof_not_displayable.fpp:9:14
+ --> [ local path prefix ]/expr/sizeof_not_displayable.fpp:9:21
   |
 9 | constant c = sizeof(S)
-  |              ^^^^^^^^^ size of type S is not known in the model
+  |                     ^ size of type S is not known in the model
+  |
+ ::: [ local path prefix ]/expr/sizeof_not_displayable.fpp:6:6
+  |
+6 |   x: T
+  |      - because this type is not displayable
+  |
+ ::: [ local path prefix ]/expr/sizeof_not_displayable.fpp:3:1
+  |
+3 | type T
+  | ------ type is defined here
 

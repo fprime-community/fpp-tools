@@ -106,10 +106,25 @@ pub enum SemanticError {
     InvalidShiftAmount {
         loc: Span,
     },
-    /// A member-selection expression names a member that does not exist on the type
-    InvalidTypeForMemberSelection {
+    /// No member in anonymous struct type
+    InvalidAnonStructMember {
+        member_name: String,
         loc: Span,
-        member: String,
+        /// The definition of the symbol whose value has no such member, if
+        /// the selection is from a symbol
+        def_loc: Option<Span>,
+    },
+    /// No member in struct type
+    InvalidStructMember {
+        member_name: String,
+        loc: Span,
+        struct_type_name: String,
+        def_loc: Span,
+    },
+    /// No member in a value whose type has no members
+    InvalidTypeForMemberSelection {
+        member_name: String,
+        loc: Span,
         type_name: String,
     },
     FormatStringMismatchLength {
@@ -663,14 +678,43 @@ impl From<SemanticError> for Diagnostic {
                     "shift amount must be a non-negative value that must be in the range [0,255]",
                 )
             }
-            SemanticError::InvalidTypeForMemberSelection {
+            SemanticError::InvalidAnonStructMember {
+                member_name,
                 loc,
-                member,
+                def_loc,
+            } => {
+                let diag = Diagnostic::new(
+                    loc,
+                    Level::Error,
+                    format!("no member {} in anonymous struct value", member_name),
+                );
+                match def_loc {
+                    Some(def_loc) => diag.span_note(def_loc, "symbol is defined here"),
+                    None => diag,
+                }
+            }
+            SemanticError::InvalidStructMember {
+                member_name,
+                loc,
+                struct_type_name,
+                def_loc,
+            } => Diagnostic::new(
+                loc,
+                Level::Error,
+                format!(
+                    "no member {} in struct type {}",
+                    member_name, struct_type_name
+                ),
+            )
+            .span_note(def_loc, "symbol is defined here"),
+            SemanticError::InvalidTypeForMemberSelection {
+                member_name,
+                loc,
                 type_name,
             } => Diagnostic::new(
                 loc,
                 Level::Error,
-                format!("{} has no member `{}`", type_name, member),
+                format!("no member {} in value of type {}", member_name, type_name),
             ),
             SemanticError::FormatStringMismatchLength {
                 format_locs,
