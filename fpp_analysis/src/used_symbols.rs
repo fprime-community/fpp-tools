@@ -204,10 +204,10 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for UsedSymbols<'ast> {
     fn type_use(
         &self,
         a: &mut Analysis,
-        node: &QualIdent,
+        node: &TypeName,
         _name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
+        self.add_symbol(a, node.node_id)
     }
 
     fn port_use(

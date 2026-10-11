@@ -259,10 +259,13 @@ impl<'ast, Reader: FileReader> UseAnalysisPass<'ast, Analysis> for TuAnalyzer<'a
     fn type_use(
         &self,
         a: &mut Analysis,
-        node: &QualIdent,
+        node: &TypeName,
         use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        self.analyze_use(a, SpecLocKind::Type, use_, node.is_absolute())
+        let is_absolute = node
+            .get_is_absolute_opt()
+            .expect("a type use is a qualified identifier");
+        self.analyze_use(a, SpecLocKind::Type, use_, is_absolute)
     }
 
     /// An implied use names a definition by its fully qualified name
@@ -289,7 +292,7 @@ impl<'ast, Reader: FileReader> UseAnalysisPass<'ast, Analysis> for TuAnalyzer<'a
     fn implied_type_use(
         &self,
         a: &mut Analysis,
-        _node: &QualIdent,
+        _node: &TypeName,
         use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.analyze_use(a, SpecLocKind::Type, use_, true)
@@ -449,7 +452,7 @@ impl<'ast, 'r, Reader: FileReader> TuAnalyzer<'ast, 'r, Reader> {
             self.implied_port_use(a, &iu.as_qual_ident_node(), iu.name().clone())?;
         }
         for iu in a.get_implied_uses(ImpliedUseKind::Type, id) {
-            self.implied_type_use(a, &iu.as_qual_ident_node(), iu.name().clone())?;
+            self.implied_type_use(a, &iu.as_type_name_node(), iu.name().clone())?;
         }
         ControlFlow::Continue(())
     }

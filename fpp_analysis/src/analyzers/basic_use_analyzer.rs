@@ -87,10 +87,13 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
     }
 
     /// A use of a type definition
+    ///
+    /// The type name of an implied type use is built for the visit, so `node`
+    /// need not be part of the model.
     fn type_use(
         &self,
         a: &mut Self::State,
-        node: &QualIdent,
+        node: &TypeName,
         use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let _ = a;
@@ -172,12 +175,12 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
         self.port_use(a, node, use_)
     }
 
-    /// An implied type use: a use of the type definition named by the
-    /// qualified identifier of the implied use
+    /// An implied type use: a use of the type definition named by the type
+    /// name of the implied use
     fn implied_type_use(
         &self,
         a: &mut Self::State,
-        node: &QualIdent,
+        node: &TypeName,
         use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.type_use(a, node, use_)
@@ -303,7 +306,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
         iu: &ImpliedUse,
     ) -> ControlFlow<V::Break> {
         iu.annotate_emitted_errors(|| {
-            visitor.implied_type_use(a, &iu.as_qual_ident_node(), iu.name().clone())?;
+            visitor.implied_type_use(a, &iu.as_type_name_node(), iu.name().clone())?;
             visitor.implied_use(a, iu, ImpliedUseKind::Type)
         })
     }
@@ -462,7 +465,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                 ControlFlow::Continue(())
             }
             Node::TypeName(tn) => match &tn.kind {
-                TypeNameKind::QualIdent(qi) => visitor.type_use(a, qi, qi.into()),
+                TypeNameKind::QualIdent(qi) => visitor.type_use(a, tn, qi.into()),
                 TypeNameKind::String(_) => {
                     self.visit_implied_uses(visitor, a, tn.node_id)?;
                     self.super_.visit(visitor, a, node)

@@ -94,3 +94,8 @@ fn string_implied_type_order() {
 fn alias_string_size_not_numeric() {
     run_test("types/alias_string_size_not_numeric")
 }
+
+#[test]
+fn state_machine_not_a_type() {
+    run_test("types/state_machine_not_a_type")
+}

@@ -8,8 +8,8 @@ use crate::semantics::{
     Symbol, SymbolInterface,
 };
 use fpp_ast::{
-    AstNode, DefEnum, Expr, ExprKind, Ident, Node, QualIdent, SpecTemplateExpand, Visitable,
-    Visitor,
+    AstNode, DefEnum, Expr, ExprKind, Ident, Node, QualIdent, SpecTemplateExpand, TypeName,
+    TypeNameKind, Visitable, Visitor,
 };
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
@@ -311,10 +311,18 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
     fn type_use(
         &self,
         a: &mut Analysis,
-        node: &QualIdent,
+        node: &TypeName,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        check_qual_ident(a, NameGroup::Type, node);
+        match &node.kind {
+            TypeNameKind::QualIdent(qual_ident) => {
+                check_qual_ident(a, NameGroup::Type, qual_ident);
+                if let Some(symbol) = a.use_def_map.get(&qual_ident.id()).cloned() {
+                    a.use_def_map.insert(node.node_id, symbol);
+                }
+            }
+            _ => panic!("type use should be qualified identifier"),
+        }
         ControlFlow::Continue(())
     }
 

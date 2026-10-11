@@ -38,11 +38,9 @@ impl StateMachineAnalysisVisitor for CheckInitialTransitions {
                 _ => None,
             })
             .collect();
-        if let Err(err) = Self::check_one_initial_transition(
-            initial_transitions,
-            node.span(),
-            "state machine",
-        ) {
+        if let Err(err) =
+            Self::check_one_initial_transition(initial_transitions, node.span(), "state machine")
+        {
             err.emit();
             sma.blocking_error = true;
         }

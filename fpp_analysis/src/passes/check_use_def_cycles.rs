@@ -259,9 +259,9 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUseDefCycles<'ast> {
     fn type_use(
         &self,
         a: &mut Analysis,
-        node: &QualIdent,
+        node: &TypeName,
         use_: QualifiedName,
     ) -> ControlFlow<Self::Break> {
-        self.visit_use(a, node.id(), use_)
+        self.visit_use(a, node.node_id, use_)
     }
 }
