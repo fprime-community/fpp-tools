@@ -5,7 +5,7 @@ use crate::semantics::{
     ComponentInstance, Connection, ConnectionPattern, InterfaceInstance, Symbol, Topology,
 };
 use fpp_core::Span;
-use rustc_hash::FxHashSet as HashSet;
+use indexmap::IndexSet;
 
 // Resolve a partially numbered topology
 
@@ -54,7 +54,7 @@ fn check_pattern_instances(t: &Topology, pattern: &ConnectionPattern) -> Semanti
 
 /// Compute the transitively imported topologies
 fn compute_transitive_imports(a: &Analysis, t: &mut Topology) {
-    let mut tis: HashSet<Symbol> = HashSet::default();
+    let mut tis: IndexSet<Symbol> = IndexSet::default();
     for ts in t.get_imported_topology_symbols(a) {
         if let Some(dep) = a.topology_map.get(&ts) {
             for s in &dep.transitive_import_set {

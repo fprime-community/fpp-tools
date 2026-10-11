@@ -1,0 +1,60 @@
+  --> [ local path prefix ]/top_import/import_order_connections.fpp:25:5
+   |
+25 |     x.pIn -> x.pIn
+   |     ^^^^^ invalid directions input -> input (should be output -> input)
+   |
+  ::: [ local path prefix ]/top_import/import_order_connections.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/top_import/import_order_connections.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- to port is specified here
+
+  --> [ local path prefix ]/top_import/import_order_connections.fpp:19:5
+   |
+19 |     w.pIn -> w.pIn
+   |     ^^^^^ invalid directions input -> input (should be output -> input)
+   |
+  ::: [ local path prefix ]/top_import/import_order_connections.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/top_import/import_order_connections.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- to port is specified here
+
+  --> [ local path prefix ]/top_import/import_order_connections.fpp:31:5
+   |
+31 |     y.pIn -> y.pIn
+   |     ^^^^^ invalid directions input -> input (should be output -> input)
+   |
+  ::: [ local path prefix ]/top_import/import_order_connections.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/top_import/import_order_connections.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- to port is specified here
+
+  --> [ local path prefix ]/top_import/import_order_connections.fpp:37:5
+   |
+37 |     z.pIn -> z.pIn
+   |     ^^^^^ invalid directions input -> input (should be output -> input)
+   |
+  ::: [ local path prefix ]/top_import/import_order_connections.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/top_import/import_order_connections.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- to port is specified here
+

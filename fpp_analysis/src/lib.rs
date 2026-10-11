@@ -291,7 +291,7 @@ pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> Contr
     CheckComponentInstanceDefs::check_id_ranges(a);
     CheckStateMachineDefs.visit_trans_units(a, ast.iter().cloned())?;
     CheckTopologyInstances.visit_trans_units(a, ast.iter().cloned())?;
-    CheckTopologyDefs.resolve_all(a);
+    CheckTopologyDefs.visit_trans_units(a, ast.iter().cloned())?;
     CheckTemplateInterfaceArgs.check(a);
     BuildSpecLocMap.visit_trans_units(a, ast.iter().cloned())?;
     CheckSpecLocs.visit_trans_units(a, ast.iter().cloned())?;

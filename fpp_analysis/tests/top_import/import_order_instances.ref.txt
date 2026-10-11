@@ -1,0 +1,20 @@
+  --> [ local path prefix ]/top_import/import_order_instances.fpp:13:3
+   |
+13 |   instance d
+   |   ^^^^^^^^^^ duplicate instance d
+   |
+  ::: [ local path prefix ]/top_import/import_order_instances.fpp:12:3
+   |
+12 |   instance d
+   |   ---------- previous instance is here
+
+ --> [ local path prefix ]/top_import/import_order_instances.fpp:9:3
+  |
+9 |   instance c
+  |   ^^^^^^^^^^ duplicate instance c
+  |
+ ::: [ local path prefix ]/top_import/import_order_instances.fpp:8:3
+  |
+8 |   instance c
+  |   ---------- previous instance is here
+

@@ -5,7 +5,7 @@ use crate::semantics::{
 };
 use fpp_ast::{self as ast, AstNode, ConnectionPatternKind, QualIdent};
 use fpp_core::{Span, Spanned};
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use indexmap::{IndexMap, IndexSet};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
@@ -41,7 +41,7 @@ pub struct ConnectionPattern {
     pub node: Arc<ast::SpecPatternConnectionGraph>,
     /// The source instance.
     pub source: (ComponentInstance, Span),
-    /// The target instances, deduplicated by instance and kept in source order.
+    /// The target instances, in the order they are written
     pub targets: Vec<(ComponentInstance, Span)>,
 }
 
@@ -71,9 +71,7 @@ impl ConnectionPattern {
             let Some(ci) = a.get_represented_component_instance(tgt.id())? else {
                 return Ok(None);
             };
-            if !targets.iter().any(|(prev, _)| prev == &ci) {
-                targets.push((ci, tgt.span()));
-            }
+            targets.push((ci, tgt.span()));
         }
         Ok(Some(ConnectionPattern {
             node: spec.clone(),
@@ -91,32 +89,38 @@ pub struct Topology {
     /// The fully qualified name of the topology
     pub qualified_name: String,
     /// The component instances directly declared in this topology
-    pub direct_component_instances: HashMap<Symbol, Span>,
+    pub direct_component_instances: IndexMap<Symbol, Span>,
     /// The topologies directly imported into this topology
-    pub direct_topologies: HashMap<Symbol, Span>,
+    pub direct_topologies: IndexMap<Symbol, Span>,
     /// The bound port interface instance template parameters directly declared
     /// as instances of this topology
-    pub direct_template_args: HashMap<Symbol, Span>,
+    pub direct_template_args: IndexMap<Symbol, Span>,
     /// The transitively imported topologies (by symbol).
-    pub transitive_import_set: HashSet<Symbol>,
+    pub transitive_import_set: IndexSet<Symbol>,
     /// The instances of this topology, resolved across imports.
     pub instance_map: BTreeMap<InterfaceInstance, Span>,
     /// The top ports to resolve into the port interface.
     pub ports: Vec<Arc<ast::SpecTopPort>>,
-    /// The raw direct connection graph specs, to resolve in dependency order.
+    /// The direct connection graph specifiers of this topology, in source
+    /// order. The analysis does not read them; they are kept for the tools that
+    /// present a topology's connection graphs.
     pub raw_direct_graphs: Vec<ast::SpecDirectConnectionGraph>,
-    /// The raw pattern connection graph specs, to resolve in dependency order.
+    /// The pattern connection graph specifiers of this topology, in source
+    /// order. The analysis does not read them; they are kept for the tools that
+    /// present a topology's connection graphs.
     pub raw_patterns: Vec<Arc<ast::SpecPatternConnectionGraph>>,
     /// The resolved top ports by name.
-    pub port_map: HashMap<String, TopologyPort>,
+    pub port_map: IndexMap<String, TopologyPort>,
     /// The resolved port interface of the topology (from its topology ports).
     pub port_interface: PortInterface,
     /// The connection patterns of this topology, indexed by kind.
-    pub pattern_map: HashMap<ConnectionPatternKind, ConnectionPattern>,
-    /// The connections of this topology, indexed by graph name.
-    pub connection_map: BTreeMap<String, Vec<Connection>>,
-    /// The connections defined locally (not imported), indexed by graph name.
-    pub local_connection_map: BTreeMap<String, Vec<Connection>>,
+    pub pattern_map: IndexMap<ConnectionPatternKind, ConnectionPattern>,
+    /// The connections of this topology, indexed by graph name. Each list holds
+    /// the most recently added connection first.
+    pub connection_map: IndexMap<String, Vec<Connection>>,
+    /// The connections defined locally, not imported. Each list holds the most
+    /// recently added connection first.
+    pub local_connection_map: IndexMap<String, Vec<Connection>>,
     /// The output connections going from each port.
     pub output_connection_map: BTreeMap<PortInstanceIdentifier, BTreeSet<Connection>>,
     /// The input connections going to each port.
@@ -134,19 +138,19 @@ impl Topology {
         Topology {
             symbol,
             qualified_name,
-            direct_component_instances: HashMap::default(),
-            direct_topologies: HashMap::default(),
-            direct_template_args: HashMap::default(),
-            transitive_import_set: HashSet::default(),
+            direct_component_instances: IndexMap::default(),
+            direct_topologies: IndexMap::default(),
+            direct_template_args: IndexMap::default(),
+            transitive_import_set: IndexSet::default(),
             instance_map: BTreeMap::new(),
             ports: Vec::new(),
             raw_direct_graphs: Vec::new(),
             raw_patterns: Vec::new(),
-            port_map: HashMap::default(),
+            port_map: IndexMap::default(),
             port_interface: PortInterface::new("topology"),
-            pattern_map: HashMap::default(),
-            connection_map: BTreeMap::new(),
-            local_connection_map: BTreeMap::new(),
+            pattern_map: IndexMap::default(),
+            connection_map: IndexMap::default(),
+            local_connection_map: IndexMap::default(),
             output_connection_map: BTreeMap::new(),
             input_connection_map: BTreeMap::new(),
             from_port_number_map: BTreeMap::new(),
@@ -287,12 +291,12 @@ impl Topology {
         Ok(())
     }
 
-    /// Add a connection to all the connection maps.
+    /// Add a connection
     pub fn add_connection(&mut self, graph_name: &str, c: Connection) {
         self.connection_map
             .entry(graph_name.to_string())
             .or_default()
-            .push(c.clone());
+            .insert(0, c.clone());
         self.output_connection_map
             .entry(c.from.port.clone())
             .or_default()
@@ -309,12 +313,12 @@ impl Topology {
         }
     }
 
-    /// Add a locally declared connection.
+    /// Add a local connection
     pub fn add_local_connection(&mut self, graph_name: &str, c: Connection) {
         self.local_connection_map
             .entry(graph_name.to_string())
             .or_default()
-            .push(c.clone());
+            .insert(0, c.clone());
         self.add_connection(graph_name, c);
     }
 

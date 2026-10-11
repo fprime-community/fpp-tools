@@ -1,0 +1,30 @@
+  --> [ local path prefix ]/connection_pattern/pattern_before_direct.fpp:10:3
+   |
+10 |   health connections instance c
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ duplicate health pattern
+   |
+  ::: [ local path prefix ]/connection_pattern/pattern_before_direct.fpp:9:3
+   |
+ 9 |   health connections instance c
+   |   ----------------------------- previous occurrence is here
+
+  --> [ local path prefix ]/connection_pattern/pattern_before_direct.fpp:12:5
+   |
+12 |     c.pIn -> c.pOut
+   |     ^^^^^ invalid directions input -> output (should be output -> input)
+   |
+  ::: [ local path prefix ]/connection_pattern/pattern_before_direct.fpp:3:3
+   |
+ 3 |   sync input port pIn: P
+   |   ---------------------- from port is specified here
+   |
+  ::: [ local path prefix ]/connection_pattern/pattern_before_direct.fpp:4:3
+   |
+ 4 |   output port pOut: P
+   |   ------------------- to port is specified here
+
+ --> [ local path prefix ]/connection_pattern/pattern_before_direct.fpp:9:31
+  |
+9 |   health connections instance c
+  |                               ^ instance c has no ping input port
+

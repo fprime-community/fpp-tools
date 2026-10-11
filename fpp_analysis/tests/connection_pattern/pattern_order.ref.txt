@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/connection_pattern/pattern_order.fpp:5:30
+  |
+5 |   event connections instance x
+  |                              ^ instance x has no event input port
+

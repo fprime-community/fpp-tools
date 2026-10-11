@@ -1,4 +1,4 @@
-use crate::run_test;
+use crate::{run_test, run_test_with};
 
 #[test]
 fn undef_instance() {
@@ -58,4 +58,30 @@ fn internal_port() {
 #[test]
 fn unresolved_topology() {
     run_test("connection_direct/unresolved_topology")
+}
+
+#[test]
+fn include_first_error() {
+    run_test("connection_direct/include_first_error")
+}
+
+#[test]
+fn file_order() {
+    run_test_with(
+        &[
+            "connection_direct/file_order_common",
+            "connection_direct/file_order_z",
+        ],
+        "connection_direct/file_order_a",
+    )
+}
+
+#[test]
+fn not_member_order() {
+    run_test("connection_direct/not_member_order")
+}
+
+#[test]
+fn graph_order() {
+    run_test("connection_direct/graph_order")
 }

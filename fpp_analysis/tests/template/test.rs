@@ -1,4 +1,4 @@
-use crate::run_test;
+use crate::{run_test, run_test_with};
 
 #[test]
 fn arg_kind_constant_param_instance_arg() {
@@ -318,4 +318,25 @@ fn use_before_expand() {
 #[test]
 fn use_before_expand_ok() {
     run_test("template/use_before_expand_ok")
+}
+
+#[test]
+fn expanded_topology_order() {
+    run_test("template/expanded_topology_order")
+}
+
+#[test]
+fn expanded_topology_import_order() {
+    run_test("template/expanded_topology_import_order")
+}
+
+#[test]
+fn interface_arg_file_order() {
+    run_test_with(
+        &[
+            "template/interface_arg_file_order_common",
+            "template/interface_arg_file_order_z",
+        ],
+        "template/interface_arg_file_order_a",
+    )
 }

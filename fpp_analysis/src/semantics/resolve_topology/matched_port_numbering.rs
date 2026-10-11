@@ -6,6 +6,7 @@ use crate::semantics::{
     PortMatching, Topology,
 };
 use fpp_core::Span;
+use indexmap::IndexMap;
 use rustc_hash::FxHashMap as HashMap;
 use std::collections::BTreeSet;
 
@@ -13,7 +14,7 @@ use std::collections::BTreeSet;
 
 // A map from component instances to connections for tracking
 // matching pairs of connections
-type InstanceConnectionMap = HashMap<ComponentInstance, Connection>;
+type InstanceConnectionMap = IndexMap<ComponentInstance, Connection>;
 
 // A map from port numbers to connections for tracking port
 // assignments
@@ -279,7 +280,7 @@ fn compute_instance_connection_map(
         port_instance: pi.clone(),
     };
     let cs = t.get_connections_at(&pii);
-    let mut m: InstanceConnectionMap = HashMap::default();
+    let mut m: InstanceConnectionMap = IndexMap::default();
     for c in cs {
         if c.is_unmatched {
             continue;

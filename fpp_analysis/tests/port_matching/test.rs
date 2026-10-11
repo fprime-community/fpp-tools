@@ -69,3 +69,8 @@ fn template_unmatched() {
 fn template_unmatched_remote_arg() {
     run_test("port_matching/template_unmatched_remote_arg")
 }
+
+#[test]
+fn missing_connection_order() {
+    run_test("port_matching/missing_connection_order")
+}

@@ -1,4 +1,4 @@
-use crate::run_test_with;
+use crate::{run_test, run_test_with};
 
 #[test]
 fn not_deployment_topology() {
@@ -160,4 +160,14 @@ fn template_channel_neither_used_nor_omitted() {
         &["tlm_packets/instances"],
         "tlm_packets/template_channel_neither_used_nor_omitted",
     )
+}
+
+#[test]
+fn not_deployment_after_instance_error() {
+    run_test("tlm_packets/not_deployment_after_instance_error")
+}
+
+#[test]
+fn not_deployment_after_connection_error() {
+    run_test("tlm_packets/not_deployment_after_connection_error")
 }

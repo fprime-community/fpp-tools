@@ -159,3 +159,13 @@ fn source_not_component_instance() {
 fn target_not_component_instance() {
     run_test("connection_pattern/target_not_component_instance")
 }
+
+#[test]
+fn pattern_before_direct() {
+    run_test("connection_pattern/pattern_before_direct")
+}
+
+#[test]
+fn pattern_order() {
+    run_test("connection_pattern/pattern_order")
+}
