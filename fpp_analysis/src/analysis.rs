@@ -4,8 +4,7 @@ use crate::semantics::{
     ImpliedUse, ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, InterfaceInstance,
     MathError, MathResult, NameGroup, NestedScope, PortInstance, PortInstanceType, QualifiedName,
     Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion, TlmPacketSet, Topology, Type,
-    TypeConversionError, UseDefMatching, Value,
-    state_machine::StateMachine,
+    TypeConversionError, UseDefMatching, Value, state_machine::StateMachine,
 };
 use fpp_ast::{
     AstNode, Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc,
