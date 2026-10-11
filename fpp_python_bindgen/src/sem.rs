@@ -475,7 +475,14 @@ fn path_type_args(args: &Option<Box<GenericArgs>>) -> Vec<&Type> {
 }
 
 const WRAPPERS: &[&str] = &["Box", "Arc", "Rc"];
-const LISTS: &[&str] = &["Vec", "VecDeque", "HashSet", "BTreeSet", "FxHashSet"];
+const LISTS: &[&str] = &[
+    "Vec",
+    "VecDeque",
+    "HashSet",
+    "BTreeSet",
+    "FxHashSet",
+    "IndexSet",
+];
 const MAPS: &[&str] = &["HashMap", "BTreeMap", "FxHashMap", "IndexMap"];
 
 /// The reflection-root struct in `fpp_analysis`: the entry point of the transitive
