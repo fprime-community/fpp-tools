@@ -1109,8 +1109,61 @@ fn trans_unit_end_of_input_error() {
             (3, 13),
         ),
         ("@ d\ndictionary constant c = 1 +", (2, 12)),
+        (
+            "passive component C {\n  @ p\n  async product recv",
+            (3, 17),
+        ),
+        ("passive component C {\n  @ p\n  command reg", (3, 11)),
         // Without a pre-annotation, the member ends the sequence before it
         ("module M {\n  module N {", (2, 3)),
+    ];
+    for (s, location) in cases {
+        assert_eq!(first_error_location(s), Some(location), "{s}");
+    }
+}
+
+// Rust-only: when the input ends inside an expression, a type name or
+// another construct with alternatives of its own, the first error is the
+// furthest failure of the alternatives of the construct
+#[test]
+fn trans_unit_end_of_input_construct_error() {
+    let cases = [
+        // An array is the first alternative of a primary expression, and a
+        // unary minus fails at the start of the operand
+        ("module M {\n  constant a = [1, 2", (2, 16)),
+        // The other primary expressions fail at their start
+        ("module M {\n  constant a = (", (2, 16)),
+        ("module M {\n  constant a = {x = 1", (2, 16)),
+        ("module M {\n  constant a = .", (2, 16)),
+        // A parenthesized expression or a size fails where the expression
+        // or the type name inside it last fails
+        ("module M {\n  constant a = (1 + 2", (2, 21)),
+        ("module M {\n  constant a = sizeof(F64", (2, 23)),
+        ("module M {\n  constant a = sizeof(string size 2", (2, 35)),
+        // A subscript is not a selector, so the expression ends before it
+        ("module M {\n  constant a = b[1", (2, 17)),
+        // A string type with a size is not a type name
+        ("module M {\n  array A = [3] string size 1 +", (2, 17)),
+        // A transition fails where its actions do
+        ("state machine S {\n  choice C { if g enter", (2, 19)),
+        ("state machine S {\n  @ i\n  initial do { a }", (3, 18)),
+        (
+            "state machine S {\n  state A {\n    on s if g enter",
+            (3, 15),
+        ),
+        // The other severity levels and update kinds fail at the first
+        // keyword
+        (
+            "passive component C {\n  event E severity activity",
+            (2, 20),
+        ),
+        (
+            "passive component C {\n  telemetry T: U32 update on",
+            (2, 27),
+        ),
+        // A member selection or qualifier fails after its dot
+        ("constant a = (a.)\n", (1, 17)),
+        ("constant a = sizeof(A.)\n", (1, 23)),
     ];
     for (s, location) in cases {
         assert_eq!(first_error_location(s), Some(location), "{s}");

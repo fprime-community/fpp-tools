@@ -26,6 +26,23 @@ pub(crate) enum ParseError {
 
     /// A token that does not belong where it occurs
     UnexpectedToken { got_kind: TokenKind, got_span: Span },
+
+    /// The end of the input inside a `construct`, reported at `loc`, where
+    /// the alternatives of the construct fail
+    EndOfInputIn { loc: Span, construct: &'static str },
+}
+
+impl ParseError {
+    /// Whether the error is at the end of the input
+    pub(crate) fn is_at_end_of_input(&self) -> bool {
+        match self {
+            ParseError::ExpectedOneOf { got_kind, .. }
+            | ParseError::UnexpectedToken { got_kind, .. } => *got_kind == TokenKind::EOF,
+            ParseError::ExpectedToken { got, .. } => *got == TokenKind::EOF,
+            ParseError::UnexpectedEof { .. } => true,
+            ParseError::EndOfInputIn { .. } => false,
+        }
+    }
 }
 
 /// An include error
@@ -88,6 +105,11 @@ impl From<ParseError> for Diagnostic {
                 Diagnostic::new(got_span, Level::Error, "syntax error: unexpected token")
                     .note(format!("got {}", got_kind))
             }
+            ParseError::EndOfInputIn { loc, construct } => Diagnostic::new(
+                loc,
+                Level::Error,
+                format!("syntax error: unexpected end of input in {construct}"),
+            ),
         }
     }
 }

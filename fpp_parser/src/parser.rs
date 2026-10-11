@@ -9,15 +9,13 @@
 //!
 //! Unlike the Scala parser, this one recovers from an error at the next element
 //! of the enclosing element sequence and goes on parsing, so one parse can
-//! report several errors. The first one is the one the Scala parser reports,
-//! except when the input ends inside an element. There the Scala parser reports
-//! the failure that got furthest among every alternative it tried, a failure at
-//! the end of the input counting as the least far. This parser makes that
-//! choice only between the alternatives of an element sequence, such as the
-//! members of a module, from the keywords they start with (see
-//! [ElementState]). So when the input ends inside an expression, a type name,
-//! a transition or another part of an element that has alternatives of its
-//! own, the first error can be at another token of the line.
+//! report several errors. The first one is the one the Scala parser reports.
+//! When the input ends inside an element, that is the failure that got
+//! furthest among the alternatives the Scala parser tried, a failure at the end
+//! of the input counting as the least far. So the productions record where the
+//! alternatives they do not try fail: the alternatives of an element sequence
+//! in [ElementState], and those inside an element where an alternative fails
+//! at the end of the input (see [Parser::alternative_failed]).
 
 use crate::cursor::Cursor;
 use crate::error::{ParseError, ParseResult};
@@ -38,8 +36,12 @@ pub struct Parser<'a> {
     ends: Vec<TokenKind>,
     /// The state of the element sequence element being parsed
     element: ElementState,
-    /// An error at the end of the input that has propagated out of the element
-    /// in which it occurred, to be reported by an enclosing element sequence
+    /// The first error at the end of the input that passed a commit point and
+    /// has not been reported: one that has propagated out of the element in
+    /// which it occurred, to be reported by an enclosing element sequence, or
+    /// one of an alternative whose failure the failure of other alternatives
+    /// replaced. If the element sequences end without another error at the
+    /// top level, it is the error.
     eof_error: Option<ParseError>,
 }
 
@@ -98,6 +100,41 @@ macro_rules! into_member {
             TypeOrConstantDef::Struct(def) => $member::DefStruct(def),
         }
     };
+}
+
+/// The span of the last token of the node located at `span`, a closing token
+fn last_token(span: fpp_core::Span) -> fpp_core::Span {
+    fpp_core::Span::new(span.file(), span.end().pos() - 1, 1, span.including_span())
+}
+
+/// The furthest failure of the Scala parser inside the expression `e`, when
+/// the input ends after it: the last token at which an alternative or an
+/// optional part fails
+fn last_failure(e: &Expr) -> fpp_core::Span {
+    match &e.kind {
+        ExprKind::Binop { right, .. } => last_failure(right),
+        ExprKind::Unop { e, .. } | ExprKind::Dot { e, .. } => last_failure(e),
+        ExprKind::Array(_)
+        | ExprKind::ArraySubscript { .. }
+        | ExprKind::Paren(_)
+        | ExprKind::Struct(_) => last_token(e.span()),
+        ExprKind::SizeOf(type_name) => match type_name.kind {
+            TypeNameKind::QualIdent(_) | TypeNameKind::String(_) => last_token(e.span()),
+            TypeNameKind::Integer(_) | TypeNameKind::Floating(_) => type_name.span(),
+            TypeNameKind::Bool => e.span(),
+        },
+        _ => e.span(),
+    }
+}
+
+/// The furthest failure of the Scala parser inside the type name
+/// `type_name`, when the input ends after it, if it has one
+fn type_name_last_failure(type_name: &TypeName) -> Option<fpp_core::Span> {
+    match &type_name.kind {
+        TypeNameKind::Bool => None,
+        TypeNameKind::String(Some(size)) => Some(last_failure(size)),
+        _ => Some(type_name.span()),
+    }
 }
 
 /// Parse a file with the entry point `entry`, which must consume all of it.
@@ -980,7 +1017,18 @@ impl<'a> Parser<'a> {
             }
             Dot => {
                 let first = self.next().unwrap();
-                let id = self.consume(Identifier)?;
+                let committed = self.begin_alternative();
+                let id = match self.consume(Identifier) {
+                    Ok(id) => self.end_alternative(committed, id),
+                    Err(err) => {
+                        return Err(self.alternative_failed(
+                            err,
+                            committed,
+                            first.span(),
+                            "expression",
+                        ));
+                    }
+                };
                 Ok(Expr {
                     node_id: self.node(first.span()),
                     kind: ExprKind::Ident {
@@ -998,8 +1046,29 @@ impl<'a> Parser<'a> {
             }
             LeftParen => {
                 let first = self.next().unwrap();
-                let e = self.scoped(|p| p.expr_node())?;
-                self.consume(RightParen)?;
+                let committed = self.begin_alternative();
+                let e = match self.expr_node() {
+                    Ok(e) => e,
+                    Err(err) => {
+                        return Err(self.alternative_failed(
+                            err,
+                            committed,
+                            first.span(),
+                            "expression",
+                        ));
+                    }
+                };
+                // The parenthesized expression does not commit
+                self.element.committed = committed;
+                if let Some(err) = self.dot_selector_failure() {
+                    return Err(err);
+                }
+                if let Err(err) = self.consume(RightParen) {
+                    // The furthest failure inside the expression replaces a
+                    // failure at the end of the input
+                    let loc = last_failure(&e);
+                    return Err(self.alternative_failed(err, committed, loc, "expression"));
+                }
                 Ok(Expr {
                     node_id: self.node(first.span()),
                     kind: ExprKind::Paren(Box::new(e)),
@@ -1012,12 +1081,39 @@ impl<'a> Parser<'a> {
                     kind: ExprKind::LiteralString(first.text().to_string()),
                 })
             }
-            LeftCurly => self.struct_expr(),
+            LeftCurly => {
+                let first = self.current_span()?;
+                let committed = self.begin_alternative();
+                match self.struct_expr() {
+                    Ok(e) => Ok(self.end_alternative(committed, e)),
+                    Err(err) => Err(self.alternative_failed(err, committed, first, "expression")),
+                }
+            }
             Keyword(Sizeof) => {
                 let first = self.next().unwrap();
-                self.consume(LeftParen)?;
-                let type_name = self.scoped(|p| p.type_name())?;
-                self.consume(RightParen)?;
+                let committed = self.begin_alternative();
+                let type_name = match self.consume(LeftParen).and_then(|_| self.type_name()) {
+                    Ok(type_name) => type_name,
+                    Err(err) => {
+                        return Err(self.alternative_failed(
+                            err,
+                            committed,
+                            first.span(),
+                            "expression",
+                        ));
+                    }
+                };
+                // The size expression does not commit
+                self.element.committed = committed;
+                if let Some(err) = self.dot_selector_failure() {
+                    return Err(err);
+                }
+                if let Err(err) = self.consume(RightParen) {
+                    // The furthest failure inside the type name replaces a
+                    // failure at the end of the input
+                    let loc = type_name_last_failure(&type_name).unwrap_or(first.span());
+                    return Err(self.alternative_failed(err, committed, loc, "expression"));
+                }
                 Ok(Expr {
                     node_id: self.node(first.span()),
                     kind: ExprKind::SizeOf(Box::new(type_name)),
@@ -1088,8 +1184,18 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn post_fix_expr(&mut self) -> ParseResult<Expr> {
-        let mut left = self.primary_expr()?;
+    /// Parse a postfix expression. `operand_start` is the start of the
+    /// operand it is when it is not the operand of a unary minus, which the
+    /// Scala parser tries first and which fails there.
+    fn post_fix_expr(&mut self, operand_start: Option<fpp_core::Span>) -> ParseResult<Expr> {
+        let committed = self.begin_alternative();
+        let mut left = match (self.primary_expr(), operand_start) {
+            (Ok(left), _) => self.end_alternative(committed, left),
+            (Err(err), Some(loc)) => {
+                return Err(self.alternative_failed(err, committed, loc, "expression"));
+            }
+            (Err(err), None) => return Err(self.end_alternative(committed, err)),
+        };
         let first_span = left.span();
         loop {
             match self.peek(0) {
@@ -1110,11 +1216,23 @@ impl<'a> Parser<'a> {
                     let bracket = self.peek_token().unwrap();
                     self.next();
                     let committed = std::mem::replace(&mut self.element.committed, false);
-                    let e2 = match self.expr_node() {
+                    let e2 = self.expr_node().and_then(|e2| {
+                        self.commit();
+                        self.consume(RightSquare).map(|_| e2)
+                    });
+                    let e2 = match e2 {
                         Ok(e2) => e2,
-                        Err(_) if !self.element.committed => {
-                            // No subscript follows, so the expression ends
-                            // before the `[`
+                        // A subscript that fails before its commit point, or
+                        // at the end of the input inside an element sequence
+                        // that a token ends, is not a selector, so the
+                        // expression ends before the `[`. At the top level, a
+                        // failure at the end of the input after the commit
+                        // point is the first error that passed a commit
+                        // point, which is the error.
+                        Err(err)
+                            if !self.element.committed
+                                || (err.is_at_end_of_input() && self.sequence_end() != EOF) =>
+                        {
                             self.element.committed = true;
                             return Err(self.sequence_ended_at(bracket));
                         }
@@ -1122,7 +1240,6 @@ impl<'a> Parser<'a> {
                     };
                     self.element.committed = committed;
                     self.commit();
-                    self.consume(RightSquare)?;
                     left = Expr {
                         node_id: self.node(first_span),
                         kind: ExprKind::ArraySubscript {
@@ -1141,7 +1258,7 @@ impl<'a> Parser<'a> {
             Minus => {
                 let first = self.next().unwrap();
                 self.commit();
-                let right = self.post_fix_expr()?;
+                let right = self.post_fix_expr(None)?;
                 Ok(Expr {
                     node_id: self.node(first.span()),
                     kind: ExprKind::Unop {
@@ -1150,7 +1267,10 @@ impl<'a> Parser<'a> {
                     },
                 })
             }
-            _ => self.post_fix_expr(),
+            _ => {
+                let operand_start = self.peek_span(0);
+                self.post_fix_expr(operand_start)
+            }
         }
     }
 
@@ -1647,7 +1767,7 @@ impl<'a> Parser<'a> {
         fn severity_level(p: &mut Parser) -> ParseResult<EventSeverity> {
             match p.peek(0) {
                 Keyword(Activity) => {
-                    p.next();
+                    let first = p.next().unwrap();
                     match p.peek(0) {
                         Keyword(High) => {
                             p.next();
@@ -1657,6 +1777,11 @@ impl<'a> Parser<'a> {
                             p.next();
                             Ok(EventSeverity::ActivityLow)
                         }
+                        // The other severity levels fail at `activity`
+                        EOF => Err(ParseError::EndOfInputIn {
+                            loc: first.span(),
+                            construct: "severity level",
+                        }),
                         _ => Err(p.cursor.err_expected_one_of(
                             "severity level expected",
                             vec![Keyword(High), Keyword(Low)],
@@ -1664,7 +1789,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Keyword(Warning) => {
-                    p.next();
+                    let first = p.next().unwrap();
                     match p.peek(0) {
                         Keyword(High) => {
                             p.next();
@@ -1674,6 +1799,11 @@ impl<'a> Parser<'a> {
                             p.next();
                             Ok(EventSeverity::WarningLow)
                         }
+                        // The other severity levels fail at `warning`
+                        EOF => Err(ParseError::EndOfInputIn {
+                            loc: first.span(),
+                            construct: "severity level",
+                        }),
                         _ => Err(p.cursor.err_expected_one_of(
                             "severity level expected",
                             vec![Keyword(High), Keyword(Low)],
@@ -2180,7 +2310,26 @@ impl<'a> Parser<'a> {
                 )),
             }?;
 
-            p.consume_keyword(Port)?;
+            if let Err(err) = p.consume_keyword(Port) {
+                return Err(match kind {
+                    // The kinds before this one that start with the same
+                    // keyword fail at its second keyword, which is further
+                    // than the end of the input
+                    SpecialPortInstanceKind::CommandReg
+                    | SpecialPortInstanceKind::CommandResp
+                    | SpecialPortInstanceKind::ProductRecv
+                    | SpecialPortInstanceKind::ProductRequest
+                    | SpecialPortInstanceKind::ProductSend
+                        if err.is_at_end_of_input() =>
+                    {
+                        ParseError::EndOfInputIn {
+                            loc: p.cursor.last_token_span(),
+                            construct: "port instance",
+                        }
+                    }
+                    _ => err,
+                });
+            }
             p.commit();
             let name = p.name()?;
 
@@ -2278,9 +2427,20 @@ impl<'a> Parser<'a> {
                     Ok(TlmChannelUpdate::Always)
                 }
                 Keyword(On) => {
-                    p.next();
-                    p.consume_keyword(Change)?;
-                    Ok(TlmChannelUpdate::OnChange)
+                    let first = p.next().unwrap();
+                    match p.consume_keyword(Change) {
+                        Ok(_) => Ok(TlmChannelUpdate::OnChange),
+                        // `on change` commits after `on`, and the failure
+                        // of the alternatives at `on` replaces its failure
+                        Err(err) if err.is_at_end_of_input() => {
+                            p.eof_error.get_or_insert(err);
+                            Err(ParseError::EndOfInputIn {
+                                loc: first.span(),
+                                construct: "update kind",
+                            })
+                        }
+                        Err(err) => Err(err),
+                    }
                 }
                 _ => Err(p.cursor.err_expected_one_of(
                     "update kind expected",
@@ -2656,15 +2816,10 @@ impl<'a> Parser<'a> {
             _ => None,
         };
 
-        match self.peek(0) {
+        let target = match self.peek(0) {
             Keyword(Enter) => {
                 self.next();
-                let target = self.qual_ident()?;
-                Ok(TransitionExpr {
-                    node_id: self.node(first_span),
-                    actions: do_expr,
-                    target,
-                })
+                self.qual_ident()
             }
             _ => Err(self.cursor.err_expected_one_of(
                 "expected transition expression",
@@ -2673,6 +2828,24 @@ impl<'a> Parser<'a> {
                     None => vec![Keyword(Enter), Keyword(Do)],
                 },
             )),
+        };
+        match target {
+            Ok(target) => Ok(TransitionExpr {
+                node_id: self.node(first_span),
+                actions: do_expr,
+                target,
+            }),
+            // The do expression, or the missing one, fails further than the
+            // end of the input: at the closing brace of the actions, or where
+            // `do` is expected
+            Err(err) if err.is_at_end_of_input() => Err(ParseError::EndOfInputIn {
+                loc: match &do_expr {
+                    Some(do_expr) => last_token(do_expr.span()),
+                    None => first_span,
+                },
+                construct: "transition",
+            }),
+            Err(err) => Err(err),
         }
     }
 
@@ -2694,7 +2867,18 @@ impl<'a> Parser<'a> {
         match (is_transition, do_expr) {
             (true, actions) => {
                 self.next();
-                let target = self.qual_ident()?;
+                let target = match self.qual_ident() {
+                    Ok(target) => target,
+                    // A do expression, which both alternatives can start
+                    // with, fails at `enter`
+                    Err(err) if err.is_at_end_of_input() => {
+                        return Err(ParseError::EndOfInputIn {
+                            loc: first_span,
+                            construct: "transition",
+                        });
+                    }
+                    Err(err) => return Err(err),
+                };
                 Ok(TransitionOrDo::Transition(TransitionExpr {
                     node_id: self.node(first_span),
                     actions,
@@ -2762,10 +2946,26 @@ impl<'a> Parser<'a> {
             }
             Keyword(String_) => {
                 self.next();
-                let size = self.opt_expr(Size)?;
-                Ok(TypeNameKind::String(size))
+                let committed = self.begin_alternative();
+                match self.opt_expr(Size) {
+                    Ok(size) => Ok(TypeNameKind::String(self.end_alternative(committed, size))),
+                    Err(err) => {
+                        Err(self.alternative_failed(err, committed, first_span, "type name"))
+                    }
+                }
             }
-            Identifier | Dot => Ok(TypeNameKind::QualIdent(self.qual_ident()?)),
+            Identifier => Ok(TypeNameKind::QualIdent(self.qual_ident()?)),
+            Dot => {
+                let committed = self.begin_alternative();
+                match self.qual_ident() {
+                    Ok(qid) => Ok(TypeNameKind::QualIdent(
+                        self.end_alternative(committed, qid),
+                    )),
+                    Err(err) => {
+                        Err(self.alternative_failed(err, committed, first_span, "type name"))
+                    }
+                }
+            }
             _ => Err(self.cursor.err_expected_one_of(
                 "type name expected",
                 vec![
@@ -2937,6 +3137,62 @@ impl<'a> Parser<'a> {
         out
     }
 
+    /// The failure of a member selection or qualifier that the next token, a
+    /// dot that no identifier follows, would start, if the token after the
+    /// dot is not the end of the input. The selection fails there, which is
+    /// further than the token that the dot ends an expression or a type name
+    /// before.
+    fn dot_selector_failure(&mut self) -> Option<ParseError> {
+        if self.peek(0) != Dot || matches!(self.peek(1), Identifier | EOF) {
+            return None;
+        }
+        let (last, got) = self.peek_token_at(1)?;
+        Some(ParseError::ExpectedToken {
+            expected: Identifier,
+            got,
+            last,
+            msg: "unexpected token",
+        })
+    }
+
+    /// Begin an alternative of a Scala alternation that is not its first
+    /// alternative. Returns whether the element had passed a commit point
+    /// before it.
+    fn begin_alternative(&mut self) -> bool {
+        std::mem::replace(&mut self.element.committed, false)
+    }
+
+    /// End an alternative, begun when the element was `committed`, that
+    /// produced `out`
+    fn end_alternative<T>(&mut self, committed: bool, out: T) -> T {
+        self.element.committed |= committed;
+        out
+    }
+
+    /// The failure of an alternative begun when the element was `committed`,
+    /// which failed with `err`, when the Scala parser has tried other
+    /// alternatives that fail at `loc`. A failure at the end of the input is
+    /// the lowest-placed one, so the failure at `loc` replaces it, and the
+    /// commit points of the alternative do not count. If the alternative
+    /// failed after one of them, its error may still be the first error that
+    /// passed a commit point.
+    fn alternative_failed(
+        &mut self,
+        err: ParseError,
+        committed: bool,
+        loc: fpp_core::Span,
+        construct: &'static str,
+    ) -> ParseError {
+        if !err.is_at_end_of_input() {
+            return self.end_alternative(committed, err);
+        }
+        if self.element.committed {
+            self.eof_error.get_or_insert(err);
+        }
+        self.element.committed = committed;
+        ParseError::EndOfInputIn { loc, construct }
+    }
+
     /// Mark the element being parsed as the first alternative of its sequence
     fn first_alternative(&mut self) {
         self.element.eof_error_survives = true;
@@ -3057,7 +3313,7 @@ impl<'a> Parser<'a> {
         element_start: Option<(fpp_core::Span, TokenKind)>,
         punct: TokenKind,
     ) -> bool {
-        let mut at_eof = self.peek(0) == EOF;
+        let mut at_eof = err.is_at_end_of_input();
         if at_eof
             && !(state.committed && state.eof_error_survives)
             && let Some(alternative_error) = state.alternative_error.take()
@@ -3117,6 +3373,10 @@ impl<'a> Parser<'a> {
             }
         };
 
+        if !err.is_at_end_of_input() {
+            // An error before the end of the input is the error of the parse
+            self.eof_error = None;
+        }
         fpp_core::Diagnostic::from(err).emit();
         self.recover(punct)
     }
