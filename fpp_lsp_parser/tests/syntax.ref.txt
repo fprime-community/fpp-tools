@@ -1995,13 +1995,13 @@ ROOT@0..8355
         WHITESPACE@6564..6565 " "
         EQUALS@6565..6566 "="
         WHITESPACE@6566..6567 " "
-        INDEX_OR_SIZE@6567..6572
+        INDEX_OR_SIZE@6567..6571
           LEFT_SQUARE@6567..6568 "["
           EXPR@6568..6570
             EXPR_LITERAL@6568..6570
               LITERAL_INT@6568..6570 "10"
           RIGHT_SQUARE@6570..6571 "]"
-          WHITESPACE@6571..6572 " "
+        WHITESPACE@6571..6572 " "
       ERROR@6572..6573
         DOT@6572..6573 "."
       ERROR@6573..6574
@@ -2652,42 +2652,42 @@ ROOT@0..8355
   POST_ANNOTATION@8340..8354 "@< Expressions"
   EOL@8354..8355 "\n"
 error 4331..4332: expected QUAL_IDENT
-error 4332..4332: expected `SEMI`
+error 4332..4332: } expected
 error 4333..4333: topology member expected
 error 4567..4567: expected IDENT
 error 4577..4577: expected IDENT
 error 4977..4977: telemetry packet member expected
-error 4978..4978: expected `COMMA`
+error 4978..4978: } expected
 error 4980..4980: telemetry packet member expected
-error 4981..4981: expected `COMMA`
+error 4981..4981: } expected
 error 5132..5132: expected IDENT
 error 5336..5336: expected IDENT
 error 5892..5892: expected QUAL_IDENT
-error 5892..5892: expected `SEMI`
+error 5892..5892: } expected
 error 5893..5893: module member expected
-error 5894..5894: expected `SEMI`
+error 5894..5894: } expected
 error 5895..5895: module member expected
 error 6118..6119: expected QUAL_IDENT
 error 6119..6119: expected AT_KW
 error 6119..6119: expected LITERAL_STRING
-error 6119..6119: expected `SEMI`
+error 6119..6119: } expected
 error 6120..6120: module member expected
-error 6122..6122: expected `SEMI`
+error 6122..6122: } expected
 error 6125..6125: module member expected
 error 6571..6572: expected TYPE_NAME
-error 6572..6572: expected `SEMI`
+error 6572..6572: } expected
 error 6573..6573: module member expected
-error 6574..6574: expected `SEMI`
+error 6574..6574: } expected
 error 6575..6575: module member expected
-error 6576..6576: expected `SEMI`
+error 6576..6576: } expected
 error 6577..6577: module member expected
 error 7288..7288: expected EXPR
-error 7288..7288: expected `SEMI`
+error 7288..7288: } expected
 error 7289..7289: module member expected
-error 7290..7290: expected `SEMI`
+error 7290..7290: } expected
 error 7291..7291: module member expected
-error 7292..7292: expected `SEMI`
+error 7292..7292: } expected
 error 7293..7293: module member expected
 error 7541..7541: expected EXPR
-error 7541..7541: expected `SEMI`
+error 7541..7541: } expected
 error 7542..7542: module member expected

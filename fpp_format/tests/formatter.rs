@@ -18,16 +18,6 @@ fn format_src(
     Ok(Formatter::new(options).format(&root))
 }
 
-fn dup(entry: &TopEntryPoint) -> TopEntryPoint {
-    match entry {
-        TopEntryPoint::Module => TopEntryPoint::Module,
-        TopEntryPoint::Component => TopEntryPoint::Component,
-        TopEntryPoint::Topology => TopEntryPoint::Topology,
-        TopEntryPoint::TlmPacket => TopEntryPoint::TlmPacket,
-        TopEntryPoint::TlmPacketSet => TopEntryPoint::TlmPacketSet,
-    }
-}
-
 fn run_test(file_name: &str, entry: TopEntryPoint) {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
@@ -48,7 +38,7 @@ fn run_test(file_name: &str, entry: TopEntryPoint) {
         }
     };
 
-    let formatted = match format_src(&src, dup(&entry), FormatOptions::default()) {
+    let formatted = match format_src(&src, entry, FormatOptions::default()) {
         Ok(f) => f,
         Err(e) => panic!("{}: formatting failed: {:?}", file_name, e),
     };
@@ -66,7 +56,7 @@ fn run_test(file_name: &str, entry: TopEntryPoint) {
         }
     }
 
-    let parse_result = parse(&formatted, dup(&entry));
+    let parse_result = parse(&formatted, entry);
     if !parse_result.errors().is_empty() {
         panic!(
             "{}: output has parse errors: {:?}\nOutput:\n{}",

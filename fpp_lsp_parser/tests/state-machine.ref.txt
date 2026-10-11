@@ -542,11 +542,13 @@ ROOT@0..1258
   ERROR@1015..1017
     DO_KW@1015..1017 "do"
   WHITESPACE@1017..1018 " "
-  ERROR@1018..1024
+  ERROR@1018..1020
     LEFT_CURLY@1018..1019 "{"
     WHITESPACE@1019..1020 " "
+  ERROR@1020..1022
     IDENT@1020..1022 "a1"
-    WHITESPACE@1022..1023 " "
+  WHITESPACE@1022..1023 " "
+  ERROR@1023..1024
     RIGHT_CURLY@1023..1024 "}"
   WHITESPACE@1024..1025 " "
   ERROR@1025..1030
@@ -573,11 +575,13 @@ ROOT@0..1258
   WHITESPACE@1054..1055 " "
   ERROR@1055..1057
     IDENT@1055..1057 "S1"
-  EOL@1057..1059 "\n\n"
-  WHITESPACE@1059..1063 "    "
-  PRE_ANNOTATION@1063..1081 "@ Transition to S1"
-  EOL@1081..1082 "\n"
-  WHITESPACE@1082..1086 "    "
+  ERROR@1057..1063
+    EOL@1057..1059 "\n\n"
+    WHITESPACE@1059..1063 "    "
+  ERROR@1063..1086
+    PRE_ANNOTATION@1063..1081 "@ Transition to S1"
+    EOL@1081..1082 "\n"
+    WHITESPACE@1082..1086 "    "
   ERROR@1086..1088
     ON_KW@1086..1088 "on"
   WHITESPACE@1088..1089 " "
@@ -595,11 +599,13 @@ ROOT@0..1258
   WHITESPACE@1103..1104 " "
   ERROR@1104..1106
     IDENT@1104..1106 "S1"
-  EOL@1106..1108 "\n\n"
-  WHITESPACE@1108..1112 "    "
-  PRE_ANNOTATION@1112..1130 "@ Transition to S1"
-  EOL@1130..1131 "\n"
-  WHITESPACE@1131..1135 "    "
+  ERROR@1106..1112
+    EOL@1106..1108 "\n\n"
+    WHITESPACE@1108..1112 "    "
+  ERROR@1112..1135
+    PRE_ANNOTATION@1112..1130 "@ Transition to S1"
+    EOL@1130..1131 "\n"
+    WHITESPACE@1131..1135 "    "
   ERROR@1135..1137
     ON_KW@1135..1137 "on"
   WHITESPACE@1137..1138 " "
@@ -611,11 +617,13 @@ ROOT@0..1258
   WHITESPACE@1146..1147 " "
   ERROR@1147..1149
     IDENT@1147..1149 "S1"
-  EOL@1149..1151 "\n\n"
-  WHITESPACE@1151..1155 "    "
-  PRE_ANNOTATION@1155..1176 "@ Internal transition"
-  EOL@1176..1177 "\n"
-  WHITESPACE@1177..1181 "    "
+  ERROR@1149..1155
+    EOL@1149..1151 "\n\n"
+    WHITESPACE@1151..1155 "    "
+  ERROR@1155..1181
+    PRE_ANNOTATION@1155..1176 "@ Internal transition"
+    EOL@1176..1177 "\n"
+    WHITESPACE@1177..1181 "    "
   ERROR@1181..1183
     ON_KW@1181..1183 "on"
   WHITESPACE@1183..1184 " "
@@ -631,11 +639,13 @@ ROOT@0..1258
   ERROR@1193..1195
     DO_KW@1193..1195 "do"
   WHITESPACE@1195..1196 " "
-  ERROR@1196..1202
+  ERROR@1196..1198
     LEFT_CURLY@1196..1197 "{"
     WHITESPACE@1197..1198 " "
+  ERROR@1198..1200
     IDENT@1198..1200 "a1"
-    WHITESPACE@1200..1201 " "
+  WHITESPACE@1200..1201 " "
+  ERROR@1201..1202
     RIGHT_CURLY@1201..1202 "}"
   EOL@1202..1204 "\n\n"
   WHITESPACE@1204..1208 "    "
@@ -651,75 +661,93 @@ ROOT@0..1258
   ERROR@1240..1242
     DO_KW@1240..1242 "do"
   WHITESPACE@1242..1243 " "
-  ERROR@1243..1249
+  ERROR@1243..1245
     LEFT_CURLY@1243..1244 "{"
     WHITESPACE@1244..1245 " "
+  ERROR@1245..1247
     IDENT@1245..1247 "a1"
-    WHITESPACE@1247..1248 " "
+  WHITESPACE@1247..1248 " "
+  ERROR@1248..1249
     RIGHT_CURLY@1248..1249 "}"
-  EOL@1249..1251 "\n\n"
-  WHITESPACE@1251..1253 "  "
-  ERROR@1253..1254
+  ERROR@1249..1254
+    EOL@1249..1251 "\n\n"
+    WHITESPACE@1251..1253 "  "
     RIGHT_CURLY@1253..1254 "}"
-  EOL@1254..1256 "\n\n"
-  ERROR@1256..1257
+  ERROR@1254..1257
+    EOL@1254..1256 "\n\n"
     RIGHT_CURLY@1256..1257 "}"
   EOL@1257..1258 "\n"
 error 684..685: expected QUAL_IDENT
 error 685..685: expected RIGHT_CURLY
-error 685..685: expected `SEMI`
+error 685..685: } expected
 error 686..686: expected state machine member
 error 712..713: expected MACHINE_KW
 error 737..738: expected MACHINE_KW
 error 748..748: expected state machine member
-error 754..754: expected `SEMI`
+error 754..754: } expected
 error 757..757: expected state machine member
+error 767..767: expected state machine member
 error 772..772: expected state machine member
-error 777..777: expected `SEMI`
+error 777..777: } expected
 error 780..780: expected state machine member
+error 790..790: expected state machine member
 error 936..937: expected QUAL_IDENT
 error 937..937: expected RIGHT_CURLY
-error 937..937: expected `SEMI`
+error 937..937: } expected
 error 938..938: expected state machine member
-error 940..940: expected `SEMI`
+error 940..940: } expected
 error 941..941: expected state machine member
 error 971..972: expected MACHINE_KW
 error 1003..1003: module member expected
-error 1006..1006: expected `;`
+error 1006..1006: unexpected token
 error 1009..1009: module member expected
-error 1012..1012: expected `;`
+error 1012..1012: unexpected token
 error 1015..1015: module member expected
-error 1017..1017: expected `;`
-error 1018..1018: expected module member
-error 1025..1025: module member expected
-error 1031..1031: expected `;`
+error 1018..1018: unexpected token
+error 1018..1018: module member expected
+error 1020..1020: unexpected token
+error 1023..1023: module member expected
+error 1025..1025: unexpected token
+error 1031..1031: module member expected
 error 1037..1037: module member expected
-error 1040..1040: expected `;`
+error 1040..1040: unexpected token
 error 1043..1043: module member expected
-error 1046..1046: expected `;`
+error 1046..1046: unexpected token
 error 1049..1049: module member expected
-error 1055..1055: expected `;`
+error 1055..1055: unexpected token
+error 1057..1057: module member expected
+error 1063..1063: unexpected token
 error 1086..1086: module member expected
-error 1089..1089: expected `;`
+error 1089..1089: unexpected token
 error 1092..1092: module member expected
-error 1095..1095: expected `;`
+error 1095..1095: unexpected token
 error 1098..1098: module member expected
-error 1104..1104: expected `;`
+error 1104..1104: unexpected token
+error 1106..1106: module member expected
+error 1112..1112: unexpected token
 error 1135..1135: module member expected
-error 1138..1138: expected `;`
+error 1138..1138: unexpected token
 error 1141..1141: module member expected
-error 1147..1147: expected `;`
+error 1147..1147: unexpected token
+error 1149..1149: module member expected
+error 1155..1155: unexpected token
 error 1181..1181: module member expected
-error 1184..1184: expected `;`
+error 1184..1184: unexpected token
 error 1187..1187: module member expected
-error 1190..1190: expected `;`
+error 1190..1190: unexpected token
 error 1193..1193: module member expected
-error 1195..1195: expected `;`
-error 1196..1196: expected module member
+error 1196..1196: unexpected token
+error 1196..1196: module member expected
+error 1198..1198: unexpected token
+error 1201..1201: module member expected
 error 1234..1234: module member expected
-error 1237..1237: expected `;`
+error 1237..1237: unexpected token
 error 1240..1240: module member expected
-error 1242..1242: expected `;`
-error 1243..1243: expected module member
-error 1253..1253: module member expected
-error 1256..1256: module member expected
+error 1243..1243: unexpected token
+error 1243..1243: module member expected
+error 1245..1245: unexpected token
+error 1248..1248: module member expected
+error 1249..1249: unexpected token
+error 1249..1249: module member expected
+error 1254..1254: unexpected token
+error 1254..1254: module member expected

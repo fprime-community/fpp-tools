@@ -138,5 +138,5 @@ ROOT@0..457
   POST_ANNOTATION@434..456 "@< Expansion specifier"
   EOL@456..457 "\n"
 error 421..422: expected QUAL_IDENT
-error 422..422: expected `COMMA`
+error 422..422: ) expected
 error 423..423: expected template argument

@@ -19,7 +19,8 @@ ROOT@0..206
     WHITESPACE@39..40 " "
   ERROR@40..41
     IDENT@40..41 "c"
-  EOL@41..43 "\n\n"
+  ERROR@41..43
+    EOL@41..43 "\n\n"
   ERROR@43..45
     PLUS@43..44 "+"
     WHITESPACE@44..45 " "
@@ -71,9 +72,9 @@ ROOT@0..206
         QUAL_IDENT@129..130
           IDENT@129..130 "d"
       WHITESPACE@130..131 " "
-      ERROR@131..133
+      ERROR@131..134
         RIGHT_ARROW@131..133 "->"
-      WHITESPACE@133..134 " "
+        WHITESPACE@133..134 " "
       ERROR@134..135
         IDENT@134..135 "d"
       EOL@135..137 "\n\n"
@@ -110,10 +111,11 @@ ROOT@0..206
               LITERAL_INT@203..204 "1"
       EOL@204..206 "\n\n"
 error 38..38: module member expected
-error 40..40: expected `;`
-error 43..43: module member expected
-error 45..45: expected `;`
+error 40..40: unexpected token
+error 41..41: module member expected
+error 43..43: unexpected token
+error 45..45: module member expected
 error 125..126: expected PORT_KW
-error 131..131: expected `SEMI`
+error 131..131: } expected
 error 134..134: component member expected
 error 206..206: expected RIGHT_CURLY

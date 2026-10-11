@@ -17,4 +17,4 @@ note: embedded tab characters are not allowed in FPP source files
 try configuring your editor to convert tabs to spaces
 error 20..30: invalid token: non whitespace character illegal after line continuation
 error 4..4: module member expected
-error 15..15: expected `;`
+error 15..15: unexpected token

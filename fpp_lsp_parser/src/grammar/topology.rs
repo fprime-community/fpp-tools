@@ -158,7 +158,7 @@ fn spec_tlm_packet_set(p: &mut Parser) {
     m.complete(p, TLM_PACKET_SET);
 }
 
-fn tlm_packet_set_member(p: &mut Parser) {
+pub(super) fn tlm_packet_set_member(p: &mut Parser) {
     match p.current() {
         INCLUDE_KW => spec_include(p),
         PACKET_KW => spec_tlm_packet(p),
@@ -203,7 +203,7 @@ fn spec_tlm_packet(p: &mut Parser) {
     m.complete(p, SPEC_TLM_PACKET);
 }
 
-fn tlm_packet_member(p: &mut Parser) {
+pub(super) fn tlm_packet_member(p: &mut Parser) {
     match p.current() {
         INCLUDE_KW => spec_include(p),
         IDENT => tlm_channel_identifier(p),

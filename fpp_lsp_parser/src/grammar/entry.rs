@@ -1,97 +1,84 @@
 use super::*;
 
-pub(crate) fn module_entry(p: &mut Parser) {
+/// Parse a whole file as a sequence of members of kind `member`.
+fn entry(
+    p: &mut Parser,
+    member: impl Fn(&mut Parser),
+    delim: SyntaxKind,
+    annotated: bool,
+    expected_error_msg: &'static str,
+) {
     let m = p.start();
-    while !p.at(EOF) {
-        if p.at(LEFT_CURLY) {
-            error_block(p, "expected module member");
-            continue;
-        }
-
-        while p.at(EOL) || p.at(SEMI) {
-            p.bump_any();
-        }
-
-        if p.at(EOF) {
-            break;
-        }
-
-        module::module_member(p);
-        match p.current() {
-            SEMI | EOL | EOF => {}
-            _ => {
-                p.err_recover("expected `;`", MEMBER_RECOVERY_SET);
-            }
-        }
-    }
-
+    element_sequence(p, EOF, member, delim, annotated, expected_error_msg);
     m.complete(p, ROOT);
+}
+
+pub(crate) fn module_entry(p: &mut Parser) {
+    entry(
+        p,
+        module::module_member,
+        SEMI,
+        true,
+        "module member expected",
+    );
 }
 
 pub(crate) fn component_entry(p: &mut Parser) {
-    let m = p.start();
-    while !p.at(EOF) {
-        if p.at(LEFT_CURLY) {
-            error_block(p, "expected component member");
-            continue;
-        }
-
-        while p.at(EOL) || p.at(SEMI) {
-            p.bump_any();
-        }
-
-        if p.at(EOF) {
-            break;
-        }
-
-        component::component_member(p);
-        match p.current() {
-            SEMI | EOL | EOF => {}
-            _ => {
-                p.err_recover("expected `;`", MEMBER_RECOVERY_SET);
-            }
-        }
-    }
-
-    m.complete(p, ROOT);
+    entry(
+        p,
+        component::component_member,
+        SEMI,
+        true,
+        "component member expected",
+    );
 }
 
 pub(crate) fn topology_entry(p: &mut Parser) {
-    let m = p.start();
-    while !p.at(EOF) {
-        if p.at(LEFT_CURLY) {
-            error_block(p, "expected topology member");
-            continue;
-        }
-
-        while p.at(EOL) || p.at(SEMI) {
-            p.bump_any();
-        }
-
-        if p.at(EOF) {
-            break;
-        }
-
-        topology::topology_member(p);
-        match p.current() {
-            SEMI | EOL | EOF => {}
-            _ => {
-                p.err_recover("expected `;`", MEMBER_RECOVERY_SET);
-            }
-        }
-    }
-
-    m.complete(p, ROOT);
+    entry(
+        p,
+        topology::topology_member,
+        SEMI,
+        true,
+        "topology member expected",
+    );
 }
 
 pub(crate) fn tlm_packet_entry(p: &mut Parser) {
-    let m = p.start();
-
-    m.complete(p, ROOT);
+    entry(
+        p,
+        topology::tlm_packet_member,
+        COMMA,
+        false,
+        "telemetry packet member expected",
+    );
 }
 
 pub(crate) fn tlm_packet_set_entry(p: &mut Parser) {
-    let m = p.start();
+    entry(
+        p,
+        topology::tlm_packet_set_member,
+        COMMA,
+        true,
+        "telemetry packet set member expected",
+    );
+}
 
-    m.complete(p, ROOT);
+pub(crate) fn state_machine_entry(p: &mut Parser) {
+    entry(
+        p,
+        state_machine::state_machine_member,
+        SEMI,
+        true,
+        "state machine member expected",
+    );
+}
+
+pub(crate) fn state_entry(p: &mut Parser) {
+    entry(
+        p,
+        state_machine::state_member,
+        SEMI,
+        true,
+        "state member expected",
+    );
 }

@@ -103,6 +103,10 @@ const CONTEXTS: &[(TopEntryPoint, &str)] = &[
     (TopEntryPoint::Module, "locate $"),
     (TopEntryPoint::Component, "$"),
     (TopEntryPoint::Topology, "$"),
+    (TopEntryPoint::TlmPacket, "$"),
+    (TopEntryPoint::TlmPacketSet, "$"),
+    (TopEntryPoint::StateMachine, "$"),
+    (TopEntryPoint::State, "$"),
 ];
 
 #[test]
