@@ -1,22 +1,25 @@
-use crate::analyzers::NestedScopeState;
-use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
+use crate::Analysis;
+use crate::analyzers::analyzer::{Analyzer, NestedScopeState};
+use crate::analyzers::module_analyzer::visit_expansion;
+use crate::analyzers::type_expression_analyzer::TypeExpressionAnalyzer;
 use crate::semantics::{ImpliedUse, ImpliedUseKind, QualifiedName, Symbol};
 use fpp_ast::*;
-use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
-/// The use hooks of [`BasicUseAnalyzer`], and the hooks of the template
-/// expansion analysis it builds on
+/// The use hooks of [`BasicUseAnalyzer`], and the hooks of its analysis of
+/// template expansions
 ///
 /// A pass gets these hooks called by running [`BasicUseAnalyzer`] or
 /// [`super::UseAnalyzer`] as its super visitor. A hook receives the node of the
 /// use and the qualified name the use names.
 ///
-/// The template argument hooks do nothing by default. Visiting a bound argument
-/// needs a visitor for the lifetime of the argument, which only a concrete pass
-/// can provide, so a pass that analyzes the bound arguments overrides these
-/// hooks with [`visit_template_arg`].
+/// [`BasicUseAnalyzer`] analyzes the parameters on a template expansion through
+/// the template hooks, where [`super::TemplateExpandAnalyzer`] visits the
+/// arguments of the expansion specifier. The template argument hooks do
+/// nothing by default. Visiting a bound argument needs a visitor for the
+/// lifetime of the argument, which only a concrete pass can provide, so a pass
+/// that analyzes the bound arguments overrides these hooks with
+/// [`visit_template_arg`].
 pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
     /// A use of a component definition
     fn component_use(
@@ -251,24 +254,20 @@ where
 
 /// Basic use analysis
 /// Assumes all qualified identifiers are constant uses
-pub struct BasicUseAnalyzer<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> {
-    super_: NestedAnalyzer<'ast, S, V>,
-    phantom_data: PhantomData<S>,
+pub struct BasicUseAnalyzer<'ast, V: UseAnalysisPass<'ast, Analysis>> {
+    super_: TypeExpressionAnalyzer<'ast, V>,
 }
 
-impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Default
-    for BasicUseAnalyzer<'ast, S, V>
-{
+impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Default for BasicUseAnalyzer<'ast, V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'ast, S, V> {
-    pub fn new() -> BasicUseAnalyzer<'ast, S, V> {
+impl<'ast, V: UseAnalysisPass<'ast, Analysis>> BasicUseAnalyzer<'ast, V> {
+    pub fn new() -> BasicUseAnalyzer<'ast, V> {
         BasicUseAnalyzer {
-            super_: NestedAnalyzer::new(NestedAnalyzerMode::DEEP),
-            phantom_data: Default::default(),
+            super_: TypeExpressionAnalyzer::new(),
         }
     }
 
@@ -276,7 +275,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
     fn implied_constant_use(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         iu: &ImpliedUse,
     ) -> ControlFlow<V::Break> {
         iu.annotate_emitted_errors(|| {
@@ -289,7 +288,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
     fn implied_port_use(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         iu: &ImpliedUse,
     ) -> ControlFlow<V::Break> {
         iu.annotate_emitted_errors(|| {
@@ -302,7 +301,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
     fn implied_type_use(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         iu: &ImpliedUse,
     ) -> ControlFlow<V::Break> {
         iu.annotate_emitted_errors(|| {
@@ -311,10 +310,50 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
         })
     }
 
+    fn port_instance_identifier_node(
+        &self,
+        visitor: &V,
+        a: &mut Analysis,
+        node: &PortInstanceIdentifier,
+    ) -> ControlFlow<V::Break> {
+        visitor.interface_instance_use(
+            a,
+            &node.interface_instance,
+            (&node.interface_instance).into(),
+        )
+    }
+
+    fn tlm_channel_identifier_node(
+        &self,
+        visitor: &V,
+        a: &mut Analysis,
+        node: &TlmChannelIdentifier,
+    ) -> ControlFlow<V::Break> {
+        visitor.interface_instance_use(
+            a,
+            &node.component_instance,
+            (&node.component_instance).into(),
+        )
+    }
+
+    fn tlm_packet_member(
+        &self,
+        visitor: &V,
+        a: &mut Analysis,
+        member: &TlmPacketMember,
+    ) -> ControlFlow<V::Break> {
+        match member {
+            TlmPacketMember::SpecInclude(_) => ControlFlow::Continue(()),
+            TlmPacketMember::TlmChannelIdentifier(node) => {
+                self.tlm_channel_identifier_node(visitor, a, node)
+            }
+        }
+    }
+
     fn visit_implied_constant_uses(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
         for iu in a.get_implied_uses(ImpliedUseKind::Constant, id) {
@@ -326,7 +365,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
     fn visit_implied_port_uses(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
         for iu in a.get_implied_uses(ImpliedUseKind::Port, id) {
@@ -338,7 +377,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
     fn visit_implied_type_uses(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
         for iu in a.get_implied_uses(ImpliedUseKind::Type, id) {
@@ -350,7 +389,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
     fn visit_implied_uses(
         &self,
         visitor: &V,
-        a: &mut V::State,
+        a: &mut Analysis,
         id: fpp_core::Node,
     ) -> ControlFlow<V::Break> {
         self.visit_implied_constant_uses(visitor, a, id)?;
@@ -359,14 +398,12 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> BasicUseAnalyzer<'a
     }
 }
 
-impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
-    for BasicUseAnalyzer<'ast, S, V>
-{
-    fn visit(&self, visitor: &V, a: &mut V::State, node: Node<'ast>) -> ControlFlow<V::Break> {
+impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Analyzer<'ast, V> for BasicUseAnalyzer<'ast, V> {
+    fn visit(&self, visitor: &V, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<V::Break> {
         match node {
             Node::DefComponentInstance(ci) => {
                 visitor.component_use(a, &ci.component, (&ci.component).into())?;
-                ci.walk(a, visitor)
+                self.super_.visit(visitor, a, node)
             }
             Node::DefSystem(s) => {
                 visitor.interface_instance_use(a, &s.topology, (&s.topology).into())
@@ -383,7 +420,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                     visitor.interface_use(a, i, i.into())?;
                 }
 
-                t.walk(a, visitor)
+                self.super_.visit(visitor, a, node)
             }
             Node::Expr(e) => match &e.kind {
                 ExprKind::Dot { e: e1, .. } => match e.get_ident_list_opt() {
@@ -392,7 +429,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                     Some(il) => visitor.constant_use(a, e, QualifiedName::from(il)),
                     // e is not a qualified identifier
                     // Analyze the left side, which may contain constant uses
-                    None => self.visit(visitor, a, Node::Expr(e1)),
+                    None => e1.visit(a, visitor),
                 },
                 ExprKind::Ident { value, .. } => visitor.constant_use(a, e, value.clone().into()),
                 _ => self.super_.visit(visitor, a, node),
@@ -402,7 +439,13 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
             }
             Node::SpecStateMachineInstance(si) => {
                 visitor.state_machine_use(a, &si.state_machine, (&si.state_machine).into())?;
-                si.walk(a, visitor)
+                self.super_.visit(visitor, a, node)
+            }
+            Node::Connection(c) => {
+                self.port_instance_identifier_node(visitor, a, &c.from_port)?;
+                c.from_index.visit(a, visitor)?;
+                self.port_instance_identifier_node(visitor, a, &c.to_port)?;
+                c.to_index.visit(a, visitor)
             }
             Node::SpecPatternConnectionGraph(cg) => {
                 visitor.interface_instance_use(a, &cg.source, (&cg.source).into())?;
@@ -422,14 +465,34 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                 pi.priority.visit(a, visitor)?;
                 self.visit_implied_port_uses(visitor, a, pi.node_id)
             }
+            Node::SpecTlmPacket(p) => {
+                self.super_.visit(visitor, a, node)?;
+                for member in &p.members {
+                    self.tlm_packet_member(visitor, a, member)?;
+                }
+                ControlFlow::Continue(())
+            }
+            Node::SpecTlmPacketSet(s) => {
+                self.super_.visit(visitor, a, node)?;
+                for omitted in &s.omitted {
+                    self.tlm_channel_identifier_node(visitor, a, omitted)?;
+                }
+                ControlFlow::Continue(())
+            }
             Node::SpecInterfaceImport(i) => {
                 visitor.interface_use(a, &i.interface, (&i.interface).into())
             }
-            Node::PortInstanceIdentifier(pii) => visitor.interface_instance_use(
-                a,
-                &pii.interface_instance,
-                (&pii.interface_instance).into(),
-            ),
+            Node::SpecTopPort(p) => {
+                self.port_instance_identifier_node(visitor, a, &p.underlying_port)
+            }
+            Node::TypeName(tn) => match &tn.kind {
+                TypeNameKind::QualIdent(qi) => visitor.type_use(a, tn, qi.into()),
+                TypeNameKind::String(_) => {
+                    self.visit_implied_uses(visitor, a, tn.node_id)?;
+                    self.super_.visit(visitor, a, node)
+                }
+                _ => self.super_.visit(visitor, a, node),
+            },
             Node::SpecTemplateExpand(s) => {
                 visitor.template_use(a, &s.template, (&s.template).into())?;
 
@@ -448,7 +511,7 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                     }
                 }
 
-                self.super_.visit(visitor, a, node)
+                visit_expansion(visitor, a, s)
             }
             Node::DefModuleTemplate(d) => {
                 // Visit the type of each constant parameter and the interface
@@ -464,19 +527,6 @@ impl<'ast, S: NestedScopeState, V: UseAnalysisPass<'ast, S>> Analyzer<'ast, V>
                 }
                 ControlFlow::Continue(())
             }
-            Node::TypeName(tn) => match &tn.kind {
-                TypeNameKind::QualIdent(qi) => visitor.type_use(a, tn, qi.into()),
-                TypeNameKind::String(_) => {
-                    self.visit_implied_uses(visitor, a, tn.node_id)?;
-                    self.super_.visit(visitor, a, node)
-                }
-                _ => ControlFlow::Continue(()),
-            },
-            Node::TlmChannelIdentifier(ci) => visitor.interface_instance_use(
-                a,
-                &ci.component_instance,
-                (&ci.component_instance).into(),
-            ),
             _ => self.super_.visit(visitor, a, node),
         }
     }

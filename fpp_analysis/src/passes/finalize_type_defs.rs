@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
+use crate::analyzers::type_expression_analyzer::TypeExpressionAnalyzer;
 use crate::errors::SemanticError;
 use crate::semantics::{
     AliasType, AnonArrayType, AnonStructType, ArrayType, ArrayValue, Format, StructType,
@@ -17,7 +17,7 @@ use std::sync::Arc;
 /// Finalize type definitions. Update the types of uses (type names) that
 /// refer to the definitions.
 pub struct FinalizeTypeDefs<'ast> {
-    super_: NestedAnalyzer<'ast, Analysis, Self>,
+    super_: TypeExpressionAnalyzer<'ast, Self>,
 }
 
 impl<'ast> Default for FinalizeTypeDefs<'ast> {
@@ -29,7 +29,7 @@ impl<'ast> Default for FinalizeTypeDefs<'ast> {
 impl<'ast> FinalizeTypeDefs<'ast> {
     pub fn new() -> FinalizeTypeDefs<'ast> {
         Self {
-            super_: NestedAnalyzer::new(NestedAnalyzerMode::TYPE_EXPRESSION),
+            super_: TypeExpressionAnalyzer::new(),
         }
     }
 }

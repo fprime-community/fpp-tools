@@ -1,8 +1,10 @@
 use crate::Analysis;
+use crate::analyzers::analyzer::Analyzer;
+use crate::analyzers::type_expression_analyzer::TypeExpressionAnalyzer;
 use crate::semantics::{ImpliedUse, ImpliedUseKind, ImpliedUseSet, QualifiedName, Symbol};
 use fpp_ast::{
-    DefStateMachine, DefTopology, MoveWalkable, Node, SpecSpecialPortInstance,
-    SpecialPortInstanceKind, TypeName, TypeNameKind, Visitor, Walkable,
+    DefModuleTemplate, DefStateMachine, DefTopology, Node, SpecSpecialPortInstance,
+    SpecialPortInstanceKind, TypeName, TypeNameKind, Visitable, Visitor,
 };
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -14,9 +16,19 @@ impl<'ast> Visitor<'ast> for ConstructImpliedUseMap {
     type Break = ();
     type State = Analysis;
 
-    /// Descend into every container so all type names in the model are reached.
     fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
-        node.walk(a, self)
+        TypeExpressionAnalyzer::new().visit(self, a, node)
+    }
+
+    /// The implied uses in the body of a template are constructed at the
+    /// definition, whether or not the template is expanded
+    fn visit_def_module_template(
+        &self,
+        a: &mut Analysis,
+        node: &'ast DefModuleTemplate,
+    ) -> ControlFlow<Self::Break> {
+        self.super_visit(a, Node::DefModuleTemplate(node))?;
+        node.members.visit(a, self)
     }
 
     fn visit_spec_special_port_instance(
@@ -98,7 +110,7 @@ impl<'ast> Visitor<'ast> for ConstructImpliedUseMap {
             );
         }
         a.implied_use_map.insert(node.node_id, set);
-        node.walk(a, self)
+        self.super_visit(a, Node::DefTopology(node))
     }
 
     fn visit_type_name(&self, a: &mut Analysis, node: &'ast TypeName) -> ControlFlow<Self::Break> {

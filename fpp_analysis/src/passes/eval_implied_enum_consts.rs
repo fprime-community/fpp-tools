@@ -1,6 +1,8 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
+use crate::analyzers::component_analyzer::ComponentAnalyzer;
+use crate::analyzers::module_analyzer::ModuleAnalyzer;
+use crate::analyzers::state_machine_analyzer::StateMachineAnalyzer;
 use crate::errors::SemanticError;
 use crate::semantics::{EnumConstantValue, Type, Value};
 use fpp_ast::{DefEnum, Node, Visitor};
@@ -8,25 +10,18 @@ use fpp_core::Spanned;
 use std::ops::{ControlFlow, Deref};
 
 /// Evaluate implied enum constants
-pub struct EvalImpliedEnumConsts<'ast> {
-    super_: NestedAnalyzer<'ast, Analysis, Self>,
+#[derive(Default)]
+pub struct EvalImpliedEnumConsts {
+    super_: StateMachineAnalyzer<ComponentAnalyzer<ModuleAnalyzer>>,
 }
 
-impl<'ast> Default for EvalImpliedEnumConsts<'ast> {
-    fn default() -> Self {
-        Self::new()
+impl EvalImpliedEnumConsts {
+    pub fn new() -> EvalImpliedEnumConsts {
+        EvalImpliedEnumConsts::default()
     }
 }
 
-impl<'ast> EvalImpliedEnumConsts<'ast> {
-    pub fn new() -> EvalImpliedEnumConsts<'ast> {
-        EvalImpliedEnumConsts {
-            super_: NestedAnalyzer::new(NestedAnalyzerMode::SHALLOW),
-        }
-    }
-}
-
-impl<'ast> Visitor<'ast> for EvalImpliedEnumConsts<'ast> {
+impl<'ast> Visitor<'ast> for EvalImpliedEnumConsts {
     type Break = ();
     type State = Analysis;
 
