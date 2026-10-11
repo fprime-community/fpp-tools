@@ -271,7 +271,7 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
     }
 }
 
-impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckTypeUses<'ast> {
+impl<'ast> UseAnalysisPass<'ast> for CheckTypeUses<'ast> {
     fn type_use(
         &self,
         a: &mut Analysis,

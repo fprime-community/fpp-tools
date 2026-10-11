@@ -1,5 +1,5 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
+use crate::analyzers::module_analyzer::visit_expansion;
 use crate::passes::check_uses::check_qual_ident;
 use crate::semantics::{NameGroup, ScopeOwner, Symbol};
 use fpp_ast::{DefModule, SpecTemplateExpand, TransUnit, Visitor, Walkable};

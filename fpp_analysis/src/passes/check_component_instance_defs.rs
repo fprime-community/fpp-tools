@@ -1,5 +1,5 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
+use crate::analyzers::module_analyzer::visit_expansion;
 use crate::errors::SemanticError;
 use crate::semantics::{ComponentInstance, InitSpecifier};
 use fpp_ast::{DefComponentInstance, DefModule, SpecInit, SpecTemplateExpand, Visitor, Walkable};

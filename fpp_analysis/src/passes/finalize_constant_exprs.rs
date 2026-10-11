@@ -304,7 +304,7 @@ impl<'ast> Visitor<'ast> for FinalizeConstantExprs<'ast> {
     }
 }
 
-impl<'ast> UseAnalysisPass<'ast, Analysis> for FinalizeConstantExprs<'ast> {
+impl<'ast> UseAnalysisPass<'ast> for FinalizeConstantExprs<'ast> {
     fn constant_use(
         &self,
         a: &mut Analysis,

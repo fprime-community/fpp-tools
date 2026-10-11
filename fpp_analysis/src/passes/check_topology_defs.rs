@@ -1,5 +1,5 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
+use crate::analyzers::module_analyzer::visit_expansion;
 use crate::errors::SemanticError;
 use crate::semantics::resolve_topology;
 use crate::semantics::{Connection, ConnectionPattern, Symbol};

@@ -38,7 +38,7 @@ impl<'ast> EvalConstantExprs<'ast> {
     }
 }
 
-impl<'ast> UseAnalysisPass<'ast, Analysis> for EvalConstantExprs<'ast> {
+impl<'ast> UseAnalysisPass<'ast> for EvalConstantExprs<'ast> {
     fn constant_use(
         &self,
         a: &mut Analysis,

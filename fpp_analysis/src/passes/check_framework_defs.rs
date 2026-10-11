@@ -1,5 +1,5 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
+use crate::analyzers::module_analyzer::visit_expansion;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{PrimitiveInt, Signedness, Symbol, SymbolInterface, Type};
 use fpp_ast::{

@@ -231,7 +231,7 @@ impl<'ast> Visitor<'ast> for CheckUses<'ast> {
     }
 }
 
-impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckUses<'ast> {
+impl<'ast> UseAnalysisPass<'ast> for CheckUses<'ast> {
     fn component_use(
         &self,
         a: &mut Analysis,

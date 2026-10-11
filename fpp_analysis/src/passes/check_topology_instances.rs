@@ -1,5 +1,5 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
+use crate::analyzers::module_analyzer::visit_expansion;
 use crate::semantics::{Symbol, Topology};
 use fpp_ast::{
     AstNode, DefModule, DefTopology, SpecDirectConnectionGraph, SpecInstance,

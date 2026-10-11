@@ -147,7 +147,7 @@ impl<'ast, Reader: FileReader> Visitor<'ast> for TuAnalyzer<'ast, '_, Reader> {
     }
 }
 
-impl<'ast, Reader: FileReader> UseAnalysisPass<'ast, Analysis> for TuAnalyzer<'ast, '_, Reader> {
+impl<'ast, Reader: FileReader> UseAnalysisPass<'ast> for TuAnalyzer<'ast, '_, Reader> {
     fn template_use(
         &self,
         a: &mut Analysis,

@@ -60,7 +60,7 @@ impl<'ast> Visitor<'ast> for UsedSymbols<'ast> {
     }
 }
 
-impl<'ast> UseAnalysisPass<'ast, Analysis> for UsedSymbols<'ast> {
+impl<'ast> UseAnalysisPass<'ast> for UsedSymbols<'ast> {
     fn component_use(
         &self,
         a: &mut Analysis,

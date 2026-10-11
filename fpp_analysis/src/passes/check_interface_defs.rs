@@ -1,5 +1,5 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
+use crate::analyzers::module_analyzer::visit_expansion;
 use crate::semantics::resolve_topology::resolve_interface;
 use crate::semantics::{Interface, PortInstance, Symbol};
 use fpp_ast::{

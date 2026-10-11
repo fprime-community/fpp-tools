@@ -1,5 +1,5 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
+use crate::analyzers::module_analyzer::visit_expansion;
 use crate::passes::state_machine::CheckStateMachineSemantics;
 use crate::semantics::Symbol;
 use crate::semantics::state_machine::{StateMachine, StateMachineAnalysis};

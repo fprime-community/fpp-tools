@@ -20,7 +20,7 @@ use std::ops::ControlFlow;
 /// lifetime of the argument, which only a concrete pass can provide, so a pass
 /// that analyzes the bound arguments overrides these hooks with
 /// [`visit_template_arg`].
-pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
+pub trait UseAnalysisPass<'ast>: Visitor<'ast, State = Analysis> {
     /// A use of a component definition
     fn component_use(
         &self,
@@ -233,14 +233,13 @@ pub trait UseAnalysisPass<'ast, S: NestedScopeState>: Visitor<'ast, State = S> {
 ///
 /// This is the default analysis of the template argument hooks of
 /// [`UseAnalysisPass`] for a use analysis.
-pub fn visit_template_arg<'ast, S, V>(
+pub fn visit_template_arg<'ast, V>(
     visitor: &V,
-    a: &mut S,
+    a: &mut Analysis,
     arg: &'ast Symbol,
 ) -> ControlFlow<V::Break>
 where
-    S: NestedScopeState,
-    V: UseAnalysisPass<'ast, S>,
+    V: UseAnalysisPass<'ast>,
 {
     match arg {
         Symbol::TemplateConstantArg { value, .. } => value.visit(a, visitor),
@@ -254,17 +253,17 @@ where
 
 /// Basic use analysis
 /// Assumes all qualified identifiers are constant uses
-pub struct BasicUseAnalyzer<'ast, V: UseAnalysisPass<'ast, Analysis>> {
+pub struct BasicUseAnalyzer<'ast, V: UseAnalysisPass<'ast>> {
     super_: TypeExpressionAnalyzer<'ast, V>,
 }
 
-impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Default for BasicUseAnalyzer<'ast, V> {
+impl<'ast, V: UseAnalysisPass<'ast>> Default for BasicUseAnalyzer<'ast, V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'ast, V: UseAnalysisPass<'ast, Analysis>> BasicUseAnalyzer<'ast, V> {
+impl<'ast, V: UseAnalysisPass<'ast>> BasicUseAnalyzer<'ast, V> {
     pub fn new() -> BasicUseAnalyzer<'ast, V> {
         BasicUseAnalyzer {
             super_: TypeExpressionAnalyzer::new(),
@@ -398,7 +397,7 @@ impl<'ast, V: UseAnalysisPass<'ast, Analysis>> BasicUseAnalyzer<'ast, V> {
     }
 }
 
-impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Analyzer<'ast, V> for BasicUseAnalyzer<'ast, V> {
+impl<'ast, V: UseAnalysisPass<'ast>> Analyzer<'ast, V> for BasicUseAnalyzer<'ast, V> {
     fn visit(&self, visitor: &V, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<V::Break> {
         match node {
             Node::DefComponentInstance(ci) => {

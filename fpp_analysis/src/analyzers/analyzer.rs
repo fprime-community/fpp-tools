@@ -3,8 +3,6 @@ use crate::semantics::{ImpliedUse, ImpliedUseKind, ImpliedUseSet, ScopeOwner, Sy
 use fpp_ast::{AstNode, Node, Visitor};
 use std::ops::ControlFlow;
 
-pub use crate::analyzers::module_analyzer::visit_expansion;
-
 /// A generic analysis visitor
 ///
 /// An analyzer is the super visitor of a pass: the hooks of the pass that do

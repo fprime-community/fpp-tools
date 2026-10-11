@@ -1,5 +1,5 @@
 use crate::Analysis;
-use crate::analyzers::analyzer::visit_expansion;
+use crate::analyzers::module_analyzer::visit_expansion;
 use crate::errors::SemanticResult;
 use crate::semantics::{
     Command, Component, Container, Event, Param, PortInstance, Record, StateMachineInstance,

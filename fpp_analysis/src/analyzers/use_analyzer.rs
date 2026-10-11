@@ -1,4 +1,3 @@
-use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::basic_use_analyzer::{BasicUseAnalyzer, UseAnalysisPass};
 use crate::semantics::QualifiedName;
@@ -7,17 +6,17 @@ use std::ops::ControlFlow;
 
 /// Analyze uses
 /// This analyzer assumes that CheckUses has already been run to populate the use-def map
-pub struct UseAnalyzer<'ast, V: UseAnalysisPass<'ast, Analysis>> {
+pub struct UseAnalyzer<'ast, V: UseAnalysisPass<'ast>> {
     super_: BasicUseAnalyzer<'ast, V>,
 }
 
-impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Default for UseAnalyzer<'ast, V> {
+impl<'ast, V: UseAnalysisPass<'ast>> Default for UseAnalyzer<'ast, V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'ast, V: UseAnalysisPass<'ast, Analysis>> UseAnalyzer<'ast, V> {
+impl<'ast, V: UseAnalysisPass<'ast>> UseAnalyzer<'ast, V> {
     pub fn new() -> UseAnalyzer<'ast, V> {
         UseAnalyzer {
             super_: BasicUseAnalyzer::new(),
@@ -25,7 +24,7 @@ impl<'ast, V: UseAnalysisPass<'ast, Analysis>> UseAnalyzer<'ast, V> {
     }
 }
 
-impl<'ast, V: UseAnalysisPass<'ast, Analysis>> Analyzer<'ast, V> for UseAnalyzer<'ast, V> {
+impl<'ast, V: UseAnalysisPass<'ast>> Analyzer<'ast, V> for UseAnalyzer<'ast, V> {
     fn visit(&self, visitor: &V, a: &mut V::State, node: Node<'ast>) -> ControlFlow<V::Break> {
         match node {
             Node::Expr(expr) => {
