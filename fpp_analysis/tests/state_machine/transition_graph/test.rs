@@ -44,3 +44,8 @@ fn cycle_and_types() {
 fn two_choice_cycles() {
     run_test("state_machine/transition_graph/two_choice_cycles")
 }
+
+#[test]
+fn choice_cycle_side_branch() {
+    run_test("state_machine/transition_graph/choice_cycle_side_branch")
+}

@@ -91,24 +91,35 @@ impl CheckChoiceCycles {
     }
 }
 
-/// A choice cycle found by the search: the path from the start choice, ending
-/// with the arc that returns to a choice already on the path
+/// A choice cycle found by the search: the arcs the search took from the start
+/// choice, ending with the arc that returns to a choice already on the path
 struct Cycle {
     /// The choice that the path returns to
     choice: StateMachineSymbol,
-    /// The arcs of the path, latest first
+    /// The arcs the search took, latest first. The list also holds the arcs of
+    /// the branches that the search finished before it found the cycle.
     path_list: Vec<TgArc>,
 }
 
 impl Cycle {
     /// The arcs that form the cycle itself, without the arcs that lead to it
+    /// and the arcs of finished branches
     fn arcs(&self) -> HashSet<TgArc> {
         let mut arcs = HashSet::default();
+        // Follow the cycle backwards from the choice it returns to. No arc of a
+        // finished branch ends at a choice on the path, since that arc would
+        // have closed a cycle there.
+        let mut end = self.choice.clone();
         for a in &self.path_list {
+            if a.get_end_node().soc.get_symbol() != &end {
+                continue;
+            }
             arcs.insert(a.clone());
-            if a.get_start_node().soc.get_symbol() == &self.choice {
+            let start = a.get_start_node().soc.get_symbol().clone();
+            if start == self.choice {
                 break;
             }
+            end = start;
         }
         arcs
     }
