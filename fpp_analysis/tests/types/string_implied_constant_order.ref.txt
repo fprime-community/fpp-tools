@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/types/string_implied_constant_order.fpp:6:40
+  |
+6 | constant FW_FIXED_LENGTH_STRING_SIZE = -false
+  |                                        ^^^^^^ cannot convert boolean to a numeric type
+
+ --> [ local path prefix ]/types/string_implied_constant_order.fpp:5:14
+  |
+5 | constant x = -true
+  |              ^^^^^ cannot convert boolean to a numeric type
+

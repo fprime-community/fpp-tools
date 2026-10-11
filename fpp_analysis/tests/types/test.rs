@@ -46,6 +46,11 @@ fn string_missing_default_size_constant() {
 }
 
 #[test]
+fn string_implied_constant_order() {
+    run_test("types/string_implied_constant_order")
+}
+
+#[test]
 fn string_missing_fw_size_store_type() {
     run_test("types/string_missing_fw_size_store_type")
 }
@@ -58,4 +63,9 @@ fn string_size_type_shadowed() {
 #[test]
 fn string_size_zero_ok() {
     run_test("types/string_size_zero_ok")
+}
+
+#[test]
+fn alias_string_size_not_numeric() {
+    run_test("types/alias_string_size_not_numeric")
 }

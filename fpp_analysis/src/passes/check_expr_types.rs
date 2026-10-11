@@ -7,14 +7,15 @@ use crate::semantics::{
     AnonArrayType, AnonStructType, QualifiedName, Symbol, SymbolInterface, Type,
 };
 use fpp_ast::{
-    Binop, DefAliasType, DefArray, DefConstant, DefEnum, DefEnumConstant, DefStruct, EventThrottle,
-    Expr, ExprKind, FloatKind, Ident, IntegerKind, Node, SpecCommand, SpecContainer, SpecEvent,
-    SpecGeneralPortInstance, SpecInit, SpecInternalPort, SpecParam, SpecRecord,
-    SpecSpecialPortInstance, SpecStateMachineInstance, SpecTlmChannel, SpecTlmPacket,
-    StructExprMember, StructTypeMember, TypeName, TypeNameKind, Visitable, Visitor,
+    Binop, Connection, DefAliasType, DefArray, DefComponentInstance, DefConstant, DefEnum,
+    DefEnumConstant, DefStruct, EventThrottle, Expr, ExprKind, FloatKind, Ident, IntegerKind, Node,
+    SpecCommand, SpecContainer, SpecEvent, SpecGeneralPortInstance, SpecInit, SpecInternalPort,
+    SpecParam, SpecRecord, SpecSpecialPortInstance, SpecStateMachineInstance, SpecTlmChannel,
+    SpecTlmPacket, StructExprMember, StructTypeMember, TypeName, TypeNameKind, Visitable, Visitor,
 };
 use fpp_core::{Span, Spanned};
-use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use std::cell::RefCell;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
@@ -22,6 +23,10 @@ use std::sync::Arc;
 /// and default values
 pub struct CheckExprTypes<'ast> {
     super_: UseAnalyzer<'ast, Self>,
+    /// The constant definitions and template constant arguments visited so
+    /// far. One whose value fails to type check gets no type, so the type map
+    /// does not record that it was visited.
+    visited: RefCell<HashSet<fpp_core::Node>>,
 }
 
 impl<'ast> Default for CheckExprTypes<'ast> {
@@ -34,6 +39,7 @@ impl<'ast> CheckExprTypes<'ast> {
     pub fn new() -> CheckExprTypes<'ast> {
         Self {
             super_: UseAnalyzer::new(),
+            visited: RefCell::default(),
         }
     }
 
@@ -444,6 +450,47 @@ impl<'ast> CheckExprTypes<'ast> {
         }
     }
 
+    /// Type a constant use, given the symbol that it refers to
+    fn constant_use_symbol(
+        &self,
+        a: &mut Analysis,
+        node: &Expr,
+        symbol: Symbol,
+    ) -> ControlFlow<()> {
+        match &symbol {
+            // Constant symbol: visit the constant definition
+            // to ensure it has a type
+            Symbol::Constant(def) => {
+                def.visit(a, self)?;
+            }
+            // Enum symbol: if this is in scope, then we are in
+            // the enum definition, so it already has a type
+            Symbol::EnumConstant(_) => {}
+            // Template constant argument symbol
+            Symbol::TemplateConstantArg { value, .. } => {
+                if !a.type_map.contains_key(&value.node_id) {
+                    self.template_constant_arg(a, &symbol)?;
+                }
+            }
+            // Invalid use of a symbol in an expression
+            _ => {
+                SemanticError::InvalidSymbol {
+                    symbol_name: symbol.name().data.clone(),
+                    msg: "not a constant symbol".to_string(),
+                    loc: node.span(),
+                    def_loc: symbol.node().span(),
+                }
+                .emit();
+                return ControlFlow::Break(());
+            }
+        }
+
+        if let Some(t) = a.type_map.get(&symbol.node()).cloned() {
+            a.assign_type(node.node_id, t);
+        }
+        ControlFlow::Continue(())
+    }
+
     /// Check for duplicate struct member
     fn check_for_duplicate_struct_member(members: &[StructExprMember]) -> SemanticResult {
         let mut prev_locs: HashMap<&str, Span> = HashMap::default();
@@ -480,21 +527,34 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         ControlFlow::Continue(())
     }
 
+    fn visit_def_component_instance(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefComponentInstance,
+    ) -> ControlFlow<Self::Break> {
+        self.super_visit(a, Node::DefComponentInstance(node))?;
+        Self::emit_error(Self::convert_node_to_numeric(a, &node.base_id));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.queue_size));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.stack_size));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.priority));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.cpu));
+
+        ControlFlow::Continue(())
+    }
+
     fn visit_def_constant(
         &self,
         a: &mut Self::State,
         node: &'ast DefConstant,
     ) -> ControlFlow<Self::Break> {
-        if a.type_map.contains_key(&node.node_id) {
+        if a.type_map.contains_key(&node.node_id) || !self.visited.borrow_mut().insert(node.node_id)
+        {
             return ControlFlow::Continue(());
         }
 
         self.super_visit(a, Node::DefConstant(node))?;
-        match a.type_map.get(&node.value.node_id) {
-            None => {}
-            Some(ty) => {
-                a.type_map.insert(node.node_id, ty.clone());
-            }
+        if let Some(t) = a.type_map.get(&node.value.node_id).cloned() {
+            a.assign_type(node.node_id, t);
         }
 
         ControlFlow::Continue(())
@@ -505,13 +565,14 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         a: &mut Self::State,
         node: &'ast DefAliasType,
     ) -> ControlFlow<Self::Break> {
-        if a.type_map.contains_key(&node.node_id) {
-            return ControlFlow::Continue(());
-        }
-
+        // CheckTypeUses has given the definition its type, but the type name
+        // is still visited, so that the size of a string type is checked
         self.super_visit(a, Node::DefAliasType(node))?;
-        let ty = a.type_map.get(&node.type_name.node_id).unwrap().clone();
-        a.type_map.insert(node.node_id, ty);
+        if !a.type_map.contains_key(&node.node_id)
+            && let Some(t) = a.type_map.get(&node.type_name.node_id).cloned()
+        {
+            a.assign_type(node.node_id, t);
+        }
 
         ControlFlow::Continue(())
     }
@@ -577,6 +638,18 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
             ExprKind::Struct(members) => self.expr_struct_node(a, node, members),
             ExprKind::Unop { e, .. } => self.expr_unop_node(a, node, e),
         }
+    }
+
+    fn visit_connection(
+        &self,
+        a: &mut Self::State,
+        node: &'ast Connection,
+    ) -> ControlFlow<Self::Break> {
+        self.super_visit(a, Node::Connection(node))?;
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.from_index));
+        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.to_index));
+
+        ControlFlow::Continue(())
     }
 
     fn visit_spec_command(
@@ -764,43 +837,20 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
             None => return ControlFlow::Break(()),
             Some(symbol) => symbol.clone(),
         };
+        self.constant_use_symbol(a, node, symbol)
+    }
 
-        match &symbol {
-            // Constant symbol: visit the constant definition
-            // to ensure it has a type
-            Symbol::Constant(def) => {
-                def.visit(a, self)?;
-            }
-            // Enum symbol: if this is in scope, then we are in
-            // the enum definition, so it already has a type
-            Symbol::EnumConstant(_) => {}
-            // Bound constant parameter: compute the type of the argument bound
-            // to it
-            Symbol::TemplateConstantArg { value, .. } => {
-                if !a.type_map.contains_key(&value.node_id) {
-                    self.template_constant_arg(a, &symbol)?;
-                }
-            }
-            // Invalid use of a symbol in an expression
-            _ => {
-                SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
-                    msg: "not a constant symbol".to_string(),
-                    loc: node.span(),
-                    def_loc: symbol.node().span(),
-                }
-                .emit();
-                return ControlFlow::Break(());
-            }
+    fn implied_constant_use(
+        &self,
+        a: &mut Analysis,
+        node: &Expr,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        // An implied use that does not resolve has no use-def entry
+        match a.use_def_map.get(&node.node_id).cloned() {
+            Some(symbol) => self.constant_use_symbol(a, node, symbol),
+            None => ControlFlow::Continue(()),
         }
-
-        match a.type_map.get(&symbol.node()) {
-            None => {}
-            Some(ty) => {
-                a.type_map.insert(node.node_id, ty.clone());
-            }
-        }
-        ControlFlow::Continue(())
     }
 
     /// The type of a bound constant parameter is the type declared in the
@@ -811,6 +861,9 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
         };
         let param_def = param_def.clone();
         let value = value.clone();
+        if !self.visited.borrow_mut().insert(value.node_id) {
+            return ControlFlow::Continue(());
+        }
 
         // Compute the type of the argument
         visit_template_arg(self, a, arg)?;
