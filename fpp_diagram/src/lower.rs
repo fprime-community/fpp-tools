@@ -237,6 +237,15 @@ fn port_kind(pi: &PortInstance) -> ir::PortKind {
 
 /// Build edges for a topology. When `only_group` is `Some`, only connections in
 /// that named graph are included; otherwise all connections are included.
+///
+/// Each graph's edges come out in source order, so `{graph}.connection.0` is
+/// the graph's first written connection. The lists of
+/// [`Topology::connection_map`] are not in source order: each holds the most
+/// recently added connection first, and resolution re-adds the direct
+/// connections before it adds the imported and the pattern ones. So the
+/// connections are sorted by location. The connections of one pattern share
+/// the pattern's location; walking the list back to front first keeps them in
+/// the order the pattern generated them.
 fn topology_edges(a: &Analysis, topology: &Topology, only_group: Option<&str>) -> Vec<Edge> {
     let mut edges = Vec::new();
     for (graph_name, connections) in &topology.connection_map {
@@ -245,7 +254,9 @@ fn topology_edges(a: &Analysis, topology: &Topology, only_group: Option<&str>) -
         {
             continue;
         }
-        for (i, connection) in connections.iter().enumerate() {
+        let mut connections: Vec<&Connection> = connections.iter().rev().collect();
+        connections.sort_by(|c1, c2| c1.get_loc().compare(&c2.get_loc()));
+        for (i, connection) in connections.into_iter().enumerate() {
             if let Some(edge) = connection_edge(a, topology, graph_name, connection, i) {
                 edges.push(edge);
             }

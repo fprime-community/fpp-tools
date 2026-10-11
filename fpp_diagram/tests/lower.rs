@@ -156,6 +156,87 @@ fn connection_group_includes_only_participants() {
     });
 }
 
+/// A topology whose graph holds several connections, written in an order that
+/// sorts neither by port name nor by instance name, plus a connection of the
+/// same graph imported from a topology written after it.
+const MULTI_CONNECTION_MODEL: &str = r#"
+port P
+
+passive component Producer {
+    output port a: P
+    output port b: P
+    output port c: P
+}
+
+passive component Consumer {
+    sync input port x: P
+    sync input port y: P
+    sync input port z: P
+}
+
+instance prod: Producer base id 0x100
+instance cons: Consumer base id 0x200
+instance subProd: Producer base id 0x300
+instance subCons: Consumer base id 0x400
+
+topology Sys {
+    import Sub
+    instance prod
+    instance cons
+
+    connections C {
+        prod.b -> cons.z
+        prod.c -> cons.x
+        prod.a -> cons.y
+    }
+}
+
+topology Sub {
+    instance subProd
+    instance subCons
+
+    connections C {
+        subProd.a -> subCons.x
+    }
+}
+"#;
+
+#[test]
+fn edges_follow_connection_source_order() {
+    with_analysis(MULTI_CONNECTION_MODEL, |a| {
+        let diagram =
+            fpp_diagram::lower(a, DiagramKind::Topology, "Sys").expect("topology Sys should lower");
+        let edges: Vec<(&str, &str, &str)> = diagram
+            .edges
+            .iter()
+            .map(|e| (e.id.as_str(), e.from_port.as_str(), e.to_port.as_str()))
+            .collect();
+        assert_eq!(
+            edges,
+            vec![
+                ("C.connection.0", "prod.b.0", "cons.z.0"),
+                ("C.connection.1", "prod.c.0", "cons.x.0"),
+                ("C.connection.2", "prod.a.0", "cons.y.0"),
+                ("C.connection.3", "subProd.a.0", "subCons.x.0"),
+            ]
+        );
+
+        // A connection group diagram lists the same edges in the same order.
+        let group = fpp_diagram::lower(a, DiagramKind::ConnectionGroup, "Sys.C")
+            .expect("connection group Sys.C should lower");
+        let group_ids: Vec<&str> = group.edges.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(
+            group_ids,
+            vec![
+                "C.connection.0",
+                "C.connection.1",
+                "C.connection.2",
+                "C.connection.3"
+            ]
+        );
+    });
+}
+
 #[test]
 fn lowers_to_sprotty_graph() {
     with_analysis(MODEL, |a| {
