@@ -59,7 +59,7 @@ fpp_python_macros::fpp_sem_bindings! {
             get_finalized_type(node: node) -> opt(union(Type)),
             get_int_value(node: node) -> opt(i128),
             get_int_value_checked(node: node, loc: span) throws(SemanticError) -> i128,
-            get_interface(id: node) -> opt(entity(Interface)),
+            get_interface(id: node) throws(SemanticError) -> opt(entity(Interface)),
             get_interface_instance(id: node) -> opt(union(InterfaceInstance)),
             get_interface_instance_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
             get_interface_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
@@ -167,7 +167,7 @@ fpp_python_macros::fpp_sem_bindings! {
         }
     }
 
-    union PortInstanceType native fpp_analysis::semantics::PortInstanceType handle clone alias "PortInstanceType" accessor native {
+    union PortInstanceType native fpp_analysis::semantics::PortInstanceType handle clone alias "PortInstanceType" accessor native repr display {
         variants {
             DefPort => DefPortPortInstanceType : astdef(DefPort),
             Serial => SerialPortInstanceType : unit,
@@ -603,14 +603,14 @@ fpp_python_macros::fpp_sem_bindings! {
             event_map: map(i128, entity(Event)),
             default_event_id: i128,
             param_map: map(i128, entity(Param)),
+            spec_port_matching_list: list(astdef(SpecPortMatching)),
+            state_machine_instance_map: map(str, entity(StateMachineInstance)),
+            port_matching_list: list(entity(PortMatching)),
             default_param_id: i128,
             container_map: map(i128, entity(Container)),
             default_container_id: i128,
             record_map: map(i128, entity(Record)),
             default_record_id: i128,
-            state_machine_instance_map: map(str, entity(StateMachineInstance)),
-            spec_port_matching_list: list(astdef(SpecPortMatching)),
-            port_matching_list: list(entity(PortMatching)),
         }
         methods {
             get_max_id -> i128,
