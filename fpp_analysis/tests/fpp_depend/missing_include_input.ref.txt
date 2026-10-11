@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/compiler/tools/fpp-depend/test/missing_include_input.fpp:3:9
+  |
+3 | include "missing_include_input_nope.fppi"
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ No such file or directory (os error 2)
+

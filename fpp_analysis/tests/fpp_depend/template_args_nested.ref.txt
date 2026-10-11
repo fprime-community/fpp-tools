@@ -1,0 +1,4 @@
+[ local path prefix ]/compiler/tools/fpp-depend/test/template_args_nested_a_ty.fpp
+[ local path prefix ]/compiler/tools/fpp-depend/test/template_args_nested_ab_y.fpp
+[ local path prefix ]/compiler/tools/fpp-depend/test/template_args_nested_d_t.fpp
+[ local path prefix ]/compiler/tools/fpp-depend/test/template_args_nested_d_x.fpp

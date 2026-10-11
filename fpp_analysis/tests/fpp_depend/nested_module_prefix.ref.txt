@@ -1,0 +1,1 @@
+[ local path prefix ]/compiler/tools/fpp-depend/test/nested_module_prefix_a_c.fpp

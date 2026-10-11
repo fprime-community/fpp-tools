@@ -1,7 +1,7 @@
 use crate::passes::compute_dependencies::FrameworkDependency;
 use fpp_ast::{
-    ComponentKind, DefComponent, DefInterface, DefModule, InputPortKind, Node,
-    SpecGeneralPortInstance, TransUnit, Visitable, Visitor, Walkable,
+    ComponentKind, DefComponent, DefInterface, DefModule, DefModuleTemplate, InputPortKind, Node,
+    SpecGeneralPortInstance, SpecTemplateExpand, TransUnit, Visitable, Visitor, Walkable,
 };
 use rustc_hash::FxHashSet as HashSet;
 use std::ops::ControlFlow;
@@ -59,6 +59,23 @@ impl<'ast> Visitor<'ast> for ComputeFrameworkDependencies {
         node: &'ast DefModule,
     ) -> ControlFlow<Self::Break> {
         node.walk(s, self)
+    }
+
+    fn visit_def_module_template(
+        &self,
+        s: &mut Self::State,
+        node: &'ast DefModuleTemplate,
+    ) -> ControlFlow<Self::Break> {
+        node.members.visit(s, self)
+    }
+
+    /// Visit the members of an expanded template
+    fn visit_spec_template_expand(
+        &self,
+        s: &mut Self::State,
+        node: &'ast SpecTemplateExpand,
+    ) -> ControlFlow<Self::Break> {
+        node.members.visit(s, self)
     }
 
     fn visit_spec_general_port_instance(

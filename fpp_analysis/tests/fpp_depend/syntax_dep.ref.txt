@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/compiler/tools/fpp-depend/test/syntax_dep_bad.fpp:1:12
+  |
+1 | constant a = 
+  |            ^ unexpected end of input
+
