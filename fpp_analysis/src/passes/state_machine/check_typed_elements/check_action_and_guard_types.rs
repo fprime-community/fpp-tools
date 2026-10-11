@@ -35,8 +35,6 @@ impl<'a> CheckActionAndGuardTypes<'a> {
     ) -> SmResult {
         StateMachineAnalysisVisitor::def_state_machine(&CheckActionAndGuardTypes { a }, sma, node)
     }
-
-    // Check action types
 }
 
 impl SmTypedElementAnalyzer for CheckActionAndGuardTypes<'_> {
@@ -147,6 +145,7 @@ impl StateMachineAnalysisVisitor for CheckActionAndGuardTypes<'_> {
 }
 
 impl CheckActionAndGuardTypes<'_> {
+    // Check action types
     fn check_action_types(
         &self,
         sma: &mut StateMachineAnalysis,

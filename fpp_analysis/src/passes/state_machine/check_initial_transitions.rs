@@ -27,7 +27,7 @@ impl StateMachineAnalysisVisitor for CheckInitialTransitions {
         members: &[StateMachineMember],
     ) -> SmResult {
         // Check that there is exactly one initial transition specifier. The
-        // error is blocking: without an initial transition the reachability
+        // error is blocking: with no initial transition the reachability
         // check has no node to start from.
         let initial_transitions = members
             .iter()
@@ -113,8 +113,8 @@ impl StateMachineAnalysisVisitor for CheckInitialTransitions {
             // Substates or initial transitions: Check semantics
             _ => {
                 // Check for exactly one initial transition. The error is
-                // blocking: the reachability check would report the substates
-                // that the state cannot enter as unreachable.
+                // blocking: with no initial transition the reachability check
+                // can report the substates as unreachable.
                 if let Err(err) = Self::check_one_initial_transition(
                     initial_transitions,
                     loc,

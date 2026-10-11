@@ -62,15 +62,15 @@ pub struct StateMachineAnalysis {
     /// the passes that depend on them:
     /// - an undefined symbol leaves no `use_def_map` entry, which every later
     ///   pass reads;
-    /// - an initial transition error: a missing state machine initial
-    ///   transition leaves the transition graph without the `initial_node` the
-    ///   reachability check starts from, and the other initial transition
-    ///   errors would make the check report unreachable states;
+    /// - a state machine or state without exactly one initial transition: a
+    ///   state machine with none leaves the transition graph without the
+    ///   `initial_node` the reachability check starts from, and a state with
+    ///   none can make the check report its substates as unreachable;
     /// - a choice cycle, because the typed-element pass walks the choice graph
     ///   assuming it is acyclic.
     ///
-    /// Duplicate signals, type mismatches and unreachable nodes leave the flag
-    /// clear.
+    /// Initial transitions that leave their state or state machine, duplicate
+    /// signals, type mismatches and unreachable nodes leave the flag clear.
     pub blocking_error: bool,
 }
 
