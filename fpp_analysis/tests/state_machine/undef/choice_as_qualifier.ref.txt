@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/state_machine/undef/choice_as_qualifier.fpp:6:16
+  |
+6 |     on s enter C.X
+  |                ^^^ invalid use of symbol C: not a qualifier
+  |
+ ::: [ local path prefix ]/state_machine/undef/choice_as_qualifier.fpp:4:3
+  |
+4 |   choice C { if g enter S else enter S }
+  |   -------------------------------------- symbol is defined here
+

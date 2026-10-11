@@ -1,4 +1,5 @@
 use crate::Analysis;
+use crate::analyzers::state_machine::sm_typed_element_analyzer::sm_typed_element_analyzer_hooks;
 use crate::analyzers::state_machine::{
     SmResult, SmTypedElementAnalyzer, StateMachineAnalysisVisitor,
 };
@@ -6,10 +7,7 @@ use crate::semantics::Type;
 use crate::semantics::state_machine::{
     StateMachineAnalysis, StateMachineSymbol, StateMachineTypedElement,
 };
-use fpp_ast::{
-    AstNode, DefChoice, DefState, DefStateMachine, Ident, SpecInitialTransition, SpecStateEntry,
-    SpecStateExit, SpecStateTransition, TransitionExpr, TransitionOrDo,
-};
+use fpp_ast::{AstNode, DefStateMachine, Ident, TransitionExpr, TransitionOrDo};
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -34,72 +32,6 @@ impl<'a> CheckActionAndGuardTypes<'a> {
         node: &DefStateMachine,
     ) -> SmResult {
         StateMachineAnalysisVisitor::def_state_machine(&CheckActionAndGuardTypes { a }, sma, node)
-    }
-
-    // Check action types
-    fn check_action_types(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        te: &StateMachineTypedElement,
-        actions: &[Ident],
-    ) -> SmResult {
-        let a = self.a;
-        let get_type_option = |sym: &StateMachineSymbol| -> Option<Arc<Type>> {
-            match sym {
-                StateMachineSymbol::Action(node) => node
-                    .type_name
-                    .as_ref()
-                    .map(|tn| a.type_map.get(&tn.node_id).unwrap().clone()),
-                _ => panic!("expected action symbol"),
-            }
-        };
-        Self::check_call_site_types(sma, te, actions, "action", get_type_option)
-    }
-
-    // Check guard types
-    fn check_guard_type(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        te: &StateMachineTypedElement,
-        guard: &Ident,
-    ) -> SmResult {
-        let a = self.a;
-        let get_type_option = |sym: &StateMachineSymbol| -> Option<Arc<Type>> {
-            match sym {
-                StateMachineSymbol::Guard(node) => node
-                    .type_name
-                    .as_ref()
-                    .map(|tn| a.type_map.get(&tn.node_id).unwrap().clone()),
-                _ => panic!("expected guard symbol"),
-            }
-        };
-        Self::check_call_site_types(
-            sma,
-            te,
-            std::slice::from_ref(guard),
-            "guard",
-            get_type_option,
-        )
-    }
-
-    // Check call site types
-    fn check_call_site_types(
-        sma: &mut StateMachineAnalysis,
-        te: &StateMachineTypedElement,
-        call_sites: &[Ident],
-        site_kind: &str,
-        get_type_option: impl Fn(&StateMachineSymbol) -> Option<Arc<Type>>,
-    ) -> SmResult {
-        let te_kind = te.show_kind().to_string();
-        let te_to = sma.type_option_map.get(te).cloned().unwrap();
-        for cs in call_sites {
-            let loc = cs.span();
-            let sym = sma.use_def_map.get(&cs.id()).unwrap().clone();
-            let site_to = get_type_option(&sym);
-            // Non-blocking: a mismatch is emitted in place and analysis continues.
-            sma.convert_type_options_at_call_site(loc, &te_kind, &te_to, site_kind, &site_to);
-        }
-        ControlFlow::Continue(())
     }
 }
 
@@ -181,35 +113,73 @@ impl SmTypedElementAnalyzer for CheckActionAndGuardTypes<'_> {
 }
 
 impl StateMachineAnalysisVisitor for CheckActionAndGuardTypes<'_> {
-    fn def_choice(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
-        self.def_choice_te(sma, node)
-    }
+    sm_typed_element_analyzer_hooks!();
+}
 
-    fn spec_state_entry(&self, sma: &mut StateMachineAnalysis, node: &SpecStateEntry) -> SmResult {
-        self.spec_state_entry_te(sma, node)
-    }
-
-    fn spec_state_exit(&self, sma: &mut StateMachineAnalysis, node: &SpecStateExit) -> SmResult {
-        self.spec_state_exit_te(sma, node)
-    }
-
-    fn spec_initial_transition(
+impl CheckActionAndGuardTypes<'_> {
+    // Check action types
+    fn check_action_types(
         &self,
         sma: &mut StateMachineAnalysis,
-        node: &SpecInitialTransition,
+        te: &StateMachineTypedElement,
+        actions: &[Ident],
     ) -> SmResult {
-        self.spec_initial_transition_te(sma, node)
+        let a = self.a;
+        let get_type_option = |sym: &StateMachineSymbol| -> Option<Arc<Type>> {
+            match sym {
+                StateMachineSymbol::Action(node) => node
+                    .type_name
+                    .as_ref()
+                    .map(|tn| a.type_map.get(&tn.node_id).unwrap().clone()),
+                _ => panic!("expected action symbol"),
+            }
+        };
+        Self::check_call_site_types(sma, te, actions, "action", get_type_option)
     }
 
-    fn spec_state_transition(
+    // Check guard types
+    fn check_guard_type(
         &self,
         sma: &mut StateMachineAnalysis,
-        node: &SpecStateTransition,
+        te: &StateMachineTypedElement,
+        guard: &Ident,
     ) -> SmResult {
-        self.spec_state_transition_te(sma, node)
+        let a = self.a;
+        let get_type_option = |sym: &StateMachineSymbol| -> Option<Arc<Type>> {
+            match sym {
+                StateMachineSymbol::Guard(node) => node
+                    .type_name
+                    .as_ref()
+                    .map(|tn| a.type_map.get(&tn.node_id).unwrap().clone()),
+                _ => panic!("expected guard symbol"),
+            }
+        };
+        Self::check_call_site_types(
+            sma,
+            te,
+            std::slice::from_ref(guard),
+            "guard",
+            get_type_option,
+        )
     }
 
-    fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
-        self.state_analyzer_def_state(sma, node)
+    // Check call site types
+    fn check_call_site_types(
+        sma: &mut StateMachineAnalysis,
+        te: &StateMachineTypedElement,
+        call_sites: &[Ident],
+        site_kind: &str,
+        get_type_option: impl Fn(&StateMachineSymbol) -> Option<Arc<Type>>,
+    ) -> SmResult {
+        let te_kind = te.show_kind().to_string();
+        let te_to = sma.type_option_map.get(te).cloned().unwrap();
+        for cs in call_sites {
+            let loc = cs.span();
+            let sym = sma.use_def_map.get(&cs.id()).unwrap().clone();
+            let site_to = get_type_option(&sym);
+            // Non-blocking: a mismatch is emitted in place and analysis continues.
+            sma.convert_type_options_at_call_site(loc, &te_kind, &te_to, site_kind, &site_to);
+        }
+        ControlFlow::Continue(())
     }
 }

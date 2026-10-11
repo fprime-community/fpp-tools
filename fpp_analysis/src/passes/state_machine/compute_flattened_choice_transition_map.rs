@@ -1,3 +1,4 @@
+use crate::analyzers::state_machine::transition_expr_analyzer::transition_expr_analyzer_hooks;
 use crate::analyzers::state_machine::{
     SmResult, StateMachineAnalysisVisitor, TransitionExprAnalyzer,
 };
@@ -5,12 +6,8 @@ use crate::passes::state_machine::ConstructFlattenedTransition;
 use crate::semantics::state_machine::{
     StateMachineAnalysis, StateMachineSymbol, StateOrChoice, Transition,
 };
-use fpp_ast::{
-    AstNode, DefChoice, DefState, DefStateMachine, SpecInitialTransition, SpecStateTransition,
-    TransitionExpr,
-};
+use fpp_ast::{AstNode, DefStateMachine, TransitionExpr};
 use std::ops::ControlFlow;
-use std::sync::Arc;
 
 /// Compute the flattened choice transition map
 pub struct ComputeFlattenedChoiceTransitionMap;
@@ -55,31 +52,5 @@ impl TransitionExprAnalyzer for ComputeFlattenedChoiceTransitionMap {
 }
 
 impl StateMachineAnalysisVisitor for ComputeFlattenedChoiceTransitionMap {
-    fn def_choice(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
-        self.def_choice_texpr(sma, node)
-    }
-
-    fn spec_initial_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecInitialTransition,
-    ) -> SmResult {
-        self.spec_initial_transition_texpr(sma, node)
-    }
-
-    fn spec_state_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecStateTransition,
-    ) -> SmResult {
-        self.spec_state_transition_texpr(sma, node)
-    }
-
-    fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
-        let saved = sma.parent_state.clone();
-        sma.parent_state = Some(StateMachineSymbol::State(Arc::new(node.clone())));
-        self.state_analyzer_def_state(sma, node)?;
-        sma.parent_state = saved;
-        ControlFlow::Continue(())
-    }
+    transition_expr_analyzer_hooks!();
 }

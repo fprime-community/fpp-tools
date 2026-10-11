@@ -227,15 +227,15 @@ impl Analysis {
     }
 
     /// Gets the qualified name of a symbol from a parent-symbol map
-    pub fn get_qualified_name_from_map(
-        parent_symbol_map: &HashMap<Symbol, Symbol>,
-        symbol: &Symbol,
+    pub fn get_qualified_name_from_map<S: SymbolInterface + Eq + std::hash::Hash>(
+        parent_symbol_map: &HashMap<S, S>,
+        symbol: &S,
     ) -> QualifiedName {
         let mut parts = vec![symbol.name().data.clone()];
-        let mut current = symbol.clone();
-        while let Some(parent) = parent_symbol_map.get(&current) {
+        let mut current = symbol;
+        while let Some(parent) = parent_symbol_map.get(current) {
             parts.push(parent.name().data.clone());
-            current = parent.clone();
+            current = parent;
         }
         parts.reverse();
         parts.into()

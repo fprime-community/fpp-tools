@@ -266,8 +266,9 @@ impl Model {
     ///   ordered map the analysis already keeps them in.
     ///
     /// One exception: `TransitionGraph.arc_map`, whose key neither sorts nor carries
-    /// a node id, comes out in the underlying hash order — stable from run to run,
-    /// but neither key nor declaration order. Sort it yourself if you emit from it.
+    /// a node id, comes out in the order the analysis built the transition graph —
+    /// deterministic, but neither key nor declaration order. Sort it yourself if you
+    /// emit from it.
     ///
     /// One more caveat: a *semantic* map keyed by member name — chiefly
     /// `AnonStructType.members` — is in name order, not declaration order, because

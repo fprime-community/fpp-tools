@@ -1,0 +1,20 @@
+ --> [ local path prefix ]/state_machine/transition_graph/choice_cycle_side_branch.fpp:8:3
+  |
+8 |   choice A { if g enter B else enter S }
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle:
+  |
+ ::: [ local path prefix ]/state_machine/transition_graph/choice_cycle_side_branch.fpp:8:19
+  |
+8 |   choice A { if g enter B else enter S }
+  |                   ------- choice transition to choice B
+  |
+ ::: [ local path prefix ]/state_machine/transition_graph/choice_cycle_side_branch.fpp:9:19
+  |
+9 |   choice B { if g enter Y else enter A }
+  |                   ------- choice transition to choice Y
+  |
+ ::: [ local path prefix ]/state_machine/transition_graph/choice_cycle_side_branch.fpp:9:32
+  |
+9 |   choice B { if g enter Y else enter A }
+  |                                ------- choice transition to choice A
+

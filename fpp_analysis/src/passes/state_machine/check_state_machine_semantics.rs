@@ -31,8 +31,10 @@ impl CheckStateMachineSemantics {
                 }
                 CheckInitialTransitions::def_state_machine(sma, node)?;
                 CheckSignalUses::def_state_machine(sma, node)?;
-                // A malformed initial transition leaves no `initial_node`, which
-                // the reachability check reads; stop before the graph passes.
+                // A state machine or state without exactly one initial
+                // transition stops the graph passes: without a state machine
+                // initial transition there is no `initial_node` for the
+                // reachability check to start from.
                 if sma.blocking_error {
                     return ControlFlow::Continue(());
                 }

@@ -1,11 +1,17 @@
-mod name_group;
-pub use name_group::*;
+mod state_machine_name_group;
+pub use state_machine_name_group::*;
 
-mod symbol;
-pub use symbol::*;
+mod state_machine_symbol;
+pub use state_machine_symbol::*;
 
-mod scope;
-pub use scope::*;
+mod sm_name_symbol_map;
+pub use sm_name_symbol_map::*;
+
+mod state_machine_scope;
+pub use state_machine_scope::*;
+
+mod state_machine_nested_scope;
+pub use state_machine_nested_scope::*;
 
 mod state;
 pub use state::*;
@@ -16,8 +22,8 @@ pub use state_or_choice::*;
 mod transition;
 pub use transition::*;
 
-mod typed_element;
-pub use typed_element::*;
+mod state_machine_typed_element;
+pub use state_machine_typed_element::*;
 
 mod type_option;
 pub use type_option::*;
@@ -25,8 +31,8 @@ pub use type_option::*;
 pub mod transition_graph;
 pub use transition_graph::TransitionGraph;
 
-mod analysis;
-pub use analysis::*;
+mod state_machine_analysis;
+pub use state_machine_analysis::*;
 
 use crate::semantics::Symbol;
 use fpp_ast::{

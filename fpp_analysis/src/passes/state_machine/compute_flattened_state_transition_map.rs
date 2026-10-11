@@ -1,9 +1,11 @@
-use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor};
+use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor, state_analyzer};
 use crate::passes::state_machine::ConstructFlattenedTransition;
 use crate::semantics::state_machine::{
     GuardedTransition, StateMachineAnalysis, StateMachineSymbol, StateOrChoice, Transition,
 };
-use fpp_ast::{DefState, DefStateMachine, SpecStateTransition, StateMember, TransitionOrDo};
+use fpp_ast::{
+    DefState, DefStateMachine, SpecStateTransition, StateMachineMember, StateMember, TransitionOrDo,
+};
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -19,42 +21,18 @@ impl ComputeFlattenedStateTransitionMap {
             node,
         )
     }
-
-    fn get_state_transition_specifiers(def_state: &DefState) -> Vec<&SpecStateTransition> {
-        def_state
-            .members
-            .iter()
-            .filter_map(|m| match m {
-                StateMember::SpecStateTransition(node) => Some(node),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn get_state_defs(def_state: &DefState) -> Vec<&DefState> {
-        def_state
-            .members
-            .iter()
-            .filter_map(|m| match m {
-                StateMember::DefState(node) => Some(node),
-                _ => None,
-            })
-            .collect()
-    }
 }
 
 impl StateMachineAnalysisVisitor for ComputeFlattenedStateTransitionMap {
-    fn def_state_machine(
+    fn def_state_machine_internal(
         &self,
         sma: &mut StateMachineAnalysis,
-        node: &DefStateMachine,
+        _node: &DefStateMachine,
+        members: &[StateMachineMember],
     ) -> SmResult {
         sma.signal_transition_map = Default::default();
         sma.flattened_state_transition_map = Default::default();
-        match &node.members {
-            Some(members) => self.visit_sm_members(sma, members),
-            None => ControlFlow::Continue(()),
-        }
+        self.visit_sm_members(sma, members)
     }
 
     fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
@@ -112,10 +90,34 @@ impl StateMachineAnalysisVisitor for ComputeFlattenedStateTransitionMap {
             }
             _ => {
                 sma.signal_transition_map = stm;
-                self.state_analyzer_def_state(sma, node)?;
+                state_analyzer::def_state(self, sma, node)?;
                 sma.signal_transition_map = saved_stm;
                 ControlFlow::Continue(())
             }
         }
+    }
+}
+
+impl ComputeFlattenedStateTransitionMap {
+    fn get_state_transition_specifiers(def_state: &DefState) -> Vec<&SpecStateTransition> {
+        def_state
+            .members
+            .iter()
+            .filter_map(|m| match m {
+                StateMember::SpecStateTransition(node) => Some(node),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn get_state_defs(def_state: &DefState) -> Vec<&DefState> {
+        def_state
+            .members
+            .iter()
+            .filter_map(|m| match m {
+                StateMember::DefState(node) => Some(node),
+                _ => None,
+            })
+            .collect()
     }
 }

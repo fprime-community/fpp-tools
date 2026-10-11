@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/state_machine/undef/absolute_state_error.fpp:9:21
+  |
+9 |       on s enter .S.T
+  |                     ^ cannot find state `T` in scope
+
