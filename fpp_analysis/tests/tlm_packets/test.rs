@@ -179,6 +179,14 @@ fn topology_order_include() {
     )
 }
 
+#[test]
+fn shadowed_instance_error() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/shadowed_instance_error",
+    )
+}
+
 // Rust-only: the order in which the channels of a packet set are checked
 #[test]
 fn channel_order_instances() {
