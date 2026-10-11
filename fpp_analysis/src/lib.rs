@@ -17,17 +17,9 @@ mod errors;
 pub mod used_symbols;
 pub use used_symbols::UsedSymbols;
 
-use crate::passes::{
-    BuildSpecLocMap, CheckComponentDefs, CheckComponentInstanceDefs, CheckDictionaryDefs,
-    CheckExprTypes, CheckFrameworkConstantValues, CheckFrameworkDefs, CheckInterfaceDefs,
-    CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs,
-    CheckTemplateInterfaceArgs, CheckTemplateUses, CheckTopologyDefs, CheckTopologyInstances,
-    CheckTypeUses, CheckUseDefCycles, CheckUses, ConstructDictionaryMap, ConstructImpliedUseMap,
-    EnterSymbols, EnterTemplateExpansionSymbols, EvalConstantExprs, EvalImpliedEnumConsts,
-    FinalizeConstantExprs, FinalizeTypeDefs,
-};
+pub use crate::passes::{CheckSemantics, ExpandSyntaxAndEnterSymbols};
 pub use analysis::*;
-use fpp_ast::{MutVisitor, Visitor};
+use fpp_ast::MutVisitor;
 use fpp_core::FileReader;
 use std::ops::ControlFlow;
 
@@ -48,6 +40,12 @@ pub mod analyzers {
 }
 
 pub mod passes {
+    mod expand_syntax_and_enter_symbols;
+    pub use expand_syntax_and_enter_symbols::*;
+
+    mod check_semantics;
+    pub use check_semantics::*;
+
     mod enter_module_symbols;
 
     mod enter_symbols;
@@ -250,56 +248,29 @@ pub fn resolve_includes<Reader: FileReader>(
     result
 }
 
-/// Expand template expansion specifiers and enter the symbols they produce.
+/// Enter the symbols of a model and expand its templates: the steps of
+/// [`ExpandSyntaxAndEnterSymbols::tu_list`] that follow include resolution and
+/// the synthesis of the state enums (see
+/// [`ExpandSyntaxAndEnterSymbols::enter_symbols_and_expand_templates`]).
 ///
-/// This runs before [`check_semantics`], on the same analysis: it performs the
-/// symbol entering that the rest of the analysis relies on, and it rewrites the
+/// This is a lower-level entry point than [`CheckSemantics::tu_list`], for a
+/// driver that resolves the includes and adds the state enums of each
+/// translation unit itself ([`resolve_includes`], [`add_state_enums`]). It
+/// runs before [`check_semantics`], on the same analysis, and it rewrites the
 /// translation units, replacing each template expansion specifier with the
-/// expanded template.
-///
-/// A model whose templates do not expand cannot be analyzed, so a `Break` result
-/// means the caller must not go on to [`check_semantics`].
+/// expanded template. A `Break` result means the caller must not go on to
+/// [`check_semantics`].
 pub fn resolve_templates(a: &mut Analysis, ast: &mut [fpp_ast::TransUnit]) -> ControlFlow<()> {
-    EnterSymbols.visit_trans_units(a, ast.iter())?;
-    CheckTemplateUses.visit_trans_units(a, ast.iter())?;
-    if let Err(err) = ExpandTemplates::transform_list(a, ast) {
-        err.emit();
-        return ControlFlow::Break(());
-    }
-    EnterTemplateExpansionSymbols.visit_trans_units(a, ast.iter())?;
-    ControlFlow::Continue(())
+    ExpandSyntaxAndEnterSymbols::enter_symbols_and_expand_templates(a, ast)
 }
 
-/// Check the semantics of a list of translation units.
+/// Check the semantics of a list of translation units: the steps of
+/// [`CheckSemantics::tu_list`] that follow
+/// [`ExpandSyntaxAndEnterSymbols::tu_list`].
 ///
+/// This is a lower-level entry point than [`CheckSemantics::tu_list`].
 /// [`resolve_templates`] must have run on the same analysis first: it enters the
 /// symbols of the model.
 pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> ControlFlow<()> {
-    ConstructImpliedUseMap.visit_trans_units(a, ast.iter().cloned())?;
-    CheckUses::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckUseDefCycles::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckTypeUses::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckExprTypes::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckFrameworkDefs.visit_trans_units(a, ast.iter().cloned())?;
-    EvalImpliedEnumConsts::new().visit_trans_units(a, ast.iter().cloned())?;
-    EvalConstantExprs::new().visit_trans_units(a, ast.iter().cloned())?;
-    FinalizeTypeDefs::new().visit_trans_units(a, ast.iter().cloned())?;
-    FinalizeConstantExprs::new().visit_trans_units(a, ast.iter().cloned())?;
-    CheckFrameworkConstantValues.check(a);
-    CheckPortDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckInterfaceDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckComponentDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckComponentInstanceDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckComponentInstanceDefs::check_id_ranges(a);
-    CheckStateMachineDefs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckTopologyInstances.visit_trans_units(a, ast.iter().cloned())?;
-    CheckTopologyDefs.resolve_all(a);
-    CheckTemplateInterfaceArgs.check(a);
-    BuildSpecLocMap.visit_trans_units(a, ast.iter().cloned())?;
-    CheckSpecLocs.visit_trans_units(a, ast.iter().cloned())?;
-    CheckDictionaryDefs.visit_trans_units(a, ast.iter().cloned())?;
-    ConstructDictionaryMap::construct(a);
-    CheckSystemDefs.visit_trans_units(a, ast.iter().cloned())?;
-
-    ControlFlow::Continue(())
+    CheckSemantics::check_expanded_tu_list(a, &ast)
 }

@@ -476,6 +476,9 @@ impl GlobalState {
                     // the cache keeps position lookups unambiguous.
                     let mut asts: Vec<fpp_ast::TransUnit> =
                         self.cache.values().map(|v| v.ast.clone()).collect();
+                    // The cached units already have their includes resolved and
+                    // their state enums added, so the analysis starts from the
+                    // steps that follow those in ExpandSyntaxAndEnterSymbols.
                     if fpp_analysis::resolve_templates(&mut analysis, &mut asts).is_continue() {
                         let _ = fpp_analysis::check_semantics(&mut analysis, asts.iter().collect());
                     }

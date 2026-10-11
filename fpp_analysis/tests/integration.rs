@@ -1,6 +1,4 @@
-use fpp_analysis::{
-    Analysis, add_state_enums, check_semantics, resolve_includes, resolve_templates,
-};
+use fpp_analysis::{Analysis, CheckSemantics};
 use fpp_core::{FileReader, SourceFile};
 use fpp_fs::FsReader;
 use pretty_assertions::assert_eq;
@@ -55,13 +53,7 @@ pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
         let mut asts: Vec<_> = dep_files.iter().map(parse).collect();
         asts.push(parse(&fpp_file));
         let mut a = Analysis::new();
-        for ast in &mut asts {
-            let _ = resolve_includes(&mut a, FsReader {}, ast);
-            add_state_enums(ast);
-        }
-        if resolve_templates(&mut a, &mut asts).is_continue() {
-            let _ = check_semantics(&mut a, asts.iter().collect());
-        }
+        let _ = CheckSemantics::tu_list(&mut a, FsReader {}, &mut asts);
     });
 
     let output = String::from_utf8(diagnostics_str)
