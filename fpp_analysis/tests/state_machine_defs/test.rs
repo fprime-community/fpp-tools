@@ -24,3 +24,18 @@ fn implied_state_enum_component_named_like_module_ok() {
 fn implied_state_enum_module_named_like_module_ok() {
     run_test("state_machine_defs/implied_state_enum_module_named_like_module_ok")
 }
+
+#[test]
+fn include_state_members_ok() {
+    run_test("state_machine_defs/include_state_members_ok")
+}
+
+#[test]
+fn include_state_machine_members_ok() {
+    run_test("state_machine_defs/include_state_machine_members_ok")
+}
+
+#[test]
+fn include_unreachable_state() {
+    run_test("state_machine_defs/include_unreachable_state")
+}
