@@ -1,0 +1,43 @@
+  --> [ local path prefix ]/tlm_packets/topology_order_include.fpp:5:3
+   |
+ 5 | /   telemetry packets P {
+ 6 | |     packet X group 0 {
+ 7 | |     }
+ 8 | |   }
+   | |___^ invalid telemetry packet set P
+   |
+   = note: telemetry channel c1.T is neither used nor marked as omitted
+   |
+  ::: [ local path prefix ]/tlm_packets/topology_order_include.fpp:4:3
+   |
+ 4 |     instance c1
+   |     ----------- component instance is specified here
+   |
+  ::: [ local path prefix ]/tlm_packets/instances.fpp:15:3
+   |
+15 |     telemetry T: U32
+   |     ---------------- telemetry channel is specified here
+
+  --> [ local path prefix ]/tlm_packets/include/topology_order.fppi:3:3
+   |
+ 3 | /   telemetry packets Q {
+ 4 | |     packet X group 0 {
+ 5 | |     }
+ 6 | |   }
+   | |___^ invalid telemetry packet set Q
+   |
+   = note: included from [ local path prefix ]/tlm_packets/topology_order_include.fpp:10:1
+   = note: telemetry channel c2.T is neither used nor marked as omitted
+   |
+  ::: [ local path prefix ]/tlm_packets/include/topology_order.fppi:2:3
+   |
+ 2 |     instance c2
+   |     ----------- component instance is specified here
+   |
+   = note: included from [ local path prefix ]/tlm_packets/topology_order_include.fpp:10:1
+   |
+  ::: [ local path prefix ]/tlm_packets/instances.fpp:15:3
+   |
+15 |     telemetry T: U32
+   |     ---------------- telemetry channel is specified here
+

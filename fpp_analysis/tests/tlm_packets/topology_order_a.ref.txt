@@ -1,0 +1,20 @@
+ --> [ local path prefix ]/tlm_packets/topology_order_b.fpp:5:5
+  |
+5 |     packet P group 1 { c1.T }
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^ duplicate packet name P
+  |
+ ::: [ local path prefix ]/tlm_packets/topology_order_b.fpp:4:5
+  |
+4 |     packet P group 0 { c1.T }
+  |     ------------------------- previous occurrence is here
+
+ --> [ local path prefix ]/tlm_packets/topology_order_a.fpp:7:5
+  |
+7 |     packet Q group 1 { c2.T }
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^ duplicate packet name Q
+  |
+ ::: [ local path prefix ]/tlm_packets/topology_order_a.fpp:6:5
+  |
+6 |     packet Q group 0 { c2.T }
+  |     ------------------------- previous occurrence is here
+

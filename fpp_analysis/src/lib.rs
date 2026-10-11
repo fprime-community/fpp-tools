@@ -296,7 +296,7 @@ pub fn check_semantics(a: &mut Analysis, ast: Vec<&fpp_ast::TransUnit>) -> Contr
     BuildSpecLocMap.visit_trans_units(a, ast.iter().cloned())?;
     CheckSpecLocs.visit_trans_units(a, ast.iter().cloned())?;
     CheckDictionaryDefs.visit_trans_units(a, ast.iter().cloned())?;
-    ConstructDictionaryMap::construct(a);
+    ConstructDictionaryMap.visit_trans_units(a, ast.iter().cloned())?;
     CheckSystemDefs.visit_trans_units(a, ast.iter().cloned())?;
 
     ControlFlow::Continue(())

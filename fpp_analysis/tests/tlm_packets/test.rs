@@ -145,3 +145,27 @@ fn template_channel_neither_used_nor_omitted() {
         "tlm_packets/template_channel_neither_used_nor_omitted",
     )
 }
+
+#[test]
+fn topology_order_files() {
+    run_test_with(
+        &["tlm_packets/instances", "tlm_packets/topology_order_b"],
+        "tlm_packets/topology_order_a",
+    )
+}
+
+#[test]
+fn topology_order_template() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/topology_order_template",
+    )
+}
+
+#[test]
+fn topology_order_include() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/topology_order_include",
+    )
+}
