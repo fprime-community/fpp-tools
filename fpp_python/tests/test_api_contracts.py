@@ -824,7 +824,7 @@ def test_repr_names_the_concrete_class_and_identifies_the_value():
 
     # A type: the class, then the compiler's rendering of the value.
     array = a.type_map[m.lookup("M.A").node_id]
-    assert repr(array) == "<ArrayType A>"
+    assert repr(array) == "<ArrayType array A>"
     assert repr(array.anon_array.elt_type) == "<PrimitiveIntType U32>"
 
     # A value: likewise, so a folded constant reads as what it folded to.
