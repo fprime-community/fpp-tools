@@ -190,3 +190,43 @@ impl SourceFile {
         self.len() == 0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        CompilerContext, DiagnosticData, DiagnosticEmitter, Error, FileReader, SourceFile,
+    };
+
+    struct NoEmitter;
+
+    impl DiagnosticEmitter for NoEmitter {
+        fn emit(&mut self, _diagnostic: DiagnosticData) {}
+    }
+
+    /// A reader that resolves paths with the default implementation
+    struct DefaultReader;
+
+    impl FileReader for DefaultReader {
+        fn read(&self, path: &str) -> Result<String, Error> {
+            Err(format!("cannot read {path}").into())
+        }
+    }
+
+    #[test]
+    fn resolve_is_relative_to_the_directory_and_lexical() {
+        crate::run(&mut CompilerContext::new(NoEmitter), || {
+            let file = SourceFile::new("/a/b/c.fpp", String::new());
+            let resolve = |include| DefaultReader.resolve(file, include).unwrap();
+            assert_eq!(resolve("d.fppi"), "/a/b/d.fppi");
+            assert_eq!(resolve("./nonexistent/../d.fppi"), "/a/b/d.fppi");
+            assert_eq!(resolve("../../e.fppi"), "/e.fppi");
+
+            let stdin = SourceFile::new("<stdin>", String::new());
+            let cwd = std::env::current_dir().unwrap();
+            assert_eq!(
+                DefaultReader.resolve(stdin, "f.fppi").unwrap(),
+                cwd.join("f.fppi").to_string_lossy()
+            );
+        });
+    }
+}
