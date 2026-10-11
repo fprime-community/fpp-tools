@@ -61,7 +61,7 @@ fn constant_state_machine() {
 }
 
 #[test]
-fn enum_() {
+fn r#enum() {
     run_test("redef/enum")
 }
 
@@ -131,7 +131,7 @@ fn state_machine() {
 }
 
 #[test]
-fn struct_() {
+fn r#struct() {
     run_test("redef/struct")
 }
 
@@ -146,7 +146,7 @@ fn topology_module() {
 }
 
 #[test]
-fn type_() {
+fn r#type() {
     run_test("redef/type")
 }
 

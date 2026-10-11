@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/struct/default_member_size_error.fpp:2:27
+  |
+2 | struct S { a: A } default { a = [1, 2] }
+  |                           ^^^^^^^^^^^^^^ cannot convert { a: [2] Integer } to struct S
+  |
+  = note: struct member `a` type cannot be converted
+  = note: array sizes do not match 2 != 3
+

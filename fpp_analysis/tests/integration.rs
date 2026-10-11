@@ -163,7 +163,7 @@ mod container {
     mod test;
 }
 
-mod cycles {
+mod cycle {
     mod test;
 }
 
@@ -171,7 +171,7 @@ mod defs {
     mod test;
 }
 
-mod enums {
+mod r#enum {
     mod test;
 }
 
@@ -283,7 +283,7 @@ mod state_machine_instance {
     mod test;
 }
 
-mod structs {
+mod r#struct {
     mod test;
 }
 
@@ -311,7 +311,7 @@ mod top_ports {
     mod test;
 }
 
-mod types {
+mod r#type {
     mod test;
 }
 

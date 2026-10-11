@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/enum/duplicate_value.fpp:3:17
+  |
+3 | enum E { X = a, Y = b + 1 }
+  |                 ^^^^^^^^^ duplicate enum value 2
+  |
+ ::: [ local path prefix ]/enum/duplicate_value.fpp:3:10
+  |
+3 | enum E { X = a, Y = b + 1 }
+  |          ----- previous occurrence is here
+

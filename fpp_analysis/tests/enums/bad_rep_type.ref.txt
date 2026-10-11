@@ -1,5 +1,0 @@
- --> [ local path prefix ]/enums/bad_rep_type.fpp:2:9
-  |
-2 | enum E: A { X = 1 }
-  |         ^ primitive integer type must be used
-

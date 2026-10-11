@@ -1,5 +1,0 @@
- --> [ local path prefix ]/structs/format_precision_and_type.fpp:1:27
-  |
-1 | struct S { x: U32 format "{.200f}" }
-  |                           ^^^^^^^ invalid format string: precision value 200 is out of range
-

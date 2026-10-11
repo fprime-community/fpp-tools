@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/enum/rep_type_string_size_scope.fpp:2:22
+  |
+2 | enum E : string size A { A = 1 }
+  |                      ^ cannot find constant `A` in scope
+
+ --> [ local path prefix ]/enum/rep_type_string_size_scope.fpp:2:10
+  |
+2 | enum E : string size A { A = 1 }
+  |          ^^^^^^^^^^^^^ primitive integer type must be used
+

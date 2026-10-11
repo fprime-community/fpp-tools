@@ -1,8 +1,0 @@
- --> [ local path prefix ]/types/string_size_type_shadowed.fpp:5:12
-  |
-5 |   type T = string size 100
-  |            ^^^^^^^^^^^^^^^ cannot find type `FwSizeStoreType` in scope
-  |
-  = note: the symbol FwSizeStoreType has an implied use at the point of the error
-  = note: use of a string type requires this definition
-

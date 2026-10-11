@@ -1,5 +1,0 @@
- --> [ local path prefix ]/types/alias_string_size_not_numeric.fpp:3:22
-  |
-3 | type T = string size "abc"
-  |                      ^^^^^ cannot convert string to a numeric type
-

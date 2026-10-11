@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/struct/format_missing_repl.fpp:1:26
+  |
+1 | struct s { x: U32 format "" }
+  |                          ^^ invalid format string: missing replacement field
+

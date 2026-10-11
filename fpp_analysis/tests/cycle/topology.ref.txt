@@ -1,0 +1,20 @@
+ --> [ local path prefix ]/cycle/topology.fpp:1:1
+  |
+1 | topology A { instance B }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycle/topology.fpp:1:23
+  |
+1 | topology A { instance B }
+  |                       - use B refers to definition B
+  |
+ ::: [ local path prefix ]/cycle/topology.fpp:2:23
+  |
+2 | topology B { instance C }
+  |                       - use C refers to definition C
+  |
+ ::: [ local path prefix ]/cycle/topology.fpp:3:23
+  |
+3 | topology C { instance A }
+  |                       - use A refers to definition A
+

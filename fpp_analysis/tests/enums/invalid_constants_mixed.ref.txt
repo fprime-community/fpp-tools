@@ -1,5 +1,0 @@
- --> [ local path prefix ]/enums/invalid_constants_mixed.fpp:2:1
-  |
-2 | enum E { A, B = 1, C }
-  | ^^^^^^^^^^^^^^^^^^^^^^ enum constants must be all explicit or all implied
-

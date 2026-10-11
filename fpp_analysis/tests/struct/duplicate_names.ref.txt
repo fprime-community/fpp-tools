@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/struct/duplicate_names.fpp:3:3
+  |
+3 |   x: U16
+  |   ^^^^^^ duplicate struct member `x`
+  |
+ ::: [ local path prefix ]/struct/duplicate_names.fpp:2:3
+  |
+2 |   x: F32
+  |   ------ previously defined here
+

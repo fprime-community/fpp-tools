@@ -1,7 +1,0 @@
- --> [ local path prefix ]/structs/format_and_size_error.fpp:1:37
-  |
-1 | struct S { a: U32 format "{f}", b: [0] U32 }
-  |                                     ^ invalid array size 0
-  |
-  = note: size must be greater than zero
-

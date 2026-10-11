@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/enum/bad_default.fpp:1:22
+  |
+1 | enum E { X } default 0
+  |                      ^ cannot convert Integer to enum E
+

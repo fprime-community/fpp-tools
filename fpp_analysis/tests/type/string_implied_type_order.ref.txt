@@ -1,0 +1,18 @@
+ --> [ local path prefix ]/type/string_implied_type_order.fpp:4:1
+  |
+4 | enum E { }
+  | ^^^^^^^^^^ enum must define at least one constant
+  |
+  = note: the symbol FwSizeStoreType has an implied use at the point of the error
+  = note: use of a string type requires this definition
+
+ --> [ local path prefix ]/type/string_implied_type_order.fpp:2:1
+  |
+2 | enum B { }
+  | ^^^^^^^^^^ enum must define at least one constant
+
+ --> [ local path prefix ]/type/string_implied_type_order.fpp:3:1
+  |
+3 | type FwSizeStoreType = E
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ the F Prime framework type FwSizeStoreType must be an alias of an integer type
+

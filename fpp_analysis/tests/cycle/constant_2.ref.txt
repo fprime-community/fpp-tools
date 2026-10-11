@@ -1,0 +1,15 @@
+ --> [ local path prefix ]/cycle/constant_2.fpp:3:3
+  |
+3 |   constant a = b
+  |   ^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycle/constant_2.fpp:3:16
+  |
+3 |   constant a = b
+  |                - use b refers to definition b
+  |
+ ::: [ local path prefix ]/cycle/constant_2.fpp:7:14
+  |
+7 | constant b = M.a
+  |              --- use M.a refers to definition a
+

@@ -1,0 +1,15 @@
+ --> [ local path prefix ]/enum/invalid_constants_duplicate_value.fpp:2:1
+  |
+2 | enum E { A = 1, B = 1, C }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ enum constants must be all explicit or all implied
+
+ --> [ local path prefix ]/enum/invalid_constants_duplicate_value.fpp:2:17
+  |
+2 | enum E { A = 1, B = 1, C }
+  |                 ^^^^^ duplicate enum value 1
+  |
+ ::: [ local path prefix ]/enum/invalid_constants_duplicate_value.fpp:2:10
+  |
+2 | enum E { A = 1, B = 1, C }
+  |          ----- previous occurrence is here
+

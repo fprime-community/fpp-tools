@@ -1,5 +1,0 @@
- --> [ local path prefix ]/types/string_size_not_numeric.fpp:3:27
-  |
-3 | array A = [3] string size "abc"
-  |                           ^^^^^ cannot convert string to a numeric type
-

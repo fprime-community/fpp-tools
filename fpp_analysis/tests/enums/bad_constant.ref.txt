@@ -1,5 +1,0 @@
- --> [ local path prefix ]/enums/bad_constant.fpp:1:14
-  |
-1 | enum E { X = "abc" }
-  |              ^^^^^ cannot convert string to a numeric type
-

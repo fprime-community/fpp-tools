@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/enum/bad_alias_rep_type.fpp:5:9
+  |
+5 | enum E: T { A, B }
+  |         ^ primitive integer type must be used
+

@@ -1,8 +1,0 @@
- --> [ local path prefix ]/types/string_length_shadowed.fpp:7:12
-  |
-7 |   type T = string
-  |            ^^^^^^ cannot find constant `FW_FIXED_LENGTH_STRING_SIZE` in scope
-  |
-  = note: the symbol FW_FIXED_LENGTH_STRING_SIZE has an implied use at the point of the error
-  = note: use of a string type with default size requires this definition
-

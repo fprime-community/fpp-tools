@@ -1,0 +1,20 @@
+ --> [ local path prefix ]/cycle/enum.fpp:1:1
+  |
+1 | enum A: B { }
+  | ^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/cycle/enum.fpp:1:9
+  |
+1 | enum A: B { }
+  |         - use B refers to definition B
+  |
+ ::: [ local path prefix ]/cycle/enum.fpp:2:9
+  |
+2 | enum B: C { }
+  |         - use C refers to definition C
+  |
+ ::: [ local path prefix ]/cycle/enum.fpp:3:9
+  |
+3 | enum C: A { }
+  |         - use A refers to definition A
+

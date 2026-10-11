@@ -1,5 +1,0 @@
- --> [ local path prefix ]/enums/missing_constant.fpp:1:1
-  |
-1 | enum E { }
-  | ^^^^^^^^^^ enum must define at least one constant
-
