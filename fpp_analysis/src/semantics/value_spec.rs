@@ -99,15 +99,15 @@ fn members_eq(m1: &IndexMap<String, Value>, m2: &IndexMap<String, Value>) -> boo
 /// The anon-struct value `{ a = U32(0), b = String("") }`.
 fn anon_struct_val() -> Value {
     let mut m: IndexMap<String, Value> = IndexMap::new();
-    m.insert("a".to_string(), v_u32(0));
-    m.insert("b".to_string(), v_string(""));
+    m.insert("a".to_string(), create_u32(0));
+    m.insert("b".to_string(), create_string(""));
     Value::AnonStruct(AnonStructValue { members: m })
 }
 
 /// The array value `[ I32(0), I32(0), I32(0) ]: A`.
 fn array_val() -> Value {
     Value::Array(ArrayValue {
-        anon_array: AnonArrayValue::new(vec![v_i32(0), v_i32(0), v_i32(0)]),
+        anon_array: AnonArrayValue::new(vec![create_i32(0), create_i32(0), create_i32(0)]),
         ty: as_array_ty(&default_array()),
     })
 }
@@ -115,8 +115,8 @@ fn array_val() -> Value {
 /// The struct value `{ a = U32(0), b = String("") }: S`.
 fn struct_val() -> Value {
     let mut m: IndexMap<String, Value> = IndexMap::new();
-    m.insert("a".to_string(), v_u32(0));
-    m.insert("b".to_string(), v_string(""));
+    m.insert("a".to_string(), create_u32(0));
+    m.insert("b".to_string(), create_string(""));
     Value::Struct(StructValue {
         anon_struct: AnonStructValue { members: m },
         ty: as_struct_ty(&struct_ty(
@@ -177,22 +177,20 @@ fn check_convert(cases: Vec<(Value, Arc<Type>, Option<Value>)>) {
 fn value_get_type() {
     with_test_ctx(|| {
         // Every primitive int kind, plus Integer/Float/Boolean/String.
-        let prim = |kind| Value::PrimitiveInteger(PrimitiveIntegerValue { value: 0, kind });
-        use fpp_ast::IntegerKind::*;
         let scalar_cases: Vec<(Value, Arc<Type>)> = vec![
-            (prim(I8), i8()),
-            (prim(I16), i16()),
-            (prim(I32), i32()),
-            (prim(I64), i64()),
-            (prim(U8), u8()),
-            (prim(U16), u16()),
-            (prim(U32), u32()),
-            (prim(U64), u64()),
-            (v_integer(0), integer()),
-            (v_f32(0.0), f32()),
-            (v_f64(0.0), f64()),
-            (v_bool(false), boolean()),
-            (v_string(""), string(None)),
+            (create_i8(0), i8()),
+            (create_i16(0), i16()),
+            (create_i32(0), i32()),
+            (create_i64(0), i64()),
+            (create_u8(0), u8()),
+            (create_u16(0), u16()),
+            (create_u32(0), u32()),
+            (create_u64(0), u64()),
+            (create_integer(0), integer()),
+            (create_f32(0.0), f32()),
+            (create_f64(0.0), f64()),
+            (create_boolean(false), boolean()),
+            (create_string(""), string(None)),
         ];
         for (v, expected) in scalar_cases {
             assert!(
@@ -203,7 +201,7 @@ fn value_get_type() {
         }
 
         // AnonArray value -> AnonArray(Some(3), U32)
-        let aa = v_anon_array(3, v_u32(0));
+        let aa = create_anon_array(3, create_u32(0));
         assert!(types_structurally_eq(
             &aa.get_type(),
             &anon_array(Some(3), u32())
@@ -216,7 +214,7 @@ fn value_get_type() {
         ));
 
         // Enum constant -> its named enum type (default_enum()).
-        let ec = v_enum_constant("X", 0);
+        let ec = create_enum_constant("X", 0);
         assert!(types_structurally_eq(&ec.get_type(), &default_enum()));
 
         // AnonStruct value -> AnonStruct { a: U32, b: string }.
@@ -237,19 +235,31 @@ fn value_get_type() {
 fn value_add() {
     with_test_ctx(|| {
         let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_i8(1), v_i8(2), Some(v_i8(3))),
-            (v_i8(1), v_integer(2), Some(v_integer(3))),
-            (v_i8(1), v_f32(2.0), Some(v_f64(3.0))),
-            (v_f32(1.0), v_f32(2.0), Some(v_f32(3.0))),
-            (v_f32(1.0), v_f64(2.0), Some(v_f64(3.0))),
-            (v_enum_constant("X", 0), v_i32(1), Some(v_i32(1))),
-            (v_enum_constant("X", 0), v_i16(1), Some(v_integer(1))),
-            (v_i32(1), v_string("abc"), None),
-            (v_i32(1), v_anon_array(3, v_u32(0)), None),
-            (v_i32(1), array_val(), None),
-            (v_i32(1), anon_struct_val(), None),
-            (v_i32(1), struct_val(), None),
-            (v_string("abc"), v_string("def"), Some(v_string("abcdef"))),
+            (create_i8(1), create_i8(2), Some(create_i8(3))),
+            (create_i8(1), create_integer(2), Some(create_integer(3))),
+            (create_i8(1), create_f32(2.0), Some(create_f64(3.0))),
+            (create_f32(1.0), create_f32(2.0), Some(create_f32(3.0))),
+            (create_f32(1.0), create_f64(2.0), Some(create_f64(3.0))),
+            (
+                create_enum_constant("X", 0),
+                create_i32(1),
+                Some(create_i32(1)),
+            ),
+            (
+                create_enum_constant("X", 0),
+                create_i16(1),
+                Some(create_integer(1)),
+            ),
+            (create_i32(1), create_string("abc"), None),
+            (create_i32(1), create_anon_array(3, create_u32(0)), None),
+            (create_i32(1), array_val(), None),
+            (create_i32(1), anon_struct_val(), None),
+            (create_i32(1), struct_val(), None),
+            (
+                create_string("abc"),
+                create_string("def"),
+                Some(create_string("abcdef")),
+            ),
         ];
         check_binop("+", |a, b| a.add(b), cases);
     });
@@ -263,19 +273,27 @@ fn value_add() {
 fn value_sub() {
     with_test_ctx(|| {
         let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_i8(1), v_i8(2), Some(v_i8(-1))),
-            (v_i8(1), v_integer(2), Some(v_integer(-1))),
-            (v_i8(1), v_f32(2.0), Some(v_f64(-1.0))),
-            (v_f32(1.0), v_f32(2.0), Some(v_f32(-1.0))),
-            (v_f32(1.0), v_f64(2.0), Some(v_f64(-1.0))),
-            (v_enum_constant("X", 0), v_i32(1), Some(v_i32(-1))),
-            (v_enum_constant("X", 0), v_i16(1), Some(v_integer(-1))),
-            (v_i32(1), v_string("abc"), None),
-            (v_i32(1), v_anon_array(3, v_u32(0)), None),
-            (v_i32(1), array_val(), None),
-            (v_i32(1), anon_struct_val(), None),
-            (v_i32(1), struct_val(), None),
-            (v_string("abc"), v_string("def"), None),
+            (create_i8(1), create_i8(2), Some(create_i8(-1))),
+            (create_i8(1), create_integer(2), Some(create_integer(-1))),
+            (create_i8(1), create_f32(2.0), Some(create_f64(-1.0))),
+            (create_f32(1.0), create_f32(2.0), Some(create_f32(-1.0))),
+            (create_f32(1.0), create_f64(2.0), Some(create_f64(-1.0))),
+            (
+                create_enum_constant("X", 0),
+                create_i32(1),
+                Some(create_i32(-1)),
+            ),
+            (
+                create_enum_constant("X", 0),
+                create_i16(1),
+                Some(create_integer(-1)),
+            ),
+            (create_i32(1), create_string("abc"), None),
+            (create_i32(1), create_anon_array(3, create_u32(0)), None),
+            (create_i32(1), array_val(), None),
+            (create_i32(1), anon_struct_val(), None),
+            (create_i32(1), struct_val(), None),
+            (create_string("abc"), create_string("def"), None),
         ];
         check_binop("-", |a, b| a.sub(b), cases);
     });
@@ -289,19 +307,27 @@ fn value_sub() {
 fn value_mul() {
     with_test_ctx(|| {
         let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_i8(1), v_i8(2), Some(v_i8(2))),
-            (v_i8(1), v_integer(2), Some(v_integer(2))),
-            (v_i8(1), v_f32(2.0), Some(v_f64(2.0))),
-            (v_f32(1.0), v_f32(2.0), Some(v_f32(2.0))),
-            (v_f32(1.0), v_f64(2.0), Some(v_f64(2.0))),
-            (v_enum_constant("X", 0), v_i32(1), Some(v_i32(0))),
-            (v_enum_constant("X", 0), v_i16(1), Some(v_integer(0))),
-            (v_i32(1), v_string("abc"), None),
-            (v_i32(1), v_anon_array(3, v_u32(0)), None),
-            (v_i32(1), array_val(), None),
-            (v_i32(1), anon_struct_val(), None),
-            (v_i32(1), struct_val(), None),
-            (v_string("abc"), v_string("def"), None),
+            (create_i8(1), create_i8(2), Some(create_i8(2))),
+            (create_i8(1), create_integer(2), Some(create_integer(2))),
+            (create_i8(1), create_f32(2.0), Some(create_f64(2.0))),
+            (create_f32(1.0), create_f32(2.0), Some(create_f32(2.0))),
+            (create_f32(1.0), create_f64(2.0), Some(create_f64(2.0))),
+            (
+                create_enum_constant("X", 0),
+                create_i32(1),
+                Some(create_i32(0)),
+            ),
+            (
+                create_enum_constant("X", 0),
+                create_i16(1),
+                Some(create_integer(0)),
+            ),
+            (create_i32(1), create_string("abc"), None),
+            (create_i32(1), create_anon_array(3, create_u32(0)), None),
+            (create_i32(1), array_val(), None),
+            (create_i32(1), anon_struct_val(), None),
+            (create_i32(1), struct_val(), None),
+            (create_string("abc"), create_string("def"), None),
         ];
         check_binop("*", |a, b| a.mul(b), cases);
     });
@@ -315,19 +341,27 @@ fn value_mul() {
 fn value_div() {
     with_test_ctx(|| {
         let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_i8(1), v_i8(2), Some(v_i8(0))),
-            (v_i8(1), v_integer(2), Some(v_integer(0))),
-            (v_i8(1), v_f32(2.0), Some(v_f64(0.5))),
-            (v_f32(1.0), v_f32(2.0), Some(v_f32(0.5))),
-            (v_f32(1.0), v_f64(2.0), Some(v_f64(0.5))),
-            (v_enum_constant("X", 0), v_i32(1), Some(v_i32(0))),
-            (v_enum_constant("X", 0), v_i16(1), Some(v_integer(0))),
-            (v_i32(1), v_string("abc"), None),
-            (v_i32(1), v_anon_array(3, v_u32(0)), None),
-            (v_i32(1), array_val(), None),
-            (v_i32(1), anon_struct_val(), None),
-            (v_i32(1), struct_val(), None),
-            (v_string("abc"), v_string("def"), None),
+            (create_i8(1), create_i8(2), Some(create_i8(0))),
+            (create_i8(1), create_integer(2), Some(create_integer(0))),
+            (create_i8(1), create_f32(2.0), Some(create_f64(0.5))),
+            (create_f32(1.0), create_f32(2.0), Some(create_f32(0.5))),
+            (create_f32(1.0), create_f64(2.0), Some(create_f64(0.5))),
+            (
+                create_enum_constant("X", 0),
+                create_i32(1),
+                Some(create_i32(0)),
+            ),
+            (
+                create_enum_constant("X", 0),
+                create_i16(1),
+                Some(create_integer(0)),
+            ),
+            (create_i32(1), create_string("abc"), None),
+            (create_i32(1), create_anon_array(3, create_u32(0)), None),
+            (create_i32(1), array_val(), None),
+            (create_i32(1), anon_struct_val(), None),
+            (create_i32(1), struct_val(), None),
+            (create_string("abc"), create_string("def"), None),
         ];
         check_binop("/", |a, b| a.div(b), cases);
     });
@@ -341,26 +375,46 @@ fn value_div() {
 fn value_lshift() {
     with_test_ctx(|| {
         let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_i8(1), v_i8(2), Some(v_i8(4))),
-            (v_i32(1), v_i32(3), Some(v_i32(8))),
-            (v_i8(-1), v_i8(1), Some(v_i8(-2))),
-            (v_i32(1), v_integer(4), Some(v_integer(16))),
-            (v_integer(1), v_i32(5), Some(v_integer(32))),
-            (v_integer(1), v_integer(10), Some(v_integer(1024))),
-            (v_enum_constant("X", 0), v_i32(3), Some(v_i32(0))),
-            (v_enum_constant("X", 0), v_integer(3), Some(v_integer(0))),
-            (v_i32(1), v_enum_constant("X", 0), Some(v_i32(1))),
-            (v_integer(1), v_enum_constant("X", 0), Some(v_integer(1))),
-            (v_i32(1), v_f32(2.0), None),
-            (v_f32(1.0), v_i32(2), None),
-            (v_i32(1), v_string(""), None),
-            (v_string(""), v_i32(2), None),
-            (v_i32(1), v_bool(false), None),
-            (v_bool(false), v_i32(2), None),
-            (v_i32(1), v_anon_array(3, v_u32(0)), None),
-            (v_i32(1), array_val(), None),
-            (v_i32(1), anon_struct_val(), None),
-            (v_i32(1), struct_val(), None),
+            (create_i8(1), create_i8(2), Some(create_i8(4))),
+            (create_i32(1), create_i32(3), Some(create_i32(8))),
+            (create_i8(-1), create_i8(1), Some(create_i8(-2))),
+            (create_i32(1), create_integer(4), Some(create_integer(16))),
+            (create_integer(1), create_i32(5), Some(create_integer(32))),
+            (
+                create_integer(1),
+                create_integer(10),
+                Some(create_integer(1024)),
+            ),
+            (
+                create_enum_constant("X", 0),
+                create_i32(3),
+                Some(create_i32(0)),
+            ),
+            (
+                create_enum_constant("X", 0),
+                create_integer(3),
+                Some(create_integer(0)),
+            ),
+            (
+                create_i32(1),
+                create_enum_constant("X", 0),
+                Some(create_i32(1)),
+            ),
+            (
+                create_integer(1),
+                create_enum_constant("X", 0),
+                Some(create_integer(1)),
+            ),
+            (create_i32(1), create_f32(2.0), None),
+            (create_f32(1.0), create_i32(2), None),
+            (create_i32(1), create_string(""), None),
+            (create_string(""), create_i32(2), None),
+            (create_i32(1), create_boolean(false), None),
+            (create_boolean(false), create_i32(2), None),
+            (create_i32(1), create_anon_array(3, create_u32(0)), None),
+            (create_i32(1), array_val(), None),
+            (create_i32(1), anon_struct_val(), None),
+            (create_i32(1), struct_val(), None),
         ];
         check_binop("<<", |a, b| a.shl(b), cases);
     });
@@ -374,26 +428,46 @@ fn value_lshift() {
 fn value_rshift() {
     with_test_ctx(|| {
         let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_i8(8), v_i8(1), Some(v_i8(4))),
-            (v_i32(16), v_i32(2), Some(v_i32(4))),
-            (v_i8(-8), v_i8(1), Some(v_i8(-4))),
-            (v_i32(16), v_integer(2), Some(v_integer(4))),
-            (v_integer(32), v_i32(2), Some(v_integer(8))),
-            (v_integer(64), v_integer(3), Some(v_integer(8))),
-            (v_enum_constant("X", 0), v_i32(1), Some(v_i32(0))),
-            (v_enum_constant("X", 0), v_integer(1), Some(v_integer(0))),
-            (v_i32(16), v_enum_constant("X", 0), Some(v_i32(16))),
-            (v_integer(16), v_enum_constant("X", 0), Some(v_integer(16))),
-            (v_i32(16), v_f32(2.0), None),
-            (v_f32(16.0), v_i32(2), None),
-            (v_i32(16), v_string(""), None),
-            (v_string(""), v_i32(2), None),
-            (v_i32(16), v_bool(false), None),
-            (v_bool(false), v_i32(2), None),
-            (v_i32(16), v_anon_array(3, v_u32(0)), None),
-            (v_i32(16), array_val(), None),
-            (v_i32(16), anon_struct_val(), None),
-            (v_i32(16), struct_val(), None),
+            (create_i8(8), create_i8(1), Some(create_i8(4))),
+            (create_i32(16), create_i32(2), Some(create_i32(4))),
+            (create_i8(-8), create_i8(1), Some(create_i8(-4))),
+            (create_i32(16), create_integer(2), Some(create_integer(4))),
+            (create_integer(32), create_i32(2), Some(create_integer(8))),
+            (
+                create_integer(64),
+                create_integer(3),
+                Some(create_integer(8)),
+            ),
+            (
+                create_enum_constant("X", 0),
+                create_i32(1),
+                Some(create_i32(0)),
+            ),
+            (
+                create_enum_constant("X", 0),
+                create_integer(1),
+                Some(create_integer(0)),
+            ),
+            (
+                create_i32(16),
+                create_enum_constant("X", 0),
+                Some(create_i32(16)),
+            ),
+            (
+                create_integer(16),
+                create_enum_constant("X", 0),
+                Some(create_integer(16)),
+            ),
+            (create_i32(16), create_f32(2.0), None),
+            (create_f32(16.0), create_i32(2), None),
+            (create_i32(16), create_string(""), None),
+            (create_string(""), create_i32(2), None),
+            (create_i32(16), create_boolean(false), None),
+            (create_boolean(false), create_i32(2), None),
+            (create_i32(16), create_anon_array(3, create_u32(0)), None),
+            (create_i32(16), array_val(), None),
+            (create_i32(16), anon_struct_val(), None),
+            (create_i32(16), struct_val(), None),
         ];
         check_binop(">>", |a, b| a.shr(b), cases);
     });
@@ -406,14 +480,14 @@ fn value_rshift() {
 #[test]
 fn value_is_zero() {
     with_test_ctx(|| {
-        assert!(!v_i32(1).is_zero());
-        assert!(v_i32(0).is_zero());
+        assert!(!create_i32(1).is_zero());
+        assert!(create_i32(0).is_zero());
         // default_enum's "X" constant with value 0 is zero.
-        assert!(v_enum_constant("X", 0).is_zero());
-        assert!(!v_f32(1.0).is_zero());
-        assert!(v_f32(0.0).is_zero());
+        assert!(create_enum_constant("X", 0).is_zero());
+        assert!(!create_f32(1.0).is_zero());
+        assert!(create_f32(0.0).is_zero());
         assert!(!array_val().is_zero());
-        assert!(!v_anon_array(3, v_u32(0)).is_zero());
+        assert!(!create_anon_array(3, create_u32(0)).is_zero());
         assert!(!struct_val().is_zero());
         assert!(!anon_struct_val().is_zero());
     });
@@ -430,34 +504,38 @@ fn value_convert_to_type() {
         // widening case that adds a defaulted member.
         let abc_struct = {
             let mut m: IndexMap<String, Value> = IndexMap::new();
-            m.insert("a".to_string(), v_u32(0));
-            m.insert("b".to_string(), v_string(""));
-            m.insert("c".to_string(), v_i8(0));
+            m.insert("a".to_string(), create_u32(0));
+            m.insert("b".to_string(), create_string(""));
+            m.insert("c".to_string(), create_i8(0));
             Value::AnonStruct(AnonStructValue { members: m })
         };
         let cases: Vec<(Value, Arc<Type>, Option<Value>)> = vec![
-            (v_i8(1), i8(), Some(v_i8(1))),
-            (v_i8(1), i16(), Some(v_i16(1))),
-            (v_i8(1), f32(), Some(v_f32(1.0))),
-            (v_integer(1), i8(), Some(v_i8(1))),
-            (v_i8(1), integer(), Some(v_integer(1))),
-            (v_f64(1.0), integer(), Some(v_integer(1))),
-            (v_f64(1.0), f32(), Some(v_f32(1.0))),
-            (v_enum_constant("X", 0), f32(), Some(v_f32(0.0))),
-            (v_i32(0), default_enum(), None),
+            (create_i8(1), i8(), Some(create_i8(1))),
+            (create_i8(1), i16(), Some(create_i16(1))),
+            (create_i8(1), f32(), Some(create_f32(1.0))),
+            (create_integer(1), i8(), Some(create_i8(1))),
+            (create_i8(1), integer(), Some(create_integer(1))),
+            (create_f64(1.0), integer(), Some(create_integer(1))),
+            (create_f64(1.0), f32(), Some(create_f32(1.0))),
+            (create_enum_constant("X", 0), f32(), Some(create_f32(0.0))),
+            (create_i32(0), default_enum(), None),
             (
-                v_i32(42),
+                create_i32(42),
                 anon_array(Some(3), u32()),
-                Some(v_anon_array(3, v_u32(42))),
+                Some(create_anon_array(3, create_u32(42))),
             ),
             (anon_struct_val(), anon_array(Some(3), u32()), None),
             (
                 array_val(),
                 anon_array(Some(3), u32()),
-                Some(v_anon_array(3, v_u32(0))),
+                Some(create_anon_array(3, create_u32(0))),
             ),
             (anon_struct_val(), default_array(), None),
-            (v_anon_array(2, v_i8(1)), anon_array(Some(3), u32()), None),
+            (
+                create_anon_array(2, create_i8(1)),
+                anon_array(Some(3), u32()),
+                None,
+            ),
             (
                 anon_struct_val(),
                 anon_struct(&[("a", u32()), ("b", string(None))]),
@@ -475,16 +553,16 @@ fn value_convert_to_type() {
                 Some(abc_struct),
             ),
             (
-                v_i32(0),
+                create_i32(0),
                 anon_struct(&[("a", u32()), ("b", string(None))]),
                 None,
             ),
             (
-                v_i32(0),
+                create_i32(0),
                 anon_struct(&[("a", u32())]),
                 Some({
                     let mut m: IndexMap<String, Value> = IndexMap::new();
-                    m.insert("a".to_string(), v_u32(0));
+                    m.insert("a".to_string(), create_u32(0));
                     Value::AnonStruct(AnonStructValue { members: m })
                 }),
             ),
@@ -500,16 +578,22 @@ fn value_convert_to_type() {
 #[test]
 fn value_negate() {
     with_test_ctx(|| {
-        assert!(values_eq(&v_i8(1).negate().unwrap(), &v_i8(-1)));
-        assert!(values_eq(&v_f32(1.0).negate().unwrap(), &v_f32(-1.0)));
-        assert!(values_eq(&v_integer(1).negate().unwrap(), &v_integer(-1)));
-        assert!(v_string("").negate().is_err());
-        assert!(v_anon_array(3, v_u32(0)).negate().is_err());
+        assert!(values_eq(&create_i8(1).negate().unwrap(), &create_i8(-1)));
+        assert!(values_eq(
+            &create_f32(1.0).negate().unwrap(),
+            &create_f32(-1.0)
+        ));
+        assert!(values_eq(
+            &create_integer(1).negate().unwrap(),
+            &create_integer(-1)
+        ));
+        assert!(create_string("").negate().is_err());
+        assert!(create_anon_array(3, create_u32(0)).negate().is_err());
         assert!(anon_struct_val().negate().is_err());
         // Enum constant negates through its rep type (default_enum rep is I32).
         assert!(values_eq(
-            &v_enum_constant("X", 1).negate().unwrap(),
-            &v_i32(-1)
+            &create_enum_constant("X", 1).negate().unwrap(),
+            &create_i32(-1)
         ));
     });
 }
@@ -522,32 +606,32 @@ fn value_negate() {
 fn value_truncate() {
     with_test_ctx(|| {
         // Scalar truncation wraps modulo the type width.
-        assert!(values_eq(&v_u8(256).truncate(), &v_u8(0)));
-        assert!(values_eq(&v_i8(256).truncate(), &v_i8(0)));
-        assert!(values_eq(&v_u8(257).truncate(), &v_u8(1)));
-        assert!(values_eq(&v_i8(257).truncate(), &v_i8(1)));
-        assert!(values_eq(&v_u8(-1).truncate(), &v_u8(255)));
+        assert!(values_eq(&create_u8(256).truncate(), &create_u8(0)));
+        assert!(values_eq(&create_i8(256).truncate(), &create_i8(0)));
+        assert!(values_eq(&create_u8(257).truncate(), &create_u8(1)));
+        assert!(values_eq(&create_i8(257).truncate(), &create_i8(1)));
+        assert!(values_eq(&create_u8(-1).truncate(), &create_u8(255)));
 
         // Array truncation is elementwise.
         assert!(values_eq(
-            &v_anon_array(3, v_u8(256)).truncate(),
-            &v_anon_array(3, v_u8(0))
+            &create_anon_array(3, create_u8(256)).truncate(),
+            &create_anon_array(3, create_u8(0))
         ));
         assert!(values_eq(
-            &v_anon_array(3, v_i8(256)).truncate(),
-            &v_anon_array(3, v_i8(0))
+            &create_anon_array(3, create_i8(256)).truncate(),
+            &create_anon_array(3, create_i8(0))
         ));
         assert!(values_eq(
-            &v_anon_array(3, v_u8(257)).truncate(),
-            &v_anon_array(3, v_u8(1))
+            &create_anon_array(3, create_u8(257)).truncate(),
+            &create_anon_array(3, create_u8(1))
         ));
         assert!(values_eq(
-            &v_anon_array(3, v_i8(257)).truncate(),
-            &v_anon_array(3, v_i8(1))
+            &create_anon_array(3, create_i8(257)).truncate(),
+            &create_anon_array(3, create_i8(1))
         ));
         assert!(values_eq(
-            &v_anon_array(3, v_u8(-1)).truncate(),
-            &v_anon_array(3, v_u8(255))
+            &create_anon_array(3, create_u8(-1)).truncate(),
+            &create_anon_array(3, create_u8(255))
         ));
     });
 }
@@ -564,12 +648,12 @@ fn value_shift_keeps_the_left_kind() {
         check_binop(
             "<<",
             |a, b| a.shl(b),
-            vec![(v_i8(1), v_i32(2), Some(v_i8(4)))],
+            vec![(create_i8(1), create_i32(2), Some(create_i8(4)))],
         );
         check_binop(
             ">>",
             |a, b| a.shr(b),
-            vec![(v_i8(16), v_i32(2), Some(v_i8(4)))],
+            vec![(create_i8(16), create_i32(2), Some(create_i8(4)))],
         );
     });
 }
@@ -580,10 +664,22 @@ fn value_shift_keeps_the_left_kind() {
 fn value_rshift_saturates_past_the_value_width() {
     with_test_ctx(|| {
         let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_integer(2), v_integer(200), Some(v_integer(0))),
-            (v_integer(-2), v_integer(200), Some(v_integer(-1))),
-            (v_integer(2), v_integer(255), Some(v_integer(0))),
-            (v_i32(-1), v_i32(255), Some(v_i32(-1))),
+            (
+                create_integer(2),
+                create_integer(200),
+                Some(create_integer(0)),
+            ),
+            (
+                create_integer(-2),
+                create_integer(200),
+                Some(create_integer(-1)),
+            ),
+            (
+                create_integer(2),
+                create_integer(255),
+                Some(create_integer(0)),
+            ),
+            (create_i32(-1), create_i32(255), Some(create_i32(-1))),
         ];
         check_binop(">>", |a, b| a.shr(b), cases);
     });
@@ -596,18 +692,18 @@ fn value_lshift_reports_overflow() {
     with_test_ctx(|| {
         // `-1 << 127` is exactly `i128::MIN`, so it is still representable
         assert!(matches!(
-            v_integer(-1).shl(&v_integer(127)),
+            create_integer(-1).shl(&create_integer(127)),
             Ok(Value::Integer(IntegerValue(i128::MIN)))
         ));
         // Shifting zero is zero, however large the amount
         assert!(matches!(
-            v_integer(0).shl(&v_integer(255)),
+            create_integer(0).shl(&create_integer(255)),
             Ok(Value::Integer(IntegerValue(0)))
         ));
         for amount in [127, 128, 200, 255] {
             assert!(
                 matches!(
-                    v_integer(1).shl(&v_integer(amount)),
+                    create_integer(1).shl(&create_integer(amount)),
                     Err(MathError::ShiftOverflow)
                 ),
                 "1 << {amount} should overflow"
@@ -619,49 +715,70 @@ fn value_lshift_reports_overflow() {
 #[test]
 fn value_arithmetic_reports_overflow() {
     with_test_ctx(|| {
-        let max = v_integer(i128::MAX);
-        let min = v_integer(i128::MIN);
+        let max = create_integer(i128::MAX);
+        let min = create_integer(i128::MIN);
 
         // add / sub / mul at either end of the range
-        assert!(matches!(max.add(&v_integer(1)), Err(MathError::Overflow)));
-        assert!(matches!(min.add(&v_integer(-1)), Err(MathError::Overflow)));
-        assert!(matches!(min.sub(&v_integer(1)), Err(MathError::Overflow)));
-        assert!(matches!(max.sub(&v_integer(-1)), Err(MathError::Overflow)));
-        assert!(matches!(max.mul(&v_integer(2)), Err(MathError::Overflow)));
-        assert!(matches!(min.mul(&v_integer(-1)), Err(MathError::Overflow)));
+        assert!(matches!(
+            max.add(&create_integer(1)),
+            Err(MathError::Overflow)
+        ));
+        assert!(matches!(
+            min.add(&create_integer(-1)),
+            Err(MathError::Overflow)
+        ));
+        assert!(matches!(
+            min.sub(&create_integer(1)),
+            Err(MathError::Overflow)
+        ));
+        assert!(matches!(
+            max.sub(&create_integer(-1)),
+            Err(MathError::Overflow)
+        ));
+        assert!(matches!(
+            max.mul(&create_integer(2)),
+            Err(MathError::Overflow)
+        ));
+        assert!(matches!(
+            min.mul(&create_integer(-1)),
+            Err(MathError::Overflow)
+        ));
 
         // `i128::MIN / -1` is the one integer division with an out-of-range result
-        assert!(matches!(min.div(&v_integer(-1)), Err(MathError::Overflow)));
+        assert!(matches!(
+            min.div(&create_integer(-1)),
+            Err(MathError::Overflow)
+        ));
 
         // Negation of the one value with no positive counterpart
         assert!(matches!(min.negate(), Err(MathError::Overflow)));
 
         // The sized-integer arms overflow the same way, whatever the kind
         assert!(matches!(
-            v_i8(i128::MAX).add(&v_i8(1)),
+            create_i8(i128::MAX).add(&create_i8(1)),
             Err(MathError::Overflow)
         ));
         assert!(matches!(
-            v_u32(i128::MIN).negate(),
+            create_u32(i128::MIN).negate(),
             Err(MathError::Overflow)
         ));
         assert!(matches!(
-            v_enum_constant("X", i128::MIN).negate(),
+            create_enum_constant("X", i128::MIN).negate(),
             Err(MathError::Overflow)
         ));
 
         // Results that do fit are still computed exactly
         assert!(values_eq(
-            &max.sub(&v_integer(1)).unwrap(),
-            &v_integer(i128::MAX - 1)
+            &max.sub(&create_integer(1)).unwrap(),
+            &create_integer(i128::MAX - 1)
         ));
         assert!(values_eq(
-            &min.div(&v_integer(2)).unwrap(),
-            &v_integer(-(1 << 126))
+            &min.div(&create_integer(2)).unwrap(),
+            &create_integer(-(1 << 126))
         ));
         assert!(values_eq(
-            &v_integer(i128::MIN + 1).negate().unwrap(),
-            &v_integer(i128::MAX)
+            &create_integer(i128::MIN + 1).negate().unwrap(),
+            &create_integer(i128::MAX)
         ));
     });
 }
@@ -671,11 +788,11 @@ fn value_arithmetic_reports_overflow() {
 #[test]
 fn value_float_arithmetic_saturates() {
     with_test_ctx(|| {
-        match v_f64(f64::MAX).mul(&v_f64(2.0)) {
+        match create_f64(f64::MAX).mul(&create_f64(2.0)) {
             Ok(Value::Float(FloatValue { value, .. })) => assert!(value.is_infinite()),
             other => panic!("expected an infinite float, got {other:?}"),
         }
-        match v_f64(f64::MIN).add(&v_f64(f64::MIN)) {
+        match create_f64(f64::MIN).add(&create_f64(f64::MIN)) {
             Ok(Value::Float(FloatValue { value, .. })) => {
                 assert!(value.is_infinite() && value.is_sign_negative())
             }
@@ -690,27 +807,31 @@ fn value_float_arithmetic_saturates() {
 #[test]
 fn value_div_by_zero_uses_is_zero() {
     with_test_ctx(|| {
-        for divisor in [v_integer(0), v_i32(0), v_enum_constant("X", 0)] {
+        for divisor in [
+            create_integer(0),
+            create_i32(0),
+            create_enum_constant("X", 0),
+        ] {
             assert!(matches!(
-                v_integer(1).div(&divisor),
+                create_integer(1).div(&divisor),
                 Err(MathError::DivByZero)
             ));
             assert!(matches!(
-                v_f64(1.0).div(&divisor),
+                create_f64(1.0).div(&divisor),
                 Err(MathError::DivByZero)
             ));
         }
         // Nearer zero than EPSILON = 1e-7
         assert!(matches!(
-            v_f64(1.0).div(&v_f64(1e-8)),
+            create_f64(1.0).div(&create_f64(1e-8)),
             Err(MathError::DivByZero)
         ));
         assert!(matches!(
-            v_integer(1).div(&v_f64(-1e-8)),
+            create_integer(1).div(&create_f64(-1e-8)),
             Err(MathError::DivByZero)
         ));
         // Just outside EPSILON: an ordinary division
-        assert!(v_f64(1.0).div(&v_f64(1e-6)).is_ok());
+        assert!(create_f64(1.0).div(&create_f64(1e-6)).is_ok());
     });
 }
 
@@ -721,14 +842,14 @@ fn value_convert_scalar_to_named_aggregates() {
     with_test_ctx(|| {
         // Scalar -> named array `A = [2] U32`.
         let arr_ty = array("A", anon_array(Some(2), u32()), 500);
-        match v_i32(7).convert(&arr_ty) {
+        match create_i32(7).convert(&arr_ty) {
             Some(Value::Array(a)) => {
                 assert_eq!(a.anon_array.elements.len(), 2);
                 assert!(
                     a.anon_array
                         .elements
                         .iter()
-                        .all(|e| values_eq(e, &v_u32(7)))
+                        .all(|e| values_eq(e, &create_u32(7)))
                 );
             }
             other => panic!("expected Value::Array, got {other:?}"),
@@ -736,16 +857,16 @@ fn value_convert_scalar_to_named_aggregates() {
 
         // Scalar -> named struct `S { a: U32, b: U32 }`.
         let s_ty = struct_ty("S", anon_struct(&[("a", u32()), ("b", u32())]), 501);
-        match v_i32(3).convert(&s_ty) {
+        match create_i32(3).convert(&s_ty) {
             Some(Value::Struct(s)) => {
                 assert_eq!(s.anon_struct.members.len(), 2);
                 assert!(values_eq(
                     s.anon_struct.members.get("a").unwrap(),
-                    &v_u32(3)
+                    &create_u32(3)
                 ));
                 assert!(values_eq(
                     s.anon_struct.members.get("b").unwrap(),
-                    &v_u32(3)
+                    &create_u32(3)
                 ));
             }
             other => panic!("expected Value::Struct, got {other:?}"),
@@ -758,13 +879,19 @@ fn value_convert_scalar_to_named_aggregates() {
 #[test]
 fn value_convert_float_source() {
     with_test_ctx(|| {
-        assert!(values_eq(&v_f64(2.0).convert(&i32()).unwrap(), &v_i32(2)));
-        assert!(values_eq(&v_f64(2.0).convert(&f32()).unwrap(), &v_f32(2.0)));
         assert!(values_eq(
-            &v_f64(2.0).convert(&integer()).unwrap(),
-            &v_integer(2)
+            &create_f64(2.0).convert(&i32()).unwrap(),
+            &create_i32(2)
         ));
-        assert!(v_f64(2.0).convert(&boolean()).is_none());
+        assert!(values_eq(
+            &create_f64(2.0).convert(&f32()).unwrap(),
+            &create_f32(2.0)
+        ));
+        assert!(values_eq(
+            &create_f64(2.0).convert(&integer()).unwrap(),
+            &create_integer(2)
+        ));
+        assert!(create_f64(2.0).convert(&boolean()).is_none());
     });
 }
 
@@ -777,41 +904,47 @@ fn value_convert_float_narrows_to_i32_width() {
         // Saturating, not wrapping: the low bits of a wider result would make
         // `[1] I32 default [1.0e300]` come out as -1
         assert!(values_eq(
-            &v_f64(1.0e300).convert(&i32()).unwrap(),
-            &v_i32(I32_MAX)
+            &create_f64(1.0e300).convert(&i32()).unwrap(),
+            &create_i32(I32_MAX)
         ));
         assert!(values_eq(
-            &v_f64(-1.0e300).convert(&i32()).unwrap(),
-            &v_i32(I32_MIN)
+            &create_f64(-1.0e300).convert(&i32()).unwrap(),
+            &create_i32(I32_MIN)
         ));
 
         // A wider target kind does not widen the conversion
         assert!(values_eq(
-            &v_f64(1.0e18).convert(&i64()).unwrap(),
-            &v_i64(I32_MAX)
+            &create_f64(1.0e18).convert(&i64()).unwrap(),
+            &create_i64(I32_MAX)
         ));
         assert!(values_eq(
-            &v_f64(1.0e18).convert(&integer()).unwrap(),
-            &v_integer(I32_MAX)
+            &create_f64(1.0e18).convert(&integer()).unwrap(),
+            &create_integer(I32_MAX)
         ));
 
         // NaN and the infinities land at zero and the ends of the range
         assert!(values_eq(
-            &v_f64(f64::NAN).convert(&i32()).unwrap(),
-            &v_i32(0)
+            &create_f64(f64::NAN).convert(&i32()).unwrap(),
+            &create_i32(0)
         ));
         assert!(values_eq(
-            &v_f64(f64::INFINITY).convert(&integer()).unwrap(),
-            &v_integer(I32_MAX)
+            &create_f64(f64::INFINITY).convert(&integer()).unwrap(),
+            &create_integer(I32_MAX)
         ));
         assert!(values_eq(
-            &v_f64(f64::NEG_INFINITY).convert(&integer()).unwrap(),
-            &v_integer(I32_MIN)
+            &create_f64(f64::NEG_INFINITY).convert(&integer()).unwrap(),
+            &create_integer(I32_MIN)
         ));
 
         // Values inside the range round towards zero
-        assert!(values_eq(&v_f64(2.9).convert(&i32()).unwrap(), &v_i32(2)));
-        assert!(values_eq(&v_f64(-2.9).convert(&i32()).unwrap(), &v_i32(-2)));
+        assert!(values_eq(
+            &create_f64(2.9).convert(&i32()).unwrap(),
+            &create_i32(2)
+        ));
+        assert!(values_eq(
+            &create_f64(-2.9).convert(&i32()).unwrap(),
+            &create_i32(-2)
+        ));
     });
 }
 
@@ -820,16 +953,16 @@ fn value_convert_float_narrows_to_i32_width() {
 fn value_convert_bool_and_string() {
     with_test_ctx(|| {
         assert!(values_eq(
-            &v_bool(true).convert(&boolean()).unwrap(),
-            &v_bool(true)
+            &create_boolean(true).convert(&boolean()).unwrap(),
+            &create_boolean(true)
         ));
-        assert!(v_bool(true).convert(&i32()).is_none());
+        assert!(create_boolean(true).convert(&i32()).is_none());
 
         assert!(values_eq(
-            &v_string("hi").convert(&string(Some(8))).unwrap(),
-            &v_string("hi")
+            &create_string("hi").convert(&string(Some(8))).unwrap(),
+            &create_string("hi")
         ));
-        assert!(v_string("hi").convert(&boolean()).is_none());
+        assert!(create_string("hi").convert(&boolean()).is_none());
     });
 }
 
@@ -852,22 +985,34 @@ fn value_binop_integer_and_float_left() {
         // (lhs, rhs, expected) using the existing `check_binop` (Some=Ok, None=Err).
         let cases: Vec<(Value, Value, Option<Value>)> = vec![
             // Integer-left arm
-            (v_integer(1), v_f32(2.0), Some(v_f64(3.0))),
-            (v_integer(1), v_integer(2), Some(v_integer(3))),
-            (v_integer(4), v_enum_constant("X", 1), Some(v_integer(5))),
-            (v_integer(1), v_string("x"), None),
+            (create_integer(1), create_f32(2.0), Some(create_f64(3.0))),
+            (
+                create_integer(1),
+                create_integer(2),
+                Some(create_integer(3)),
+            ),
+            (
+                create_integer(4),
+                create_enum_constant("X", 1),
+                Some(create_integer(5)),
+            ),
+            (create_integer(1), create_string("x"), None),
             // Float-left arm
-            (v_f64(1.0), v_integer(2), Some(v_f64(3.0))),
-            (v_f32(1.0), v_f64(2.0), Some(v_f64(3.0))),
-            (v_f64(1.0), v_string("x"), None),
+            (create_f64(1.0), create_integer(2), Some(create_f64(3.0))),
+            (create_f32(1.0), create_f64(2.0), Some(create_f64(3.0))),
+            (create_f64(1.0), create_string("x"), None),
             // enum-left arm with matching rep type -> keeps the primitive kind
-            (v_enum_constant("X", 2), v_i32(3), Some(v_i32(5))),
+            (
+                create_enum_constant("X", 2),
+                create_i32(3),
+                Some(create_i32(5)),
+            ),
         ];
         check_binop("+", |a, b| a.add(b), cases);
 
         // Integer / 0 -> DivByZero (Value::div tests the divisor with is_zero)
         assert!(matches!(
-            v_integer(1).div(&v_integer(0)),
+            create_integer(1).div(&create_integer(0)),
             Err(MathError::DivByZero)
         ));
     });
@@ -877,32 +1022,35 @@ fn value_binop_integer_and_float_left() {
 #[test]
 fn value_display() {
     with_test_ctx(|| {
-        assert_eq!(v_i8(5).to_string(), "5: I8");
-        assert_eq!(v_u8(200).to_string(), "200: U8");
-        assert_eq!(v_integer(-3).to_string(), "-3");
-        assert_eq!(v_f64(1.5).to_string(), "1.5: F64");
-        assert_eq!(v_f64(2.0).to_string(), "2.0: F64");
+        assert_eq!(create_i8(5).to_string(), "5: I8");
+        assert_eq!(create_u8(200).to_string(), "200: U8");
+        assert_eq!(create_integer(-3).to_string(), "-3");
+        assert_eq!(create_f64(1.5).to_string(), "1.5: F64");
+        assert_eq!(create_f64(2.0).to_string(), "2.0: F64");
         assert_eq!(
-            v_f32(0.1_f32 as f64).to_string(),
+            create_f32(0.1_f32 as f64).to_string(),
             "0.10000000149011612: F32"
         );
-        assert_eq!(v_f64(1.0e300).to_string(), "1.0E300: F64");
-        assert_eq!(v_f64(1.5e-5).to_string(), "1.5E-5: F64");
-        assert_eq!(v_f64(0.001).to_string(), "0.001: F64");
-        assert_eq!(v_f64(1234567.0).to_string(), "1234567.0: F64");
-        assert_eq!(v_f64(12345678.0).to_string(), "1.2345678E7: F64");
-        assert_eq!(v_f64(-0.5).to_string(), "-0.5: F64");
-        assert_eq!(v_bool(true).to_string(), "true");
-        assert_eq!(v_string("hi").to_string(), "\"hi\"");
-        assert_eq!(v_enum_constant("X", 7).to_string(), "(X,7): E");
+        assert_eq!(create_f64(1.0e300).to_string(), "1.0E300: F64");
+        assert_eq!(create_f64(1.5e-5).to_string(), "1.5E-5: F64");
+        assert_eq!(create_f64(0.001).to_string(), "0.001: F64");
+        assert_eq!(create_f64(1234567.0).to_string(), "1234567.0: F64");
+        assert_eq!(create_f64(12345678.0).to_string(), "1.2345678E7: F64");
+        assert_eq!(create_f64(-0.5).to_string(), "-0.5: F64");
+        assert_eq!(create_boolean(true).to_string(), "true");
+        assert_eq!(create_string("hi").to_string(), "\"hi\"");
+        assert_eq!(create_enum_constant("X", 7).to_string(), "(X,7): E");
         // An enum constant wider than 32 bits displays in full
         assert_eq!(
-            v_enum_constant("X", 0xFFFFFFFFFFFFFFFF_u64 as i128).to_string(),
+            create_enum_constant("X", 0xFFFFFFFFFFFFFFFF_u64 as i128).to_string(),
             "(X,18446744073709551615): E"
         );
-        assert_eq!(v_anon_array(2, v_u32(0)).to_string(), "[ 0: U32, 0: U32 ]");
         assert_eq!(
-            Value::AnonArray(AnonArrayValue::promoted(v_u32(1))).to_string(),
+            create_anon_array(2, create_u32(0)).to_string(),
+            "[ 0: U32, 0: U32 ]"
+        );
+        assert_eq!(
+            Value::AnonArray(AnonArrayValue::promoted(create_u32(1))).to_string(),
             "[ 1: U32, ... ]"
         );
         assert_eq!(array_val().to_string(), "[ 0: I32, 0: I32, 0: I32 ]: A");
