@@ -127,11 +127,21 @@ fn member_list(
             break;
         }
 
+        let start = p.position();
         member(p);
 
         // Check for end delim
         if !p.eat(delim) && !p.eat(EOL) && !p.at(ket) {
             p.err_recover(&format!("expected `{:?}`", delim), MEMBER_RECOVERY_SET);
+        }
+
+        // Every iteration must consume input. A closing delimiter that does
+        // not close this list closes an enclosing construct.
+        if p.position() == start {
+            if p.at(RIGHT_CURLY) || p.at(RIGHT_PAREN) || p.at(RIGHT_SQUARE) {
+                break;
+            }
+            p.err_and_bump(expected_error_msg);
         }
     }
 

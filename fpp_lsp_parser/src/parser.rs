@@ -63,6 +63,11 @@ impl<'t> Parser<'t> {
         self.inp.kind(self.pos + n)
     }
 
+    /// The number of input tokens consumed so far.
+    pub(crate) fn position(&self) -> usize {
+        self.pos
+    }
+
     /// Checks if the current token is `kind`.
     pub(crate) fn at(&self, kind: SyntaxKind) -> bool {
         self.nth_at(0, kind)
