@@ -7,11 +7,11 @@ use crate::semantics::{
     AnonArrayType, AnonStructType, QualifiedName, Symbol, SymbolInterface, Type,
 };
 use fpp_ast::{
-    Binop, Connection, DefAliasType, DefArray, DefComponentInstance, DefConstant, DefEnum,
-    DefEnumConstant, DefStruct, EventThrottle, Expr, ExprKind, FloatKind, Ident, IntegerKind, Node,
-    SpecCommand, SpecContainer, SpecEvent, SpecGeneralPortInstance, SpecInit, SpecInternalPort,
-    SpecParam, SpecRecord, SpecSpecialPortInstance, SpecStateMachineInstance, SpecTlmChannel,
-    SpecTlmPacket, StructExprMember, StructTypeMember, TypeName, TypeNameKind, Visitable, Visitor,
+    Binop, DefAliasType, DefArray, DefConstant, DefEnum, DefEnumConstant, DefStruct, EventThrottle,
+    Expr, ExprKind, FloatKind, Ident, IntegerKind, Node, SpecCommand, SpecContainer, SpecEvent,
+    SpecGeneralPortInstance, SpecInit, SpecInternalPort, SpecParam, SpecRecord,
+    SpecSpecialPortInstance, SpecStateMachineInstance, SpecTlmChannel, SpecTlmPacket,
+    StructExprMember, StructTypeMember, TypeName, TypeNameKind, Visitable, Visitor,
 };
 use fpp_core::{Span, Spanned};
 use rustc_hash::FxHashSet as HashSet;
@@ -134,23 +134,6 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         ControlFlow::Continue(())
     }
 
-    /// The expressions of a component instance must have numeric types (spec,
-    /// Component Instance Definitions)
-    fn visit_def_component_instance(
-        &self,
-        a: &mut Self::State,
-        node: &'ast DefComponentInstance,
-    ) -> ControlFlow<Self::Break> {
-        self.super_visit(a, Node::DefComponentInstance(node))?;
-        Self::emit_error(Self::convert_node_to_numeric(a, &node.base_id));
-        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.queue_size));
-        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.stack_size));
-        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.priority));
-        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.cpu));
-
-        ControlFlow::Continue(())
-    }
-
     fn visit_def_constant(
         &self,
         a: &mut Self::State,
@@ -235,20 +218,6 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
             ExprKind::Struct(members) => self.expr_struct_node(a, node, members),
             ExprKind::Unop { e, .. } => self.expr_unop_node(a, node, e),
         }
-    }
-
-    /// The port numbers of a connection must have numeric types (spec,
-    /// Connection Graph Specifiers)
-    fn visit_connection(
-        &self,
-        a: &mut Self::State,
-        node: &'ast Connection,
-    ) -> ControlFlow<Self::Break> {
-        self.super_visit(a, Node::Connection(node))?;
-        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.from_index));
-        Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.to_index));
-
-        ControlFlow::Continue(())
     }
 
     fn visit_spec_command(

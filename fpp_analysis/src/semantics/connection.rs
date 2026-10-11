@@ -2,12 +2,11 @@ use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
     ComponentInstance, Direction, InterfaceInstance, PortInstance, PortInstanceIdentifier,
-    PortInstanceType, Type,
+    PortInstanceType,
 };
 use fpp_ast as ast;
 use fpp_core::{Span, Spanned};
 use std::cmp::Ordering;
-use std::sync::Arc;
 
 /// A connection endpoint
 #[derive(Debug, Clone)]
@@ -85,15 +84,6 @@ impl Endpoint {
         Ok(())
     }
 
-    /// Whether a port number has a numeric type, as the spec requires.
-    /// `CheckExprTypes` reports a port number that does not.
-    fn has_numeric_port_number_type(a: &Analysis, index: &ast::Expr) -> bool {
-        match a.type_map.get(&index.node_id) {
-            Some(ty) => ty.is_numeric() || Type::convert(ty, &Arc::new(Type::Integer)).is_ok(),
-            None => true,
-        }
-    }
-
     /// Get underlying endpoint by stripping off topology port aliases
     /// and template interface parameters
     pub fn get_underlying_endpoint(&self, a: &Analysis) -> Endpoint {
@@ -156,11 +146,7 @@ impl Endpoint {
             return Ok(None);
         };
         pid.port_instance.require_connection_at(port.span())?;
-        if let Some(pn) = port_number
-            && !Self::has_numeric_port_number_type(a, pn)
-        {
-            return Ok(None);
-        }
+        a.check_numeric_type_opt(port_number)?;
         let pn = a.get_nonnegative_int_value_opt(port_number)?;
         let endpoint = Endpoint {
             loc: port.span(),

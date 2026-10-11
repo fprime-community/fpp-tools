@@ -126,6 +126,16 @@ fn cpu_not_numeric() {
 }
 
 #[test]
+fn passive_queue_size_not_numeric() {
+    run_test("component_instance_def/passive_queue_size_not_numeric")
+}
+
+#[test]
+fn not_numeric_after_component_error() {
+    run_test("component_instance_def/not_numeric_after_component_error")
+}
+
+#[test]
 fn conflicting_ids_equal_base() {
     run_test("component_instance_def/conflicting_ids_equal_base")
 }

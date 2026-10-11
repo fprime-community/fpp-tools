@@ -138,6 +138,7 @@ impl ComponentInstance {
         };
         let component_kind = component.node.kind.clone();
 
+        a.check_numeric_type(&node.base_id)?;
         let base_id = a.get_nonnegative_big_int_value(node.base_id.node_id, node.base_id.span())?;
 
         let file = node.file.as_ref().map(get_file);
@@ -146,21 +147,30 @@ impl ComponentInstance {
             &name,
             &component_kind,
             "stack size",
-            |node_opt| a.get_nonnegative_big_int_value_opt(node_opt),
+            |node_opt| {
+                a.check_numeric_type_opt(node_opt)?;
+                a.get_nonnegative_big_int_value_opt(node_opt)
+            },
             &node.stack_size,
         )?;
         let priority = get_active_attribute(
             &name,
             &component_kind,
             "priority",
-            |node_opt| Ok(a.get_big_int_value_opt(node_opt)),
+            |node_opt| {
+                a.check_numeric_type_opt(node_opt)?;
+                Ok(a.get_big_int_value_opt(node_opt))
+            },
             &node.priority,
         )?;
         let cpu = get_active_attribute(
             &name,
             &component_kind,
             "CPU affinity",
-            |node_opt| Ok(a.get_big_int_value_opt(node_opt)),
+            |node_opt| {
+                a.check_numeric_type_opt(node_opt)?;
+                Ok(a.get_big_int_value_opt(node_opt))
+            },
             &node.cpu,
         )?;
 
@@ -242,7 +252,10 @@ fn get_queue_size(
             node.span(),
             "passive component may not have queue size".to_string(),
         )),
-        (_, Some(_)) => a.get_nonnegative_big_int_value_opt(node_opt),
+        (_, Some(node)) => {
+            a.check_numeric_type(node)?;
+            a.get_nonnegative_big_int_value_opt(node_opt)
+        }
         (ComponentKind::Passive, None) => Ok(None),
         (component_kind, None) => Err(invalid(
             name,

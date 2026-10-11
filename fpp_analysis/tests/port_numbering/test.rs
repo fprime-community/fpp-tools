@@ -99,3 +99,8 @@ fn port_number_out_of_range() {
 fn port_number_not_numeric() {
     run_test("port_numbering/port_number_not_numeric")
 }
+
+#[test]
+fn port_number_not_numeric_after_component_error() {
+    run_test("port_numbering/port_number_not_numeric_after_component_error")
+}

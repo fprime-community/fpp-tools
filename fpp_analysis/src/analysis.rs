@@ -766,6 +766,34 @@ impl Analysis {
         }
     }
 
+    /// Checks that the type of an expression converts to a numeric type, so
+    /// that the expression has an integer value to read. `CheckExprTypes`
+    /// leaves the expressions of a component instance definition and the port
+    /// numbers of a connection unchecked; this check runs where their values
+    /// are read. An expression with no type failed to type check, and that
+    /// error is already reported.
+    pub(crate) fn check_numeric_type(&self, e: &Expr) -> SemanticResult {
+        match self.type_map.get(&e.node_id) {
+            Some(t) if !t.is_numeric() && Type::convert(t, &Arc::new(Type::Integer)).is_err() => {
+                Err(SemanticError::InvalidType {
+                    loc: e.span(),
+                    msg: format!("cannot convert {} to a numeric type", t),
+                    notes: vec![],
+                })
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Checks the type of an optional expression with
+    /// [`Analysis::check_numeric_type`]
+    pub(crate) fn check_numeric_type_opt(&self, e: &Option<Expr>) -> SemanticResult {
+        match e {
+            Some(e) => self.check_numeric_type(e),
+            None => Ok(()),
+        }
+    }
+
     /// Gets a queue full behavior from an AST node
     pub fn get_queue_full(opt: &Option<QueueFull>) -> QueueFull {
         opt.clone().unwrap_or(QueueFull::Assert)
