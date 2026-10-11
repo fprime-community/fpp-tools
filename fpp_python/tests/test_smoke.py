@@ -12,7 +12,7 @@ def test_analyze_ok():
     assert type(mod).__name__ == "DefModule" and mod.name == "M"
     (const,) = mod.members
     assert type(const).__name__ == "DefConstant" and const.name == "a"
-    assert type(const.value.kind).__name__ == "ExprLiteralInt"
+    assert type(const.value.kind).__qualname__ == "ExprKind.LiteralInt"
     assert const.value.kind.value == "1234"
 
 

@@ -6,9 +6,15 @@
 //! `fpp_python_macros::fpp_sem_bindings!` invocation inside it expands, at
 //! compile time, into the read-only PyO3 wrappers for the whole semantic graph:
 //! the `Analysis` root, every closed union (`Symbol`/`Type`/`Value` + the
-//! state-machine/port unions) with its `*Ref`/`*Arg` newtypes + Python alias, every
-//! entity (including opaque handles), the payload structs, and the leaf-enum
-//! mirrors — plus `defs::register` and `defs::union_aliases`.
+//! state-machine/port unions) as a base class carrying its variants as nested
+//! classes, with its `*Ref`/`*Arg` newtypes, every entity (including opaque
+//! handles), the payload structs, and the leaf-enum mirrors — plus
+//! `defs::register`, `defs::union_stubs` and `defs::PY_MODULE`.
+//!
+//! These wrappers are the package itself ([`PY_MODULE`]); the AST wrappers are the
+//! `ast` submodule ([`crate::ast::PY_MODULE`]). That is what lets `Connection`,
+//! `PortInstanceIdentifier` and `TlmChannelIdentifier` name the semantic entity here
+//! and the grammar production there.
 //!
 //! [`hand`] holds the one thing the macro cannot produce mechanically:
 //! `build_type` (the `Type` union is `custom_build` because an "unknown" type whose
@@ -25,7 +31,7 @@ mod hand;
 
 // `defs` (generated): the `Analysis` root, every union + its `*Ref`/`*Arg`/`*_ref`/`build_*`
 // items, the entities + `build_*`, payloads, leaf enums, and `defs::register` /
-// `defs::union_aliases` (shadowed by the combined wrappers below).
+// `defs::union_stubs` (shadowed by the combined wrappers below).
 pub use defs::*;
 // The single surviving hand-build: the `Type` union is `custom_build`, so the
 // generated `type_ref` calls `crate::sem::build_type`.
@@ -38,7 +44,7 @@ pub fn register(m: &::pyo3::Bound<'_, ::pyo3::types::PyModule>) -> ::pyo3::PyRes
     Ok(())
 }
 
-/// `(alias name, `Sub1 | Sub2 | …` RHS)` for every generated closed union.
-pub fn union_aliases() -> ::std::vec::Vec<(&'static str, ::std::string::String)> {
-    defs::union_aliases()
+/// One [`crate::UnionStub`] per generated closed union.
+pub fn union_stubs() -> ::std::vec::Vec<crate::UnionStub> {
+    defs::union_stubs()
 }

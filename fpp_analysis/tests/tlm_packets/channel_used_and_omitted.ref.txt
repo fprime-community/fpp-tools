@@ -9,15 +9,15 @@
 13 | |   }
    | |___^ invalid telemetry packet set P
    |
-   = note: telemetry channel c1.T is both used and marked omitted
+   = note: 1 telemetry channel is both used and marked as omitted
    |
   ::: [ local path prefix ]/tlm_packets/channel_used_and_omitted.fpp:8:7
    |
  8 |         c1.T
-   |         ---- used here
+   |         ---- c1.T is used here
    |
   ::: [ local path prefix ]/tlm_packets/channel_used_and_omitted.fpp:12:5
    |
 12 |       c1.T
-   |       ---- marked omitted here
+   |       ---- c1.T is marked omitted here
 

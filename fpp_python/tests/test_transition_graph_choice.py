@@ -8,7 +8,7 @@ cleanly (did not raise, and did not fall back to the opaque base).
 """
 
 import fpp as f
-from fpp import StateMachineSymbol, ChoiceTransitionGraphArc
+from fpp import StateMachineSymbol, TransitionGraphArc
 
 # A state machine whose initial transition enters a choice, and whose choice has
 # guarded `if`/`else` transitions — so the transition graph records `Choice` arcs
@@ -37,7 +37,7 @@ def test_choice_arc_a_node_is_transition_expr():
         arc
         for arcs in tg.arc_map.values()
         for arc in arcs
-        if isinstance(arc, ChoiceTransitionGraphArc)
+        if isinstance(arc, TransitionGraphArc.Choice)
     ]
     assert choice_arcs, "the choice `C` should produce at least one Choice arc"
 

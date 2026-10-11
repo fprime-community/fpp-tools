@@ -156,7 +156,7 @@ def test_parsed_nodes_have_locations_but_no_resolved_semantics():
     assert b.value.resolved_value is None
     assert b.value.resolved_type is None
     use = b.value.kind.left  # the `a` use site
-    assert type(use.kind).__name__ == "ExprIdent" and use.kind.value == "a"
+    assert type(use.kind).__qualname__ == "ExprKind.Ident" and use.kind.value == "a"
     assert use.definition is None
 
 

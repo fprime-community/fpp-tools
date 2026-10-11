@@ -6,9 +6,6 @@
 //! ~1:1 declaration of the `fpp_ast` grammar (nodes / unions / kind-enums /
 //! leaves). The `fpp_ast_bindings!` proc macro expands that declaration at
 //! compile time into the PyO3 node wrappers + the recording walk.
-//!
-//! The `shadowed {…}` set comes from the driver's `set_shadowed` (the RESOLVED
-//! semantic Python names that collide with an AST-node wrapper), not a hand list.
 
 use std::path::Path;
 
@@ -76,19 +73,6 @@ fn emit_defs(reg: &Registry) -> String {
         }
         out.push_str("    }\n\n");
     }
-
-    // shadowed { … } — entity-shadowed node names (no stub; opaque as children).
-    // Filtered to names that are still real nodes (a reused-from-committed set on
-    // `--only ast` may name a since-renamed node), and emitted unconditionally so a
-    // reader (`read_committed_shadowed`) can always distinguish "empty shadow set"
-    // from "pre-feature file".
-    let names: Vec<&str> = reg
-        .shadowed
-        .iter()
-        .filter(|s| reg.node_structs.contains_key(*s))
-        .map(String::as_str)
-        .collect();
-    out.push_str(&format!("    shadowed {{ {} }}\n\n", names.join(", ")));
 
     // node <Name> { <field>: <type>, … } — fields in source order; Skip omitted.
     for (name, def) in &reg.node_structs {

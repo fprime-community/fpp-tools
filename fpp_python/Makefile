@@ -13,7 +13,7 @@
 #   make bindgen      # src/ast/defs.rs + src/sem/defs.rs   (pinned nightly)
 #   make bindgen-ast  # src/ast/defs.rs only                (stable only)
 #   make bindgen-sem  # src/sem/defs.rs only                (pinned nightly)
-#   make stubs        # fpp.pyi
+#   make stubs        # python/fpp/__init__.pyi + python/fpp/ast.pyi
 #   make drift        # fail if any generated file differs from the index
 #   make ext          # build the import-only extension (what the wheel ships)
 #   make nightly      # install the pinned nightly the bindgen rustdoc needs
@@ -32,7 +32,8 @@ ROOT := $(abspath $(CRATE_DIR)/..)
 GENERATED := \
 	fpp_python/src/ast/defs.rs \
 	fpp_python/src/sem/defs.rs \
-	fpp_python/fpp.pyi
+	fpp_python/python/fpp/__init__.pyi \
+	fpp_python/python/fpp/ast.pyi
 
 # --- libpython linker hint (stub_gen only) ----------------------------------
 #
@@ -90,7 +91,7 @@ bindgen:
 	$(BINDGEN)
 
 # `--only ast` skips the rustdoc reflection (no nightly needed) and reuses the
-# committed `shadowed {…}`/`leaves {…}` blocks, which only a full run derives.
+# committed `leaves {…}` block, which only a full run derives.
 bindgen-ast:
 	$(BINDGEN) -- --only ast
 

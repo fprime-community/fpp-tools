@@ -108,7 +108,6 @@ pub struct Registry {
     pub used_leaves: BTreeSet<String>,
     pub str_leaf_accessor: BTreeMap<String, String>,
     pub root: Option<RootDef>,
-    pub shadowed: BTreeSet<String>,
 }
 
 const EXCLUDE_NODE: &[&str] = &["Name"]; // collapsed to str; never a node wrapper
@@ -182,21 +181,10 @@ impl Registry {
         }
     }
 
-    /// Every parsed AST-node wrapper name (the candidates a semantic class name
-    /// can shadow).
-    pub fn node_names(&self) -> &BTreeSet<String> {
-        &self.is_node
-    }
-
     /// Record a leaf enum the semantic layer references, so `ast/defs.rs` emits a
     /// Python-enum mirror for it even if no `fpp_ast` field/variant uses it.
     pub fn register_used_leaf(&mut self, name: String) {
         self.used_leaves.insert(name);
-    }
-
-    /// Install the derived entity-shadowed node set (rendered into `shadowed {…}`).
-    pub fn set_shadowed(&mut self, shadowed: BTreeSet<String>) {
-        self.shadowed = shadowed;
     }
 }
 
@@ -557,36 +545,6 @@ fn classify_one(
 // ---------------------------------------------------------------------------
 // Committed-declaration readers (for the `--only` partial runs)
 // ---------------------------------------------------------------------------
-
-/// Parse the `shadowed { A, B, … }` line of an already-committed `ast/defs.rs`.
-/// Used by `--only ast`, which regenerates the AST declaration without the sem
-/// reflection that derives the shadowed set. `None` only when the file is
-/// unreadable; a readable file with no (or an empty) `shadowed` line yields an
-/// empty set — the full run emits `shadowed { … }` unconditionally, so a missing
-/// line means a genuinely empty shadow set (or a pre-feature file), never a
-/// dead-end.
-pub fn read_committed_shadowed(path: &Path) -> Option<BTreeSet<String>> {
-    let text = std::fs::read_to_string(path).ok()?;
-    let Some(line) = text
-        .lines()
-        .map(str::trim)
-        .find(|l| l.starts_with("shadowed"))
-    else {
-        return Some(BTreeSet::new());
-    };
-    let inner = match line.split_once('{').and_then(|(_, r)| r.split_once('}')) {
-        Some((inner, _)) => inner,
-        None => return Some(BTreeSet::new()),
-    };
-    Some(
-        inner
-            .split(',')
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(str::to_string)
-            .collect(),
-    )
-}
 
 /// Parse the leaf-enum names declared in an already-committed `ast/defs.rs`
 /// `leaves { … }` block. Used by `--only sem` to verify every `leaf(crate::ast::X)`

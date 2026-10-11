@@ -34,7 +34,6 @@ fpp_python_macros::fpp_sem_bindings! {
             component_map: map(union(Symbol), entity(Component)),
             component_instance_map: map(union(Symbol), rewrap(InterfaceInstance::Component)),
             interface_map: map(union(Symbol), entity(Interface)),
-            partial_topology_map: map(union(Symbol), entity(Topology)),
             topology_map: map(union(Symbol), entity(Topology)),
             state_machine_map: map(union(Symbol), entity(StateMachine)),
             dictionary_map: map(union(Symbol), entity(Dictionary)),
@@ -1002,7 +1001,7 @@ fpp_python_macros::fpp_sem_bindings! {
 
     entity TlmChannelIdentifier native fpp_analysis::semantics::TlmChannelIdentifier repr display {
         fields {
-            node: skip,
+            node: astdef(TlmChannelIdentifier),
             component_instance: rewrap(InterfaceInstance::Component),
             tlm_channel: entity(TlmChannel),
         }

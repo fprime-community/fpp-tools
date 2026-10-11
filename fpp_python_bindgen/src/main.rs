@@ -13,25 +13,17 @@
 //!     `fpp_analysis` semantic layer, reflected from nightly rustdoc JSON (see
 //!     [`sem`]).
 //!
-//! The two share ONE `fpp_ast` partition: the semantic generator resolves every
-//! `fpp_ast::X` reference against the REAL grammar classification (nodes / unions
-//! / kind-enums / leaves) rather than a `Def*/Spec*` name prefix, and the set of
-//! entity-shadowed AST nodes is DERIVED — `node_names ∩ resolved-semantic-names`
-//! — instead of a hand-maintained list.
-//!
 //! # Phases (default full run)
 //!
 //! A. build the AST partition from `fpp_ast` source (always; both emitters need it).
 //! B. reflect `fpp_analysis` from rustdoc JSON; the `fpp_ast` arm resolves against
 //!    the partition, and every referenced leaf is cross-fed back to it.
 //! C. resolve the semantic Python names.
-//! D. derive the entity-shadowed AST nodes and install them on the partition.
-//! E. normalize: rewrite `astdef(x)` → `skip` for each shadowed `x`.
-//! F. emit `ast/defs.rs`.
-//! G. emit `sem/defs.rs`.
+//! D. emit `ast/defs.rs`.
+//! E. emit `sem/defs.rs`.
 //!
-//! `--only ast` runs A + F (no nightly), reusing the committed `shadowed {…}` line.
-//! `--only sem` runs A + B..E + G, validating that every `leaf(crate::ast::X)` it
+//! `--only ast` runs A + D (no nightly).
+//! `--only sem` runs A + B + C + E, validating that every `leaf(crate::ast::X)` it
 //! emits already has a Python-enum mirror in the committed `ast/defs.rs`.
 //!
 //! # Toolchain
@@ -68,7 +60,7 @@ fn main() {
 // Phase orchestration
 // ---------------------------------------------------------------------------
 
-/// Default full run: A → G (nightly rustdoc).
+/// Default full run: A → E (nightly rustdoc).
 fn run_full(cfg: &Config) {
     // A: the shared AST partition (also runs the string-leaf/classification asserts).
     let mut part = partition::build(&cfg.fpp_src);
@@ -76,7 +68,7 @@ fn run_full(cfg: &Config) {
     // B: reflect `fpp_analysis`; the `fpp_ast` arm consults the partition.
     let krate = load_krate(cfg);
     let mut ctx = sem::prepare(&krate, part.ast_class());
-    let mut reflected = sem::reflect(&mut ctx);
+    let reflected = sem::reflect(&mut ctx);
     sem::assert_special_union_handles(&ctx, &reflected);
     sem::assert_core_unions_present(&ctx, &reflected);
     // Cross-feed: every leaf the sem layer references gets a mirror in `ast/defs.rs`.
@@ -87,29 +79,11 @@ fn run_full(cfg: &Config) {
     // C: resolve the semantic Python names.
     let names = sem::resolve_names(&ctx, &reflected);
 
-    // D: derive the entity-shadowed AST nodes from the RESOLVED semantic names.
-    let sem_names = names.all_python_names();
-    let shadowed: BTreeSet<String> = part
-        .node_names()
-        .intersection(&sem_names)
-        .cloned()
-        .collect();
-    eprintln!(
-        "bindgen: derived entity-shadowed nodes = {}",
-        fmt_set(&shadowed)
-    );
-    part.set_shadowed(shadowed.clone());
-
-    // E: normalize the reflected model (shadowed astdef → skip).
-    for line in sem::apply_shadow(&mut reflected, &names, &shadowed) {
-        eprintln!("{line}");
-    }
-
-    // F: emit the AST declaration.
+    // D: emit the AST declaration.
     ast_emit::write_defs(&cfg.ast_out, &part, &cfg.ast_version);
     summarize_ast(cfg, &part);
 
-    // G: emit the semantic declaration.
+    // E: emit the semantic declaration.
     let mut skips = Vec::new();
     sem::warn_identityless_map_keys(&ctx, &reflected, &names, &mut skips);
     let text = sem::emit(&ctx, &reflected, &names, &cfg.sem_version, &mut skips);
@@ -117,8 +91,7 @@ fn run_full(cfg: &Config) {
     finish_sem(cfg, &ctx, &reflected, skips);
 }
 
-/// `--only ast`: A + F. No nightly; the shadowed set is reused from the committed
-/// declaration (only the full run — with the sem reflection — can derive it).
+/// `--only ast`: A + D. No nightly.
 fn run_ast_only(cfg: &Config) {
     let mut part = partition::build(&cfg.fpp_src);
     // Preserve leaves cross-fed from the semantic layer on the last full run: this
@@ -130,30 +103,17 @@ fn run_ast_only(cfg: &Config) {
             part.register_used_leaf(leaf);
         }
     }
-    let shadowed = partition::read_committed_shadowed(&cfg.ast_out).unwrap_or_else(|| {
-        panic!(
-            "--only ast needs the `shadowed {{…}}` line from the committed {} to preserve \
-             it, but none was found — run the full bindgen (it derives the set from the \
-             semantic layer)",
-            cfg.ast_out.display()
-        )
-    });
-    eprintln!(
-        "bindgen: reusing committed entity-shadowed nodes = {}",
-        fmt_set(&shadowed)
-    );
-    part.set_shadowed(shadowed);
     ast_emit::write_defs(&cfg.ast_out, &part, &cfg.ast_version);
     summarize_ast(cfg, &part);
 }
 
-/// `--only sem`: A + B..E + G (skip F). Guards that every `leaf(crate::ast::X)`
+/// `--only sem`: A + B + C + E (skip D). Guards that every `leaf(crate::ast::X)`
 /// the semantic file emits already has a mirror in the committed `ast/defs.rs`.
 fn run_sem_only(cfg: &Config) {
     let part = partition::build(&cfg.fpp_src);
     let krate = load_krate(cfg);
     let mut ctx = sem::prepare(&krate, part.ast_class());
-    let mut reflected = sem::reflect(&mut ctx);
+    let reflected = sem::reflect(&mut ctx);
     sem::assert_special_union_handles(&ctx, &reflected);
     sem::assert_core_unions_present(&ctx, &reflected);
 
@@ -176,19 +136,6 @@ fn run_sem_only(cfg: &Config) {
     }
 
     let names = sem::resolve_names(&ctx, &reflected);
-    let sem_names = names.all_python_names();
-    let shadowed: BTreeSet<String> = part
-        .node_names()
-        .intersection(&sem_names)
-        .cloned()
-        .collect();
-    eprintln!(
-        "bindgen: derived entity-shadowed nodes = {}",
-        fmt_set(&shadowed)
-    );
-    for line in sem::apply_shadow(&mut reflected, &names, &shadowed) {
-        eprintln!("{line}");
-    }
 
     let mut skips = Vec::new();
     sem::warn_identityless_map_keys(&ctx, &reflected, &names, &mut skips);
@@ -229,11 +176,6 @@ fn summarize_ast(cfg: &Config, part: &partition::Registry) {
         part.kinds.len(),
         part.used_leaves.len(),
     );
-}
-
-fn fmt_set(set: &BTreeSet<String>) -> String {
-    let items: Vec<&str> = set.iter().map(String::as_str).collect();
-    format!("{{{}}}", items.join(", "))
 }
 
 /// The nightly toolchain rustdoc JSON is generated with, single-sourced from

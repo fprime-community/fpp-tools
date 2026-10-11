@@ -88,7 +88,7 @@ pub struct Analysis {
     pub(crate) interface: Option<Interface>,
     /// The map from topology symbols to 'partial' topologies
     /// with only port interface/instance information
-    pub partial_topology_map: HashMap<Symbol, Topology>,
+    pub(crate) partial_topology_map: HashMap<Symbol, Topology>,
     /// The map from topology symbols to topologies, in the order the
     /// topologies were resolved
     pub topology_map: indexmap::IndexMap<Symbol, Topology, FxBuildHasher>,
