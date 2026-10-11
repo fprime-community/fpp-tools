@@ -24,7 +24,7 @@ pub struct LexerError {
 /// suppress newlines or compute the values of literals; `fpp_parser` does that
 /// from the token texts.
 ///
-/// The lexer reads the text one character at a time with [`Lexer::bump`], which
+/// The lexer reads the text one character at a time with `bump`, which
 /// reduces a CR LF pair to an LF. [`Lexer::first`], [`Lexer::second`] and
 /// [`Lexer::third`] look at the characters that follow without reading them.
 pub struct Lexer<'a> {
