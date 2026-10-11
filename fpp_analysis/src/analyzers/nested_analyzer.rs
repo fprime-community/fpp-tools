@@ -56,7 +56,7 @@ impl NestedScopeState for Analysis {
     fn template_expansion_params(&self, node: fpp_core::Node) -> Option<Vec<Symbol>> {
         self.template_expansion_map
             .get(&node)
-            .map(|expansion| expansion.params.clone())
+            .map(|expansion| expansion.params.values().cloned().collect())
     }
 
     fn push_template_expansion(&mut self, node: fpp_core::Node) -> Option<fpp_core::Node> {

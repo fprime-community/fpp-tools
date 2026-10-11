@@ -204,7 +204,12 @@ impl<'ast> Visitor<'ast> for CheckUses<'ast> {
 
         // Analyze the argument list, which is written at the expansion site and
         // so resolves in the enclosing scope
-        let params = a.expansion_at(node.node_id).params.clone();
+        let params: Vec<Symbol> = a
+            .expansion_at(node.node_id)
+            .params
+            .values()
+            .cloned()
+            .collect();
         for param in &params {
             self.template_param(a, param)?;
         }

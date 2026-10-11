@@ -2,7 +2,7 @@ use fpp_macros::EnumMap;
 use std::fmt::{Display, Formatter};
 
 /// A name group
-#[derive(EnumMap, Copy, Clone, Debug)]
+#[derive(EnumMap, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum NameGroup {
     Component,
     Port,
