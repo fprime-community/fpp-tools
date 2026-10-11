@@ -256,6 +256,11 @@ fn parameter_shadow_error() {
 }
 
 #[test]
+fn parameter_shadow_ok() {
+    run_test("template/parameter_shadow_ok")
+}
+
+#[test]
 fn struct_parameter_anon_array_promote() {
     run_test("template/struct_parameter_anon_array_promote")
 }

@@ -25,9 +25,11 @@ pub fn visit_expansion<'ast, V>(
 where
     V: Visitor<'ast, State = Analysis>,
 {
+    // Check if this template has been expanded
     let Some(members) = &node.members else {
         return ControlFlow::Continue(());
     };
+    // Mark the analysis with the proper expansion
     let saved = a.template_expansion.replace(node.node_id);
     let out = members.visit(a, visitor);
     a.template_expansion = saved;

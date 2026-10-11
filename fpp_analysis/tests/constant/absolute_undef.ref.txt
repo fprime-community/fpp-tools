@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/constant/absolute_undef.fpp:3:16
+  |
+3 |   constant y = .x
+  |                ^^ cannot find constant `x` in scope
+

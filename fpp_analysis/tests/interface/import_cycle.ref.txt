@@ -3,15 +3,15 @@
 1 | / interface A {
 2 | |     import B
 3 | | }
-  | |_^ encountered symbol use-definition cycle
+  | |_^ encountered a use-def cycle
   |
- ::: [ local path prefix ]/interface/import_cycle.fpp:5:11
+ ::: [ local path prefix ]/interface/import_cycle.fpp:2:12
   |
-5 |   interface B {
-  |             - defined here
+2 |       import B
+  |              - use B refers to definition B
   |
  ::: [ local path prefix ]/interface/import_cycle.fpp:6:12
   |
 6 |       import A
-  |              - used here
+  |              - use A refers to definition A
 

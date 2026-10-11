@@ -64,3 +64,18 @@ fn dictionary_error() {
 fn dictionary_ok() {
     run_test("constant/dictionary_ok")
 }
+
+#[test]
+fn shadowed_error() {
+    run_test("constant/shadowed_error")
+}
+
+#[test]
+fn shadowed_ok() {
+    run_test("constant/shadowed_ok")
+}
+
+#[test]
+fn absolute_undef() {
+    run_test("constant/absolute_undef")
+}

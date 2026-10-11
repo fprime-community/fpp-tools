@@ -1,0 +1,14 @@
+  --> [ local path prefix ]/instance_spec/shadowed_error.fpp:11:14
+   |
+11 |       instance T.c
+   |                ^^^ invalid use of symbol T: not a qualifier
+   |
+  ::: [ local path prefix ]/instance_spec/shadowed_error.fpp:9:3
+   |
+ 9 | /   topology T {
+10 | |
+11 | |     instance T.c
+12 | |
+13 | |   }
+   | |___- symbol is defined here
+

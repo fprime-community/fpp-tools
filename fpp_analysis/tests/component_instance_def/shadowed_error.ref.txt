@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/component_instance_def/shadowed_error.fpp:15:3
+   |
+15 |   instance c: C base id 0x100
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ invalid instance c: active component must have queue size
+

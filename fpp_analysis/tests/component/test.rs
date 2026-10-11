@@ -104,3 +104,23 @@ fn array_undef_constant() {
 fn array_ok() {
     run_test("component/array_ok")
 }
+
+#[test]
+fn shadowed_constant_error() {
+    run_test("component/shadowed_constant_error")
+}
+
+#[test]
+fn shadowed_constant_ok() {
+    run_test("component/shadowed_constant_ok")
+}
+
+#[test]
+fn shadowed_type_error() {
+    run_test("component/shadowed_type_error")
+}
+
+#[test]
+fn shadowed_type_ok() {
+    run_test("component/shadowed_type_ok")
+}

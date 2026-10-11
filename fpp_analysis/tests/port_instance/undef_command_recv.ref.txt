@@ -2,6 +2,8 @@
   |
 3 |   command recv port cmdIn
   |   ^^^^^^^^^^^^^^^^^^^^^^^ cannot find port `Fw` in scope
+  |
+  = note: the symbol Fw.Cmd has an implied use at the point of the error
 
  --> [ local path prefix ]/port_instance/undef_command_recv.fpp:3:3
   |

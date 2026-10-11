@@ -1,25 +1,20 @@
  --> [ local path prefix ]/cycles/constant_1.fpp:1:1
   |
 1 | constant a = b
-  | ^^^^^^^^^^^^^^ encountered symbol use-definition cycle
+  | ^^^^^^^^^^^^^^ encountered a use-def cycle
   |
- ::: [ local path prefix ]/cycles/constant_1.fpp:2:10
+ ::: [ local path prefix ]/cycles/constant_1.fpp:1:14
   |
-2 | constant b = c
-  |          - defined here
+1 | constant a = b
+  |              - use b refers to definition b
   |
  ::: [ local path prefix ]/cycles/constant_1.fpp:2:14
   |
 2 | constant b = c
-  |              - used here
-  |
- ::: [ local path prefix ]/cycles/constant_1.fpp:3:10
-  |
-3 | constant c = a
-  |          - defined here
+  |              - use c refers to definition c
   |
  ::: [ local path prefix ]/cycles/constant_1.fpp:3:14
   |
 3 | constant c = a
-  |              - used here
+  |              - use a refers to definition a
 

@@ -3,10 +3,10 @@
 1 | / interface I {
 2 | |     import I
 3 | | }
-  | |_^ encountered symbol use-definition cycle
+  | |_^ encountered a use-def cycle
   |
- ::: [ local path prefix ]/interface/cycles.fpp:1:11
+ ::: [ local path prefix ]/interface/cycles.fpp:2:12
   |
-1 |   interface I {
-  |             - defined here
+2 |       import I
+  |              - use I refers to definition I
 

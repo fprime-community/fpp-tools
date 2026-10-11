@@ -84,3 +84,18 @@ fn dictionary_not_displayable() {
 fn dictionary_ok() {
     run_test("structs/dictionary_ok")
 }
+
+#[test]
+fn default_shadowed_error() {
+    run_test("structs/default_shadowed_error")
+}
+
+#[test]
+fn default_shadowed_ok() {
+    run_test("structs/default_shadowed_ok")
+}
+
+#[test]
+fn duplicate_member_before_member_types() {
+    run_test("structs/duplicate_member_before_member_types")
+}

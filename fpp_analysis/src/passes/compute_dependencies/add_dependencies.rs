@@ -260,7 +260,7 @@ impl<'ast, Reader: FileReader + Clone> UseAnalysisPass<'ast, Analysis>
     fn constant_use(
         &self,
         a: &mut Analysis,
-        _node: &'ast Expr,
+        _node: &Expr,
         name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         // Analyze as a constant

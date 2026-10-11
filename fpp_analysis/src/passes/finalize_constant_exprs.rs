@@ -300,7 +300,7 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for FinalizeConstantExprs<'ast> {
     fn constant_use(
         &self,
         a: &mut Analysis,
-        node: &'ast Expr,
+        node: &Expr,
         _: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         let Some(symbol) = a.use_def_map.get(&node.node_id).cloned() else {

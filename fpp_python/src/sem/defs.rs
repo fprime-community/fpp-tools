@@ -76,7 +76,6 @@ fpp_python_macros::fpp_sem_bindings! {
             get_template_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
             get_topology(id: node) throws(SemanticError) -> opt(entity(Topology)),
             get_topology_symbol(id: node) throws(SemanticError) -> opt(union(Symbol)),
-            implied_uses(node: node) -> opt(entity(ImpliedUseSet)),
             lookup_scope(symbol: ref union(Symbol)) -> opt(entity(Scope)),
             nested_scope_at(symbol: ref union(Symbol)) -> entity(NestedScope),
             template_expansion_params(node: node) -> opt(list(union(Symbol))),

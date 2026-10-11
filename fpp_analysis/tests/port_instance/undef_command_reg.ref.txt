@@ -2,6 +2,8 @@
   |
 3 |   command reg port cmdRegOut
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot find port `Fw` in scope
+  |
+  = note: the symbol Fw.CmdReg has an implied use at the point of the error
 
  --> [ local path prefix ]/port_instance/undef_command_reg.fpp:3:3
   |

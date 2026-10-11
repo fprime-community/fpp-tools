@@ -2,6 +2,8 @@
   |
 3 |   product request port productRequestOut
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot find port `Fw` in scope
+  |
+  = note: the symbol Fw.DpRequest has an implied use at the point of the error
 
  --> [ local path prefix ]/port_instance/undef_product_request.fpp:3:3
   |

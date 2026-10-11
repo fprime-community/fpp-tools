@@ -164,3 +164,23 @@ fn undef_param_set() {
 fn undef_product_send() {
     run_test("port_instance/undef_product_send")
 }
+
+#[test]
+fn undef_size_and_port() {
+    run_test("port_instance/undef_size_and_port")
+}
+
+#[test]
+fn undef_priority_and_implied_port() {
+    run_test("port_instance/undef_priority_and_implied_port")
+}
+
+#[test]
+fn implied_port_qualifier_not_qualifier() {
+    run_test("port_instance/implied_port_qualifier_not_qualifier")
+}
+
+#[test]
+fn implied_port_undef_member() {
+    run_test("port_instance/implied_port_undef_member")
+}

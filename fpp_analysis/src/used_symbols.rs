@@ -1,6 +1,6 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
-use crate::analyzers::basic_use_analyzer::UseAnalysisPass;
+use crate::analyzers::basic_use_analyzer::{UseAnalysisPass, visit_template_arg};
 use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::semantics::{QualifiedName, Symbol, Type};
 use fpp_ast::*;
@@ -57,6 +57,7 @@ impl<'ast> UsedSymbols<'ast> {
         out
     }
 
+    // Helper function for recursive resolution
     fn resolve_node(
         &self,
         a: &mut Analysis,
@@ -164,6 +165,15 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for UsedSymbols<'ast> {
         self.add_symbol(a, node.id())
     }
 
+    fn template_use(
+        &self,
+        a: &mut Analysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.add_symbol(a, node.id())
+    }
+
     fn interface_instance_use(
         &self,
         a: &mut Analysis,
@@ -176,22 +186,13 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for UsedSymbols<'ast> {
     fn constant_use(
         &self,
         a: &mut Analysis,
-        node: &'ast Expr,
+        node: &Expr,
         _name: QualifiedName,
     ) -> ControlFlow<Self::Break> {
         self.add_symbol(a, node.id())
     }
 
     fn interface_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
-    }
-
-    fn template_use(
         &self,
         a: &mut Analysis,
         node: &QualIdent,
@@ -218,21 +219,15 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for UsedSymbols<'ast> {
         self.add_symbol(a, node.id())
     }
 
-    fn implied_type_use(
-        &self,
-        a: &mut Analysis,
-        node: &QualIdent,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
     }
 
-    fn implied_constant_use(
-        &self,
-        a: &mut Analysis,
-        node: &Expr,
-        _name: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.add_symbol(a, node.id())
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+
+    fn template_interface_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
     }
 }

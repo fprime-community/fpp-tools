@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/component/shadowed_type_error.fpp:3:3
+  |
+3 |   struct S { x: S }
+  |   ^^^^^^^^^^^^^^^^^ encountered a use-def cycle
+  |
+ ::: [ local path prefix ]/component/shadowed_type_error.fpp:3:17
+  |
+3 |   struct S { x: S }
+  |                 - use S refers to definition S
+

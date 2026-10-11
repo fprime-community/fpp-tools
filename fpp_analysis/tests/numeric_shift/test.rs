@@ -54,3 +54,8 @@ fn shift_wide_amount_negative_error() {
 fn shift_overflow_error() {
     run_test("numeric_shift/shift_overflow_error")
 }
+
+#[test]
+fn shift_enum_ok() {
+    run_test("numeric_shift/shift_enum_ok")
+}

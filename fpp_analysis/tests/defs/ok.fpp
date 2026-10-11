@@ -14,8 +14,6 @@ enum E2 { X, Y }
 
 state machine S
 
-interface I {}
-
 module M {
 
   type a
@@ -34,8 +32,4 @@ module M {
 
   state machine S
 
-}
-
-module M {
-  type c
 }

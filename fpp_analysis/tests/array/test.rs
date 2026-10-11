@@ -111,11 +111,6 @@ fn format_alias_int_not_rational() {
 }
 
 #[test]
-fn array_no_default_ok() {
-    run_test("array/array_no_default_ok")
-}
-
-#[test]
 fn format_ok() {
     run_test("array/format_ok")
 }
@@ -153,4 +148,14 @@ fn no_default_ok() {
 #[test]
 fn size_out_of_range() {
     run_test("array/size_out_of_range")
+}
+
+#[test]
+fn default_shadowed_error() {
+    run_test("array/default_shadowed_error")
+}
+
+#[test]
+fn default_shadowed_ok() {
+    run_test("array/default_shadowed_ok")
 }

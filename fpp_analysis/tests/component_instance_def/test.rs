@@ -99,3 +99,13 @@ fn queued_priority() {
 fn invalid_negative_int() {
     run_test("component_instance_def/invalid_negative_int")
 }
+
+#[test]
+fn shadowed_error() {
+    run_test("component_instance_def/shadowed_error")
+}
+
+#[test]
+fn shadowed_ok() {
+    run_test("component_instance_def/shadowed_ok")
+}

@@ -59,3 +59,28 @@ fn string_size_type_shadowed() {
 fn string_size_zero_ok() {
     run_test("types/string_size_zero_ok")
 }
+
+#[test]
+fn string_implied_type_not_type() {
+    run_test("types/string_implied_type_not_type")
+}
+
+#[test]
+fn string_implied_constant_not_constant() {
+    run_test("types/string_implied_constant_not_constant")
+}
+
+#[test]
+fn string_implied_constant_module() {
+    run_test("types/string_implied_constant_module")
+}
+
+#[test]
+fn string_implied_constant_order() {
+    run_test("types/string_implied_constant_order")
+}
+
+#[test]
+fn string_implied_type_order() {
+    run_test("types/string_implied_type_order")
+}

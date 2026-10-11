@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/invalid_symbols/enum_constant_as_qualifier.fpp:2:14
+  |
+2 | constant c = E.A.x
+  |              ^^^ E does not have members
+

@@ -2,6 +2,8 @@
   |
 3 |   param get port paramGetOut
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot find port `Fw` in scope
+  |
+  = note: the symbol Fw.PrmGet has an implied use at the point of the error
 
  --> [ local path prefix ]/port_instance/undef_param_get.fpp:3:3
   |

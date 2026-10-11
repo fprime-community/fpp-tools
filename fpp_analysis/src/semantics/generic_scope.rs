@@ -5,7 +5,7 @@ use fpp_util::EnumMap;
 use std::marker::PhantomData;
 
 /// A generic collection of name-symbol maps, one for each name group
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct GenericScope<NG, S: SymbolInterface, M: EnumMap<NG, GenericNameSymbolMap<S>>>(
     M,
     PhantomData<NG>,
@@ -13,16 +13,16 @@ pub struct GenericScope<NG, S: SymbolInterface, M: EnumMap<NG, GenericNameSymbol
 );
 
 impl<NG, S: SymbolInterface, M: EnumMap<NG, GenericNameSymbolMap<S>>> GenericScope<NG, S, M> {
-    /// Construct a new scope
+    /// Create an empty scope
     pub fn new() -> Self {
         Self(
-            M::new(|_| GenericNameSymbolMap::new()),
+            M::new(|_| GenericNameSymbolMap::empty()),
             Default::default(),
             Default::default(),
         )
     }
 
-    /// Look up a symbol in this scope
+    /// Get a symbol from the map. Return none if the name is not there.
     pub fn get(&self, name_group: NG, name: &str) -> Option<S> {
         self.0.get(name_group).get(name)
     }
