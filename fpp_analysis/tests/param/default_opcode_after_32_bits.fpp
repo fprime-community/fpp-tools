@@ -1,7 +1,7 @@
 # The default set and save opcodes of a parameter follow the previous opcode,
-# as the spec says. fpp-check truncates that default to a 32-bit integer
-# first, so it gives the parameter set opcode 0 here and reports a duplicate
-# opcode.
+# as the spec says, also past 32 bits. Command B has opcode 0xFFFFFFFF, so
+# the parameter has set opcode 0x100000000 and save opcode 0x100000001, and
+# no opcode is duplicated.
 
 module Fw {
   port Cmd

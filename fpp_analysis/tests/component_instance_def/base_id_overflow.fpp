@@ -1,6 +1,6 @@
-# Identifiers are kept as 128-bit integers. The ID range of this instance ends
-# past the largest one, so it is reported as an error where Scala, with
-# arbitrary-precision identifiers, accepts it.
+# Identifiers are kept as 128-bit integers. The base identifier of this
+# instance is the largest one, so its ID range, which holds two telemetry
+# channel identifiers, ends past that range: the instance is an error.
 
 module Fw {
   port Tlm

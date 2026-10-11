@@ -1,6 +1,6 @@
-# Opcodes are kept as 128-bit integers. The default opcode after the largest
-# one is out of that range, so it is reported as an error where Scala, with
-# arbitrary-precision opcodes, assigns it.
+# Opcodes are kept as 128-bit integers. Command A has the largest one, so the
+# default opcode after it, which command B would get, is out of that range:
+# the error is reported at A.
 
 module Fw {
   port Cmd

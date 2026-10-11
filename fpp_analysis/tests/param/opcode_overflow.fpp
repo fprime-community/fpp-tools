@@ -1,7 +1,7 @@
-# Opcodes are kept as 128-bit integers. The default set opcode of the parameter
-# is the largest one, so its default save opcode is out of that range and is
-# reported as an error where Scala, with arbitrary-precision opcodes, assigns
-# it.
+# Opcodes are kept as 128-bit integers. Command A has the opcode before the
+# largest one, so the default set opcode of the parameter is the largest one,
+# and its default save opcode is out of that range: the parameter is an
+# error.
 
 module Fw {
   port Cmd
