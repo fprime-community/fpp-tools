@@ -61,6 +61,11 @@ fn arg_kind_type_param_instance_arg() {
 }
 
 #[test]
+fn array_params_common_type_error() {
+    run_test("template/array_params_common_type_error")
+}
+
+#[test]
 fn arity_no_params_ok() {
     run_test("template/arity_no_params_ok")
 }
