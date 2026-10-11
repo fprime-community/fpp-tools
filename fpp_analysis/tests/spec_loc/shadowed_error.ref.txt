@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/spec_loc/shadowed_error.fpp:2:24
+  |
+2 |   locate constant a at "incorrect.fpp"
+  |                        ^^^^^^^^^^^^^^^ incorrect location path [ local path prefix ]/spec_loc/incorrect.fpp
+  |
+ ::: [ local path prefix ]/spec_loc/shadowed_error.fpp:3:3
+  |
+3 |   constant a = 0
+  |   -------------- actual location is here
+

@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/spec_loc/relative_path_error.fpp:2:22
+  |
+2 | locate constant a at "./sub/../incorrect.fpp"
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^ incorrect location path [ local path prefix ]/spec_loc/incorrect.fpp
+  |
+ ::: [ local path prefix ]/spec_loc/relative_path_error.fpp:4:1
+  |
+4 | constant a = 0
+  | -------------- actual location is here
+

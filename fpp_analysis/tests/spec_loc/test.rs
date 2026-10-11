@@ -146,6 +146,16 @@ fn port_path_error() {
 }
 
 #[test]
+fn shadowed_error() {
+    run_test("spec_loc/shadowed_error")
+}
+
+#[test]
+fn shadowed_ok() {
+    run_test("spec_loc/shadowed_ok")
+}
+
+#[test]
 fn state_machine_ok() {
     run_test("spec_loc/state_machine_ok")
 }
@@ -218,4 +228,25 @@ fn template_body_inconsistent_path_error() {
 #[test]
 fn template_body_expanded_path_error() {
     run_test("spec_loc/template_body_expanded_path_error")
+}
+
+// Rust-only: location paths are normalized before they are compared
+#[test]
+fn relative_path_ok() {
+    run_test("spec_loc/relative_path_ok")
+}
+
+#[test]
+fn relative_path_error() {
+    run_test("spec_loc/relative_path_error")
+}
+
+#[test]
+fn relative_path_include_ok() {
+    run_test("spec_loc/relative_path_include_ok")
+}
+
+#[test]
+fn equivalent_paths_ok() {
+    run_test("spec_loc/equivalent_paths_ok")
 }

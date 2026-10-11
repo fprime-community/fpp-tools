@@ -1,73 +1,76 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::visit_expansion;
-use crate::errors::SemanticError;
+use crate::errors::{SemanticError, SemanticResult};
+use crate::semantics::{QualifiedName, Symbol, SymbolInterface};
 use fpp_ast::{
     AstNode, DefAbsType, DefAliasType, DefArray, DefComponent, DefComponentInstance, DefConstant,
     DefEnum, DefInterface, DefModule, DefModuleTemplate, DefPort, DefStateMachine, DefStruct,
     DefSystem, DefTopology, SpecLocKind, SpecTemplateExpand, Visitor, Walkable,
 };
-use fpp_core::{Span, Spanned};
+use fpp_core::{File, Spanned};
 use std::ops::ControlFlow;
 
-/// Resolve a location-specifier path relative to the directory of the file that
-/// contains the specifier's file string literal.
-pub(crate) fn resolve_spec_path(file_span: Span, specified: &str) -> String {
-    let uri = file_span.file().uri();
-    match std::path::Path::new(&uri).parent() {
-        Some(dir) => dir.join(specified).to_string_lossy().into_owned(),
-        None => specified.to_string(),
-    }
-}
-
-/// Follow the include chain up to the enclosing translation unit.
-pub(crate) fn tu_span(mut span: Span) -> Span {
-    loop {
-        // A copy made by template expansion is at the point of the expansion
-        // specifier, wherever the syntax it copies was written
-        if let Some(expanding) = span.expanding_span() {
-            span = expanding;
-        } else if let Some(including) = span.including_span() {
-            span = including;
-        } else {
-            return span;
-        }
-    }
-}
-
-/// Check location specifiers against the actual definition locations.
+/// Check location specifiers
 pub struct CheckSpecLocs;
 
 impl CheckSpecLocs {
-    fn check_spec_loc<N: AstNode + Spanned>(&self, a: &Analysis, kind: SpecLocKind, node: &N) {
+    fn check_spec_loc<N: AstNode>(&self, a: &Analysis, kind: SpecLocKind, node: &N) {
         let Some(symbol) = a.get_symbol(node) else {
             return;
         };
-        let qualified_name = Analysis::get_qualified_name_from_map(&a.parent_symbol_map, &symbol);
-        let Some(entry) = a.location_specifier_map.get(&(kind, qualified_name)) else {
-            return;
-        };
-
-        // Check the path
-        let specified_path = resolve_spec_path(entry.file.span(), &entry.file.data);
-        let actual_span = tu_span(node.span());
-        let actual_path = actual_span.file().uri();
-        if specified_path != actual_path {
-            SemanticError::IncorrectLocationPath {
-                loc: entry.file.span(),
-                specified_path,
-                actual_loc: actual_span,
-            }
-            .emit();
-            return;
+        let result = Self::check_path(a, kind.clone(), &symbol)
+            .and_then(|()| Self::check_dictionary_specifier(a, kind, &symbol));
+        if let Err(err) = result {
+            err.emit();
         }
+    }
 
-        // Check the dictionary specifier
-        if symbol.is_dictionary_def() != entry.is_dictionary_def {
-            SemanticError::IncorrectDictionarySpecifier {
-                loc: entry.span(),
-                def_loc: node.span(),
+    fn check_path(a: &Analysis, kind: SpecLocKind, symbol: &Symbol) -> SemanticResult {
+        let name = symbol.name().data.clone();
+        let mut ident_list: Vec<String> = a.scope_name_list.iter().rev().cloned().collect();
+        ident_list.push(name);
+        let qualified_name = QualifiedName::from(ident_list);
+        let actual_loc = symbol.get_loc().tu_location();
+        match a.location_specifier_map.get(&(kind, qualified_name)) {
+            Some(spec_loc) => {
+                let specifier_loc = spec_loc.file.span();
+                let specified_java_path = specifier_loc.get_relative_path(&spec_loc.file.data);
+                let specified_path = File::Path(specified_java_path).to_string();
+                let actual_path = File::from_string(&actual_loc.file().uri()).to_string();
+                if specified_path == actual_path {
+                    Ok(())
+                } else {
+                    Err(SemanticError::IncorrectLocationPath {
+                        loc: specifier_loc,
+                        specified_path,
+                        actual_loc,
+                    })
+                }
             }
-            .emit();
+            None => Ok(()),
+        }
+    }
+
+    fn check_dictionary_specifier(
+        a: &Analysis,
+        kind: SpecLocKind,
+        symbol: &Symbol,
+    ) -> SemanticResult {
+        let name = Analysis::get_qualified_name_from_map(&a.parent_symbol_map, symbol);
+        let def_loc = symbol.get_loc();
+        match a.location_specifier_map.get(&(kind, name)) {
+            Some(spec_loc) => {
+                let specifier_loc = spec_loc.span();
+                if symbol.is_dictionary_def() == spec_loc.is_dictionary_def {
+                    Ok(())
+                } else {
+                    Err(SemanticError::IncorrectDictionarySpecifier {
+                        loc: specifier_loc,
+                        def_loc,
+                    })
+                }
+            }
+            None => Ok(()),
         }
     }
 }
@@ -100,7 +103,10 @@ impl<'ast> Visitor<'ast> for CheckSpecLocs {
         a: &mut Self::State,
         node: &'ast DefModule,
     ) -> ControlFlow<Self::Break> {
-        node.walk(a, self)
+        a.scope_name_list.insert(0, node.name.data.clone());
+        let result = node.walk(a, self);
+        a.scope_name_list.remove(0);
+        result
     }
 
     fn visit_def_abs_type(
