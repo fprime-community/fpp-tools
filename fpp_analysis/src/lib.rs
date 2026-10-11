@@ -156,11 +156,41 @@ pub mod semantics {
     mod framework_definitions;
     pub use framework_definitions::*;
 
+    mod port_instance;
+    pub use port_instance::*;
+
+    mod port_interface;
+    pub use port_interface::*;
+
     mod interface;
     pub use interface::*;
 
+    mod command;
+    pub use command::*;
+
+    mod container;
+    pub use container::*;
+
+    mod event;
+    pub use event::*;
+
+    mod param;
+    pub use param::*;
+
+    mod record;
+    pub use record::*;
+
+    mod tlm_channel;
+    pub use tlm_channel::*;
+
+    mod state_machine_instance;
+    pub use state_machine_instance::*;
+
     mod component;
     pub use component::*;
+
+    mod init_specifier;
+    pub use init_specifier::*;
 
     mod component_instance;
     pub use component_instance::*;

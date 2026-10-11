@@ -1,9 +1,9 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::visit_expansion;
-use fpp_ast::{DefModuleTemplate, DefPort, MoveWalkable, Node, SpecTemplateExpand, Visitor};
+use fpp_ast::{DefModule, DefPort, SpecTemplateExpand, Visitor, Walkable};
 use std::ops::ControlFlow;
 
-/// Check port definitions.
+/// Check port definitions
 pub struct CheckPortDefs;
 
 impl<'ast> Visitor<'ast> for CheckPortDefs {
@@ -20,27 +20,23 @@ impl<'ast> Visitor<'ast> for CheckPortDefs {
         visit_expansion(self, a, node)
     }
 
-    /// The body of a module template is analyzed where the template is expanded,
-    /// not at the point of the definition.
-    fn visit_def_module_template(
+    /// Visit translation unit members and module members
+    fn visit_def_module(
         &self,
-        _a: &mut Self::State,
-        _node: &'ast DefModuleTemplate,
+        a: &mut Self::State,
+        node: &'ast DefModule,
     ) -> ControlFlow<Self::Break> {
-        ControlFlow::Continue(())
-    }
-
-    /// Descend into every container so that port definitions nested in modules
-    /// are reached.
-    fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
         node.walk(a, self)
     }
 
-    fn visit_def_port(&self, a: &mut Self::State, node: &'ast DefPort) -> ControlFlow<Self::Break> {
+    fn visit_def_port(
+        &self,
+        _a: &mut Self::State,
+        node: &'ast DefPort,
+    ) -> ControlFlow<Self::Break> {
         if let Err(err) = Analysis::check_for_duplicate_parameter(&node.params) {
             err.emit();
         }
-
-        self.super_visit(a, Node::DefPort(node))
+        ControlFlow::Continue(())
     }
 }

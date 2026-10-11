@@ -1,38 +1,15 @@
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
-    Component, InterfaceInstance, PortInstanceIdentifier, PortInterface, Symbol,
+    Component, InitSpecifier, InterfaceInstance, PortInstanceIdentifier, PortInterface, Symbol,
 };
-use fpp_ast::{AstNode, ComponentKind, DefComponentInstance, Expr, LitString, SpecInit};
+use fpp_ast::{AstNode, ComponentKind, DefComponentInstance, Expr, LitString};
 use fpp_core::{Span, Spanned};
 use rustc_hash::FxHashMap as HashMap;
 use std::path::{Component as PathComponent, Path, PathBuf};
 use std::sync::Arc;
 
-/// An FPP init specifier.
-#[derive(Debug, Clone)]
-pub struct InitSpecifier {
-    pub node: Arc<SpecInit>,
-    pub phase: i128,
-}
-
-impl InitSpecifier {
-    /// Gets the location of the init specifier
-    pub fn get_loc(&self) -> Span {
-        self.node.span()
-    }
-
-    /// Creates an init specifier from an AST node
-    pub fn from_node(a: &Analysis, node: &SpecInit) -> SemanticResult<InitSpecifier> {
-        let phase = a.get_int_value_checked(node.phase.node_id, node.phase.span())?;
-        Ok(InitSpecifier {
-            node: Arc::new(node.clone()),
-            phase,
-        })
-    }
-}
-
-/// An FPP component instance.
+/// An FPP component instance
 #[derive(Debug, Clone)]
 pub struct ComponentInstance {
     pub node: Arc<DefComponentInstance>,
@@ -81,6 +58,20 @@ impl std::hash::Hash for ComponentInstance {
 }
 
 impl ComponentInstance {
+    /// Adds an init specifier
+    pub fn add_init_specifier(&self, spec: InitSpecifier) -> SemanticResult<ComponentInstance> {
+        if let Some(prev) = self.init_specifier_map.get(&spec.phase) {
+            return Err(SemanticError::DuplicateInitSpecifier {
+                phase: spec.phase,
+                loc: spec.get_loc(),
+                prev_loc: prev.get_loc(),
+            });
+        }
+        let mut ci = self.clone();
+        ci.init_specifier_map.insert(spec.phase, spec);
+        Ok(ci)
+    }
+
     /// Gets the qualified name of the component instance
     pub fn get_qualified_name(&self) -> &str {
         &self.qualified_name
@@ -96,19 +87,21 @@ impl ComponentInstance {
         self.node.span()
     }
 
-    /// Gets the component this is an instance of
-    pub fn get_component<'a>(&self, a: &'a Analysis) -> Option<&'a Component> {
-        a.component_map.get(&self.component_symbol)
-    }
-
     /// Gets the port interface of the component this is an instance of
     pub fn get_interface<'a>(&self, a: &'a Analysis) -> Option<&'a PortInterface> {
         self.get_component(a).map(|c| &c.port_interface)
     }
 
+    /// Gets the component this is an instance of. Rust-only: the instance
+    /// holds the component's symbol, and the component lives in the analysis.
+    pub fn get_component<'a>(&self, a: &'a Analysis) -> Option<&'a Component> {
+        a.component_map.get(&self.component_symbol)
+    }
+
     /// Builds a port instance identifier for a port on this component
     /// instance, by name. Errors are annotated at this instance's own
-    /// location, since a plain name carries no span of its own.
+    /// location, since a plain name carries no span of its own. Rust-only, for
+    /// the Python bindings.
     pub fn get_port_instance_identifier(
         &self,
         a: &Analysis,
@@ -122,26 +115,12 @@ impl ComponentInstance {
         })
     }
 
-    /// Adds an init specifier
-    pub fn add_init_specifier(&self, spec: InitSpecifier) -> SemanticResult<ComponentInstance> {
-        if let Some(prev) = self.init_specifier_map.get(&spec.phase) {
-            return Err(SemanticError::DuplicateInitSpecifier {
-                phase: spec.phase,
-                loc: spec.get_loc(),
-                prev_loc: prev.get_loc(),
-            });
-        }
-        let mut ci = self.clone();
-        ci.init_specifier_map.insert(spec.phase, spec);
-        Ok(ci)
-    }
-
     /// Creates a component instance from a component instance definition.
     ///
     /// Returns `None` if the component use did not resolve, or if the component
     /// it names failed its own checks; in both cases an error was already
     /// reported.
-    pub fn from_def(
+    pub fn from_def_component_instance(
         a: &Analysis,
         node: &DefComponentInstance,
     ) -> SemanticResult<Option<ComponentInstance>> {
@@ -157,17 +136,26 @@ impl ComponentInstance {
         let file = node.file.as_ref().map(get_file);
         let queue_size = get_queue_size(a, &name, loc, &component_kind, &node.queue_size)?;
         let stack_size = get_active_attribute(
-            a,
             &name,
             &component_kind,
             "stack size",
+            |node_opt| a.get_nonnegative_big_int_value_opt(node_opt),
             &node.stack_size,
-            true,
         )?;
-        let priority =
-            get_active_attribute(a, &name, &component_kind, "priority", &node.priority, false)?;
-        let cpu =
-            get_active_attribute(a, &name, &component_kind, "CPU affinity", &node.cpu, false)?;
+        let priority = get_active_attribute(
+            &name,
+            &component_kind,
+            "priority",
+            |node_opt| Ok(a.get_big_int_value_opt(node_opt)),
+            &node.priority,
+        )?;
+        let cpu = get_active_attribute(
+            &name,
+            &component_kind,
+            "CPU affinity",
+            |node_opt| Ok(a.get_big_int_value_opt(node_opt)),
+            &node.cpu,
+        )?;
 
         let Some(symbol) = a.get_symbol(node) else {
             return Ok(None);
@@ -259,46 +247,39 @@ fn get_queue_size(
     a: &Analysis,
     name: &str,
     loc: Span,
-    kind: &ComponentKind,
+    component_kind: &ComponentKind,
     node_opt: &Option<Expr>,
 ) -> SemanticResult<Option<i128>> {
-    match (kind, node_opt) {
-        (ComponentKind::Passive, Some(e)) => Err(invalid(
+    match (component_kind, node_opt) {
+        (ComponentKind::Passive, Some(node)) => Err(invalid(
             name,
-            e.span(),
+            node.span(),
             "passive component may not have queue size".to_string(),
         )),
-        (_, Some(e)) => Ok(Some(a.get_nonnegative_big_int_value(e.node_id, e.span())?)),
+        (_, Some(_)) => a.get_nonnegative_big_int_value_opt(node_opt),
         (ComponentKind::Passive, None) => Ok(None),
-        (kind, None) => Err(invalid(
+        (component_kind, None) => Err(invalid(
             name,
             loc,
-            format!("{} component must have queue size", kind),
+            format!("{} component must have queue size", component_kind),
         )),
     }
 }
 
 /// Get an attribute for an active component
 fn get_active_attribute(
-    a: &Analysis,
     name: &str,
-    kind: &ComponentKind,
-    attr: &str,
+    component_kind: &ComponentKind,
+    kind: &str,
+    get_value: impl FnOnce(&Option<Expr>) -> SemanticResult<Option<i128>>,
     node_opt: &Option<Expr>,
-    nonnegative: bool,
 ) -> SemanticResult<Option<i128>> {
-    match (kind, node_opt) {
-        (ComponentKind::Active, Some(e)) => {
-            if nonnegative {
-                Ok(Some(a.get_nonnegative_big_int_value(e.node_id, e.span())?))
-            } else {
-                Ok(Some(a.get_int_value(e.node_id).unwrap_or(0)))
-            }
-        }
-        (_, Some(e)) => Err(invalid(
+    match (component_kind, node_opt) {
+        (ComponentKind::Active, Some(_)) => get_value(node_opt),
+        (_, Some(node)) => Err(invalid(
             name,
-            e.span(),
-            format!("{} component may not have {}", kind, attr),
+            node.span(),
+            format!("{} component may not have {}", component_kind, kind),
         )),
         (_, None) => Ok(None),
     }
@@ -308,6 +289,7 @@ fn get_active_attribute(
 mod tests {
     use super::{get_active_attribute, get_file};
     use crate::Analysis;
+    use crate::semantics::{IntegerValue, Value};
     use fpp_ast::{ComponentKind, Expr, ExprKind, LitString};
     use fpp_core::{CompilerContext, Node, SourceFile, Span};
 
@@ -376,10 +358,9 @@ mod tests {
         );
     }
 
-    /// An expression node with no entry in `Analysis::value_map`, standing for an
-    /// attribute that the constant-evaluation passes failed to evaluate.
-    fn unevaluated_expr() -> Expr {
-        Expr {
+    /// An expression node for an attribute, with the value `3`.
+    fn attribute_expr(a: &mut Analysis) -> Expr {
+        let e = Expr {
             kind: ExprKind::LiteralInt("3".to_string()),
             node_id: Node::new(Span::new(
                 SourceFile::new("attr.fpp", "3".to_string()),
@@ -387,24 +368,34 @@ mod tests {
                 1,
                 None,
             )),
-        }
+        };
+        a.value_map
+            .insert(e.node_id, Value::Integer(IntegerValue(3)));
+        e
     }
 
+    /// An active component may specify each attribute; any other kind of
+    /// component may specify none of them.
     #[test]
-    fn a_specified_active_attribute_is_always_some() {
+    fn active_attributes_belong_to_active_components() {
         with_ctx(|| {
-            let a = Analysis::new();
-            let e = Some(unevaluated_expr());
-            let attribute = |attr: &str, node: &Option<Expr>, nonnegative: bool| {
-                get_active_attribute(&a, "c", &ComponentKind::Active, attr, node, nonnegative)
-                    .unwrap_or_else(|_| panic!("{attr} is valid for an active component"))
+            let mut a = Analysis::new();
+            let e = Some(attribute_expr(&mut a));
+            let attribute = |kind: &ComponentKind, node_opt: &Option<Expr>| {
+                get_active_attribute(
+                    "c",
+                    kind,
+                    "priority",
+                    |node_opt| Ok(a.get_big_int_value_opt(node_opt)),
+                    node_opt,
+                )
             };
-            assert_eq!(attribute("priority", &e, false), Some(0));
-            assert_eq!(attribute("CPU affinity", &e, false), Some(0));
-            // The nonnegative path (stack size) has the same shape.
-            assert_eq!(attribute("stack size", &e, true), Some(0));
+            assert_eq!(attribute(&ComponentKind::Active, &e).ok(), Some(Some(3)));
             // An unspecified attribute is `None`.
-            assert_eq!(attribute("priority", &None, false), None);
+            assert_eq!(attribute(&ComponentKind::Active, &None).ok(), Some(None));
+            assert!(attribute(&ComponentKind::Passive, &e).is_err());
+            assert!(attribute(&ComponentKind::Queued, &e).is_err());
+            assert_eq!(attribute(&ComponentKind::Queued, &None).ok(), Some(None));
         });
     }
 }
