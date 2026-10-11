@@ -2,7 +2,7 @@ use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
     ComponentInstance, Direction, Interface, PortInstance, PortInstanceType, PortInterface, Symbol,
-    SymbolInterface, Topology,
+    SymbolInterface, Topology, Type,
 };
 use fpp_ast::{self as ast, AstNode, Ident};
 use fpp_core::{Span, Spanned};
@@ -399,7 +399,10 @@ impl Endpoint {
             return Ok(None);
         };
         pid.port_instance.require_connection_at(port.span())?;
-        let port_number = a.get_nonnegative_big_int_value_opt(index)?;
+        if let Some(index) = index {
+            Self::check_port_number_type(a, index)?;
+        }
+        let port_number = a.get_nonnegative_int_value_opt(index)?;
         let endpoint = Endpoint {
             loc: port.span(),
             port: pid,
@@ -467,6 +470,22 @@ impl Endpoint {
                 };
                 next.get_underlying_endpoint(a)
             }
+        }
+    }
+
+    /// Check that a port number has a numeric type, as the spec requires
+    fn check_port_number_type(a: &Analysis, index: &ast::Expr) -> SemanticResult {
+        match a.type_map.get(&index.node_id) {
+            Some(ty)
+                if !ty.is_numeric() && Type::convert(ty, &Arc::new(Type::Integer)).is_err() =>
+            {
+                Err(SemanticError::InvalidType {
+                    loc: index.span(),
+                    msg: format!("cannot convert {} to a numeric type", ty),
+                    notes: vec![],
+                })
+            }
+            _ => Ok(()),
         }
     }
 

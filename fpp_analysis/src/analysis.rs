@@ -568,6 +568,17 @@ impl Analysis {
         }
     }
 
+    /// Gets an optional nonnegative int value from an AST node
+    pub fn get_nonnegative_int_value_opt(
+        &self,
+        expr: &Option<Expr>,
+    ) -> SemanticResult<Option<i128>> {
+        match expr {
+            Some(e) => Ok(Some(self.get_nonnegative_int_value(e.node_id, e.span())?)),
+            None => Ok(None),
+        }
+    }
+
     /// Get a queue full behavior, defaulting to `Assert`.
     pub fn get_queue_full(opt: &Option<QueueFull>) -> QueueFull {
         opt.clone().unwrap_or(QueueFull::Assert)

@@ -89,3 +89,13 @@ fn template_two_expansions_too_many_output_ports() {
 fn template_two_expansions_duplicate_output_connection() {
     run_test("port_numbering/template_two_expansions_duplicate_output_connection")
 }
+
+#[test]
+fn port_number_out_of_range() {
+    run_test("port_numbering/port_number_out_of_range")
+}
+
+#[test]
+fn port_number_not_numeric() {
+    run_test("port_numbering/port_number_not_numeric")
+}

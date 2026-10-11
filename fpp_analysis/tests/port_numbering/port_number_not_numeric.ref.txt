@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/port_numbering/port_number_not_numeric.fpp:14:14
+   |
+14 |     c1.p1Out["a"] -> c2.p1In
+   |              ^^^ cannot convert string to a numeric type
+

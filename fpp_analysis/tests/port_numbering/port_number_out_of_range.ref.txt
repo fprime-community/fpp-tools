@@ -1,0 +1,7 @@
+  --> [ local path prefix ]/port_numbering/port_number_out_of_range.fpp:12:14
+   |
+12 |     c1.p1Out[0x100000000] -> c2.p1In
+   |              ^^^^^^^^^^^ value out of range
+   |
+   = note: expression evaluated to `4294967296`
+
