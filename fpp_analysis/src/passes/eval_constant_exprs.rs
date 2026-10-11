@@ -6,8 +6,9 @@ use crate::errors::{SemanticError, SemanticResult};
 use crate::passes::FinalizeTypeDefs;
 use crate::semantics::{
     AliasType, AnonArrayValue, AnonStructValue, ArrayType, ArrayValue, BooleanValue,
-    EnumConstantValue, EnumType, FloatValue, IntegerValue, QualifiedName, SerializedSizeError,
-    StringValue, StructType, StructValue, Symbol, SymbolInterface, Type, TypeVisitor, Value,
+    EnumConstantValue, EnumType, FloatValue, IntegerValue, QualifiedName, SerializedSize,
+    SerializedSizeError, StringValue, StructType, StructValue, Symbol, SymbolInterface, Type,
+    TypeVisitor, Value,
 };
 use fpp_ast::{
     Binop, DefConstant, DefEnum, DefEnumConstant, Expr, ExprKind, Ident, Node, StructExprMember,
@@ -491,7 +492,7 @@ impl<'ast> EvalConstantExprs<'ast> {
             _ => FinalizeType::get_finalized_type(a, &t),
         };
         // Use the finalized type to compute the size
-        match t_fin.serialized_size(a) {
+        match SerializedSize.ty(a, &t_fin) {
             Ok(size) => {
                 a.assign_value(node.node_id, Value::Integer(IntegerValue(size)));
             }
