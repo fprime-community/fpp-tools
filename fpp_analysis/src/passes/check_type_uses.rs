@@ -9,7 +9,7 @@ use crate::semantics::{
 };
 use fpp_ast::*;
 use fpp_core::Spanned;
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use rustc_hash::FxHashSet as HashSet;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
@@ -83,21 +83,6 @@ impl<'ast> CheckTypeUses<'ast> {
             visitor(a)
         } else {
             ControlFlow::Continue(())
-        }
-    }
-}
-
-/// Check for duplicate struct members, reporting each duplicate
-fn check_for_duplicate_struct_member(members: &[StructTypeMember]) {
-    let mut member_locs: HashMap<&str, fpp_core::Span> = HashMap::default();
-    for member in members {
-        if let Some(prev_loc) = member_locs.insert(member.name.data.as_str(), member.span()) {
-            SemanticError::DuplicateStructMember {
-                name: member.name.data.clone(),
-                loc: member.span(),
-                prev_loc,
-            }
-            .emit();
         }
     }
 }
@@ -216,7 +201,12 @@ impl<'ast> Visitor<'ast> for CheckTypeUses<'ast> {
         self.visit_if_needed(a, node.node_id, |a| {
             // The member names are checked before the member types, which may
             // reach definitions with errors of their own
-            check_for_duplicate_struct_member(&node.members);
+            fn get_name(member: &StructTypeMember) -> &str {
+                &member.name.data
+            }
+            if let Err(err) = Analysis::check_for_duplicate_struct_member(get_name, &node.members) {
+                err.emit();
+            }
             node.walk(a, self)?;
 
             let mut member_names = HashSet::default();

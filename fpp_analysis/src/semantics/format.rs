@@ -1,9 +1,6 @@
-use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
-use crate::semantics::Type;
 use fpp_ast::LitString;
 use fpp_core::Spanned;
-use std::sync::Arc;
 
 /// The type of an integer replacement field
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,23 +51,6 @@ pub enum FormatPart {
 pub struct Format(pub Vec<FormatPart>);
 
 impl Format {
-    /// Computes the format of a format string for the types of the values it
-    /// formats, reporting an invalid format string. A format string that is
-    /// not valid for the types has the empty format. The type-name spans are
-    /// not used.
-    ///
-    /// See [`Analysis::compute_format`].
-    pub fn new(node: &LitString, ts: Vec<(Arc<Type>, fpp_core::Span)>) -> Format {
-        let ts: Vec<Arc<Type>> = ts.into_iter().map(|(t, _)| t).collect();
-        match Analysis::compute_format(node, &ts) {
-            Ok(format) => format,
-            Err(err) => {
-                err.emit();
-                Format(vec![])
-            }
-        }
-    }
-
     /// Number of fields in the format string
     pub fn len(&self) -> usize {
         self.0

@@ -932,19 +932,55 @@ impl Analysis {
         }
     }
 
-    /// Check for duplicate parameter
-    pub fn check_for_duplicate_parameter(params: &[FormalParam]) -> SemanticResult {
-        let mut seen: HashMap<String, Span> = HashMap::default();
-        for param in params {
-            if let Some(prev_loc) = seen.insert(param.name.data.clone(), param.span()) {
-                return Err(SemanticError::DuplicateParameter {
-                    name: param.name.data.clone(),
-                    loc: param.span(),
-                    prev_loc,
-                });
+    /// Check for duplicate node
+    pub fn check_for_duplicate_node<T: Spanned>(
+        get_name: impl Fn(&T) -> &str,
+        error: impl Fn(String, Span, Span) -> SemanticError,
+        nodes: &[T],
+    ) -> SemanticResult {
+        let mut map: HashMap<&str, Span> = HashMap::default();
+        for node in nodes {
+            let name = get_name(node);
+            match map.get(name) {
+                None => {
+                    map.insert(name, node.span());
+                }
+                Some(prev_loc) => return Err(error(name.to_string(), node.span(), *prev_loc)),
             }
         }
         Ok(())
+    }
+
+    /// Check for duplicate struct member
+    pub fn check_for_duplicate_struct_member<T: Spanned>(
+        get_name: impl Fn(&T) -> &str,
+        nodes: &[T],
+    ) -> SemanticResult {
+        Analysis::check_for_duplicate_node(
+            get_name,
+            |name, loc, prev_loc| SemanticError::DuplicateStructMember {
+                name,
+                loc,
+                prev_loc,
+            },
+            nodes,
+        )
+    }
+
+    /// Check for duplicate parameter
+    pub fn check_for_duplicate_parameter(nodes: &[FormalParam]) -> SemanticResult {
+        fn get_name(param: &FormalParam) -> &str {
+            &param.name.data
+        }
+        Analysis::check_for_duplicate_node(
+            get_name,
+            |name, loc, prev_loc| SemanticError::DuplicateParameter {
+                name,
+                loc,
+                prev_loc,
+            },
+            nodes,
+        )
     }
 
     /// Checks whether a port instance is the specified general port
