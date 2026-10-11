@@ -14,7 +14,7 @@ use fpp_ast::{
     SpecTlmPacket, StructExprMember, StructTypeMember, TypeName, TypeNameKind, Visitable, Visitor,
 };
 use fpp_core::{Span, Spanned};
-use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use rustc_hash::FxHashSet as HashSet;
 use std::cell::RefCell;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
@@ -642,7 +642,12 @@ impl<'ast> CheckExprTypes<'ast> {
         node: &'ast Expr,
         members: &'ast [StructExprMember],
     ) -> ControlFlow<()> {
-        let no_duplicates = Self::emit_error(Self::check_for_duplicate_struct_member(members));
+        fn get_name(member: &StructExprMember) -> &str {
+            &member.name.data
+        }
+        let no_duplicates = Self::emit_error(Analysis::check_for_duplicate_struct_member(
+            get_name, members,
+        ));
         self.super_visit(a, Node::Expr(node))?;
         if no_duplicates.is_none() {
             return ControlFlow::Continue(());
@@ -691,26 +696,11 @@ impl<'ast> CheckExprTypes<'ast> {
             return ControlFlow::Continue(());
         }
 
-        match a.use_def_map.get(&node.node_id) {
-            // A use of a constant symbol whose definition failed to type check
-            Some(
-                Symbol::Constant(_) | Symbol::EnumConstant(_) | Symbol::TemplateConstantArg { .. },
-            ) => {
-                return ControlFlow::Continue(());
-            }
-            // A dot expression that names a symbol of another kind, such as a
-            // type with a scope, is not a constant use
-            Some(symbol) => {
-                SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
-                    msg: "not a constant symbol".to_string(),
-                    loc: node.span(),
-                    def_loc: symbol.node().span(),
-                }
-                .emit();
-                return ControlFlow::Break(());
-            }
-            None => {}
+        // A dot expression that is a use is a constant use, which
+        // constant_use has typed; one with no type is a use of a constant
+        // whose definition failed to type check
+        if a.use_def_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
         }
 
         // The type was not resolved, this is some sort of member selection
@@ -827,21 +817,6 @@ impl<'ast> CheckExprTypes<'ast> {
             }
             _ => Ok(()),
         }
-    }
-
-    /// Check for duplicate struct member
-    fn check_for_duplicate_struct_member(members: &[StructExprMember]) -> SemanticResult {
-        let mut prev_locs: HashMap<&str, Span> = HashMap::default();
-        for member in members {
-            if let Some(prev_loc) = prev_locs.insert(&member.name.data, member.span()) {
-                return Err(SemanticError::DuplicateStructMember {
-                    name: member.name.data.clone(),
-                    loc: member.span(),
-                    prev_loc,
-                });
-            }
-        }
-        Ok(())
     }
 
     /// Check that the type of a node may be converted to a numeric type. A node

@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/numeric_shift/shift_empty_struct_error.fpp:2:14
+  |
+2 | constant c = s << 1
+  |              ^ { } is not an integer or enum type
+

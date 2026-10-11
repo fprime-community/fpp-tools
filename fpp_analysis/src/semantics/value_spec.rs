@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use super::test_helpers::*;
+use super::spec::*;
 use crate::semantics::{
     AbsTypeValue, AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue,
     FloatValue, IntegerValue, MathError, MathResult, PrimitiveIntegerValue, StringValue,
@@ -96,37 +96,6 @@ fn members_eq(m1: &IndexMap<String, Value>, m2: &IndexMap<String, Value>) -> boo
             .all(|(name, v1)| m2.get(name).is_some_and(|v2| values_eq(v1, v2)))
 }
 
-/// The anon-struct value `{ a = U32(0), b = String("") }`.
-fn anon_struct_val() -> Value {
-    let mut m: IndexMap<String, Value> = IndexMap::new();
-    m.insert("a".to_string(), create_u32(0));
-    m.insert("b".to_string(), create_string(""));
-    Value::AnonStruct(AnonStructValue { members: m })
-}
-
-/// The array value `[ I32(0), I32(0), I32(0) ]: A`.
-fn array_val() -> Value {
-    Value::Array(ArrayValue {
-        anon_array: AnonArrayValue::new(vec![create_i32(0), create_i32(0), create_i32(0)]),
-        ty: as_array_ty(&default_array()),
-    })
-}
-
-/// The struct value `{ a = U32(0), b = String("") }: S`.
-fn struct_val() -> Value {
-    let mut m: IndexMap<String, Value> = IndexMap::new();
-    m.insert("a".to_string(), create_u32(0));
-    m.insert("b".to_string(), create_string(""));
-    Value::Struct(StructValue {
-        anon_struct: AnonStructValue { members: m },
-        ty: as_struct_ty(&struct_ty(
-            "S",
-            anon_struct(&[("a", u32()), ("b", string(None))]),
-            3,
-        )),
-    })
-}
-
 /// Drives a table of `(lhs, rhs, expected)` cases through a binary op.
 /// `Some(v)` means `Ok` (checked with `values_eq`); `None` means that the
 /// operation does not apply to the values.
@@ -176,54 +145,33 @@ fn check_convert(cases: Vec<(Value, Arc<Type>, Option<Value>)>) {
 #[test]
 fn value_get_type() {
     with_test_ctx(|| {
-        // Every primitive int kind, plus Integer/Float/Boolean/String.
-        let scalar_cases: Vec<(Value, Arc<Type>)> = vec![
-            (create_i8(0), i8()),
-            (create_i16(0), i16()),
-            (create_i32(0), i32()),
-            (create_i64(0), i64()),
-            (create_u8(0), u8()),
-            (create_u16(0), u16()),
-            (create_u32(0), u32()),
-            (create_u64(0), u64()),
-            (create_integer(0), integer()),
-            (create_f32(0.0), f32()),
-            (create_f64(0.0), f64()),
-            (create_boolean(false), boolean()),
-            (create_string(""), string(None)),
+        let pairs: Vec<(Value, Arc<Type>)> = vec![
+            (default_i8(), i8()),
+            (default_i16(), i16()),
+            (default_i32(), i32()),
+            (default_i64(), i64()),
+            (default_u8(), u8()),
+            (default_u16(), u16()),
+            (default_u32(), u32()),
+            (default_u64(), u64()),
+            (default_integer(), integer()),
+            (default_f32(), f32()),
+            (default_f64(), f64()),
+            (default_boolean(), boolean()),
+            (default_string(), string(None)),
+            (default_anon_array_3_u32(), default_anon_array_3_u32_type()),
+            (array_value(), array_type()),
+            (enumeration_value(), enum_type()),
+            (anon_struct_value(), anon_struct_type()),
+            (struct_value(), struct_type()),
         ];
-        for (v, expected) in scalar_cases {
+        for (v, expected) in pairs {
             assert!(
                 types_structurally_eq(&v.get_type(), &expected),
                 "get_type({v}) expected `{expected}`, got `{}`",
                 v.get_type()
             );
         }
-
-        // AnonArray value -> AnonArray(Some(3), U32)
-        let aa = create_anon_array(3, create_u32(0));
-        assert!(types_structurally_eq(
-            &aa.get_type(),
-            &anon_array(Some(3), u32())
-        ));
-
-        // Array value -> its named array type A (= default_array()).
-        assert!(types_structurally_eq(
-            &array_val().get_type(),
-            &default_array()
-        ));
-
-        // Enum constant -> its named enum type (default_enum()).
-        let ec = create_enum_constant("X", 0);
-        assert!(types_structurally_eq(&ec.get_type(), &default_enum()));
-
-        // AnonStruct value -> AnonStruct { a: U32, b: string }.
-        let as_ty = anon_struct(&[("a", u32()), ("b", string(None))]);
-        assert!(types_structurally_eq(&anon_struct_val().get_type(), &as_ty));
-
-        // Struct value -> its named struct type S.
-        let s_ty = struct_ty("S", anon_struct(&[("a", u32()), ("b", string(None))]), 3);
-        assert!(types_structurally_eq(&struct_val().get_type(), &s_ty));
     });
 }
 
@@ -240,21 +188,13 @@ fn value_add() {
             (create_i8(1), create_f32(2.0), Some(create_f64(3.0))),
             (create_f32(1.0), create_f32(2.0), Some(create_f32(3.0))),
             (create_f32(1.0), create_f64(2.0), Some(create_f64(3.0))),
-            (
-                create_enum_constant("X", 0),
-                create_i32(1),
-                Some(create_i32(1)),
-            ),
-            (
-                create_enum_constant("X", 0),
-                create_i16(1),
-                Some(create_integer(1)),
-            ),
+            (enumeration_value(), create_i32(1), Some(create_i32(1))),
+            (enumeration_value(), create_i16(1), Some(create_integer(1))),
             (create_i32(1), create_string("abc"), None),
-            (create_i32(1), create_anon_array(3, create_u32(0)), None),
-            (create_i32(1), array_val(), None),
-            (create_i32(1), anon_struct_val(), None),
-            (create_i32(1), struct_val(), None),
+            (create_i32(1), default_anon_array_3_u32(), None),
+            (create_i32(1), array_value(), None),
+            (create_i32(1), anon_struct_value(), None),
+            (create_i32(1), struct_value(), None),
             (
                 create_string("abc"),
                 create_string("def"),
@@ -278,21 +218,13 @@ fn value_sub() {
             (create_i8(1), create_f32(2.0), Some(create_f64(-1.0))),
             (create_f32(1.0), create_f32(2.0), Some(create_f32(-1.0))),
             (create_f32(1.0), create_f64(2.0), Some(create_f64(-1.0))),
-            (
-                create_enum_constant("X", 0),
-                create_i32(1),
-                Some(create_i32(-1)),
-            ),
-            (
-                create_enum_constant("X", 0),
-                create_i16(1),
-                Some(create_integer(-1)),
-            ),
+            (enumeration_value(), create_i32(1), Some(create_i32(-1))),
+            (enumeration_value(), create_i16(1), Some(create_integer(-1))),
             (create_i32(1), create_string("abc"), None),
-            (create_i32(1), create_anon_array(3, create_u32(0)), None),
-            (create_i32(1), array_val(), None),
-            (create_i32(1), anon_struct_val(), None),
-            (create_i32(1), struct_val(), None),
+            (create_i32(1), default_anon_array_3_u32(), None),
+            (create_i32(1), array_value(), None),
+            (create_i32(1), anon_struct_value(), None),
+            (create_i32(1), struct_value(), None),
             (create_string("abc"), create_string("def"), None),
         ];
         check_binop("-", |a, b| a.sub(b), cases);
@@ -312,21 +244,13 @@ fn value_mul() {
             (create_i8(1), create_f32(2.0), Some(create_f64(2.0))),
             (create_f32(1.0), create_f32(2.0), Some(create_f32(2.0))),
             (create_f32(1.0), create_f64(2.0), Some(create_f64(2.0))),
-            (
-                create_enum_constant("X", 0),
-                create_i32(1),
-                Some(create_i32(0)),
-            ),
-            (
-                create_enum_constant("X", 0),
-                create_i16(1),
-                Some(create_integer(0)),
-            ),
+            (enumeration_value(), create_i32(1), Some(create_i32(0))),
+            (enumeration_value(), create_i16(1), Some(create_integer(0))),
             (create_i32(1), create_string("abc"), None),
-            (create_i32(1), create_anon_array(3, create_u32(0)), None),
-            (create_i32(1), array_val(), None),
-            (create_i32(1), anon_struct_val(), None),
-            (create_i32(1), struct_val(), None),
+            (create_i32(1), default_anon_array_3_u32(), None),
+            (create_i32(1), array_value(), None),
+            (create_i32(1), anon_struct_value(), None),
+            (create_i32(1), struct_value(), None),
             (create_string("abc"), create_string("def"), None),
         ];
         check_binop("*", |a, b| a.mul(b), cases);
@@ -346,21 +270,13 @@ fn value_div() {
             (create_i8(1), create_f32(2.0), Some(create_f64(0.5))),
             (create_f32(1.0), create_f32(2.0), Some(create_f32(0.5))),
             (create_f32(1.0), create_f64(2.0), Some(create_f64(0.5))),
-            (
-                create_enum_constant("X", 0),
-                create_i32(1),
-                Some(create_i32(0)),
-            ),
-            (
-                create_enum_constant("X", 0),
-                create_i16(1),
-                Some(create_integer(0)),
-            ),
+            (enumeration_value(), create_i32(1), Some(create_i32(0))),
+            (enumeration_value(), create_i16(1), Some(create_integer(0))),
             (create_i32(1), create_string("abc"), None),
-            (create_i32(1), create_anon_array(3, create_u32(0)), None),
-            (create_i32(1), array_val(), None),
-            (create_i32(1), anon_struct_val(), None),
-            (create_i32(1), struct_val(), None),
+            (create_i32(1), default_anon_array_3_u32(), None),
+            (create_i32(1), array_value(), None),
+            (create_i32(1), anon_struct_value(), None),
+            (create_i32(1), struct_value(), None),
             (create_string("abc"), create_string("def"), None),
         ];
         check_binop("/", |a, b| a.div(b), cases);
@@ -385,36 +301,28 @@ fn value_lshift() {
                 create_integer(10),
                 Some(create_integer(1024)),
             ),
+            (enumeration_value(), create_i32(3), Some(create_i32(0))),
             (
-                create_enum_constant("X", 0),
-                create_i32(3),
-                Some(create_i32(0)),
-            ),
-            (
-                create_enum_constant("X", 0),
+                enumeration_value(),
                 create_integer(3),
                 Some(create_integer(0)),
             ),
-            (
-                create_i32(1),
-                create_enum_constant("X", 0),
-                Some(create_i32(1)),
-            ),
+            (create_i32(1), enumeration_value(), Some(create_i32(1))),
             (
                 create_integer(1),
-                create_enum_constant("X", 0),
+                enumeration_value(),
                 Some(create_integer(1)),
             ),
             (create_i32(1), create_f32(2.0), None),
             (create_f32(1.0), create_i32(2), None),
-            (create_i32(1), create_string(""), None),
-            (create_string(""), create_i32(2), None),
-            (create_i32(1), create_boolean(false), None),
-            (create_boolean(false), create_i32(2), None),
-            (create_i32(1), create_anon_array(3, create_u32(0)), None),
-            (create_i32(1), array_val(), None),
-            (create_i32(1), anon_struct_val(), None),
-            (create_i32(1), struct_val(), None),
+            (create_i32(1), default_string(), None),
+            (default_string(), create_i32(2), None),
+            (create_i32(1), default_boolean(), None),
+            (default_boolean(), create_i32(2), None),
+            (create_i32(1), default_anon_array_3_u32(), None),
+            (create_i32(1), array_value(), None),
+            (create_i32(1), anon_struct_value(), None),
+            (create_i32(1), struct_value(), None),
         ];
         check_binop("<<", |a, b| a.shl(b), cases);
     });
@@ -438,36 +346,28 @@ fn value_rshift() {
                 create_integer(3),
                 Some(create_integer(8)),
             ),
+            (enumeration_value(), create_i32(1), Some(create_i32(0))),
             (
-                create_enum_constant("X", 0),
-                create_i32(1),
-                Some(create_i32(0)),
-            ),
-            (
-                create_enum_constant("X", 0),
+                enumeration_value(),
                 create_integer(1),
                 Some(create_integer(0)),
             ),
-            (
-                create_i32(16),
-                create_enum_constant("X", 0),
-                Some(create_i32(16)),
-            ),
+            (create_i32(16), enumeration_value(), Some(create_i32(16))),
             (
                 create_integer(16),
-                create_enum_constant("X", 0),
+                enumeration_value(),
                 Some(create_integer(16)),
             ),
             (create_i32(16), create_f32(2.0), None),
             (create_f32(16.0), create_i32(2), None),
-            (create_i32(16), create_string(""), None),
-            (create_string(""), create_i32(2), None),
-            (create_i32(16), create_boolean(false), None),
-            (create_boolean(false), create_i32(2), None),
-            (create_i32(16), create_anon_array(3, create_u32(0)), None),
-            (create_i32(16), array_val(), None),
-            (create_i32(16), anon_struct_val(), None),
-            (create_i32(16), struct_val(), None),
+            (create_i32(16), default_string(), None),
+            (default_string(), create_i32(2), None),
+            (create_i32(16), default_boolean(), None),
+            (default_boolean(), create_i32(2), None),
+            (create_i32(16), default_anon_array_3_u32(), None),
+            (create_i32(16), array_value(), None),
+            (create_i32(16), anon_struct_value(), None),
+            (create_i32(16), struct_value(), None),
         ];
         check_binop(">>", |a, b| a.shr(b), cases);
     });
@@ -483,13 +383,13 @@ fn value_is_zero() {
         assert!(!create_i32(1).is_zero());
         assert!(create_i32(0).is_zero());
         // default_enum's "X" constant with value 0 is zero.
-        assert!(create_enum_constant("X", 0).is_zero());
+        assert!(enumeration_value().is_zero());
         assert!(!create_f32(1.0).is_zero());
         assert!(create_f32(0.0).is_zero());
-        assert!(!array_val().is_zero());
-        assert!(!create_anon_array(3, create_u32(0)).is_zero());
-        assert!(!struct_val().is_zero());
-        assert!(!anon_struct_val().is_zero());
+        assert!(!array_value().is_zero());
+        assert!(!default_anon_array_3_u32().is_zero());
+        assert!(!struct_value().is_zero());
+        assert!(!anon_struct_value().is_zero());
     });
 }
 
@@ -500,14 +400,13 @@ fn value_is_zero() {
 #[test]
 fn value_convert_to_type() {
     with_test_ctx(|| {
-        // Expected anon-struct { a = U32(0), b = String(""), c = I8(0) } for the
-        // widening case that adds a defaulted member.
+        // anon_struct_value() with the member c = default_i8() added
         let abc_struct = {
-            let mut m: IndexMap<String, Value> = IndexMap::new();
-            m.insert("a".to_string(), create_u32(0));
-            m.insert("b".to_string(), create_string(""));
-            m.insert("c".to_string(), create_i8(0));
-            Value::AnonStruct(AnonStructValue { members: m })
+            let Value::AnonStruct(AnonStructValue { mut members }) = anon_struct_value() else {
+                unreachable!("anon_struct_value is an anonymous struct value")
+            };
+            members.insert("c".to_string(), default_i8());
+            Value::AnonStruct(AnonStructValue { members })
         };
         let cases: Vec<(Value, Arc<Type>, Option<Value>)> = vec![
             (create_i8(1), i8(), Some(create_i8(1))),
@@ -517,54 +416,52 @@ fn value_convert_to_type() {
             (create_i8(1), integer(), Some(create_integer(1))),
             (create_f64(1.0), integer(), Some(create_integer(1))),
             (create_f64(1.0), f32(), Some(create_f32(1.0))),
-            (create_enum_constant("X", 0), f32(), Some(create_f32(0.0))),
-            (create_i32(0), default_enum(), None),
+            (enumeration_value(), f32(), Some(create_f32(0.0))),
+            (create_i32(0), enum_type(), None),
             (
                 create_i32(42),
-                anon_array(Some(3), u32()),
+                default_anon_array_3_u32_type(),
                 Some(create_anon_array(3, create_u32(42))),
             ),
-            (anon_struct_val(), anon_array(Some(3), u32()), None),
+            (anon_struct_value(), default_anon_array_3_u32_type(), None),
             (
-                array_val(),
-                anon_array(Some(3), u32()),
-                Some(create_anon_array(3, create_u32(0))),
+                array_value(),
+                default_anon_array_3_u32_type(),
+                Some(default_anon_array_3_u32()),
             ),
-            (anon_struct_val(), default_array(), None),
+            (anon_struct_value(), array_type(), None),
             (
                 create_anon_array(2, create_i8(1)),
-                anon_array(Some(3), u32()),
+                default_anon_array_3_u32_type(),
                 None,
             ),
             (
-                anon_struct_val(),
-                anon_struct(&[("a", u32()), ("b", string(None))]),
-                Some(anon_struct_val()),
+                anon_struct_value(),
+                anon_struct_type(),
+                Some(anon_struct_value()),
             ),
-            (anon_struct_val(), anon_struct(&[("a", string(None))]), None),
             (
-                anon_struct_val(),
+                anon_struct_value(),
+                anon_struct(&[("a", string(None))]),
+                None,
+            ),
+            (
+                anon_struct_value(),
                 anon_struct(&[("a", u32()), ("b", string(None)), ("c", i8())]),
                 Some(abc_struct.clone()),
             ),
             (
-                struct_val(),
+                struct_value(),
                 anon_struct(&[("a", u32()), ("b", string(None)), ("c", i8())]),
                 Some(abc_struct),
             ),
-            (
-                create_i32(0),
-                anon_struct(&[("a", u32()), ("b", string(None))]),
-                None,
-            ),
+            (create_i32(0), anon_struct_type(), None),
             (
                 create_i32(0),
                 anon_struct(&[("a", u32())]),
-                Some({
-                    let mut m: IndexMap<String, Value> = IndexMap::new();
-                    m.insert("a".to_string(), create_u32(0));
-                    Value::AnonStruct(AnonStructValue { members: m })
-                }),
+                Some(Value::AnonStruct(AnonStructValue {
+                    members: IndexMap::from([("a".to_string(), default_u32())]),
+                })),
             ),
         ];
         check_convert(cases);
@@ -587,9 +484,9 @@ fn value_negate() {
             &create_integer(1).negate().unwrap(),
             &create_integer(-1)
         ));
-        assert!(create_string("").negate().is_err());
-        assert!(create_anon_array(3, create_u32(0)).negate().is_err());
-        assert!(anon_struct_val().negate().is_err());
+        assert!(default_string().negate().is_err());
+        assert!(default_anon_array_3_u32().negate().is_err());
+        assert!(anon_struct_value().negate().is_err());
         // Enum constant negates through its rep type (default_enum rep is I32).
         assert!(values_eq(
             &create_enum_constant("X", 1).negate().unwrap(),
@@ -856,7 +753,7 @@ fn value_convert_scalar_to_named_aggregates() {
         }
 
         // Scalar -> named struct `S { a: U32, b: U32 }`.
-        let s_ty = struct_ty("S", anon_struct(&[("a", u32()), ("b", u32())]), 501);
+        let s_ty = struct_("S", anon_struct(&[("a", u32()), ("b", u32())]), 501, &[]);
         match create_i32(3).convert(&s_ty) {
             Some(Value::Struct(s)) => {
                 assert_eq!(s.anon_struct.members.len(), 2);
@@ -1018,6 +915,105 @@ fn value_binop_integer_and_float_left() {
     });
 }
 
+/// An array default holds `size` references to one element value, so a
+/// nested array default costs the SUM of the nested sizes and not their
+/// PRODUCT.
+///
+/// The pointer-identity assertions are what bound the memory: with an
+/// independent copy per element, `array Inner = [n] U8` +
+/// `array Outer = [n] Inner` would build n^2 values, which at the size bound
+/// (n = 2^31-1) cannot complete.
+#[test]
+fn array_default_shares_its_repeated_element() {
+    const N: usize = 2000;
+
+    let inner = anon_array(Some(N), u8());
+    let outer = anon_array(Some(N), inner);
+
+    let Some(Value::AnonArray(outer_default)) = outer.default_value() else {
+        panic!("expected an anonymous array default");
+    };
+    assert_eq!(outer_default.elements.len(), N);
+
+    // Every element of the outer array is the one shared inner array
+    let first = &outer_default.elements[0];
+    assert!(
+        outer_default.elements.iter().all(|e| Arc::ptr_eq(e, first)),
+        "the outer array's elements are not shared"
+    );
+
+    // ... and that inner array shares its own repeated element in turn, so
+    // the whole default holds 2N references to 2 distinct values
+    let Value::AnonArray(inner_default) = first.as_ref() else {
+        panic!("expected an anonymous array element");
+    };
+    assert_eq!(inner_default.elements.len(), N);
+    let inner_first = &inner_default.elements[0];
+    assert!(
+        inner_default
+            .elements
+            .iter()
+            .all(|e| Arc::ptr_eq(e, inner_first)),
+        "the inner array's elements are not shared"
+    );
+    assert!(values_eq(inner_first, &create_u8(0)));
+
+    // Reading the value is unaffected by the sharing
+    assert_eq!(inner_default.iter().count(), N);
+    assert!(inner_default.iter().all(|e| e.to_string() == "0: U8"));
+    assert!(inner_default.get(N - 1).is_some());
+    assert!(inner_default.get(N).is_none());
+}
+
+/// A scalar promoted to an array of known size shares the promoted element
+/// too, and an array of unknown size records it as the array's scalar.
+#[test]
+fn promoted_scalar_shares_its_element() {
+    const N: usize = 1000;
+    let scalar = create_u32(7);
+
+    let u32_array = |size| anon_array(size, u32());
+    let Some(Value::AnonArray(promoted)) = scalar.convert(&u32_array(Some(N))) else {
+        panic!("expected an anonymous array");
+    };
+    assert_eq!(promoted.elements.len(), N);
+    let first = &promoted.elements[0];
+    assert!(promoted.elements.iter().all(|e| Arc::ptr_eq(e, first)));
+
+    // Unknown size: no elements, and the value is kept as the scalar
+    let Some(Value::AnonArray(unsized_array)) = scalar.convert(&u32_array(None)) else {
+        panic!("expected an anonymous array");
+    };
+    assert!(unsized_array.elements.is_empty());
+    assert!(unsized_array.scalar.is_some());
+}
+
+/// Converting and truncating an array preserve the sharing, so neither turns
+/// a shared default back into one copy per element.
+#[test]
+fn array_conversion_preserves_sharing() {
+    const N: usize = 2000;
+    let u8_array = anon_array(Some(N), u8());
+    let u32_array = anon_array(Some(N), u32());
+    let value = u8_array.default_value().expect("an array default");
+
+    for converted in [
+        value.convert(&u32_array),
+        value.truncate().convert(&u8_array),
+        Some(value.truncate()),
+    ] {
+        let Some(Value::AnonArray(a)) = converted else {
+            panic!("expected an anonymous array");
+        };
+        assert_eq!(a.elements.len(), N);
+        let first = &a.elements[0];
+        assert!(
+            a.elements.iter().all(|e| Arc::ptr_eq(e, first)),
+            "sharing was not preserved"
+        );
+    }
+}
+
 /// `Display` for every `Value` variant: the Scala `Value.toString`.
 #[test]
 fn value_display() {
@@ -1053,8 +1049,8 @@ fn value_display() {
             Value::AnonArray(AnonArrayValue::promoted(create_u32(1))).to_string(),
             "[ 1: U32, ... ]"
         );
-        assert_eq!(array_val().to_string(), "[ 0: I32, 0: I32, 0: I32 ]: A");
-        assert_eq!(anon_struct_val().to_string(), "{ a = 0: U32, b = \"\" }");
+        assert_eq!(array_value().to_string(), "[ 0: I32, 0: I32, 0: I32 ]: A");
+        assert_eq!(anon_struct_value().to_string(), "{ a = 0: U32, b = \"\" }");
         assert_eq!(
             Value::AnonStruct(AnonStructValue {
                 members: IndexMap::new()
@@ -1062,6 +1058,6 @@ fn value_display() {
             .to_string(),
             "{ }"
         );
-        assert_eq!(struct_val().to_string(), "{ a = 0: U32, b = \"\" }: S");
+        assert_eq!(struct_value().to_string(), "{ a = 0: U32, b = \"\" }: S");
     });
 }

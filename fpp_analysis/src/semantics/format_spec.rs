@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::format::{Field, ParsedFormat, Parser};
-use super::test_helpers::*;
+use super::spec::*;
 use crate::Analysis;
 use crate::errors::SemanticError;
 use crate::semantics::{

@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/binop_enum_common_type_error.fpp:5:15
+  |
+5 | constant d = [c, "a"]
+  |               ^ cannot compute common type of Integer and string
+

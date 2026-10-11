@@ -6,8 +6,9 @@ use crate::errors::{SemanticError, SemanticResult};
 use crate::passes::FinalizeTypeDefs;
 use crate::semantics::{
     AliasType, AnonArrayValue, AnonStructValue, ArrayType, ArrayValue, BooleanValue,
-    EnumConstantValue, EnumType, FloatValue, IntegerValue, QualifiedName, SerializedSizeError,
-    StringValue, StructType, StructValue, Symbol, SymbolInterface, Type, Value,
+    EnumConstantValue, EnumType, FloatValue, IntegerValue, QualifiedName, SerializedSize,
+    SerializedSizeError, StringValue, StructType, StructValue, Symbol, SymbolInterface, Type,
+    TypeVisitor, Value,
 };
 use fpp_ast::{
     Binop, DefConstant, DefEnum, DefEnumConstant, Expr, ExprKind, Ident, Node, StructExprMember,
@@ -398,20 +399,10 @@ impl<'ast> EvalConstantExprs<'ast> {
         node: &'ast Expr,
         value: &str,
     ) -> ControlFlow<()> {
-        let value: f64 = match value.parse() {
-            Ok(value) => value,
-            Err(err) => {
-                SemanticError::InvalidIntValue {
-                    loc: node.span(),
-                    v: None,
-                    msg: format!("failed to parse floating value: {}", err),
-                }
-                .emit();
-                return ControlFlow::Break(());
-            }
-        };
         let v = Value::Float(FloatValue {
-            value,
+            value: value
+                .parse()
+                .expect("the lexer accepts only well-formed float literals"),
             kind: fpp_ast::FloatKind::F64,
         });
         a.assign_value(node.node_id, v);
@@ -487,33 +478,35 @@ impl<'ast> EvalConstantExprs<'ast> {
         type_name: &'ast TypeName,
     ) -> ControlFlow<()> {
         self.super_visit(a, Node::Expr(node))?;
+        let Some(t) = a.type_map.get(&type_name.node_id).cloned() else {
+            return ControlFlow::Continue(());
+        };
         // Finalize the type so we can compute the size
-        if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
-            FinalizeType(self).finalize_if_needed(a, &ty)?;
-        }
-        // A `string size N` type name has no definition to evaluate,
-        // but its size still has to be resolved into the type.
-        FinalizeTypeDefs::new().ty(a, type_name)?;
-        if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
-            // Get the finalized type
-            let finalized = FinalizeType::get_finalized_type(a, &ty);
-            // Use the finalized type to compute the size
-            match finalized.serialized_size(a) {
-                Ok(size) => {
-                    a.assign_value(node.node_id, Value::Integer(IntegerValue(size)));
+        FinalizeType(self).finalize_if_needed(a, &t)?;
+        // Get the finalized type
+        let t_fin = match t.deref() {
+            // The type of a string type name does not hold the size; the
+            // type name gives it, and it must lie in [0, 2^31) (spec, String
+            // Type Names)
+            Type::String(_) => FinalizeTypeDefs::new().finalized_type(a, type_name)?,
+            _ => FinalizeType::get_finalized_type(a, &t),
+        };
+        // Use the finalized type to compute the size
+        match SerializedSize.ty(a, &t_fin) {
+            Ok(size) => {
+                a.assign_value(node.node_id, Value::Integer(IntegerValue(size)));
+            }
+            // The size is unknown here; a type whose size is never
+            // knowable is reported by `CheckExprTypes`
+            Err(SerializedSizeError::Unavailable) => {}
+            Err(SerializedSizeError::TooLarge) => {
+                SemanticError::InvalidIntValue {
+                    loc: node.span(),
+                    v: None,
+                    msg: "serialized size is too large to represent".to_string(),
                 }
-                // The size is unknown here; a type whose size is never
-                // knowable is reported by `CheckExprTypes`
-                Err(SerializedSizeError::Unavailable) => {}
-                Err(SerializedSizeError::TooLarge) => {
-                    SemanticError::InvalidIntValue {
-                        loc: node.span(),
-                        v: None,
-                        msg: "serialized size is too large to represent".to_string(),
-                    }
-                    .emit();
-                    return ControlFlow::Break(());
-                }
+                .emit();
+                return ControlFlow::Break(());
             }
         }
         ControlFlow::Continue(())
@@ -616,15 +609,13 @@ impl<'ast> EvalConstantExprs<'ast> {
 // The FinalizeTypeDefs methods update the visited symbol set
 struct FinalizeType<'p, 'ast>(&'p EvalConstantExprs<'ast>);
 
-impl<'p, 'ast> FinalizeType<'p, 'ast> {
-    fn ty(&self, a: &mut Analysis, t: &Arc<Type>) -> ControlFlow<()> {
-        match t.deref() {
-            Type::Alias(t) => self.alias_type(a, t),
-            Type::Array(t) => self.array(a, t),
-            Type::Enum(t) => self.enumeration(a, t),
-            Type::Struct(t) => self.struct_(a, t),
-            _ => ControlFlow::Continue(()),
-        }
+impl<'p, 'ast> TypeVisitor for FinalizeType<'p, 'ast> {
+    type In<'a> = &'a mut Analysis;
+
+    type Out = ControlFlow<()>;
+
+    fn default(&self, _: &mut Analysis, _: &Type) -> ControlFlow<()> {
+        ControlFlow::Continue(())
     }
 
     fn alias_type(&self, a: &mut Analysis, t: &AliasType) -> ControlFlow<()> {
@@ -634,20 +625,20 @@ impl<'p, 'ast> FinalizeType<'p, 'ast> {
         FinalizeTypeDefs::new().visit_def_alias_type(a, &node)
     }
 
-    fn array(&self, a: &mut Analysis, t: &ArrayType) -> ControlFlow<()> {
+    fn array(&self, a: &mut Analysis, t: &Arc<ArrayType>) -> ControlFlow<()> {
         let node = t.node.clone();
         self.0.visit_def_array(a, &node)?;
         self.finalize_if_needed(a, &t.anon_array.elt_type)?;
         FinalizeTypeDefs::new().visit_def_array(a, &node)
     }
 
-    fn enumeration(&self, a: &mut Analysis, t: &EnumType) -> ControlFlow<()> {
+    fn enumeration(&self, a: &mut Analysis, t: &Arc<EnumType>) -> ControlFlow<()> {
         let node = t.node.clone();
         self.0.visit_def_enum(a, &node)?;
         FinalizeTypeDefs::new().visit_def_enum(a, &node)
     }
 
-    fn struct_(&self, a: &mut Analysis, t: &StructType) -> ControlFlow<()> {
+    fn struct_(&self, a: &mut Analysis, t: &Arc<StructType>) -> ControlFlow<()> {
         let node = t.node.clone();
         self.0.visit_def_struct(a, &node)?;
         for (_, t1) in &t.anon_struct.members {
@@ -655,12 +646,14 @@ impl<'p, 'ast> FinalizeType<'p, 'ast> {
         }
         FinalizeTypeDefs::new().visit_def_struct(a, &node)
     }
+}
 
+impl<'p, 'ast> FinalizeType<'p, 'ast> {
     // Query whether a type is finalized
     // A type is finalized if (1) it has a definition symbol S
     // and S is in the visited symbol set; or (2)
     // it has no definition symbol
-    fn type_is_finalized(a: &Analysis, t: &Arc<Type>) -> bool {
+    fn type_is_finalized(a: &Analysis, t: &Type) -> bool {
         match t.def_symbol() {
             Some(sym) => a.visited_symbol_set.contains(&sym),
             None => true,
@@ -668,7 +661,7 @@ impl<'p, 'ast> FinalizeType<'p, 'ast> {
     }
 
     // Finalize a type if not already finalized
-    fn finalize_if_needed(&self, a: &mut Analysis, t: &Arc<Type>) -> ControlFlow<()> {
+    fn finalize_if_needed(&self, a: &mut Analysis, t: &Type) -> ControlFlow<()> {
         if !Self::type_is_finalized(a, t) {
             self.ty(a, t)
         } else {

@@ -16,6 +16,11 @@ fn shift_boolean_value_error() {
 }
 
 #[test]
+fn shift_empty_struct_error() {
+    run_test("numeric_shift/shift_empty_struct_error")
+}
+
+#[test]
 fn shift_alias_value_error() {
     run_test("numeric_shift/shift_alias_value_error")
 }

@@ -8,7 +8,7 @@ use crate::semantics::{
 };
 use fpp_ast::{
     AstNode, DefAliasType, DefArray, DefEnum, DefModuleTemplate, DefStruct, Expr, LitString, Node,
-    TemplateParam, TransUnit, TypeName, TypeNameKind, Visitor, Walkable,
+    TemplateParam, TypeName, TypeNameKind, Visitor,
 };
 use fpp_core::Spanned;
 use std::ops::{ControlFlow, Deref};
@@ -16,6 +16,11 @@ use std::sync::Arc;
 
 /// Finalize type definitions. Update the types of uses (type names) that
 /// refer to the definitions.
+///
+/// The visited symbol set holds the definitions finalized so far, including
+/// the ones that `EvalConstantExprs` finalized on demand, and it is kept for
+/// the whole model, so each definition is finalized, and its errors are
+/// reported, once.
 pub struct FinalizeTypeDefs<'ast> {
     super_: TypeExpressionAnalyzer<'ast, Self>,
 }
@@ -258,15 +263,6 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         }
         ControlFlow::Continue(())
     }
-
-    fn visit_trans_unit(
-        &self,
-        a: &mut Self::State,
-        node: &'ast TransUnit,
-    ) -> ControlFlow<Self::Break> {
-        a.visited_symbol_set.clear();
-        node.walk(a, self)
-    }
 }
 
 impl<'ast> FinalizeTypeDefs<'ast> {
@@ -289,33 +285,27 @@ impl<'ast> FinalizeTypeDefs<'ast> {
         ControlFlow::Continue(())
     }
 
-    /// Finalizes the type named by a type name, as the operand of `sizeof`
-    /// needs it: the definition the name refers to is finalized, and the size of
-    /// a `string size n` type name is evaluated into the type but not checked.
-    /// The finalized type is recorded as the type of the type name and
-    /// returned.
-    pub(crate) fn ty(&self, a: &mut Analysis, node: &'ast TypeName) -> ControlFlow<(), Arc<Type>> {
-        self.finalize_type_name(a, node, false)
-    }
-
-    /// Finalizes the type named by a type name, checking the size of a
-    /// `string size n` type, and records and returns it. This is Scala's
-    /// TypeVisitor applied to the type of the type name: the type of a
-    /// `string size n` type name does not hold the size expression, so the
-    /// type is reached through the type name.
+    /// Finalizes the type named by a type name, and records and returns it
     pub(crate) fn type_name_node(
         &self,
         a: &mut Analysis,
         node: &'ast TypeName,
     ) -> ControlFlow<(), Arc<Type>> {
-        self.finalize_type_name(a, node, true)
+        let ty = self.finalized_type(a, node)?;
+        a.assign_type(node.node_id, ty.clone());
+        ControlFlow::Continue(ty)
     }
 
-    fn finalize_type_name(
+    /// Computes the finalized type named by a type name, without recording it
+    /// as the type of the type name: the definition the name refers to is
+    /// finalized, and the size of a `string size n` type is evaluated and
+    /// checked. This is Scala's TypeVisitor applied to the type of the type
+    /// name; the type of a `string size n` type name does not hold the size
+    /// expression, so the type is reached through the type name.
+    pub(crate) fn finalized_type(
         &self,
         a: &mut Analysis,
         node: &'ast TypeName,
-        check_string_size: bool,
     ) -> ControlFlow<(), Arc<Type>> {
         let finalized = match &node.kind {
             TypeNameKind::QualIdent(q) => match a.use_def_map.get(&q.id()).cloned() {
@@ -337,13 +327,13 @@ impl<'ast> FinalizeTypeDefs<'ast> {
                 }
                 // A type parameter names the type its argument names
                 Some(Symbol::TemplateTypeArg { value, .. }) => {
-                    Some(self.finalize_type_name(a, value.deref(), check_string_size)?)
+                    Some(self.finalized_type(a, value.deref())?)
                 }
                 _ => None,
             },
             TypeNameKind::String(Some(size)) => match a.get_big_int_value(size.node_id) {
                 Some(size_v) => {
-                    if check_string_size && !Type::is_valid_string_size(size_v) {
+                    if !Type::is_valid_string_size(size_v) {
                         SemanticError::InvalidStringSize {
                             loc: size.span(),
                             size: size_v,
@@ -359,15 +349,13 @@ impl<'ast> FinalizeTypeDefs<'ast> {
         };
 
         // `CheckTypeUses` normally gives every type name it reaches an entry.
-        // Fall back to the shared unknown type rather than assuming that: the
-        // operand of a `sizeof` can sit in a position that no earlier pass
-        // visited, and a missing entry must degrade to an unknown type, not
-        // abort the compiler (which would also take down `fpp_lsp_server`).
+        // Fall back to the shared unknown type rather than assuming that: a
+        // type name with no entry must degrade to an unknown type, not abort
+        // the compiler (which would also take down `fpp_lsp_server`).
         let ty = match finalized.or_else(|| a.type_map.get(&node.node_id).cloned()) {
             Some(ty) => ty,
             None => a.unknown_type(node.span()),
         };
-        a.assign_type(node.node_id, ty.clone());
         ControlFlow::Continue(ty)
     }
 

@@ -38,10 +38,12 @@ impl TlmChannel {
     ) -> SemanticResult<TlmChannel> {
         let channel_type = a.get_finalized_type(node.type_name.node_id).unwrap();
         let update = node.update.clone().unwrap_or(TlmChannelUpdate::Always);
-        let format = node
-            .format
-            .as_ref()
-            .map(|format| Format::new(format, vec![(channel_type.clone(), node.type_name.span())]));
+        // An invalid format string is reported, and the channel has no format
+        let format = node.format.as_ref().and_then(|format| {
+            Analysis::compute_format(format, std::slice::from_ref(&channel_type))
+                .map_err(|err| err.emit())
+                .ok()
+        });
         let low_limits = compute_limits(a, &node.low)?;
         let high_limits = compute_limits(a, &node.high)?;
         a.check_displayable_type(

@@ -1,9 +1,6 @@
-use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
-use crate::semantics::Type;
 use fpp_ast::LitString;
 use fpp_core::Spanned;
-use std::sync::Arc;
 
 /// The type of an integer replacement field
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,23 +51,6 @@ pub enum FormatPart {
 pub struct Format(pub Vec<FormatPart>);
 
 impl Format {
-    /// Computes the format of a format string for the types of the values it
-    /// formats, reporting an invalid format string. A format string that is
-    /// not valid for the types has the empty format. The type-name spans are
-    /// not used.
-    ///
-    /// See [`Analysis::compute_format`].
-    pub fn new(node: &LitString, ts: Vec<(Arc<Type>, fpp_core::Span)>) -> Format {
-        let ts: Vec<Arc<Type>> = ts.into_iter().map(|(t, _)| t).collect();
-        match Analysis::compute_format(node, &ts) {
-            Ok(format) => format,
-            Err(err) => {
-                err.emit();
-                Format(vec![])
-            }
-        }
-    }
-
     /// Number of fields in the format string
     pub fn len(&self) -> usize {
         self.0
@@ -197,8 +177,9 @@ type ParseResult<T> = Result<T, ParseError>;
 /// precision = "." digit { digit }
 /// ```
 ///
-/// The whole string must be a format. A failure after a field's opening `{`
-/// is final; at the first failure the parser reports the error and stops.
+/// The whole string must be a format ([`Parser::parse_all_input`]). A failure
+/// after a field's opening `{` is final; at the first failure the parser
+/// reports the error and stops.
 pub(crate) struct Parser<'a> {
     /// The node of the format string
     node: &'a LitString,
@@ -228,7 +209,7 @@ impl<'a> Parser<'a> {
     /// Parse the format string of a node
     pub(crate) fn parse_node(node: &LitString) -> SemanticResult<ParsedFormat> {
         let mut parser = Parser::new(node);
-        match parser.format() {
+        match parser.parse_all_input() {
             Ok(format) => Ok(format),
             Err(ParseError { msg, pos }) => Err(SemanticError::InvalidFormatString {
                 loc: if parser.verbatim {
@@ -242,13 +223,9 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// The whole input is a format
-    fn format(&mut self) -> ParseResult<ParsedFormat> {
-        let prefix = self.string();
-        let mut fields = vec![];
-        while let Some(field) = self.field()? {
-            fields.push((field.0, field.1, self.string()));
-        }
+    /// A format that is the whole input
+    fn parse_all_input(&mut self) -> ParseResult<ParsedFormat> {
+        let format = self.format()?;
         if self.pos < self.chars.len() {
             // The string stops only at a '{' or '}', and a '{' starts a field,
             // so this is an unmatched '}'
@@ -256,6 +233,16 @@ impl<'a> Parser<'a> {
                 msg: "illegal character".to_string(),
                 pos: self.pos,
             });
+        }
+        Ok(format)
+    }
+
+    /// A format: a string, then fields, each followed by a string
+    fn format(&mut self) -> ParseResult<ParsedFormat> {
+        let prefix = self.string();
+        let mut fields = vec![];
+        while let Some(field) = self.field()? {
+            fields.push((field.0, field.1, self.string()));
         }
         Ok(ParsedFormat { prefix, fields })
     }

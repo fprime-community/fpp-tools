@@ -273,6 +273,9 @@ pub mod semantics {
     mod types;
     pub use types::*;
 
+    mod type_visitor;
+    pub(crate) use type_visitor::*;
+
     mod value;
     pub use value::*;
 
@@ -291,7 +294,7 @@ pub mod semantics {
     #[cfg(test)]
     mod format_spec;
     #[cfg(test)]
-    pub(crate) mod test_helpers;
+    pub(crate) mod spec;
     #[cfg(test)]
     mod type_option_spec;
     #[cfg(test)]

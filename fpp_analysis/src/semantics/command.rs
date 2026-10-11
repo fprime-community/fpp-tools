@@ -103,7 +103,9 @@ impl Command {
         let kind = match node.kind {
             InputPortKind::Async => NonParamKind::Async {
                 priority,
-                queue_full: Analysis::get_specified_queue_full(&node.queue_full),
+                queue_full: Analysis::get_queue_full(
+                    &node.queue_full.as_ref().map(|q| q.kind.clone()),
+                ),
             },
             InputPortKind::Guarded => NonParamKind::Guarded,
             InputPortKind::Sync => NonParamKind::Sync,

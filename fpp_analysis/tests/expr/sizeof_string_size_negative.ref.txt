@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/expr/sizeof_string_size_negative.fpp:5:33
+  |
+5 | constant c = sizeof(string size -1)
+  |                                 ^^ invalid string size -1
+

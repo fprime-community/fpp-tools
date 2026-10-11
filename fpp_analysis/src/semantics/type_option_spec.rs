@@ -5,7 +5,7 @@
 //! (docs/spec/Type-Options.adoc): "Conversion of Type Options" and
 //! "Computing a Common Type Option".
 
-use super::test_helpers::*;
+use super::spec::*;
 use crate::semantics::Type;
 use crate::semantics::state_machine::{TypeOption, TypeOptionT};
 use std::sync::Arc;

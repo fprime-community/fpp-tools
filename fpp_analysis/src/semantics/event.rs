@@ -42,16 +42,17 @@ impl Event {
         };
         check_ref_params(&node.params)?;
         a.check_displayable_params(&node.params, "type of event is not displayable")?;
-        let types: Vec<(Arc<Type>, Span)> = node
+        let types: Vec<Arc<Type>> = node
             .params
             .iter()
-            .filter_map(|p| {
-                a.type_map
-                    .get(&p.type_name.node_id)
-                    .map(|t| (t.clone(), p.type_name.span()))
-            })
+            .filter_map(|p| a.type_map.get(&p.type_name.node_id).cloned())
             .collect();
-        let format = Format::new(&node.format, types);
+        // An invalid format string is reported, and the event has the empty
+        // format
+        let format = Analysis::compute_format(&node.format, &types).unwrap_or_else(|err| {
+            err.emit();
+            Format(vec![])
+        });
         let throttle = match &node.throttle {
             Some(throttle) => Some(check_event_throttle(a, throttle, loc)?),
             None => None,

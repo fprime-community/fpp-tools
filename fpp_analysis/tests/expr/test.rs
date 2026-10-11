@@ -196,6 +196,11 @@ fn binop_numeric_error() {
 }
 
 #[test]
+fn binop_enum_common_type_error() {
+    run_test("expr/binop_enum_common_type_error")
+}
+
+#[test]
 fn subscript_order_error() {
     run_test("expr/subscript_order_error")
 }
@@ -251,6 +256,16 @@ fn arith_overflow_use_chain() {
 }
 
 #[test]
-fn sizeof_string_size_unchecked() {
-    run_test("expr/sizeof_string_size_unchecked")
+fn sizeof_string_size_negative() {
+    run_test("expr/sizeof_string_size_negative")
+}
+
+#[test]
+fn sizeof_string_size_too_large() {
+    run_test("expr/sizeof_string_size_too_large")
+}
+
+#[test]
+fn sizeof_string_size_template_ok() {
+    run_test("expr/sizeof_string_size_template_ok")
 }

@@ -11,8 +11,18 @@ fn alias_param_arith_ok() {
 }
 
 #[test]
+fn alias_param_binop_shift_ok() {
+    run_test("template/alias_param_binop_shift_ok")
+}
+
+#[test]
 fn alias_param_dictionary_constant_error() {
     run_test("template/alias_param_dictionary_constant_error")
+}
+
+#[test]
+fn alias_param_neg_float_shift_amount_error() {
+    run_test("template/alias_param_neg_float_shift_amount_error")
 }
 
 #[test]
@@ -48,6 +58,11 @@ fn arg_kind_type_param_constant_arg() {
 #[test]
 fn arg_kind_type_param_instance_arg() {
     run_test("template/arg_kind_type_param_instance_arg")
+}
+
+#[test]
+fn array_params_common_type_error() {
+    run_test("template/array_params_common_type_error")
 }
 
 #[test]

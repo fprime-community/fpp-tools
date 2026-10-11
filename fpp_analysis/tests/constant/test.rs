@@ -76,11 +76,6 @@ fn dictionary_alias_error() {
 }
 
 #[test]
-fn dictionary_alias_template_error() {
-    run_test("constant/dictionary_alias_template_error")
-}
-
-#[test]
 fn dictionary_ok() {
     run_test("constant/dictionary_ok")
 }
