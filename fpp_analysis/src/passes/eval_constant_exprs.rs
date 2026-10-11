@@ -487,33 +487,35 @@ impl<'ast> EvalConstantExprs<'ast> {
         type_name: &'ast TypeName,
     ) -> ControlFlow<()> {
         self.super_visit(a, Node::Expr(node))?;
+        let Some(t) = a.type_map.get(&type_name.node_id).cloned() else {
+            return ControlFlow::Continue(());
+        };
         // Finalize the type so we can compute the size
-        if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
-            FinalizeType(self).finalize_if_needed(a, &ty)?;
-        }
-        // A `string size N` type name has no definition to evaluate,
-        // but its size still has to be resolved into the type.
-        FinalizeTypeDefs::new().ty(a, type_name)?;
-        if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
-            // Get the finalized type
-            let finalized = FinalizeType::get_finalized_type(a, &ty);
-            // Use the finalized type to compute the size
-            match finalized.serialized_size(a) {
-                Ok(size) => {
-                    a.assign_value(node.node_id, Value::Integer(IntegerValue(size)));
+        FinalizeType(self).finalize_if_needed(a, &t)?;
+        // Get the finalized type
+        let t_fin = match t.deref() {
+            // The type of a string type name does not hold the size; the
+            // type name gives it, and it must lie in [0, 2^31) (spec, String
+            // Type Names)
+            Type::String(_) => FinalizeTypeDefs::new().finalized_type(a, type_name)?,
+            _ => FinalizeType::get_finalized_type(a, &t),
+        };
+        // Use the finalized type to compute the size
+        match t_fin.serialized_size(a) {
+            Ok(size) => {
+                a.assign_value(node.node_id, Value::Integer(IntegerValue(size)));
+            }
+            // The size is unknown here; a type whose size is never
+            // knowable is reported by `CheckExprTypes`
+            Err(SerializedSizeError::Unavailable) => {}
+            Err(SerializedSizeError::TooLarge) => {
+                SemanticError::InvalidIntValue {
+                    loc: node.span(),
+                    v: None,
+                    msg: "serialized size is too large to represent".to_string(),
                 }
-                // The size is unknown here; a type whose size is never
-                // knowable is reported by `CheckExprTypes`
-                Err(SerializedSizeError::Unavailable) => {}
-                Err(SerializedSizeError::TooLarge) => {
-                    SemanticError::InvalidIntValue {
-                        loc: node.span(),
-                        v: None,
-                        msg: "serialized size is too large to represent".to_string(),
-                    }
-                    .emit();
-                    return ControlFlow::Break(());
-                }
+                .emit();
+                return ControlFlow::Break(());
             }
         }
         ControlFlow::Continue(())

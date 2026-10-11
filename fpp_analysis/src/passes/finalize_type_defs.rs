@@ -289,33 +289,27 @@ impl<'ast> FinalizeTypeDefs<'ast> {
         ControlFlow::Continue(())
     }
 
-    /// Finalizes the type named by a type name, as the operand of `sizeof`
-    /// needs it: the definition the name refers to is finalized, and the size of
-    /// a `string size n` type name is evaluated into the type but not checked.
-    /// The finalized type is recorded as the type of the type name and
-    /// returned.
-    pub(crate) fn ty(&self, a: &mut Analysis, node: &'ast TypeName) -> ControlFlow<(), Arc<Type>> {
-        self.finalize_type_name(a, node, false)
-    }
-
-    /// Finalizes the type named by a type name, checking the size of a
-    /// `string size n` type, and records and returns it. This is Scala's
-    /// TypeVisitor applied to the type of the type name: the type of a
-    /// `string size n` type name does not hold the size expression, so the
-    /// type is reached through the type name.
+    /// Finalizes the type named by a type name, and records and returns it
     pub(crate) fn type_name_node(
         &self,
         a: &mut Analysis,
         node: &'ast TypeName,
     ) -> ControlFlow<(), Arc<Type>> {
-        self.finalize_type_name(a, node, true)
+        let ty = self.finalized_type(a, node)?;
+        a.assign_type(node.node_id, ty.clone());
+        ControlFlow::Continue(ty)
     }
 
-    fn finalize_type_name(
+    /// Computes the finalized type named by a type name, without recording it
+    /// as the type of the type name: the definition the name refers to is
+    /// finalized, and the size of a `string size n` type is evaluated and
+    /// checked. This is Scala's TypeVisitor applied to the type of the type
+    /// name; the type of a `string size n` type name does not hold the size
+    /// expression, so the type is reached through the type name.
+    pub(crate) fn finalized_type(
         &self,
         a: &mut Analysis,
         node: &'ast TypeName,
-        check_string_size: bool,
     ) -> ControlFlow<(), Arc<Type>> {
         let finalized = match &node.kind {
             TypeNameKind::QualIdent(q) => match a.use_def_map.get(&q.id()).cloned() {
@@ -337,13 +331,13 @@ impl<'ast> FinalizeTypeDefs<'ast> {
                 }
                 // A type parameter names the type its argument names
                 Some(Symbol::TemplateTypeArg { value, .. }) => {
-                    Some(self.finalize_type_name(a, value.deref(), check_string_size)?)
+                    Some(self.finalized_type(a, value.deref())?)
                 }
                 _ => None,
             },
             TypeNameKind::String(Some(size)) => match a.get_big_int_value(size.node_id) {
                 Some(size_v) => {
-                    if check_string_size && !Type::is_valid_string_size(size_v) {
+                    if !Type::is_valid_string_size(size_v) {
                         SemanticError::InvalidStringSize {
                             loc: size.span(),
                             size: size_v,
@@ -367,7 +361,6 @@ impl<'ast> FinalizeTypeDefs<'ast> {
             Some(ty) => ty,
             None => a.unknown_type(node.span()),
         };
-        a.assign_type(node.node_id, ty.clone());
         ControlFlow::Continue(ty)
     }
 
