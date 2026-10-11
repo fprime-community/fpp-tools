@@ -208,9 +208,6 @@ pub mod semantics {
     mod tlm_channel;
     pub use tlm_channel::*;
 
-    mod state_machine_instance;
-    pub use state_machine_instance::*;
-
     mod component;
     pub use component::*;
 
@@ -219,6 +216,9 @@ pub mod semantics {
 
     mod component_instance;
     pub use component_instance::*;
+
+    mod interface_instance;
+    pub use interface_instance::*;
 
     mod topology;
     pub use topology::*;
@@ -251,6 +251,9 @@ pub mod semantics {
 
     mod connection;
     pub use connection::*;
+
+    mod port_instance_identifier;
+    pub use port_instance_identifier::*;
 
     mod scope;
     pub use scope::*;

@@ -96,8 +96,9 @@ pub struct Analysis {
     /// The map from topology symbols to 'partial' topologies
     /// with only port interface/instance information
     pub partial_topology_map: HashMap<Symbol, Topology>,
-    /// The map from topology symbols to topologies
-    pub topology_map: HashMap<Symbol, Topology>,
+    /// The map from topology symbols to topologies, in the order the
+    /// topologies were resolved
+    pub topology_map: indexmap::IndexMap<Symbol, Topology, FxBuildHasher>,
     /// The topology under construction
     pub(crate) topology: Option<Topology>,
     /// The map from state machine symbols to state machines
@@ -1189,15 +1190,23 @@ impl Analysis {
         self.use_def_map.get(&self.get_represented_use(id))
     }
 
-    /// Gets the topology symbol represented by a symbol, if there is one.
-    /// See [`Analysis::get_represented_symbol`].
-    pub fn get_represented_topology_symbol<'a>(&'a self, symbol: &'a Symbol) -> Option<&'a Symbol> {
-        let represented = if symbol.is_template_arg() {
-            self.get_represented_symbol(symbol.node())?
+    /// Gets the symbol represented by a symbol. See
+    /// [`Analysis::get_represented_symbol`].
+    pub(crate) fn get_represented_symbol_for_symbol<'a>(
+        &'a self,
+        symbol: &'a Symbol,
+    ) -> Option<&'a Symbol> {
+        if symbol.is_template_arg() {
+            self.get_represented_symbol(symbol.node())
         } else {
-            symbol
-        };
-        matches!(represented, Symbol::Topology(_)).then_some(represented)
+            Some(symbol)
+        }
+    }
+
+    /// Gets the topology symbol represented by a symbol, if there is one
+    pub fn get_represented_topology_symbol<'a>(&'a self, symbol: &'a Symbol) -> Option<&'a Symbol> {
+        self.get_represented_symbol_for_symbol(symbol)
+            .filter(|represented| matches!(represented, Symbol::Topology(_)))
     }
 
     /// Gets the component instance represented by a use. Strip off any template

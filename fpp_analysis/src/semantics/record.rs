@@ -13,6 +13,9 @@ pub struct Record {
     pub is_array: bool,
 }
 
+/// A record ID
+pub type RecordId = i128;
+
 impl Record {
     /// Gets the name of the record
     pub fn get_name(&self) -> &str {

@@ -16,6 +16,9 @@ pub struct Param {
     pub is_external: bool,
 }
 
+/// A parameter ID
+pub type ParamId = i128;
+
 impl Param {
     /// Gets the name of the parameter
     pub fn get_name(&self) -> &str {

@@ -221,6 +221,16 @@ fn interfaces_arg_missing_port() {
 }
 
 #[test]
+fn interfaces_arg_not_instance() {
+    run_test("template/interfaces_arg_not_instance")
+}
+
+#[test]
+fn interfaces_arg_not_instance_unused() {
+    run_test("template/interfaces_arg_not_instance_unused")
+}
+
+#[test]
 fn interfaces_basic() {
     run_test("template/interfaces_basic")
 }
@@ -238,6 +248,11 @@ fn interfaces_invalid_port_instance_name() {
 #[test]
 fn interfaces_invalid_port_instance_name_aliased() {
     run_test("template/interfaces_invalid_port_instance_name_aliased")
+}
+
+#[test]
+fn interfaces_param_not_interface() {
+    run_test("template/interfaces_param_not_interface")
 }
 
 #[test]

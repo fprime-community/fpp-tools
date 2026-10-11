@@ -82,4 +82,11 @@ impl StateMachineNestedScope {
     pub fn inner_scope(&self) -> &StateMachineScope {
         self.scopes.last().expect("empty scope stack")
     }
+
+    /// Get the outmost nested scope (the global scope)
+    pub fn global_scope(&self) -> StateMachineNestedScope {
+        StateMachineNestedScope {
+            scopes: vec![self.scopes.first().expect("empty scope stack").clone()],
+        }
+    }
 }

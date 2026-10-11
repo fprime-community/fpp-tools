@@ -13,7 +13,7 @@ pub struct TopologyPort {
 }
 
 impl TopologyPort {
-    /// Gets the name of the topology port
+    /// Gets the name of the topology port. Rust-only, for the Python bindings.
     pub fn get_name(&self) -> &str {
         &self.node.name.data
     }

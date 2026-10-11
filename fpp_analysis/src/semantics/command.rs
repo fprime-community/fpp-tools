@@ -19,6 +19,9 @@ pub enum Command {
     },
 }
 
+/// A command opcode
+pub type CommandOpcode = i128;
+
 /// The kind of a non-parameter command
 #[derive(Debug, Clone)]
 pub enum NonParamKind {

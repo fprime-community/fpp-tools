@@ -17,6 +17,9 @@ pub struct TlmChannel {
     pub high_limits: Limits,
 }
 
+/// A telemetry channel ID
+pub type TlmChannelId = i128;
+
 /// A map from limit kinds to the node and value of the limit
 pub type Limits = HashMap<TlmChannelLimitKind, (Node, Value)>;
 

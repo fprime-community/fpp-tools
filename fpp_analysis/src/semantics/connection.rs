@@ -1,336 +1,13 @@
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
-    ComponentInstance, Direction, Interface, PortInstance, PortInstanceType, PortInterface, Symbol,
-    SymbolInterface, Topology, Type,
+    ComponentInstance, Direction, InterfaceInstance, PortInstance, PortInstanceIdentifier,
+    PortInstanceType, Type,
 };
-use fpp_ast::{self as ast, AstNode, Ident};
+use fpp_ast as ast;
 use fpp_core::{Span, Spanned};
 use std::cmp::Ordering;
 use std::sync::Arc;
-
-/// Compare two locations. See [`Span::compare`].
-pub fn cmp_span(a: &Span, b: &Span) -> Ordering {
-    a.compare(b)
-}
-
-/// An imported topology used as an interface instance.
-///
-/// This stores identity only (symbol + resolved name + location). The full
-/// [`Topology`] is looked up lazily from [`Analysis::topology_map`] when its
-/// port interface or top-port map is actually needed. Embedding a whole
-/// `Topology` here would make cloning/dropping a single [`Connection`]
-/// deep-copy every transitively imported topology, which dominated analysis
-/// time for deeply-imported models.
-#[derive(Debug, Clone)]
-pub struct TopologyInstance {
-    /// The topology symbol, used to look up the resolved `Topology`.
-    pub symbol: Symbol,
-    /// The fully qualified name of the topology
-    pub qualified_name: String,
-}
-
-impl TopologyInstance {
-    /// Builds a port instance identifier for a top-level port on this
-    /// topology instance, by name. Errors are annotated at this instance's
-    /// own location, since a plain name carries no span of its own.
-    pub fn get_port_instance_identifier(
-        &self,
-        a: &Analysis,
-        name: &str,
-    ) -> SemanticResult<PortInstanceIdentifier> {
-        let interface_instance = InterfaceInstance::Topology(self.clone());
-        let loc = interface_instance.get_loc();
-        let port_instance = interface_instance.require_port_instance(a, name, loc)?;
-        Ok(PortInstanceIdentifier {
-            interface_instance,
-            port_instance,
-        })
-    }
-}
-
-/// A bound port interface instance template parameter used as an interface
-/// instance.
-///
-/// The port interface is the one declared in the parameter, not the one of the
-/// instance bound to it: inside the expansion only the declared interface is
-/// visible. `instance` is the interface instance the argument refers to, which
-/// may itself be a bound parameter.
-#[derive(Debug, Clone)]
-pub struct TemplateArgInstance {
-    /// The parameter this argument is bound to
-    pub param_def: Arc<ast::TemplateParamInterface>,
-    /// The interface declared in the parameter, whose port interface is the one
-    /// [`InterfaceInstance::get_interface`] reports for this instance
-    pub declared_interface: Interface,
-    /// The interface instance the argument refers to
-    pub instance: Box<InterfaceInstance>,
-}
-
-/// An FPP interface instance: a component instance, an imported topology, or a
-/// bound port interface instance template parameter.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone)]
-pub enum InterfaceInstance {
-    Component(ComponentInstance),
-    Topology(TopologyInstance),
-    TemplateArg(TemplateArgInstance),
-}
-
-impl InterfaceInstance {
-    /// The fully qualified name of the interface instance.
-    pub fn qualified_name(&self) -> String {
-        match self {
-            InterfaceInstance::Component(ci) => ci.qualified_name.clone(),
-            InterfaceInstance::Topology(t) => t.qualified_name.clone(),
-            // A bound parameter is not a global definition, so its name is the
-            // identifier it introduces in the expansion
-            InterfaceInstance::TemplateArg(arg) => arg.param_def.name.data.clone(),
-        }
-    }
-
-    /// The unqualified name of the interface instance.
-    pub fn unqualified_name(&self) -> String {
-        match self {
-            InterfaceInstance::Component(ci) => ci.get_unqualified_name().to_string(),
-            InterfaceInstance::Topology(t) => t.symbol.name().data.clone(),
-            InterfaceInstance::TemplateArg(arg) => arg.param_def.name.data.clone(),
-        }
-    }
-
-    /// The location of the interface instance.
-    pub fn get_loc(&self) -> Span {
-        match self {
-            InterfaceInstance::Component(ci) => ci.get_loc(),
-            InterfaceInstance::Topology(t) => t.symbol.node().span(),
-            InterfaceInstance::TemplateArg(arg) => arg.param_def.interface.span(),
-        }
-    }
-
-    /// The full port interface of this instance. Returns `None` if the
-    /// underlying component or topology is not (yet) resolved.
-    pub fn get_interface<'a>(&'a self, a: &'a Analysis) -> Option<&'a PortInterface> {
-        match self {
-            InterfaceInstance::Component(ci) => ci.get_interface(a),
-            InterfaceInstance::Topology(t) => {
-                a.topology_map.get(&t.symbol).map(|top| &top.port_interface)
-            }
-            InterfaceInstance::TemplateArg(arg) => Some(&arg.declared_interface.port_interface),
-        }
-    }
-
-    /// The underlying component instance of this interface instance, or `None`
-    /// if it is a topology.
-    pub fn get_component_instance_opt(&self) -> Option<&ComponentInstance> {
-        match self {
-            InterfaceInstance::Component(ci) => Some(ci),
-            InterfaceInstance::Topology(_) => None,
-            InterfaceInstance::TemplateArg(arg) => arg.instance.get_component_instance_opt(),
-        }
-    }
-
-    /// Look up the resolved topology this instance refers to, if any.
-    ///
-    /// Returns `None` for component instances or if the topology is not (yet)
-    /// resolved in the analysis.
-    pub fn as_topology<'a>(&self, a: &'a Analysis) -> Option<&'a Topology> {
-        match self {
-            InterfaceInstance::Component(_) => None,
-            InterfaceInstance::Topology(t) => a.topology_map.get(&t.symbol),
-            InterfaceInstance::TemplateArg(arg) => arg.instance.as_topology(a),
-        }
-    }
-
-    /// Look up a port instance by name in this interface instance.
-    pub fn get_port_instance(&self, a: &Analysis, name: &str) -> Option<PortInstance> {
-        let interface = self
-            .get_interface(a)
-            .expect("interface instance references a resolved component or topology");
-        interface.get_port_instance(name)
-    }
-
-    /// The name to report this instance under when it has no port instance of a
-    /// given name. A bound parameter is reported against the port interface
-    /// declared in the parameter, because that is the only interface visible
-    /// inside the expansion.
-    fn port_instance_error_name(&self) -> String {
-        match self {
-            InterfaceInstance::TemplateArg(arg) => {
-                arg.declared_interface.get_unqualified_name().to_string()
-            }
-            _ => self.unqualified_name(),
-        }
-    }
-
-    /// Look up a port instance by name, erroring at `loc` if it is not
-    /// present on this interface instance.
-    pub fn require_port_instance(
-        &self,
-        a: &Analysis,
-        name: &str,
-        loc: Span,
-    ) -> SemanticResult<PortInstance> {
-        self.get_port_instance(a, name)
-            .ok_or_else(|| SemanticError::InvalidPortInstanceId {
-                loc,
-                port_name: name.to_string(),
-                instance_type: self
-                    .get_interface(a)
-                    .expect("interface instance references a resolved component or topology")
-                    .instance_type
-                    .clone(),
-                interface_name: self.port_instance_error_name(),
-            })
-    }
-
-    /// Look up a port instance from an AST reference, erroring at the
-    /// reference's own span if it is not present.
-    pub fn lookup_port_instance(&self, a: &Analysis, name: &Ident) -> SemanticResult<PortInstance> {
-        self.require_port_instance(a, &name.data, name.span())
-    }
-}
-
-impl InterfaceInstance {
-    pub fn from_component_instance(ci: ComponentInstance) -> InterfaceInstance {
-        InterfaceInstance::Component(ci)
-    }
-
-    pub fn from_topology(top: &Topology) -> InterfaceInstance {
-        InterfaceInstance::Topology(TopologyInstance {
-            symbol: top.symbol.clone(),
-            qualified_name: top.qualified_name.clone(),
-        })
-    }
-
-    pub fn from_template_arg(
-        param_def: Arc<ast::TemplateParamInterface>,
-        declared_interface: Interface,
-        instance: InterfaceInstance,
-    ) -> InterfaceInstance {
-        InterfaceInstance::TemplateArg(TemplateArgInstance {
-            param_def,
-            declared_interface,
-            instance: Box::new(instance),
-        })
-    }
-
-    /// An ordinal for each kind of instance, used to break ties between
-    /// instances of different kinds that have the same qualified name
-    fn kind_ordinal(&self) -> u8 {
-        match self {
-            InterfaceInstance::Component(_) => 0,
-            InterfaceInstance::Topology(_) => 1,
-            InterfaceInstance::TemplateArg(_) => 2,
-        }
-    }
-}
-
-impl PartialEq for InterfaceInstance {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
-    }
-}
-impl Eq for InterfaceInstance {}
-impl PartialOrd for InterfaceInstance {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for InterfaceInstance {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.qualified_name()
-            .cmp(&other.qualified_name())
-            .then_with(|| self.kind_ordinal().cmp(&other.kind_ordinal()))
-            .then_with(|| match (self, other) {
-                // Two bound template parameters with the same name are the same
-                // instance only if they name the same parameter of the same
-                // template and are bound to the same argument
-                (InterfaceInstance::TemplateArg(a1), InterfaceInstance::TemplateArg(a2)) => {
-                    a1.instance.cmp(&a2.instance).then_with(|| {
-                        a1.param_def
-                            .interface
-                            .id()
-                            .cmp(&a2.param_def.interface.id())
-                    })
-                }
-                // Component instance and topology names are unique in a model,
-                // so equal names mean equal instances
-                _ => Ordering::Equal,
-            })
-    }
-}
-
-/// A resolved FPP port instance identifier.
-#[derive(Debug, Clone)]
-pub struct PortInstanceIdentifier {
-    /// The interface instance.
-    pub interface_instance: InterfaceInstance,
-    /// The port instance.
-    pub port_instance: PortInstance,
-}
-
-impl PartialEq for PortInstanceIdentifier {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
-    }
-}
-impl Eq for PortInstanceIdentifier {}
-impl PartialOrd for PortInstanceIdentifier {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for PortInstanceIdentifier {
-    /// Compare two port instance identifiers.
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.qualified_name()
-            .cmp(&other.qualified_name())
-            .then_with(|| self.interface_instance.cmp(&other.interface_instance))
-            .then_with(|| {
-                self.port_instance
-                    .get_node_id()
-                    .cmp(&other.port_instance.get_node_id())
-            })
-    }
-}
-
-impl PortInstanceIdentifier {
-    /// The qualified name (instance qualified name + "." + port name).
-    pub fn qualified_name(&self) -> String {
-        format!(
-            "{}.{}",
-            self.interface_instance.qualified_name(),
-            self.port_instance.get_unqualified_name()
-        )
-    }
-
-    /// The unqualified name (instance unqualified name + "." + port name).
-    pub fn get_unqualified_name(&self) -> String {
-        format!(
-            "{}.{}",
-            self.interface_instance.unqualified_name(),
-            self.port_instance.get_unqualified_name()
-        )
-    }
-
-    /// Creates a port instance identifier from an AST node. Returns `None` if
-    /// the interface instance use is unresolved, or names an instance whose
-    /// definition failed to check (both already reported).
-    pub fn from_node(
-        a: &Analysis,
-        node: &ast::PortInstanceIdentifier,
-    ) -> SemanticResult<Option<PortInstanceIdentifier>> {
-        let Some(interface_instance) = a.get_interface_instance(node.interface_instance.id())?
-        else {
-            return Ok(None);
-        };
-        let port_instance = interface_instance.lookup_port_instance(a, &node.port_name)?;
-        Ok(Some(PortInstanceIdentifier {
-            interface_instance,
-            port_instance,
-        }))
-    }
-}
 
 /// A connection endpoint
 #[derive(Debug, Clone)]
@@ -537,31 +214,6 @@ impl Ord for Connection {
 }
 
 impl Connection {
-    /// Checks the directions of a connection
-    fn check_directions(&self) -> SemanticResult {
-        let from_instance = &self.from.port.port_instance;
-        let to_instance = &self.to.port.port_instance;
-        let from_dir = from_instance.get_direction();
-        let to_dir = to_instance.get_direction();
-        if Direction::are_compatible(&from_dir, &to_dir) {
-            Ok(())
-        } else {
-            let msg = format!(
-                "invalid directions {} -> {} (should be output -> input)",
-                Direction::show(&from_dir),
-                Direction::show(&to_dir)
-            );
-            Err(SemanticError::InvalidConnection {
-                loc: self.get_loc(),
-                msg,
-                from_loc: from_instance.get_loc(),
-                to_loc: to_instance.get_loc(),
-                from_port_def_loc: None,
-                to_port_def_loc: None,
-            })
-        }
-    }
-
     /// Checks the types of a connection
     fn check_types(&self, a: &Analysis) -> SemanticResult {
         let from_instance = &self.from.port.port_instance;
@@ -632,6 +284,31 @@ impl Connection {
         Ok(())
     }
 
+    /// Checks the directions of a connection
+    fn check_directions(&self) -> SemanticResult {
+        let from_instance = &self.from.port.port_instance;
+        let to_instance = &self.to.port.port_instance;
+        let from_dir = from_instance.get_direction();
+        let to_dir = to_instance.get_direction();
+        if Direction::are_compatible(&from_dir, &to_dir) {
+            Ok(())
+        } else {
+            let msg = format!(
+                "invalid directions {} -> {} (should be output -> input)",
+                Direction::show(&from_dir),
+                Direction::show(&to_dir)
+            );
+            Err(SemanticError::InvalidConnection {
+                loc: self.get_loc(),
+                msg,
+                from_loc: from_instance.get_loc(),
+                to_loc: to_instance.get_loc(),
+                from_port_def_loc: None,
+                to_port_def_loc: None,
+            })
+        }
+    }
+
     /// Checks whether a connection is match constrained
     ///
     /// Each endpoint is first resolved through any topology-port aliases, so a
@@ -639,10 +316,10 @@ impl Connection {
     /// component port is still recognized as match constrained.
     pub(crate) fn is_match_constrained(&self, a: &Analysis) -> bool {
         let port_matching_exists = |ci: &ComponentInstance, pi: &PortInstance| -> bool {
-            match a.component_map.get(&ci.component_symbol) {
-                Some(comp) => comp.port_matching_list.iter().any(|pm| pm.matches(pi)),
-                None => false,
-            }
+            ci.component(a)
+                .port_matching_list
+                .iter()
+                .any(|pm| pm.matches(pi))
         };
         let is_constrained_at = |endpoint: &Endpoint| -> bool {
             let port = endpoint.get_underlying_endpoint(a).port;
