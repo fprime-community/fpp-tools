@@ -228,6 +228,8 @@ pub mod semantics {
     #[cfg(test)]
     pub(crate) mod test_helpers;
     #[cfg(test)]
+    mod type_option_spec;
+    #[cfg(test)]
     mod type_spec;
     #[cfg(test)]
     mod value_spec;
