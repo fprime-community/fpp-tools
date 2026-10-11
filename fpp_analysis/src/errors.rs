@@ -459,14 +459,14 @@ pub enum SemanticError {
         loc: Span,
         prev_loc: Span,
     },
-    /// Duplicate use of a signal in a state
+    /// Duplicate signal
     DuplicateSignal {
         name: String,
         state_name: String,
         loc: Span,
         prev_loc: Span,
     },
-    /// Invalid initial transition
+    /// Invalid initial transition specifier
     InvalidInitialTransition {
         loc: Span,
         msg: String,
@@ -480,12 +480,12 @@ pub enum SemanticError {
         loc: Span,
         msg: String,
     },
-    /// A node in the transition graph is unreachable
+    /// Unreachable node in the transition graph
     UnreachableNode {
         name: String,
         loc: Span,
     },
-    /// Type mismatch at a choice
+    /// Choice type mismatch
     ChoiceTypeMismatch {
         loc: Span,
         loc1: Span,
@@ -493,7 +493,7 @@ pub enum SemanticError {
         loc2: Span,
         show2: String,
     },
-    /// Type mismatch at a call site (action or guard)
+    /// Call site type mismatch
     CallSiteTypeMismatch {
         loc: Span,
         te_kind: String,

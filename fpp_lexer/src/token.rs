@@ -1,3 +1,7 @@
+/// A keyword
+///
+/// The variant for the keyword `string` is `String_`, so that it does not
+/// shadow `String` where the variants are imported.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum KeywordKind {
     Action,
@@ -12,6 +16,7 @@ pub enum KeywordKind {
     Block,
     Bool,
     Change,
+    Choice,
     Command,
     Component,
     Connections,
@@ -59,7 +64,6 @@ pub enum KeywordKind {
     Instance,
     Interface,
     Internal,
-    Choice,
     Locate,
     Low,
     Machine,
@@ -120,7 +124,7 @@ pub enum KeywordKind {
     Yellow,
 }
 
-/// The keywords, sorted by spelling
+/// The keywords and their spellings, sorted by spelling
 pub(crate) const KEYWORDS: [(&str, KeywordKind); 118] = [
     ("F32", KeywordKind::F32),
     ("F64", KeywordKind::F64),
@@ -267,6 +271,15 @@ impl std::fmt::Display for KeywordKind {
     }
 }
 
+/// The kind of a token.
+///
+/// The lexer produces every character of the input as part of a token, so that
+/// the lossless syntax tree of `fpp_lsp_parser` can be built from the tokens.
+/// For that reason there are kinds for the text between the tokens of the
+/// grammar: [`TokenKind::Whitespace`] (spaces and line continuations),
+/// [`TokenKind::Comment`] and [`TokenKind::Unknown`] (an invalid character).
+/// A multi-line string literal has a kind of its own,
+/// [`TokenKind::LiteralMultilineString`].
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum TokenKind {
     EOF,
@@ -274,39 +287,41 @@ pub enum TokenKind {
     Comment,
     Unknown,
 
+    // Identifier (non keyword words)
     Identifier,
 
-    // Annotations,
+    // Annotations
     PostAnnotation,
     PreAnnotation,
 
-    // Literals,
+    // Literals
     LiteralFloat,
     LiteralInt,
     LiteralString,
-    LiteralMultilineString { indent: u32 },
+    /// A multi-line string literal whose first line has an initial space indent
+    /// of `indent`
+    LiteralMultilineString {
+        indent: u32,
+    },
 
-    // Keywords,
+    // Keywords
     Keyword(KeywordKind),
 
-    // Symbols,
+    // Symbols
     Colon,
     Comma,
     Dot,
     Eol,
     Equals,
-
-    LeftParen,
     LeftCurly,
     LeftSquare,
-
-    RightParen,
-    RightCurly,
-    RightSquare,
-
-    RightArrow,
+    LeftParen,
     Minus,
     Plus,
+    RightArrow,
+    RightCurly,
+    RightSquare,
+    RightParen,
     Semi,
     Slash,
     Star,
@@ -334,15 +349,15 @@ impl std::fmt::Display for TokenKind {
             TokenKind::Dot => ".",
             TokenKind::Eol => "end of line",
             TokenKind::Equals => "=",
-            TokenKind::LeftParen => "(",
             TokenKind::LeftCurly => "{",
             TokenKind::LeftSquare => "[",
-            TokenKind::RightParen => ")",
-            TokenKind::RightCurly => "}",
-            TokenKind::RightSquare => "]",
-            TokenKind::RightArrow => "->",
+            TokenKind::LeftParen => "(",
             TokenKind::Minus => "-",
             TokenKind::Plus => "+",
+            TokenKind::RightArrow => "->",
+            TokenKind::RightCurly => "}",
+            TokenKind::RightSquare => "]",
+            TokenKind::RightParen => ")",
             TokenKind::Semi => ";",
             TokenKind::Slash => "/",
             TokenKind::Star => "*",
@@ -354,8 +369,11 @@ impl std::fmt::Display for TokenKind {
     }
 }
 
+/// A token of the input
 #[derive(Debug)]
 pub struct Token {
+    /// The kind of the token
     pub kind: TokenKind,
+    /// The length of the token in bytes
     pub len: usize,
 }

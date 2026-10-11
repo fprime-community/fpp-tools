@@ -2,10 +2,14 @@ use fpp_core::{BytePos, SourceFile, Span, Spanned};
 use fpp_lexer::TokenKind;
 use std::fmt::Debug;
 
+/// A token of the grammar
 #[derive(Debug)]
 pub struct Token {
+    /// The kind of the token
     pub kind: TokenKind,
+    /// The location of the token
     pub span: Span,
+    /// The string value of an identifier, annotation or literal
     pub text: Option<String>,
 }
 
@@ -29,6 +33,7 @@ impl Token {
         self.kind
     }
 
+    /// The string value of the token, empty if it has none
     pub fn text(&self) -> &str {
         match self.text.as_ref() {
             None => "",

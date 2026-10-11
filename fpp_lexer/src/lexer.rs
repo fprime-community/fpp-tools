@@ -16,6 +16,17 @@ pub struct LexerError {
     pub notes: Vec<String>,
 }
 
+/// The scanner of FPP source text.
+///
+/// Iterating the lexer yields every token of the text, including the
+/// whitespace, comments and invalid characters between the tokens of the
+/// grammar, and collects the lexer errors in [`Lexer::errors`]. It does not
+/// suppress newlines or compute the values of literals; `fpp_parser` does that
+/// from the token texts.
+///
+/// The lexer reads the text one character at a time with [`Lexer::bump`], which
+/// reduces a CR LF pair to an LF. [`Lexer::first`], [`Lexer::second`] and
+/// [`Lexer::third`] look at the characters that follow without reading them.
 pub struct Lexer<'a> {
     /// The byte offset of the next character to read
     pos: usize,
@@ -24,22 +35,27 @@ pub struct Lexer<'a> {
     /// The initial space indent of the current multi-line string literal
     indent: u32,
     /// The next identifier is forced to not be a keyword
-    escaped_identifier: bool,
+    reserved_word: bool,
+    /// The text to scan
     content: &'a str,
 
     /// The characters that remain to be read
     chars: Chars<'a>,
 
+    /// The errors found so far
     errors: Vec<LexerError>,
 }
 
+/// The character returned when looking past the end of the input
 const EOF_CHAR: char = '\0';
 
+/// Whether `c` may start an identifier
 #[inline]
 fn is_identifier_first(c: char) -> bool {
     matches!(c, 'A'..='Z' | '_' | 'a'..='z')
 }
 
+/// Whether `c` may follow the first character of an identifier
 #[inline]
 fn is_identifier_rest(c: char) -> bool {
     match c {
@@ -55,7 +71,7 @@ impl<'a> Iterator for Lexer<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.reset_token();
 
-        match self.next_token_kind() {
+        match self.fetch_token() {
             EOF => None,
             raw_kind => {
                 let kind = match raw_kind {
@@ -73,6 +89,7 @@ impl<'a> Iterator for Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+    /// Create a lexer for `content`
     pub fn new(content: &'a str) -> Lexer<'a> {
         let chars = content.chars();
         Lexer {
@@ -81,16 +98,17 @@ impl<'a> Lexer<'a> {
             indent: 0,
             content,
             chars,
-            escaped_identifier: false,
+            reserved_word: false,
             errors: vec![],
         }
     }
 
+    /// The errors found in the tokens read so far, in the order of the input
     pub fn errors(&self) -> impl Iterator<Item = &LexerError> {
         self.errors.iter()
     }
 
-    /// Generate an error covering the current token
+    /// Generate an error at the current token
     fn error<T: Into<String>>(&mut self, msg: T) {
         self.error_at(self.offset, self.pos - self.offset, msg, vec![])
     }
@@ -107,7 +125,7 @@ impl<'a> Lexer<'a> {
 
     /// Finish up construction of identifier
     fn finish_ident(&self) -> TokenKind {
-        if self.escaped_identifier {
+        if self.reserved_word {
             Identifier
         } else {
             match KeywordKind::get(&self.content[self.offset..self.pos]) {
@@ -117,7 +135,8 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn next_token_kind(&mut self) -> TokenKind {
+    /// Read the next token and return its kind
+    fn fetch_token(&mut self) -> TokenKind {
         let first_char = match self.bump() {
             Some(c) => c,
             None => return EOF,
@@ -133,9 +152,8 @@ impl<'a> Lexer<'a> {
             '$' => {
                 // Reserved words (identifier that overlaps a keyword)
                 if is_identifier_first(self.first()) {
-                    self.escaped_identifier = true;
-                    self.eat_while(is_identifier_rest);
-                    Identifier
+                    self.reserved_word = true;
+                    self.fetch_ident_rest()
                 } else {
                     self.error("invalid usage of '$', expected identifier");
                     Unknown
@@ -143,10 +161,7 @@ impl<'a> Lexer<'a> {
             }
 
             // Identifier or keyword
-            'A'..='Z' | 'a'..='z' | '_' => {
-                self.eat_while(is_identifier_rest);
-                Identifier
-            }
+            'A'..='Z' | 'a'..='z' | '_' => self.fetch_ident_rest(),
 
             // Numeric literal
             '0' => {
@@ -162,11 +177,11 @@ impl<'a> Lexer<'a> {
                     self.error("invalid literal number");
                 }
 
-                self.eat_number(base)
+                self.fetch_number(base)
             }
 
             // More numeric literals
-            '1'..='9' => self.eat_number(10),
+            '1'..='9' => self.fetch_number(10),
 
             // Escaped newline
             '\\' => {
@@ -218,29 +233,28 @@ impl<'a> Lexer<'a> {
                 }
             }
 
-            // Fractional floating literal (or DOT)
+            // Fractional floating
             '.' => {
                 // Check if this is actually part of a float
                 if self.first().is_ascii_digit() {
-                    self.eat_fraction()
+                    self.fetch_fraction()
                 } else {
                     Dot
                 }
             }
 
-            // Comment
+            // Line comment
             '#' => {
-                self.eat_while(|c| c != LF);
+                self.eat_line_comment();
                 Comment
             }
 
-            // End of lines
+            // Newline
             LF => {
                 self.eat_while(|c| c == LF);
                 Eol
             }
 
-            // Annotation
             '@' => {
                 let kind = if self.first() == '<' {
                     self.bump();
@@ -249,10 +263,11 @@ impl<'a> Lexer<'a> {
                     PreAnnotation
                 };
 
-                self.eat_while(|c| c != LF);
+                self.fetch_annotation_rest();
                 kind
             }
 
+            // Token Symbols
             '*' => Star,
 
             '-' => {
@@ -320,6 +335,23 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Read the rest of a line comment
+    fn eat_line_comment(&mut self) {
+        self.eat_while(|c| c != LF);
+    }
+
+    /// Read the rest of an identifier
+    fn fetch_ident_rest(&mut self) -> TokenKind {
+        // Valid identifier characters
+        self.eat_while(is_identifier_rest);
+        Identifier
+    }
+
+    /// Read the rest of an annotation, up to the end of the line
+    fn fetch_annotation_rest(&mut self) {
+        self.eat_while(|c| c != LF);
+    }
+
     /// Compute the initial space indent
     fn fetch_string_lit_multi_indent(&mut self) -> u32 {
         let mut indent = 0;
@@ -331,6 +363,7 @@ impl<'a> Lexer<'a> {
         indent
     }
 
+    /// Read the rest of a multi-line string literal
     fn fetch_string_lit_multi(&mut self) -> TokenKind {
         loop {
             match self.bump() {
@@ -364,11 +397,12 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Read the rest of a single-line string literal
     fn fetch_string_lit_single(&mut self) -> TokenKind {
         loop {
             // A single-line string may contain neither a newline nor an escaped
             // newline
-            if self.first() == LF || self.is_eof() {
+            if self.first() == LF || self.is_at_end() {
                 self.error("missing string double quote closure");
                 return LiteralString;
             }
@@ -378,7 +412,7 @@ impl<'a> Lexer<'a> {
                 Some('"') => return LiteralString,
 
                 Some('\\') => {
-                    if self.first() == LF || self.is_eof() {
+                    if self.first() == LF || self.is_at_end() {
                         self.error("missing string double quote closure");
                         return LiteralString;
                     }
@@ -392,18 +426,18 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Read a number in the given base
-    fn eat_number(&mut self, base: u32) -> TokenKind {
+    /// Read a number whose base is `base`
+    fn fetch_number(&mut self, base: u32) -> TokenKind {
         self.eat_while(|ch| digit2int(ch, base).is_some());
 
         match self.first() {
             '.' if base == 10 => {
                 self.bump();
-                self.eat_fraction()
+                self.fetch_fraction()
             }
 
             // Exponential
-            'e' | 'E' if base == 10 => self.eat_fraction(),
+            'e' | 'E' if base == 10 => self.fetch_fraction(),
 
             _ => LiteralInt,
         }
@@ -411,7 +445,7 @@ impl<'a> Lexer<'a> {
 
     /// Read the fractional part and exponent of a floating point number if one is
     /// present
-    fn eat_fraction(&mut self) -> TokenKind {
+    fn fetch_fraction(&mut self) -> TokenKind {
         self.eat_while(|c| c.is_ascii_digit());
 
         if matches!(self.first(), 'e' | 'E') {
@@ -434,9 +468,10 @@ impl<'a> Lexer<'a> {
         LiteralFloat
     }
 
+    /// Check that no letter follows a floating point number
     fn check_no_letter(&mut self) {
         let ch = self.first();
-        if is_identifier_part(ch) && ch >= ' ' && !self.is_eof() {
+        if is_identifier_part(ch) && ch >= ' ' && !self.is_at_end() {
             // Cover the literal and the letter that ends it
             self.error_at(
                 self.offset,
@@ -447,12 +482,13 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// The text that remains to be read
     pub fn as_str(&self) -> &'a str {
         self.chars.as_str()
     }
 
     /// Peeks the character `n` positions ahead without consuming anything,
-    /// reducing CR;LF pairs to just LF.
+    /// replacing CR;LF by LF.
     /// If requested position doesn't exist, `EOF_CHAR` is returned.
     fn peek_char(&self, n: usize) -> char {
         let mut chars = self.chars.clone();
@@ -474,7 +510,7 @@ impl<'a> Lexer<'a> {
     /// Peeks the next symbol from the input stream without consuming it.
     /// If requested position doesn't exist, `EOF_CHAR` is returned.
     /// However, getting `EOF_CHAR` doesn't always mean actual end of file,
-    /// it should be checked with `is_eof` method.
+    /// it should be checked with the `is_at_end` method.
     pub fn first(&self) -> char {
         self.peek_char(0)
     }
@@ -490,15 +526,15 @@ impl<'a> Lexer<'a> {
     }
 
     /// Checks if there is nothing more to consume.
-    pub fn is_eof(&self) -> bool {
+    pub fn is_at_end(&self) -> bool {
         self.chars.as_str().is_empty()
     }
 
-    /// Reset the per-token state
+    /// Reset the per-token state for the token that starts at the current position
     fn reset_token(&mut self) {
         self.offset = self.pos;
         self.indent = 0;
-        self.escaped_identifier = false;
+        self.reserved_word = false;
     }
 
     /// Advance one character; reducing CR;LF pairs to just LF
@@ -517,7 +553,7 @@ impl<'a> Lexer<'a> {
 
     /// Eats symbols while predicate returns true or until the end of file is reached.
     fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        while predicate(self.first()) && !self.is_eof() {
+        while predicate(self.first()) && !self.is_at_end() {
             self.bump();
         }
     }

@@ -4,6 +4,12 @@ use fpp_core::{BytePos, Diagnostic, Level, SourceFile, Span, Spanned};
 use fpp_lexer::{Lexer, LexerError, TokenKind};
 use std::collections::VecDeque;
 
+/// The cursor over the tokens of a file.
+///
+/// The cursor pulls the tokens of `fpp_lexer` through the rules for newlines:
+/// it drops whitespace and comments, folds a run of newlines into one
+/// end-of-line token, drops the newlines after a token that eats them and
+/// before a closing token, and gives each token its string value.
 pub struct Cursor<'a> {
     /// The tokens the lexer produced for the whole file that have not been
     /// pulled through the cursor
@@ -91,11 +97,10 @@ impl<'a> Cursor<'a> {
         loop {
             let token = self.tokens.pop_front()?;
             match token.kind {
-                // Skip whitespace
+                // Skip whitespace (a line continuation is whitespace that ends the run)
                 TokenKind::Eol => {
                     self.pos += token.len;
                 }
-                // A line continuation ends the run
                 TokenKind::Whitespace if !self.content[self.pos..].starts_with('\\') => {
                     self.pos += token.len;
                 }
@@ -122,9 +127,10 @@ impl<'a> Cursor<'a> {
                 // The lexer reported the invalid token
                 TokenKind::Unknown => {}
                 TokenKind::Whitespace => {}
+                // Newline (or line comment)
                 TokenKind::Eol | TokenKind::Comment => {
-                    // Check what comes after the EOL to see if this is actually an EOL or
-                    // just whitespace
+                    // Check the next token
+                    // Some tokens eat newlines and others don't
                     return match self.eat_newlines() {
                         None => Some(Token::new(
                             TokenKind::Eol,
@@ -139,7 +145,7 @@ impl<'a> Cursor<'a> {
                                 TokenKind::RightParen
                                 | TokenKind::RightCurly
                                 | TokenKind::RightSquare => {
-                                    // Absorb all the previous whitespace before these closing tokens
+                                    // Fetch the next token to avoid this newline
                                     let lookahead_prev = self.pos;
                                     self.pos += lookahead.len;
                                     Some(Token::new(
