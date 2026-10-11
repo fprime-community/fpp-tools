@@ -32,12 +32,14 @@ impl_interned_def! {
 
 impl Analysis {
     /// The definition held by the symbol entered for a definition node, so
-    /// that the types built for a definition share its symbol's node. A node
-    /// with no symbol is copied.
+    /// that the types built for a definition share its symbol's node.
+    /// [`crate::passes::EnterSymbols`] enters a symbol for every type
+    /// definition that the analysis visits.
     pub fn interned_def<D: InternedDef>(&self, node: &D) -> Arc<D> {
-        match self.symbol_map.get(&node.id()).and_then(D::from_symbol) {
-            Some(def) => def.clone(),
-            None => Arc::new(node.clone()),
-        }
+        self.symbol_map
+            .get(&node.id())
+            .and_then(D::from_symbol)
+            .expect("type definition was entered by EnterSymbols")
+            .clone()
     }
 }

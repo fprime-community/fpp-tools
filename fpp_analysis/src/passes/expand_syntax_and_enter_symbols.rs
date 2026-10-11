@@ -47,8 +47,9 @@ impl ExpandSyntaxAndEnterSymbols {
     }
 }
 
-/// A reader used for each translation unit of a list in turn
-struct ReaderRef<'r, R: FileReader>(&'r R);
+/// A borrowed [`FileReader`], for a [`fpp_parser::ResolveIncludes`], which takes
+/// its reader by value
+pub(crate) struct ReaderRef<'r, R: FileReader>(pub(crate) &'r R);
 
 impl<R: FileReader> FileReader for ReaderRef<'_, R> {
     fn resolve(&self, current: SourceFile, include: &str) -> Result<String, Error> {
