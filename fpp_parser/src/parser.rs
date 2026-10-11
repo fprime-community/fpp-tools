@@ -372,7 +372,7 @@ impl<'a> Parser<'a> {
 
     fn connection(&mut self) -> ParseResult<Connection> {
         self.first_alternative();
-        let first_span = self.current_span()?;
+        let first_span = self.current_span();
 
         let is_unmatched = match self.peek(0) {
             Keyword(Unmatched) => {
@@ -1085,7 +1085,7 @@ impl<'a> Parser<'a> {
                 })
             }
             LeftCurly => {
-                let first = self.current_span()?;
+                let first = self.current_span();
                 let committed = self.begin_alternative();
                 match self.struct_expr() {
                     Ok(e) => Ok(self.end_alternative(committed, e)),
@@ -1141,7 +1141,7 @@ impl<'a> Parser<'a> {
     }
 
     fn array_expr(&mut self) -> ParseResult<Expr> {
-        let first = self.current_span()?;
+        let first = self.current_span();
         let members = self.enclosed(LeftSquare, RightSquare, |p| {
             p.commit();
             p.element_sequence(
@@ -1173,7 +1173,7 @@ impl<'a> Parser<'a> {
     }
 
     fn struct_expr(&mut self) -> ParseResult<Expr> {
-        let first = self.current_span()?;
+        let first = self.current_span();
         let members = self.enclosed(LeftCurly, RightCurly, |p| {
             p.commit();
             p.element_sequence(&Parser::struct_member, Comma)
@@ -1360,7 +1360,7 @@ impl<'a> Parser<'a> {
 
     fn formal_param(&mut self) -> ParseResult<FormalParam> {
         self.first_alternative();
-        let first_span = self.current_span()?;
+        let first_span = self.current_span();
 
         let kind = match self.peek(0) {
             Keyword(Ref) => {
@@ -1562,7 +1562,7 @@ impl<'a> Parser<'a> {
     /// Parses a queue full specifier node, whose span covers only the keyword
     /// that names the behavior.
     fn queue_full_node(&mut self) -> ParseResult<QueueFullSpecifier> {
-        let first = self.current_span()?;
+        let first = self.current_span();
         let kind = self.queue_full()?;
         Ok(QueueFullSpecifier {
             node_id: self.node(first),
@@ -1592,7 +1592,7 @@ impl<'a> Parser<'a> {
     }
 
     fn spec_command(&mut self) -> ParseResult<SpecCommand> {
-        let first_span = self.current_span()?;
+        let first_span = self.current_span();
 
         let kind = match self.peek(0) {
             Keyword(Async) => {
@@ -1671,7 +1671,7 @@ impl<'a> Parser<'a> {
         }
 
         fn pattern_graph(p: &mut Parser) -> ParseResult<SpecPatternConnectionGraph> {
-            let first_span = p.current_span()?;
+            let first_span = p.current_span();
 
             let kind = match p.peek(0) {
                 Keyword(Command) => {
@@ -1964,69 +1964,98 @@ impl<'a> Parser<'a> {
     }
 
     fn spec_loc(&mut self) -> ParseResult<SpecLoc> {
-        let first = self.consume_keyword(Locate)?;
-        self.commit();
-
-        // Only a constant or a type may be a dictionary definition
-        let (is_dictionary_def, kind) = match self.peek(0) {
-            Keyword(Dictionary) => {
-                self.next();
-                match self.peek(0) {
-                    Keyword(Constant) => {
-                        self.next();
-                        (true, SpecLocKind::Constant)
-                    }
-                    Keyword(Type) => {
-                        self.next();
-                        (true, SpecLocKind::Type)
-                    }
-                    _ => {
-                        return Err(self.cursor.err_expected_one_of(
-                            "dictionary location kind expected",
-                            vec![Keyword(Constant), Keyword(Type)],
-                        ));
-                    }
+        /// A location kind that may follow `dictionary`
+        fn maybe_dict_kind(p: &mut Parser) -> ParseResult<SpecLocKind> {
+            let kind = match p.peek(0) {
+                Keyword(Constant) => SpecLocKind::Constant,
+                Keyword(Type) => SpecLocKind::Type,
+                _ => {
+                    return Err(p.cursor.err_expected_one_of(
+                        "dictionary location kind expected",
+                        vec![Keyword(Constant), Keyword(Type)],
+                    ));
                 }
+            };
+            p.next();
+            Ok(kind)
+        }
+
+        /// A location kind that may not follow `dictionary`
+        fn non_dict_kind(p: &mut Parser) -> ParseResult<SpecLocKind> {
+            let kind = match p.peek(0) {
+                Keyword(Component) => SpecLocKind::Component,
+                Keyword(Instance) => SpecLocKind::Instance,
+                Keyword(Port) => SpecLocKind::Port,
+                Keyword(State) => {
+                    let state = p.next().unwrap();
+                    return match p.consume_keyword(Machine) {
+                        Ok(_) => Ok(SpecLocKind::StateMachine),
+                        // `state machine` commits after `state`, and the
+                        // failure of the other alternatives at `state`
+                        // replaces its failure at the end of the input
+                        Err(err) if err.is_at_end_of_input() => Err(ParseError::EndOfInputIn {
+                            loc: state.span(),
+                            construct: "location kind",
+                        }),
+                        Err(err) => Err(err),
+                    };
+                }
+                Keyword(Template) => SpecLocKind::Template,
+                Keyword(System) => SpecLocKind::System,
+                Keyword(Interface) => SpecLocKind::Interface,
+                _ => {
+                    return Err(p.cursor.err_expected_one_of(
+                        "location kind expected",
+                        vec![
+                            Keyword(Component),
+                            Keyword(Instance),
+                            Keyword(Port),
+                            Keyword(State),
+                            Keyword(Template),
+                            Keyword(System),
+                            Keyword(Interface),
+                        ],
+                    ));
+                }
+            };
+            p.next();
+            Ok(kind)
+        }
+
+        /// An optional `dictionary` and a location kind that may follow it
+        fn maybe_dict_pair(p: &mut Parser) -> ParseResult<(bool, SpecLocKind)> {
+            let dictionary = match p.peek(0) {
+                Keyword(Dictionary) => p.next(),
+                _ => None,
+            };
+            match (maybe_dict_kind(p), dictionary) {
+                (Ok(kind), dictionary) => Ok((dictionary.is_some(), kind)),
+                // The other alternatives fail at `dictionary`, which is
+                // further than the end of the input
+                (Err(err), Some(dictionary)) if err.is_at_end_of_input() => {
+                    Err(ParseError::EndOfInputIn {
+                        loc: dictionary.span(),
+                        construct: "location kind",
+                    })
+                }
+                (Err(err), _) => Err(err),
             }
-            Keyword(Constant) => {
-                self.next();
-                (false, SpecLocKind::Constant)
-            }
-            Keyword(Type) => {
-                self.next();
-                (false, SpecLocKind::Type)
-            }
-            Keyword(Component) => {
-                self.next();
-                (false, SpecLocKind::Component)
-            }
-            Keyword(Instance) => {
-                self.next();
-                (false, SpecLocKind::Instance)
-            }
-            Keyword(Port) => {
-                self.next();
-                (false, SpecLocKind::Port)
-            }
-            Keyword(State) => {
-                self.next();
-                self.consume_keyword(Machine)?;
-                (false, SpecLocKind::StateMachine)
-            }
-            Keyword(Template) => {
-                self.next();
-                (false, SpecLocKind::Template)
-            }
-            Keyword(System) => {
-                self.next();
-                (false, SpecLocKind::System)
-            }
-            Keyword(Interface) => {
-                self.next();
-                (false, SpecLocKind::Interface)
-            }
-            _ => {
-                return Err(self.cursor.err_expected_one_of(
+        }
+
+        /// A location kind that may not follow `dictionary`, with no
+        /// `dictionary`
+        fn non_dict_pair(p: &mut Parser) -> ParseResult<(bool, SpecLocKind)> {
+            Ok((false, non_dict_kind(p)?))
+        }
+
+        /// Whether the specifier is for a dictionary definition, and its kind
+        fn is_dict_and_kind(p: &mut Parser) -> ParseResult<(bool, SpecLocKind)> {
+            match p.peek(0) {
+                Keyword(Dictionary | Constant | Type) => maybe_dict_pair(p),
+                Keyword(Component | Instance | Port | State | Template | System | Interface) => {
+                    non_dict_pair(p)
+                }
+                _ => Err(p.cursor.err_expected_one_of(
                     "dictionary specifier or location kind expected",
                     vec![
                         Keyword(Dictionary),
@@ -2040,9 +2069,13 @@ impl<'a> Parser<'a> {
                         Keyword(System),
                         Keyword(Interface),
                     ],
-                ));
+                )),
             }
-        };
+        }
+
+        let first = self.consume_keyword(Locate)?;
+        self.commit();
+        let (is_dictionary_def, kind) = is_dict_and_kind(self)?;
 
         let symbol = self.qual_ident()?;
         self.consume_keyword(At)?;
@@ -2057,7 +2090,7 @@ impl<'a> Parser<'a> {
     }
 
     fn spec_param(&mut self) -> ParseResult<SpecParam> {
-        let first_span = self.current_span()?;
+        let first_span = self.current_span();
         let is_external = match self.peek(0) {
             Keyword(External) => {
                 self.next();
@@ -2486,7 +2519,7 @@ impl<'a> Parser<'a> {
 
         fn limit(p: &mut Parser) -> ParseResult<TlmChannelLimit> {
             p.first_alternative();
-            let first_span = p.current_span()?;
+            let first_span = p.current_span();
             let kind = kind(p)?;
             p.commit();
             let value = p.expr_node()?;
@@ -2830,13 +2863,21 @@ impl<'a> Parser<'a> {
     }
 
     fn transition_expr(&mut self) -> ParseResult<TransitionExpr> {
-        let first_span = self.current_span()?;
+        let first_span = self.current_span();
 
         let do_expr = match self.peek(0) {
             Keyword(Do) => Some(self.scoped(|p| p.do_expr())?),
             _ => None,
         };
 
+        // The do expression, or the missing one, fails further than the end
+        // of the input: at the closing brace of the actions, or at `enter`,
+        // where `do` is expected
+        let actions_fail_at = match &do_expr {
+            Some(do_expr) => Some(last_token(do_expr.span())),
+            None if self.peek(0) == Keyword(Enter) => Some(first_span),
+            None => None,
+        };
         let target = match self.peek(0) {
             Keyword(Enter) => {
                 self.next();
@@ -2850,28 +2891,22 @@ impl<'a> Parser<'a> {
                 },
             )),
         };
-        match target {
-            Ok(target) => Ok(TransitionExpr {
+        match (target, actions_fail_at) {
+            (Ok(target), _) => Ok(TransitionExpr {
                 node_id: self.node(first_span),
                 actions: do_expr,
                 target,
             }),
-            // The do expression, or the missing one, fails further than the
-            // end of the input: at the closing brace of the actions, or where
-            // `do` is expected
-            Err(err) if err.is_at_end_of_input() => Err(ParseError::EndOfInputIn {
-                loc: match &do_expr {
-                    Some(do_expr) => last_token(do_expr.span()),
-                    None => first_span,
-                },
+            (Err(err), Some(loc)) if err.is_at_end_of_input() => Err(ParseError::EndOfInputIn {
+                loc,
                 construct: "transition",
             }),
-            Err(err) => Err(err),
+            (Err(err), _) => Err(err),
         }
     }
 
     fn transition_or_do(&mut self) -> ParseResult<TransitionOrDo> {
-        let first_span = self.current_span()?;
+        let first_span = self.current_span();
 
         let do_expr = match self.peek(0) {
             Keyword(Do) => Some(self.do_expr()?),
@@ -2919,7 +2954,7 @@ impl<'a> Parser<'a> {
     }
 
     fn type_name(&mut self) -> ParseResult<TypeName> {
-        let first_span = self.current_span()?;
+        let first_span = self.current_span();
         let kind = match self.peek(0) {
             Keyword(Bool) => {
                 self.next();
@@ -3015,7 +3050,7 @@ impl<'a> Parser<'a> {
     }
 
     fn template_param(&mut self) -> ParseResult<TemplateParam> {
-        let first_span = self.current_span()?;
+        let first_span = self.current_span();
 
         match self.peek(0) {
             Keyword(Constant) => {
@@ -3080,7 +3115,7 @@ impl<'a> Parser<'a> {
     }
 
     fn template_arg(&mut self) -> ParseResult<TemplateArg> {
-        let first_span = self.current_span()?;
+        let first_span = self.current_span();
 
         let kind = match self.peek(0) {
             Keyword(Constant) => {
@@ -3693,11 +3728,11 @@ impl<'a> Parser<'a> {
         self.consume(Keyword(kind))
     }
 
-    fn current_span(&mut self) -> ParseResult<fpp_core::Span> {
-        match self.peek_span(0) {
-            Some(span) => Ok(span),
-            None => Err(self.cursor.err_unexpected_eof()),
-        }
+    /// The location of the next token, or the end of the input if there is
+    /// none. A production that starts there fails at its first token, so at
+    /// the end of the input it reports what it expects.
+    fn current_span(&mut self) -> fpp_core::Span {
+        self.cursor.next_token_span()
     }
 
     /// Parse a string literal. Its `inner_span` covers the source text between

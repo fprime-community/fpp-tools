@@ -99,7 +99,7 @@ impl From<ParseError> for Diagnostic {
                 .note(format!("expected {}", expected))
                 .note(format!("got {}", got)),
             ParseError::UnexpectedEof { last } => {
-                Diagnostic::new(last, Level::Error, "unexpected end of input")
+                Diagnostic::new(last, Level::Error, "syntax error: unexpected end of input")
             }
             ParseError::UnexpectedToken { got_kind, got_span } => {
                 Diagnostic::new(got_span, Level::Error, "syntax error: unexpected token")

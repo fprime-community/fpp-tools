@@ -329,6 +329,26 @@ fn locate_dictionary_error() {
 }
 
 #[test]
+fn locate_dictionary_eof() {
+    run_test("locate-dictionary-eof")
+}
+
+#[test]
+fn locate_state_eof() {
+    run_test("locate-state-eof")
+}
+
+#[test]
+fn type_name_eof() {
+    run_test("type-name-eof")
+}
+
+#[test]
+fn transition_eof() {
+    run_test("transition-eof")
+}
+
+#[test]
 fn state_machine_dictionary() {
     run_test("state-machine-dictionary")
 }

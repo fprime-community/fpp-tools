@@ -360,7 +360,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// The location of the next token, or the end of the input if there is none
-    fn next_token_span(&mut self) -> Span {
+    pub(crate) fn next_token_span(&mut self) -> Span {
         match self.peek_internal(0) {
             Some(tok) => tok.span(),
             None => self.end_of_input_span(),
