@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::spec::*;
 use crate::Analysis;
 use crate::semantics::{

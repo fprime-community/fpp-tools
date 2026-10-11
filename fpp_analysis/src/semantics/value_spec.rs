@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::spec::*;
 use crate::semantics::{
     AbsTypeValue, AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue,
