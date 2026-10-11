@@ -111,7 +111,8 @@ impl<'ast> Visitor<'ast> for CheckTopologyDefs {
                         .expect("a topology is under construction");
                     top.add_local_connection(&node.name.data, c);
                 }
-                // A use in the connection is unresolved (already reported)
+                // An endpoint names an instance that is unresolved or whose
+                // definition failed to check (already reported)
                 Ok(None) => {}
                 Err(err) => err.emit(),
             }
@@ -127,7 +128,8 @@ impl<'ast> Visitor<'ast> for CheckTopologyDefs {
         let pattern = Arc::new(node.clone());
         let result = ConnectionPattern::from_spec_connection_graph(a, &pattern).and_then(|p| {
             let Some(p) = p else {
-                // A use in the pattern is unresolved (already reported)
+                // The pattern names an instance that is unresolved or whose
+                // definition failed to check (already reported)
                 return Ok(());
             };
             let top = a

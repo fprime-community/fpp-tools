@@ -862,13 +862,14 @@ impl Analysis {
         matches!(represented, Symbol::Topology(_)).then_some(represented)
     }
 
-    /// Gets the component instance represented by a use, stripping off any bound
-    /// template parameters
+    /// Gets the component instance represented by a use. Strip off any template
+    /// args.
     ///
     /// An error is reported at the use and names the symbol the use refers to,
     /// which for a bound parameter is the parameter; its note points at the
     /// represented definition. Returns `None` if the use, or the template
-    /// argument it stands for, is unresolved (CheckUses reported it).
+    /// argument it stands for, is unresolved, or if it names a component
+    /// instance whose definition failed to check (both already reported).
     pub fn get_represented_component_instance(
         &self,
         id: fpp_core::Node,
