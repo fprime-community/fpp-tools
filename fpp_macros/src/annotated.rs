@@ -1,6 +1,5 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use std::any::Any;
 use syn::{Fields, ItemEnum, ItemStruct, Type};
 
 pub(crate) fn annotated_struct(input: &ItemStruct) -> TokenStream {
@@ -9,14 +8,21 @@ pub(crate) fn annotated_struct(input: &ItemStruct) -> TokenStream {
 
     let debug_fields = match &input.fields {
         Fields::Named(fields_named) => {
-            // Validate that the node_id field exists
-            let node_id_type: Type = syn::parse_quote!(fpp_core::Node);
+            // Validate that the node_id field exists and is a node
             match fields_named.named.iter().find(|f| match &f.ident {
                 None => false,
                 Some(ident) => ident == "node_id",
             }) {
                 Some(node_id_field) => {
-                    if node_id_field.ty.type_id() != node_id_type.type_id() {
+                    let is_node = match &node_id_field.ty {
+                        Type::Path(path) => path
+                            .path
+                            .segments
+                            .last()
+                            .is_some_and(|segment| segment.ident == "Node"),
+                        _ => false,
+                    };
+                    if !is_node {
                         let err = syn::Error::new_spanned(
                             node_id_field,
                             "node_id member is not fpp_core::Node",
@@ -28,7 +34,7 @@ pub(crate) fn annotated_struct(input: &ItemStruct) -> TokenStream {
                 None => {
                     let err = syn::Error::new_spanned(
                         input,
-                        "`annotated` must be placed after `ast_node`",
+                        "`AstAnnotated` needs the `node_id` field that `#[ast]` adds",
                     )
                     .to_compile_error();
                     return err.into();

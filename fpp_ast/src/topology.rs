@@ -69,6 +69,21 @@ pub enum ConnectionPatternKind {
     Time,
 }
 
+/// Writes the pattern kind as it is spelled in a pattern connection graph
+impl std::fmt::Display for ConnectionPatternKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            ConnectionPatternKind::Command => "command",
+            ConnectionPatternKind::Event => "event",
+            ConnectionPatternKind::Health => "health",
+            ConnectionPatternKind::Param => "param",
+            ConnectionPatternKind::Telemetry => "telemetry",
+            ConnectionPatternKind::TextEvent => "text event",
+            ConnectionPatternKind::Time => "time",
+        })
+    }
+}
+
 /// Connection graph specifier
 #[ast]
 #[derive(AstAnnotated, Clone, Replicate, VisitorWalkable, serde::Serialize)]
