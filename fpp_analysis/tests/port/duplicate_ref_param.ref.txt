@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/port/duplicate_ref_param.fpp:1:16
+  |
+1 | port P(a: U32, ref a: U32)
+  |                ^^^^^^^^^^ duplicate parameter `a`
+  |
+ ::: [ local path prefix ]/port/duplicate_ref_param.fpp:1:8
+  |
+1 | port P(a: U32, ref a: U32)
+  |        ------ previously defined here
+

@@ -79,3 +79,8 @@ fn import_duplicate_special_port_order() {
 fn failed_import_keeps_merged_ports() {
     run_test("interface/failed_import_keeps_merged_ports")
 }
+
+#[test]
+fn import_module() {
+    run_test("interface/import_module")
+}

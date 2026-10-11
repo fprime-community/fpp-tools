@@ -136,17 +136,19 @@ impl ComponentInstance {
         Ok(ci)
     }
 
-    /// Create a component instance. Returns `None` if the referenced component
-    /// is unresolved (CheckUses already reported the error).
+    /// Creates a component instance from a component instance definition.
+    ///
+    /// Returns `None` if the component use did not resolve, or if the component
+    /// it names failed its own checks; in both cases an error was already
+    /// reported.
     pub fn from_def(
         a: &Analysis,
         node: &DefComponentInstance,
     ) -> SemanticResult<Option<ComponentInstance>> {
         let loc = node.span();
         let name = node.name.data.clone();
-        let component = match get_component(a, node) {
-            Some(c) => c,
-            None => return Ok(None),
+        let Some(component) = a.get_component(node.component.id())? else {
+            return Ok(None);
         };
         let component_kind = component.node.kind.clone();
 
@@ -232,13 +234,6 @@ fn normalize_path(path: &Path) -> PathBuf {
         }
     }
     result
-}
-
-fn get_component(a: &Analysis, node: &DefComponentInstance) -> Option<Component> {
-    match a.use_def_map.get(&node.component.id()) {
-        Some(symbol @ Symbol::Component(_)) => a.component_map.get(symbol).cloned(),
-        _ => None,
-    }
 }
 
 /// Construct an invalid instance error

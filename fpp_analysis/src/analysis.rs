@@ -1,9 +1,10 @@
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
-    Component, ComponentInstance, Dictionary, FppSystem, FrameworkDefinitions, ImpliedUse,
-    ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, NameGroup, NestedScope, QualifiedName,
-    Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion, TlmPacketSet, Topology, Type,
-    UseDefMatching, Value, state_machine::StateMachine,
+    Component, ComponentInstance, Dictionary, Direction, FppSystem, FrameworkDefinitions,
+    ImpliedUse, ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, NameGroup, NestedScope,
+    PortInstance, PortInstanceType, QualifiedName, Scope, ScopeOwner, Symbol, SymbolInterface,
+    TemplateExpansion, TlmPacketSet, Topology, Type, UseDefMatching, Value,
+    state_machine::StateMachine,
 };
 use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc};
 use fpp_core::{File, SourceFile, Span, Spanned};
@@ -346,6 +347,13 @@ impl Analysis {
         }
     }
 
+    /// Gets an interface from the interface definition map
+    pub fn get_interface(&self, id: fpp_core::Node) -> SemanticResult<Option<Interface>> {
+        Ok(self
+            .get_interface_symbol(id)?
+            .and_then(|symbol| self.interface_map.get(&symbol).cloned()))
+    }
+
     /// Gets a topology symbol from the use-def map
     pub fn get_topology_symbol(&self, id: fpp_core::Node) -> SemanticResult<Option<Symbol>> {
         match self.use_def_map.get(&id) {
@@ -575,19 +583,34 @@ impl Analysis {
         Ok(())
     }
 
-    /// Check that a formal parameter list has no duplicate parameter names.
+    /// Check for duplicate parameter
     pub fn check_for_duplicate_parameter(params: &[FormalParam]) -> SemanticResult {
         let mut seen: HashMap<String, Span> = HashMap::default();
         for param in params {
-            if let Some(prev_loc) = seen.insert(param.name.data.clone(), param.name.span()) {
+            if let Some(prev_loc) = seen.insert(param.name.data.clone(), param.span()) {
                 return Err(SemanticError::DuplicateParameter {
                     name: param.name.data.clone(),
-                    loc: param.name.span(),
+                    loc: param.span(),
                     prev_loc,
                 });
             }
         }
         Ok(())
+    }
+
+    /// Checks whether a port instance is the specified general port
+    pub fn is_general_port(
+        &self,
+        pi: &PortInstance,
+        direction: Direction,
+        port_type_name: &str,
+    ) -> bool {
+        match (pi.get_type(), pi.get_direction()) {
+            (Some(PortInstanceType::DefPort(def)), Some(d)) => {
+                self.get_qualified_name(&Symbol::Port(def)) == port_type_name && d == direction
+            }
+            _ => false,
+        }
     }
 
     /// Gets the reason for a non-displayable type at an AST node id, as the

@@ -9,3 +9,8 @@ fn duplicate_param() {
 fn ok() {
     run_test("port/ok")
 }
+
+#[test]
+fn duplicate_ref_param() {
+    run_test("port/duplicate_ref_param")
+}

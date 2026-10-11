@@ -133,9 +133,13 @@ pub(crate) fn add_resolved_port_instance(a: &mut Analysis, instance: PortInstanc
 }
 
 fn add_imported_interface(a: &mut Analysis, node: &SpecInterfaceImport) {
-    let symbol = match a.use_def_map.get(&node.interface.id()) {
-        Some(symbol @ Symbol::Interface(_)) => symbol.clone(),
-        _ => return,
+    let symbol = match a.get_interface_symbol(node.interface.id()) {
+        Ok(Some(symbol)) => symbol,
+        Ok(None) => return,
+        Err(err) => {
+            err.emit();
+            return;
+        }
     };
     if let Some(iface) = a.interface.take() {
         match iface.add_imported_interface_symbol(symbol, node) {

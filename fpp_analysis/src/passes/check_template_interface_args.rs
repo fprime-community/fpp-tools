@@ -31,7 +31,7 @@ impl CheckTemplateInterfaceArgs {
                 continue;
             };
             // Resolve the interface declared for this parameter
-            let Some(iface) = a.get_interface(param_def.interface.id()) else {
+            let Ok(Some(iface)) = a.get_interface(param_def.interface.id()) else {
                 continue;
             };
             let Some(port_interface) = instance.get_interface(a) else {

@@ -707,7 +707,7 @@ impl Analysis {
                 .map(InterfaceInstance::from_topology),
             Some(Symbol::TemplateInterfaceArg { param_def, value }) => {
                 let instance = self.get_interface_instance(value.id())?;
-                let interface = self.get_interface(param_def.interface.id())?;
+                let interface = self.get_interface(param_def.interface.id()).ok()??;
                 Some(InterfaceInstance::from_template_arg(
                     param_def.clone(),
                     interface,
@@ -735,30 +735,6 @@ impl Analysis {
             }),
             // Unresolved use: CheckUses already reported the error.
             None => Ok(None),
-        }
-    }
-
-    /// Resolve a use node to an interface.
-    pub fn get_interface(&self, id: fpp_core::Node) -> Option<Interface> {
-        match self.use_def_map.get(&id) {
-            Some(symbol @ Symbol::Interface(_)) => self.interface_map.get(symbol).cloned(),
-            _ => None,
-        }
-    }
-
-    /// Whether a port instance is a general port with the given direction and
-    /// fully qualified port type name.
-    pub fn is_general_port(
-        &self,
-        pi: &PortInstance,
-        direction: Direction,
-        port_type_name: &str,
-    ) -> bool {
-        match (pi.get_type(), pi.get_direction()) {
-            (Some(PortInstanceType::DefPort(def)), Some(d)) => {
-                self.get_qualified_name(&Symbol::Port(def)) == port_type_name && d == direction
-            }
-            _ => false,
         }
     }
 }

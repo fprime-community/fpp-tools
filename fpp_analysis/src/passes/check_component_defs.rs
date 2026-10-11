@@ -3,7 +3,7 @@ use crate::analyzers::analyzer::visit_expansion;
 use crate::errors::SemanticResult;
 use crate::semantics::{
     Command, Component, Container, Event, Param, PortInstance, Record, StateMachineInstance,
-    Symbol, TlmChannel,
+    TlmChannel,
 };
 use fpp_ast::{
     AstNode, DefComponent, DefModule, SpecCommand, SpecContainer, SpecEvent,
@@ -169,15 +169,10 @@ impl<'ast> Visitor<'ast> for CheckComponentDefs {
         node: &'ast SpecInterfaceImport,
     ) -> ControlFlow<Self::Break> {
         update(a, |a, component| {
-            let symbol = match a.use_def_map.get(&node.interface.id()) {
-                Some(symbol @ Symbol::Interface(_)) => symbol.clone(),
-                _ => return Ok(()),
+            let Some(iface) = a.get_interface(node.interface.id())? else {
+                return Ok(());
             };
-            let interface = match a.interface_map.get(&symbol) {
-                Some(iface) => iface.clone(),
-                None => return Ok(()),
-            };
-            component.add_imported_interface(&interface, node.node_id)
+            component.add_imported_interface(&iface, node.node_id)
         });
         ControlFlow::Continue(())
     }

@@ -104,3 +104,8 @@ fn array_undef_constant() {
 fn array_ok() {
     run_test("component/array_ok")
 }
+
+#[test]
+fn import_module() {
+    run_test("component/import_module")
+}

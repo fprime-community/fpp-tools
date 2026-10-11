@@ -1,9 +1,6 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::visit_expansion;
-use crate::errors::SemanticError;
 use fpp_ast::{DefModuleTemplate, DefPort, MoveWalkable, Node, SpecTemplateExpand, Visitor};
-use fpp_core::Spanned;
-use rustc_hash::FxHashMap as HashMap;
 use std::ops::ControlFlow;
 
 /// Check port definitions.
@@ -40,16 +37,8 @@ impl<'ast> Visitor<'ast> for CheckPortDefs {
     }
 
     fn visit_def_port(&self, a: &mut Self::State, node: &'ast DefPort) -> ControlFlow<Self::Break> {
-        let mut seen: HashMap<String, fpp_core::Span> = HashMap::default();
-        for param in &node.params {
-            if let Some(prev_loc) = seen.insert(param.name.data.clone(), param.name.span()) {
-                SemanticError::DuplicateParameter {
-                    name: param.name.data.clone(),
-                    loc: param.name.span(),
-                    prev_loc,
-                }
-                .emit();
-            }
+        if let Err(err) = Analysis::check_for_duplicate_parameter(&node.params) {
+            err.emit();
         }
 
         self.super_visit(a, Node::DefPort(node))
