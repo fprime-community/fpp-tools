@@ -1,5 +1,5 @@
   --> [ local path prefix ]/component_instance_def/queued_cpu.fpp:11:7
    |
 11 |   cpu 0
-   |       ^ invalid instance c: queued component may not have CPU affinity
+   |       ^ invalid component instance definition c: queued component may not have CPU affinity
 

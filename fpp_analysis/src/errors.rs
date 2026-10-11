@@ -164,8 +164,8 @@ pub enum SemanticError {
     },
     /// Error while importing an interface
     InterfaceImport {
-        loc: Span,
-        inner: Box<SemanticError>,
+        import_loc: Span,
+        err: Box<SemanticError>,
     },
     /// Passive async input
     PassiveAsync {
@@ -607,8 +607,8 @@ impl From<SemanticError> for Diagnostic {
                 name,
                 loc,
                 prev_loc,
-            } => Diagnostic::new(loc, Level::Error, format!("duplicate parameter `{}`", name))
-                .span_note(prev_loc, "previously defined here"),
+            } => Diagnostic::new(loc, Level::Error, format!("duplicate parameter {}", name))
+                .span_note(prev_loc, "previous parameter is here"),
             SemanticError::TypeConversion { loc, msg, err } => {
                 err.annotate(Diagnostic::new(loc, Level::Error, msg))
             }
@@ -730,7 +730,7 @@ impl From<SemanticError> for Diagnostic {
                 Diagnostic::new(loc, Level::Error, msg)
             }
             SemanticError::InvalidPortInstance { loc, msg, def_loc } => {
-                Diagnostic::new(loc, Level::Error, msg).span_note(def_loc, "defined here")
+                Diagnostic::new(loc, Level::Error, msg).span_note(def_loc, "port definition is here")
             }
             SemanticError::DuplicateInterface {
                 name,
@@ -758,9 +758,9 @@ impl From<SemanticError> for Diagnostic {
                     diag.span_note(*l, "previous instance imported from here")
                 })
             }
-            SemanticError::InterfaceImport { loc, inner } => {
-                let diag: Diagnostic = (*inner).into();
-                diag.span_note(loc, "failed to import interface here")
+            SemanticError::InterfaceImport { import_loc, err } => {
+                Diagnostic::new(import_loc, Level::Error, "failed to import interface")
+                    .span_note_diagnostic((*err).into())
             }
             SemanticError::PassiveAsync { loc, import_locs } => {
                 let diag = Diagnostic::new(
@@ -768,7 +768,7 @@ impl From<SemanticError> for Diagnostic {
                     Level::Error,
                     "passive component may not have async input",
                 );
-                import_locs.iter().fold(diag, |diag, l| {
+                import_locs.iter().rev().fold(diag, |diag, l| {
                     diag.span_note(*l, "port instance was imported from here")
                 })
             }
@@ -834,7 +834,7 @@ impl From<SemanticError> for Diagnostic {
             } => Diagnostic::new(
                 loc,
                 Level::Error,
-                format!("duplicate init specifier for phase {}", phase),
+                format!("duplicate initialization for phase {}", phase),
             )
             .span_note(prev_loc, "previous occurrence is here"),
             SemanticError::MissingPort {
@@ -854,7 +854,7 @@ impl From<SemanticError> for Diagnostic {
             SemanticError::PassiveStateMachine { loc } => Diagnostic::new(
                 loc,
                 Level::Error,
-                "passive component may not have state machine instances",
+                "passive component may not have a state machine instance",
             ),
             SemanticError::InvalidDataProducts { loc, msg } => {
                 Diagnostic::new(loc, Level::Error, msg)
@@ -879,9 +879,11 @@ impl From<SemanticError> for Diagnostic {
                     name, component_name
                 ),
             ),
-            SemanticError::InvalidDefComponentInstance { name, loc, msg } => {
-                Diagnostic::new(loc, Level::Error, format!("invalid instance {}: {}", name, msg))
-            }
+            SemanticError::InvalidDefComponentInstance { name, loc, msg } => Diagnostic::new(
+                loc,
+                Level::Error,
+                format!("invalid component instance definition {}: {}", name, msg),
+            ),
             SemanticError::OverlappingIdRanges {
                 base_id1,
                 name1,
@@ -898,7 +900,7 @@ impl From<SemanticError> for Diagnostic {
                     base_id1, name1, base_id2, max_id2, name2
                 ),
             )
-            .span_note(loc2, "conflicting instance is here"),
+            .span_note(loc2, format!("{} is defined here", name2)),
             SemanticError::DuplicateInstance {
                 name,
                 loc,
@@ -1146,19 +1148,8 @@ impl From<SemanticError> for Diagnostic {
             )
             .span_note(def_loc, "interface definition is here"),
             SemanticError::InterfaceImplements { loc, inner } => {
-                let d = Diagnostic::new(loc, Level::Error, "port interface not implemented");
-                match *inner {
-                    SemanticError::PortInterfaceMissingPort { loc: iloc } => {
-                        d.span_note(iloc, "port instance missing")
-                    }
-                    SemanticError::PortInterfaceInvalidPort {
-                        loc: iloc,
-                        def_loc,
-                    } => d
-                        .span_note(iloc, "port instance does not match definition in interface")
-                        .span_note(def_loc, "interface definition is here"),
-                    other => d.span_note(loc, format!("{:?}", other)),
-                }
+                Diagnostic::new(loc, Level::Error, "port interface not implemented")
+                    .span_note_diagnostic((*inner).into())
             }
             SemanticError::DuplicatePattern {
                 kind,

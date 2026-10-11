@@ -302,7 +302,7 @@ impl GeneralPortInstance {
             return Err(SemanticError::InvalidPortInstance {
                 loc: self.get_loc(),
                 msg: "async input port may not return a value".to_string(),
-                def_loc: def.name.span(),
+                def_loc: def.span(),
             });
         }
         Ok(())
@@ -817,8 +817,8 @@ impl PortInterface {
                 Ok(c) => c,
                 Err(err) => {
                     return Err(SemanticError::InterfaceImport {
-                        loc: import_node.span(),
-                        inner: Box::new(err),
+                        import_loc: import_node.span(),
+                        err: Box::new(err),
                     });
                 }
             };
