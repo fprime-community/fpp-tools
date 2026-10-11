@@ -24,6 +24,10 @@ passive component C3 {
   command foo port p
 }
 
+passive component C4 {
+  product container C default 3
+}
+
 module M1 {
   type T = 1
 }

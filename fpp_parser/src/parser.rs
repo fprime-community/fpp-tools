@@ -10,9 +10,13 @@
 //! Unlike the Scala parser, this one recovers from an error at the next element
 //! of the enclosing element sequence and goes on parsing, so one parse can
 //! report several errors. The first one is the one the Scala parser reports,
-//! except at the end of the input, where the Scala choice between failures can
-//! depend on alternatives inside an element (such as an expression) that are
-//! only followed here at the level of the element.
+//! except when the input ends inside an element. There the Scala parser reports
+//! the failure that got furthest among every alternative it tried, a failure at
+//! the end of the input counting as the least far. This parser makes that
+//! choice only between the alternatives of an element sequence, taking the
+//! failure of the others to be at the start of the element. So when the input
+//! ends inside an expression, a type name, or a member whose first keywords
+//! other members share, the first error can be at another token of the line.
 
 use crate::cursor::Cursor;
 use crate::error::{ParseError, ParseResult};
@@ -1550,10 +1554,12 @@ impl<'a> Parser<'a> {
         self.commit();
         let name = self.name()?;
         let id = self.opt_expr(Id)?;
-        let default_priority = match self.peek(0) {
-            Keyword(Default) => {
+        // `default priority` commits only after both keywords, so a `default`
+        // that `priority` does not follow ends the specifier before it
+        let default_priority = match (self.peek(0), self.peek(1)) {
+            (Keyword(Default), Keyword(Priority)) => {
                 self.next();
-                self.consume_keyword(Priority)?;
+                self.next();
                 Some(self.expr_node()?)
             }
             _ => None,

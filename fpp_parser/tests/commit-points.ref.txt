@@ -38,25 +38,33 @@
    = note: expected }
    = note: got command
 
-  --> [ local path prefix ]/commit-points.fpp:28:10
+  --> [ local path prefix ]/commit-points.fpp:28:23
    |
-28 |   type T = 1
+28 |   product container C default 3
+   |                       ^^^^^^^ syntax error: unexpected token
+   |
+   = note: expected }
+   = note: got default
+
+  --> [ local path prefix ]/commit-points.fpp:32:10
+   |
+32 |   type T = 1
    |          ^ syntax error: unexpected token
    |
    = note: expected }
    = note: got =
 
-  --> [ local path prefix ]/commit-points.fpp:32:18
+  --> [ local path prefix ]/commit-points.fpp:36:18
    |
-32 |   constant a = 1 constant b = 2
+36 |   constant a = 1 constant b = 2
    |                  ^^^^^^^^ syntax error: unexpected token
    |
    = note: expected }
    = note: got constant
 
-  --> [ local path prefix ]/commit-points.fpp:36:3
+  --> [ local path prefix ]/commit-points.fpp:40:3
    |
-36 |   state machine 3
+40 |   state machine 3
    |   ^^^^^ syntax error: unexpected token
    |
    = note: expected }
