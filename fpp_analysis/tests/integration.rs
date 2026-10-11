@@ -20,9 +20,7 @@ pub(crate) fn run_test_with(dep_paths: &[&str], file_path: &str) {
 /// writes against `<file_path>-unconnected.ref.txt`.
 ///
 /// The report lists, for each topology that has unconnected ports, the
-/// qualified names of those ports. fpp-check writes the topologies in the
-/// order of its topology map, which is not observable here, so the comparison
-/// treats the report as a set of per-topology blocks.
+/// qualified names of those ports.
 pub(crate) fn run_test_unconnected(file_path: &str) {
     run(&[], file_path, true)
 }
@@ -30,40 +28,28 @@ pub(crate) fn run_test_unconnected(file_path: &str) {
 /// Write the unconnected port report the way `fpp-check -u` does: one block per
 /// topology with unconnected ports, holding the topology's qualified name and
 /// the sorted qualified names of its unconnected ports, followed by a blank
-/// line. The blocks are in topology name order.
+/// line. The blocks are in the order of the topology map, which is the order
+/// the topologies were resolved.
 fn unconnected_port_report(a: &Analysis) -> String {
-    let mut blocks: Vec<String> = a
+    let mut report = String::new();
+    for (s, t) in a
         .topology_map
         .iter()
         .filter(|(_, t)| !t.unconnected_port_set.is_empty())
-        .map(|(s, t)| {
-            let mut ports: Vec<String> = t
-                .unconnected_port_set
-                .iter()
-                .map(|pii| pii.qualified_name())
-                .collect();
-            ports.sort();
-            let mut block = format!("Topology {}:\n", a.get_qualified_name(s));
-            for port in ports {
-                block.push_str(&format!("  {}\n", port));
-            }
-            block.push('\n');
-            block
-        })
-        .collect();
-    blocks.sort();
-    blocks.concat()
-}
-
-/// Split an unconnected port report into its per-topology blocks, sorted
-fn unconnected_report_blocks(report: &str) -> Vec<String> {
-    let mut blocks: Vec<String> = report
-        .split("\n\n")
-        .map(|block| block.trim().to_string())
-        .filter(|block| !block.is_empty())
-        .collect();
-    blocks.sort();
-    blocks
+    {
+        let mut ports: Vec<String> = t
+            .unconnected_port_set
+            .iter()
+            .map(|pii| pii.qualified_name())
+            .collect();
+        ports.sort();
+        report.push_str(&format!("Topology {}:\n", a.get_qualified_name(s)));
+        for port in ports {
+            report.push_str(&format!("  {}\n", port));
+        }
+        report.push('\n');
+    }
+    report
 }
 
 fn run(dep_paths: &[&str], file_path: &str, unconnected: bool) {
@@ -135,23 +121,11 @@ fn run(dep_paths: &[&str], file_path: &str, unconnected: bool) {
         report_file.push(format!("{file_path}-unconnected"));
         report_file.set_extension("ref.txt");
         match env::var("FPP_UPDATE_REF") {
-            Ok(_) => {
-                // Keep a ref whose blocks match, since it may list them in
-                // fpp-check's order
-                let expected = fs::read_to_string(&report_file).ok();
-                if expected.as_deref().map(unconnected_report_blocks)
-                    != Some(unconnected_report_blocks(&report))
-                {
-                    fs::write(report_file, report).expect("failed to write the report ref")
-                }
-            }
+            Ok(_) => fs::write(report_file, report).expect("failed to write the report ref"),
             Err(_) => {
                 let expected =
                     fs::read_to_string(&report_file).expect("failed to read the report ref");
-                assert_eq!(
-                    unconnected_report_blocks(&expected),
-                    unconnected_report_blocks(&report)
-                )
+                assert_eq!(expected, report)
             }
         }
     }
