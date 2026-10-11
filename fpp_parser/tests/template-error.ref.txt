@@ -27,7 +27,7 @@
 7 | expand T(constant)
   |                  ^ syntax error: expression expected
   |
-  = note: expected one of [, {, (, identifier, ., true, false, sizeof, literal float, literal integer, literal string
+  = note: expected one of [, {, (, identifier, ., -, true, false, sizeof, literal float, literal integer, literal string
   = note: got )
 
   --> [ local path prefix ]/template-error.fpp:10:1
@@ -62,11 +62,11 @@
    = note: expected :
    = note: got )
 
-  --> [ local path prefix ]/template-error.fpp:22:25
+  --> [ local path prefix ]/template-error.fpp:22:27
    |
 22 | module template T4(type Ty: U32) {}
-   |                         ^^ syntax error: unexpected token
+   |                           ^ syntax error: unexpected token
    |
-   = note: expected ,
+   = note: expected )
    = note: got :
 

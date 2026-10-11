@@ -349,14 +349,6 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    /// Generate a generic syntax error
-    pub fn err(&self, msg: &'static str) -> ParseError {
-        ParseError::Syntax {
-            last: self.last_consumed_span,
-            msg,
-        }
-    }
-
     pub fn err_unexpected_eof(&self) -> ParseError {
         ParseError::UnexpectedEof {
             last: self.last_consumed_span,

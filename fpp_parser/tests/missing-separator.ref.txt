@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/missing-separator.fpp:1:20
+  |
+1 | constant a = [1, 2 3]
+  |                    ^ syntax error: unexpected token
+  |
+  = note: expected ]
+  = note: got literal integer
+

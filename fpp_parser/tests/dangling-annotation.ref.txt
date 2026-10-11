@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/dangling-annotation.fpp:4:1
+  |
+4 | }
+  | ^ syntax error: module member expected
+  |
+  = note: expected one of dictionary, type, array, constant, enum, struct, active, passive, queued, instance, interface, module, port, state, system, deployment, topology, include, locate, expand
+  = note: got }
+

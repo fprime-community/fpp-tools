@@ -4,11 +4,6 @@ use std::fmt::Formatter;
 
 #[derive(Debug)]
 pub(crate) enum ParseError {
-    Syntax {
-        last: Span,
-        msg: &'static str,
-    },
-
     ExpectedOneOf {
         expected: Vec<TokenKind>,
         got_kind: TokenKind,
@@ -25,6 +20,12 @@ pub(crate) enum ParseError {
 
     UnexpectedEof {
         last: Span,
+    },
+
+    /// A token that does not belong where it occurs
+    UnexpectedToken {
+        got_kind: TokenKind,
+        got_span: Span,
     },
 
     IncludeCycle {
@@ -72,6 +73,10 @@ impl From<ParseError> for Diagnostic {
             ParseError::UnexpectedEof { last } => {
                 Diagnostic::new(last, Level::Error, "unexpected end of input")
             }
+            ParseError::UnexpectedToken { got_kind, got_span } => {
+                Diagnostic::new(got_span, Level::Error, "syntax error: unexpected token")
+                    .note(format!("got {}", got_kind))
+            }
             ParseError::IncludeCycle {
                 span,
                 include_cycle,
@@ -81,7 +86,6 @@ impl From<ParseError> for Diagnostic {
                     diag.note(format! {"included from {}", pos})
                 })
             }
-            ParseError::Syntax { last, msg } => Diagnostic::new(last, Level::Error, msg),
         }
     }
 }

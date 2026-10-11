@@ -10,15 +10,65 @@ use fpp_lexer::{KeywordKind, TokenKind};
 pub struct Parser<'a> {
     cursor: Cursor<'a>,
     include_span: Option<fpp_core::Span>,
+    /// The tokens that end the enclosing element sequences, innermost last.
+    /// An element sequence with no enclosing token ends at the end of the input.
+    ends: Vec<TokenKind>,
+    /// The state of the element sequence element being parsed
+    element: ElementState,
+    /// An error at the end of the input that has propagated out of the element
+    /// in which it occurred, to be reported by an enclosing element sequence
+    eof_error: Option<ParseError>,
 }
 
-enum ElementParsingResult<T> {
-    Terminated(T),
-    Unterminated(T),
-    Err(ParseError),
-    None,
+/// The state of the element being parsed in an element sequence.
+///
+/// The grammar is a set of backtracking parsers with commit points. A failure
+/// before an element's commit point is not an error: the element sequence ends
+/// before the element, and the error is reported by whatever follows the
+/// sequence, usually as a missing closing token at the start of the element. A
+/// failure after the commit point is reported where it occurs.
+#[derive(Default)]
+struct ElementState {
+    /// Whether the element has passed a commit point
+    committed: bool,
+    /// The token at which the sequence ends if the element fails before its
+    /// commit point, when a shorter alternative of the element parses up to
+    /// there
+    backtrack: Option<(fpp_core::Span, TokenKind)>,
+    /// Whether an error at the end of the input inside the element survives
+    /// the alternatives of the element, which it does when the element is the
+    /// first alternative. Otherwise the alternatives before it fail at the
+    /// start of the element, and that failure is reported instead.
+    eof_error_survives: bool,
 }
 
+/// A type, array, constant, enum or struct definition: the definitions that
+/// modules, components and state machines share, any of which may be a
+/// dictionary definition
+enum TypeOrConstantDef {
+    AliasType(DefAliasType),
+    AbsType(DefAbsType),
+    Array(DefArray),
+    Constant(DefConstant),
+    Enum(DefEnum),
+    Struct(DefStruct),
+}
+
+/// Convert a [TypeOrConstantDef] to a member of the member type `$member`
+macro_rules! into_member {
+    ($def:expr, $member:ident) => {
+        match $def {
+            TypeOrConstantDef::AliasType(def) => $member::DefAliasType(def),
+            TypeOrConstantDef::AbsType(def) => $member::DefAbsType(def),
+            TypeOrConstantDef::Array(def) => $member::DefArray(def),
+            TypeOrConstantDef::Constant(def) => $member::DefConstant(def),
+            TypeOrConstantDef::Enum(def) => $member::DefEnum(def),
+            TypeOrConstantDef::Struct(def) => $member::DefStruct(def),
+        }
+    };
+}
+
+/// Parse a file with the entry point `entry`, which must consume all of it.
 pub fn parse<T>(
     source_file: SourceFile,
     entry: fn(&mut Parser) -> T,
@@ -26,17 +76,40 @@ pub fn parse<T>(
 ) -> T {
     // We need our own copy of the source text since it needs to be long-lived
     let content = source_file.read().as_ref().to_string();
-    let mut parser = Parser {
-        cursor: Cursor::new(source_file, content.as_ref(), include_span),
-        include_span,
-    };
+    let mut parser = Parser::new(source_file, content.as_ref(), include_span);
 
-    let out = entry(&mut parser);
+    let out = parser.parse_all_input(entry);
     parser.cursor.emit_errors();
     out
 }
 
 impl<'a> Parser<'a> {
+    fn new(
+        source_file: SourceFile,
+        content: &'a str,
+        include_span: Option<fpp_core::Span>,
+    ) -> Parser<'a> {
+        Parser {
+            cursor: Cursor::new(source_file, content, include_span),
+            include_span,
+            ends: vec![],
+            element: ElementState::default(),
+            eof_error: None,
+        }
+    }
+
+    /// Run `p` and require it to consume the whole input
+    fn parse_all_input<T>(&mut self, p: fn(&mut Parser) -> T) -> T {
+        let out = p(self);
+        if let Some(err) = self.eof_error.take() {
+            fpp_core::Diagnostic::from(err).emit();
+        }
+        if self.peek(0) != EOF {
+            fpp_core::Diagnostic::from(self.unexpected_token()).emit();
+        }
+        out
+    }
+
     fn peek_span(&mut self, n: usize) -> Option<fpp_core::Span> {
         self.cursor.peek_span(n)
     }
@@ -95,6 +168,10 @@ impl<'a> Parser<'a> {
         let (first, is_dictionary_def) = self.dictionary_opt(Type)?;
 
         let name = self.name()?;
+        if !is_dictionary_def {
+            // `type` and a name alone are an abstract type definition
+            self.element.backtrack = self.peek_token();
+        }
         self.consume(Equals)?;
         let type_name = self.type_name()?;
 
@@ -119,6 +196,7 @@ impl<'a> Parser<'a> {
     fn def_action(&mut self) -> ParseResult<DefAction> {
         let first = self.consume_keyword(Action)?;
         let name = self.name()?;
+        self.commit();
         let type_name = match self.peek(0) {
             Colon => {
                 self.next();
@@ -136,6 +214,7 @@ impl<'a> Parser<'a> {
 
     fn def_array(&mut self) -> ParseResult<DefArray> {
         let (first, is_dictionary_def) = self.dictionary_opt(Array)?;
+        self.commit();
 
         let name = self.name()?;
 
@@ -144,13 +223,7 @@ impl<'a> Parser<'a> {
         let size = self.index()?;
         let elt_type = self.type_name()?;
 
-        let default = match self.peek(0) {
-            Keyword(Default) => {
-                self.next();
-                Some(self.expr()?)
-            }
-            _ => None,
-        };
+        let default = self.opt_expr(Default)?;
 
         let format = match self.peek(0) {
             Keyword(Format) => {
@@ -174,6 +247,7 @@ impl<'a> Parser<'a> {
     fn def_choice(&mut self) -> ParseResult<DefChoice> {
         let first = self.consume_keyword(Choice)?;
         let name = self.name()?;
+        self.commit();
 
         self.consume(LeftCurly)?;
 
@@ -197,12 +271,11 @@ impl<'a> Parser<'a> {
 
     fn def_component(&mut self) -> ParseResult<DefComponent> {
         let (kind, first) = self.component_kind()?;
+        self.commit();
         self.consume_keyword(Component)?;
         let name = self.name()?;
 
-        self.consume(LeftCurly)?;
-        let members = self.component_members();
-        self.consume(RightCurly)?;
+        let members = self.enclosed(LeftCurly, RightCurly, Parser::component_members)?;
 
         Ok(DefComponent {
             node_id: self.node(first.span()),
@@ -213,11 +286,15 @@ impl<'a> Parser<'a> {
     }
 
     pub fn trans_unit(&mut self) -> TransUnit {
-        TransUnit(self.module_members())
+        TransUnit(self.tu_members())
+    }
+
+    fn tu_members(&mut self) -> Vec<ModuleMember> {
+        self.module_members()
     }
 
     pub fn component_members(&mut self) -> Vec<ComponentMember> {
-        self.annotated_element_sequence(&Parser::component_member, Semi, RightCurly)
+        self.annotated_element_sequence(&Parser::component_member, Semi)
     }
 
     fn component_kind(&mut self) -> ParseResult<(ComponentKind, Token)> {
@@ -236,25 +313,9 @@ impl<'a> Parser<'a> {
 
     fn component_member(&mut self) -> ParseResult<ComponentMember> {
         match self.peek(0) {
-            Keyword(Dictionary) => match self.peek(1) {
-                Keyword(Type) => match self.peek(3) {
-                    Equals => Ok(ComponentMember::DefAliasType(self.alias_type()?)),
-                    _ => Ok(ComponentMember::DefAbsType(self.abs_type()?)),
-                },
-                Keyword(Array) => Ok(ComponentMember::DefArray(self.def_array()?)),
-                Keyword(Constant) => Ok(ComponentMember::DefConstant(self.def_constant()?)),
-                Keyword(Enum) => Ok(ComponentMember::DefEnum(self.def_enum()?)),
-                Keyword(Struct) => Ok(ComponentMember::DefStruct(self.def_struct()?)),
-                _ => Err(self.cursor.err("dictionary definition expected")),
-            },
-
-            Keyword(Type) => match self.peek(2) {
-                Equals => Ok(ComponentMember::DefAliasType(self.alias_type()?)),
-                _ => Ok(ComponentMember::DefAbsType(self.abs_type()?)),
-            },
-            Keyword(Array) => Ok(ComponentMember::DefArray(self.def_array()?)),
-            Keyword(Constant) => Ok(ComponentMember::DefConstant(self.def_constant()?)),
-            Keyword(Enum) => Ok(ComponentMember::DefEnum(self.def_enum()?)),
+            Keyword(Dictionary | Type | Array | Constant | Enum | Struct) => {
+                Ok(into_member!(self.type_or_constant_def()?, ComponentMember))
+            }
             Keyword(State) => {
                 if self.peek(2) == Keyword(Instance) {
                     Ok(ComponentMember::SpecStateMachineInstance(
@@ -264,7 +325,6 @@ impl<'a> Parser<'a> {
                     Ok(ComponentMember::DefStateMachine(self.def_state_machine()?))
                 }
             }
-            Keyword(Struct) => Ok(ComponentMember::DefStruct(self.def_struct()?)),
             Keyword(Async | Guarded | Sync)
                 if self.peek(1) == Keyword(Command)
                     && !matches!(self.peek(2), Keyword(Recv | Reg | Resp)) =>
@@ -316,6 +376,7 @@ impl<'a> Parser<'a> {
             _ => Err(self.cursor.err_expected_one_of(
                 "component member expected",
                 vec![
+                    Keyword(Dictionary),
                     Keyword(Type),
                     Keyword(Array),
                     Keyword(Constant),
@@ -325,6 +386,7 @@ impl<'a> Parser<'a> {
                     Keyword(Async),
                     Keyword(Sync),
                     Keyword(Guarded),
+                    Keyword(Output),
                     Keyword(Command),
                     Keyword(Text),
                     Keyword(Time),
@@ -342,12 +404,44 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse a type, array, constant, enum or struct definition, any of which
+    /// may be a dictionary definition. The next token is `dictionary`, `type`,
+    /// `array`, `constant`, `enum` or `struct`.
+    fn type_or_constant_def(&mut self) -> ParseResult<TypeOrConstantDef> {
+        let kind = match self.peek(0) {
+            Keyword(Dictionary) => self.peek(1),
+            kind => kind,
+        };
+        match kind {
+            Keyword(Type) if self.peek(0) == Keyword(Dictionary) || self.peek(2) == Equals => {
+                Ok(TypeOrConstantDef::AliasType(self.alias_type()?))
+            }
+            Keyword(Type) => Ok(TypeOrConstantDef::AbsType(self.abs_type()?)),
+            Keyword(Array) => Ok(TypeOrConstantDef::Array(self.def_array()?)),
+            Keyword(Constant) => Ok(TypeOrConstantDef::Constant(self.def_constant()?)),
+            Keyword(Enum) => Ok(TypeOrConstantDef::Enum(self.def_enum()?)),
+            Keyword(Struct) => Ok(TypeOrConstantDef::Struct(self.def_struct()?)),
+            _ => {
+                self.consume_keyword(Dictionary)?;
+                Err(self.cursor.err_expected_one_of(
+                    "dictionary definition expected",
+                    vec![
+                        Keyword(Type),
+                        Keyword(Array),
+                        Keyword(Constant),
+                        Keyword(Enum),
+                        Keyword(Struct),
+                    ],
+                ))
+            }
+        }
+    }
+
     fn def_module(&mut self) -> ParseResult<DefModule> {
         let first = self.consume_keyword(Module)?;
+        self.commit();
         let name = self.name()?;
-        self.consume(LeftCurly)?;
-        let members = self.module_members();
-        self.consume(RightCurly)?;
+        let members = self.enclosed(LeftCurly, RightCurly, Parser::module_members)?;
 
         Ok(DefModule {
             node_id: self.node(first.span()),
@@ -357,31 +451,14 @@ impl<'a> Parser<'a> {
     }
 
     pub fn module_members(&mut self) -> Vec<ModuleMember> {
-        self.annotated_element_sequence(&Parser::module_member, Semi, RightCurly)
+        self.annotated_element_sequence(&Parser::module_member, Semi)
     }
 
     fn module_member(&mut self) -> ParseResult<ModuleMember> {
         match self.peek(0) {
-            Keyword(Dictionary) => match self.peek(1) {
-                Keyword(Type) => match self.peek(3) {
-                    Equals => Ok(ModuleMember::DefAliasType(self.alias_type()?)),
-                    _ => Ok(ModuleMember::DefAbsType(self.abs_type()?)),
-                },
-                Keyword(Array) => Ok(ModuleMember::DefArray(self.def_array()?)),
-                Keyword(Constant) => Ok(ModuleMember::DefConstant(self.def_constant()?)),
-                Keyword(Enum) => Ok(ModuleMember::DefEnum(self.def_enum()?)),
-                Keyword(Struct) => Ok(ModuleMember::DefStruct(self.def_struct()?)),
-                _ => Err(self.cursor.err("dictionary definition expected")),
-            },
-
-            Keyword(Type) => match self.peek(2) {
-                Equals => Ok(ModuleMember::DefAliasType(self.alias_type()?)),
-                _ => Ok(ModuleMember::DefAbsType(self.abs_type()?)),
-            },
-            Keyword(Array) => Ok(ModuleMember::DefArray(self.def_array()?)),
-            Keyword(Constant) => Ok(ModuleMember::DefConstant(self.def_constant()?)),
-            Keyword(Enum) => Ok(ModuleMember::DefEnum(self.def_enum()?)),
-            Keyword(Struct) => Ok(ModuleMember::DefStruct(self.def_struct()?)),
+            Keyword(Dictionary | Type | Array | Constant | Enum | Struct) => {
+                Ok(into_member!(self.type_or_constant_def()?, ModuleMember))
+            }
             Keyword(Instance) => Ok(ModuleMember::DefComponentInstance(
                 self.def_component_instance()?,
             )),
@@ -409,15 +486,16 @@ impl<'a> Parser<'a> {
             _ => Err(self.cursor.err_expected_one_of(
                 "module member expected",
                 vec![
+                    Keyword(Dictionary),
                     Keyword(Type),
                     Keyword(Array),
                     Keyword(Constant),
                     Keyword(Enum),
                     Keyword(Struct),
-                    Keyword(Component),
                     Keyword(Active),
                     Keyword(Passive),
                     Keyword(Queued),
+                    Keyword(Instance),
                     Keyword(Interface),
                     Keyword(Module),
                     Keyword(Port),
@@ -436,11 +514,10 @@ impl<'a> Parser<'a> {
     fn def_module_template(&mut self) -> ParseResult<DefModuleTemplate> {
         let first = self.consume_keyword(Module)?;
         self.consume_keyword(Template)?;
+        self.commit();
         let name = self.name()?;
         let params = self.template_param_list()?;
-        self.consume(LeftCurly)?;
-        let members = self.module_members();
-        self.consume(RightCurly)?;
+        let members = self.enclosed(LeftCurly, RightCurly, Parser::module_members)?;
 
         Ok(DefModuleTemplate {
             node_id: self.node(first.span()),
@@ -452,14 +529,9 @@ impl<'a> Parser<'a> {
 
     fn template_param_list(&mut self) -> ParseResult<TemplateParamList> {
         match self.peek(0) {
-            LeftParen => {
-                self.next();
-                let params =
-                    self.annotated_element_sequence(&Parser::template_param, Comma, RightParen);
-
-                self.consume(RightParen)?;
-                Ok(params)
-            }
+            LeftParen => self.enclosed(LeftParen, RightParen, |p| {
+                p.annotated_element_sequence(&Parser::template_param, Comma)
+            }),
             _ => Ok(vec![]),
         }
     }
@@ -469,7 +541,9 @@ impl<'a> Parser<'a> {
 
         match self.peek(0) {
             Keyword(Constant) => {
+                self.first_alternative();
                 self.next();
+                self.commit();
                 let name = self.name()?;
                 self.consume(Colon)?;
                 let type_name = self.type_name()?;
@@ -481,6 +555,7 @@ impl<'a> Parser<'a> {
             }
             Keyword(Type) => {
                 self.next();
+                self.commit();
                 let name = self.name()?;
                 Ok(TemplateParam::Type(TemplateParamType {
                     node_id: self.node(first_span),
@@ -489,6 +564,7 @@ impl<'a> Parser<'a> {
             }
             Keyword(Instance) => {
                 self.next();
+                self.commit();
                 let name = self.name()?;
                 self.consume(Colon)?;
                 let interface = self.qual_ident()?;
@@ -507,6 +583,7 @@ impl<'a> Parser<'a> {
 
     fn spec_template_expand(&mut self) -> ParseResult<SpecTemplateExpand> {
         let first = self.consume_keyword(Expand)?;
+        self.commit();
         let template = self.qual_ident()?;
         let args = self.template_arg_list()?;
 
@@ -520,13 +597,9 @@ impl<'a> Parser<'a> {
 
     fn template_arg_list(&mut self) -> ParseResult<TemplateArgList> {
         match self.peek(0) {
-            LeftParen => {
-                self.next();
-                let args = self.element_sequence(&Parser::template_arg, Comma, RightParen);
-
-                self.consume(RightParen)?;
-                Ok(args)
-            }
+            LeftParen => self.enclosed(LeftParen, RightParen, |p| {
+                p.element_sequence(&Parser::template_arg, Comma)
+            }),
             _ => Ok(vec![]),
         }
     }
@@ -536,15 +609,19 @@ impl<'a> Parser<'a> {
 
         let kind = match self.peek(0) {
             Keyword(Constant) => {
+                self.first_alternative();
                 self.next();
+                self.commit();
                 TemplateArgKind::Constant(self.expr()?)
             }
             Keyword(Type) => {
                 self.next();
+                self.commit();
                 TemplateArgKind::Type(self.type_name()?)
             }
             Keyword(Instance) => {
                 self.next();
+                self.commit();
                 TemplateArgKind::Interface(self.qual_ident()?)
             }
             _ => {
@@ -563,6 +640,7 @@ impl<'a> Parser<'a> {
 
     fn def_port(&mut self) -> ParseResult<DefPort> {
         let first = self.consume_keyword(Port)?;
+        self.commit();
         let name = self.name()?;
         let params = self.formal_param_list()?;
         let return_type = match self.peek(0) {
@@ -583,66 +661,79 @@ impl<'a> Parser<'a> {
 
     fn spec_loc(&mut self) -> ParseResult<SpecLoc> {
         let first = self.consume_keyword(Locate)?;
+        self.commit();
 
-        let is_dictionary_def = {
-            if self.peek(0) == Keyword(Dictionary) {
-                self.consume_keyword(Dictionary)?;
-                true
-            } else {
-                false
-            }
-        };
-
-        let kind = match self.peek(0) {
-            Keyword(Component) => {
+        // Only a constant or a type may be a dictionary definition
+        let (is_dictionary_def, kind) = match self.peek(0) {
+            Keyword(Dictionary) => {
                 self.next();
-                SpecLocKind::Component
+                match self.peek(0) {
+                    Keyword(Constant) => {
+                        self.next();
+                        (true, SpecLocKind::Constant)
+                    }
+                    Keyword(Type) => {
+                        self.next();
+                        (true, SpecLocKind::Type)
+                    }
+                    _ => {
+                        return Err(self.cursor.err_expected_one_of(
+                            "dictionary location kind expected",
+                            vec![Keyword(Constant), Keyword(Type)],
+                        ));
+                    }
+                }
             }
             Keyword(Constant) => {
                 self.next();
-                SpecLocKind::Constant
+                (false, SpecLocKind::Constant)
+            }
+            Keyword(Type) => {
+                self.next();
+                (false, SpecLocKind::Type)
+            }
+            Keyword(Component) => {
+                self.next();
+                (false, SpecLocKind::Component)
             }
             Keyword(Instance) => {
                 self.next();
-                SpecLocKind::Instance
+                (false, SpecLocKind::Instance)
             }
             Keyword(Port) => {
                 self.next();
-                SpecLocKind::Port
+                (false, SpecLocKind::Port)
             }
             Keyword(State) => {
                 self.next();
                 self.consume_keyword(Machine)?;
-                SpecLocKind::StateMachine
+                (false, SpecLocKind::StateMachine)
             }
             Keyword(Template) => {
                 self.next();
-                SpecLocKind::Template
+                (false, SpecLocKind::Template)
             }
             Keyword(System) => {
                 self.next();
-                SpecLocKind::System
-            }
-            Keyword(Type) => {
-                self.next();
-                SpecLocKind::Type
+                (false, SpecLocKind::System)
             }
             Keyword(Interface) => {
                 self.next();
-                SpecLocKind::Interface
+                (false, SpecLocKind::Interface)
             }
             _ => {
                 return Err(self.cursor.err_expected_one_of(
-                    "location kind expected",
+                    "dictionary specifier or location kind expected",
                     vec![
-                        Keyword(Component),
+                        Keyword(Dictionary),
                         Keyword(Constant),
+                        Keyword(Type),
+                        Keyword(Component),
                         Keyword(Instance),
                         Keyword(Port),
                         Keyword(State),
                         Keyword(Template),
                         Keyword(System),
-                        Keyword(Type),
                         Keyword(Interface),
                     ],
                 ));
@@ -670,18 +761,25 @@ impl<'a> Parser<'a> {
             }
             _ => (false, self.consume_keyword(Topology)?),
         };
+        self.commit();
         let name = self.name()?;
         let implements = match self.peek(0) {
             Keyword(Implements) => {
                 self.next();
-                self.element_sequence(&Parser::qual_ident, Comma, LeftCurly)
+                self.until(LeftCurly, |p| {
+                    p.element_sequence(
+                        &|p| {
+                            p.first_alternative();
+                            p.qual_ident()
+                        },
+                        Comma,
+                    )
+                })
             }
             _ => vec![],
         };
 
-        self.consume(LeftCurly)?;
-        let members = self.topology_members();
-        self.consume(RightCurly)?;
+        let members = self.enclosed(LeftCurly, RightCurly, Parser::topology_members)?;
 
         Ok(DefTopology {
             node_id: self.node(first.span()),
@@ -694,6 +792,7 @@ impl<'a> Parser<'a> {
 
     fn def_system(&mut self) -> ParseResult<DefSystem> {
         let first = self.consume_keyword(System)?;
+        self.commit();
         let name = self.name()?;
         self.consume(Colon)?;
         let topology = self.qual_ident()?;
@@ -706,35 +805,29 @@ impl<'a> Parser<'a> {
     }
 
     pub fn topology_members(&mut self) -> Vec<TopologyMember> {
-        self.annotated_element_sequence(&Parser::topology_member, Semi, RightCurly)
+        self.annotated_element_sequence(&Parser::topology_member, Semi)
     }
 
     fn topology_member(&mut self) -> ParseResult<TopologyMember> {
         match self.peek(0) {
             Keyword(Import) | Keyword(Instance) => {
+                self.first_alternative();
                 Ok(TopologyMember::SpecInstance(self.spec_instance()?))
             }
             Keyword(Include) => Ok(TopologyMember::SpecInclude(self.spec_include()?)),
             Keyword(Port) => Ok(TopologyMember::SpecTopPort(self.spec_top_port()?)),
-            Keyword(Telemetry) => match self.peek(1) {
-                Keyword(Packets) => Ok(TopologyMember::SpecTlmPacketSet(
-                    self.spec_tlm_packet_set()?,
-                )),
-                _ => Ok(TopologyMember::SpecPatternConnectionGraph(
-                    self.spec_connection_graph_pattern()?,
-                )),
-            },
-            Keyword(Command) | Keyword(Event) | Keyword(Health) | Keyword(Param)
-            | Keyword(Text) | Keyword(Time) => Ok(TopologyMember::SpecPatternConnectionGraph(
-                self.spec_connection_graph_pattern()?,
-            )),
-            Keyword(Connections) => Ok(TopologyMember::SpecDirectConnectionGraph(
-                self.spec_connection_graph_direct()?,
-            )),
+            Keyword(Telemetry) if self.peek(1) == Keyword(Packets) => Ok(
+                TopologyMember::SpecTlmPacketSet(self.spec_tlm_packet_set()?),
+            ),
+            Keyword(Connections | Command | Event | Health | Param | Telemetry | Text | Time) => {
+                self.spec_connection_graph()
+            }
             _ => Err(self.cursor.err_expected_one_of(
                 "topology member expected",
                 vec![
                     Keyword(Instance),
+                    Keyword(Import),
+                    Keyword(Connections),
                     Keyword(Include),
                     Keyword(Port),
                     Keyword(Telemetry),
@@ -745,6 +838,18 @@ impl<'a> Parser<'a> {
                     Keyword(Text),
                     Keyword(Time),
                 ],
+            )),
+        }
+    }
+
+    /// Parse a direct or pattern connection graph specifier
+    fn spec_connection_graph(&mut self) -> ParseResult<TopologyMember> {
+        match self.peek(0) {
+            Keyword(Connections) => Ok(TopologyMember::SpecDirectConnectionGraph(
+                self.spec_connection_graph_direct()?,
+            )),
+            _ => Ok(TopologyMember::SpecPatternConnectionGraph(
+                self.spec_connection_graph_pattern()?,
             )),
         }
     }
@@ -799,16 +904,20 @@ impl<'a> Parser<'a> {
         };
 
         self.consume_keyword(Connections)?;
+        self.commit();
         self.consume_keyword(Instance)?;
         let source = self.qual_ident()?;
 
         let targets = match self.peek(0) {
-            LeftCurly => {
-                self.next();
-                let out = self.element_sequence(&Parser::qual_ident, Comma, RightCurly);
-                self.consume(RightCurly)?;
-                out
-            }
+            LeftCurly => self.enclosed(LeftCurly, RightCurly, |p| {
+                p.element_sequence(
+                    &|p| {
+                        p.first_alternative();
+                        p.qual_ident()
+                    },
+                    Comma,
+                )
+            })?,
             _ => vec![],
         };
 
@@ -823,9 +932,10 @@ impl<'a> Parser<'a> {
     fn spec_connection_graph_direct(&mut self) -> ParseResult<SpecDirectConnectionGraph> {
         let first = self.consume_keyword(Connections)?;
         let name = self.name()?;
-        self.consume(LeftCurly)?;
-        let connections = self.element_sequence(&Parser::connection, Comma, RightCurly);
-        self.consume(RightCurly)?;
+        self.commit();
+        let connections = self.enclosed(LeftCurly, RightCurly, |p| {
+            p.element_sequence(&Parser::connection, Comma)
+        })?;
 
         Ok(SpecDirectConnectionGraph {
             node_id: self.node(first.span()),
@@ -835,6 +945,7 @@ impl<'a> Parser<'a> {
     }
 
     fn connection(&mut self) -> ParseResult<Connection> {
+        self.first_alternative();
         let first_span = self.current_span()?;
 
         let is_unmatched = match self.peek(0) {
@@ -879,6 +990,7 @@ impl<'a> Parser<'a> {
                 ));
             }
         };
+        self.commit();
 
         let instance = self.qual_ident()?;
         Ok(SpecInstance {
@@ -890,19 +1002,22 @@ impl<'a> Parser<'a> {
     fn spec_tlm_packet_set(&mut self) -> ParseResult<SpecTlmPacketSet> {
         let first = self.consume_keyword(Telemetry)?;
         self.consume_keyword(Packets)?;
+        self.commit();
         let name = self.name()?;
-        self.consume(LeftCurly)?;
-        let members = self.tlm_packet_set_members();
-        self.consume(RightCurly)?;
+        let members = self.enclosed(LeftCurly, RightCurly, Parser::tlm_packet_set_members)?;
 
         let omitted = match self.peek(0) {
             Keyword(Omit) => {
                 self.next();
-                self.consume(LeftCurly)?;
-                let omit =
-                    self.element_sequence(&Parser::tlm_channel_identifier, Comma, RightCurly);
-                self.consume(RightCurly)?;
-                omit
+                self.enclosed(LeftCurly, RightCurly, |p| {
+                    p.element_sequence(
+                        &|p| {
+                            p.first_alternative();
+                            p.tlm_channel_identifier()
+                        },
+                        Comma,
+                    )
+                })?
             }
             _ => vec![],
         };
@@ -916,12 +1031,15 @@ impl<'a> Parser<'a> {
     }
 
     pub fn tlm_packet_set_members(&mut self) -> Vec<TlmPacketSetMember> {
-        self.annotated_element_sequence(&Parser::tlm_packet_set_member, Comma, RightCurly)
+        self.annotated_element_sequence(&Parser::tlm_packet_set_member, Comma)
     }
 
     fn tlm_packet_set_member(&mut self) -> ParseResult<TlmPacketSetMember> {
         match self.peek(0) {
-            Keyword(Include) => Ok(TlmPacketSetMember::SpecInclude(self.spec_include()?)),
+            Keyword(Include) => {
+                self.first_alternative();
+                Ok(TlmPacketSetMember::SpecInclude(self.spec_include()?))
+            }
             Keyword(Packet) => Ok(TlmPacketSetMember::SpecTlmPacket(self.spec_tlm_packet()?)),
             _ => Err(self.cursor.err_expected_one_of(
                 "telemetry packet set member expected",
@@ -932,13 +1050,12 @@ impl<'a> Parser<'a> {
 
     fn spec_tlm_packet(&mut self) -> ParseResult<SpecTlmPacket> {
         let first = self.consume_keyword(Packet)?;
+        self.commit();
         let name = self.name()?;
         let id = self.opt_expr(Id)?;
         self.consume_keyword(Group)?;
         let group = self.expr()?;
-        self.consume(LeftCurly)?;
-        let members = self.tlm_packet_members();
-        self.consume(RightCurly)?;
+        let members = self.enclosed(LeftCurly, RightCurly, Parser::tlm_packet_members)?;
 
         Ok(SpecTlmPacket {
             node_id: self.node(first.span()),
@@ -950,12 +1067,15 @@ impl<'a> Parser<'a> {
     }
 
     pub fn tlm_packet_members(&mut self) -> Vec<TlmPacketMember> {
-        self.element_sequence(&Parser::tlm_packet_member, Comma, RightCurly)
+        self.element_sequence(&Parser::tlm_packet_member, Comma)
     }
 
     fn tlm_packet_member(&mut self) -> ParseResult<TlmPacketMember> {
         match self.peek(0) {
-            Keyword(Include) => Ok(TlmPacketMember::SpecInclude(self.spec_include()?)),
+            Keyword(Include) => {
+                self.first_alternative();
+                Ok(TlmPacketMember::SpecInclude(self.spec_include()?))
+            }
             Identifier | Dot => Ok(TlmPacketMember::TlmChannelIdentifier(
                 self.tlm_channel_identifier()?,
             )),
@@ -969,6 +1089,7 @@ impl<'a> Parser<'a> {
     fn tlm_channel_identifier(&mut self) -> ParseResult<TlmChannelIdentifier> {
         let dot = self.opt_dot();
         let id = self.ident()?;
+        self.commit();
         self.consume(Dot)?;
         let mut qid = self.qual_ident_node_list()?;
         let channel_name = qid.pop().unwrap();
@@ -987,6 +1108,7 @@ impl<'a> Parser<'a> {
     fn port_instance_identifier(&mut self) -> ParseResult<PortInstanceIdentifier> {
         let dot = self.opt_dot();
         let id = self.ident()?;
+        self.commit();
         self.consume(Dot)?;
         let mut qid = self.qual_ident_node_list()?;
         let port_name = qid.pop().unwrap();
@@ -1012,6 +1134,7 @@ impl<'a> Parser<'a> {
 
     fn spec_top_port(&mut self) -> ParseResult<SpecTopPort> {
         let first = self.consume_keyword(Port)?;
+        self.commit();
         let name = self.name()?;
         self.consume(Equals)?;
         let underlying_port = self.port_instance_identifier()?;
@@ -1025,6 +1148,7 @@ impl<'a> Parser<'a> {
 
     fn def_component_instance(&mut self) -> ParseResult<DefComponentInstance> {
         let first = self.consume_keyword(Instance)?;
+        self.commit();
         let name = self.name()?;
         self.consume(Colon)?;
         let component = self.qual_ident()?;
@@ -1080,12 +1204,9 @@ impl<'a> Parser<'a> {
 
         let init_specs = {
             match self.peek(0) {
-                LeftCurly => {
-                    self.next();
-                    let seq = self.annotated_element_sequence(&Parser::spec_init, Semi, RightCurly);
-                    self.consume(RightCurly)?;
-                    seq
-                }
+                LeftCurly => self.enclosed(LeftCurly, RightCurly, |p| {
+                    p.annotated_element_sequence(&Parser::spec_init, Semi)
+                })?,
                 _ => vec![],
             }
         };
@@ -1106,7 +1227,9 @@ impl<'a> Parser<'a> {
     }
 
     fn spec_init(&mut self) -> ParseResult<SpecInit> {
+        self.first_alternative();
         let first = self.consume_keyword(Phase)?;
+        self.commit();
         let phase = self.expr()?;
         let code = self.lit_string()?;
 
@@ -1119,10 +1242,9 @@ impl<'a> Parser<'a> {
 
     fn def_interface(&mut self) -> ParseResult<DefInterface> {
         let first = self.consume_keyword(Interface)?;
+        self.commit();
         let name = self.name()?;
-        self.consume(LeftCurly)?;
-        let members = self.annotated_element_sequence(&Parser::interface_member, Semi, RightCurly);
-        self.consume(RightCurly)?;
+        let members = self.enclosed(LeftCurly, RightCurly, Parser::interface_members)?;
 
         Ok(DefInterface {
             node_id: self.node(first.span()),
@@ -1131,19 +1253,51 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn interface_members(&mut self) -> Vec<InterfaceMember> {
+        self.annotated_element_sequence(&Parser::interface_member, Semi)
+    }
+
     fn interface_member(&mut self) -> ParseResult<InterfaceMember> {
         match self.peek(0) {
             Keyword(Import) => Ok(InterfaceMember::SpecInterfaceImport(
                 self.spec_import_interface()?,
             )),
-            _ => Ok(InterfaceMember::SpecPortInstance(
-                self.spec_port_instance()?,
+            Keyword(
+                Async | Guarded | Sync | Output | Command | Event | Param | Product | Telemetry
+                | Text | Time,
+            ) => {
+                if self.peek(0) == Keyword(Output) || self.peek(1) == Keyword(Input) {
+                    // A general port instance is the first alternative of a
+                    // member
+                    self.first_alternative();
+                }
+                Ok(InterfaceMember::SpecPortInstance(
+                    self.spec_port_instance()?,
+                ))
+            }
+            _ => Err(self.cursor.err_expected_one_of(
+                "interface member expected",
+                vec![
+                    Keyword(Async),
+                    Keyword(Guarded),
+                    Keyword(Sync),
+                    Keyword(Output),
+                    Keyword(Command),
+                    Keyword(Event),
+                    Keyword(Param),
+                    Keyword(Product),
+                    Keyword(Telemetry),
+                    Keyword(Text),
+                    Keyword(Time),
+                    Keyword(Import),
+                ],
             )),
         }
     }
 
     fn def_constant(&mut self) -> ParseResult<DefConstant> {
         let (first, is_dictionary_def) = self.dictionary_opt(Constant)?;
+        self.commit();
         let name = self.name()?;
 
         self.consume(Equals)?;
@@ -1159,6 +1313,7 @@ impl<'a> Parser<'a> {
 
     fn def_enum(&mut self) -> ParseResult<DefEnum> {
         let (first, is_dictionary_def) = self.dictionary_opt(Enum)?;
+        self.commit();
         let name = self.name()?;
 
         let type_name = match self.peek(0) {
@@ -1169,18 +1324,11 @@ impl<'a> Parser<'a> {
             _ => None,
         };
 
-        self.consume(LeftCurly)?;
-        let constants =
-            self.annotated_element_sequence(&Parser::def_enum_constant, Comma, RightCurly);
-        self.consume(RightCurly)?;
+        let constants = self.enclosed(LeftCurly, RightCurly, |p| {
+            p.annotated_element_sequence(&Parser::def_enum_constant, Comma)
+        })?;
 
-        let default = match self.peek(0) {
-            Keyword(Default) => {
-                self.next();
-                Some(self.expr()?)
-            }
-            _ => None,
-        };
+        let default = self.opt_expr(Default)?;
 
         Ok(DefEnum {
             node_id: self.node(first.span()),
@@ -1193,7 +1341,9 @@ impl<'a> Parser<'a> {
     }
 
     fn def_enum_constant(&mut self) -> ParseResult<DefEnumConstant> {
+        self.first_alternative();
         let name = self.name()?;
+        self.commit();
         let first_span = name.span();
 
         let value = match self.peek(0) {
@@ -1215,6 +1365,7 @@ impl<'a> Parser<'a> {
         let first = self.consume_keyword(State)?;
         self.consume_keyword(Machine)?;
         self.consume_keyword(Instance)?;
+        self.commit();
 
         let name = self.name()?;
 
@@ -1239,18 +1390,10 @@ impl<'a> Parser<'a> {
         self.consume_keyword(Machine)?;
 
         let name = self.name()?;
+        self.commit();
         let members = match self.peek(0) {
             LeftCurly => {
-                self.next();
-                let out = self.annotated_element_sequence(
-                    &Parser::state_machine_member,
-                    Semi,
-                    RightCurly,
-                );
-
-                self.consume(RightCurly)?;
-
-                Some(out)
+                Some(self.enclosed(LeftCurly, RightCurly, Parser::state_machine_members)?)
             }
             _ => None,
         };
@@ -1262,16 +1405,16 @@ impl<'a> Parser<'a> {
         })
     }
 
+    pub fn state_machine_members(&mut self) -> Vec<StateMachineMember> {
+        self.annotated_element_sequence(&Parser::state_machine_member, Semi)
+    }
+
     fn state_machine_member(&mut self) -> ParseResult<StateMachineMember> {
         match self.peek(0) {
-            Keyword(Type) => match self.peek(2) {
-                Equals => Ok(StateMachineMember::DefAliasType(self.alias_type()?)),
-                _ => Ok(StateMachineMember::DefAbsType(self.abs_type()?)),
-            },
-            Keyword(Array) => Ok(StateMachineMember::DefArray(self.def_array()?)),
-            Keyword(Constant) => Ok(StateMachineMember::DefConstant(self.def_constant()?)),
-            Keyword(Enum) => Ok(StateMachineMember::DefEnum(self.def_enum()?)),
-            Keyword(Struct) => Ok(StateMachineMember::DefStruct(self.def_struct()?)),
+            Keyword(Dictionary | Type | Array | Constant | Enum | Struct) => Ok(into_member!(
+                self.type_or_constant_def()?,
+                StateMachineMember
+            )),
             Keyword(Include) => Ok(StateMachineMember::SpecInclude(self.spec_include()?)),
             Keyword(Initial) => Ok(StateMachineMember::SpecInitialTransition(
                 self.spec_initial_transition()?,
@@ -1284,6 +1427,7 @@ impl<'a> Parser<'a> {
             _ => Err(self.cursor.err_expected_one_of(
                 "state machine member expected",
                 vec![
+                    Keyword(Dictionary),
                     Keyword(Type),
                     Keyword(Array),
                     Keyword(Constant),
@@ -1301,9 +1445,16 @@ impl<'a> Parser<'a> {
         }
     }
 
+    pub fn state_members(&mut self) -> Vec<StateMember> {
+        self.annotated_element_sequence(&Parser::state_member, Semi)
+    }
+
     fn state_member(&mut self) -> ParseResult<StateMember> {
         match self.peek(0) {
-            Keyword(Choice) => Ok(StateMember::DefChoice(self.def_choice()?)),
+            Keyword(Choice) => {
+                self.first_alternative();
+                Ok(StateMember::DefChoice(self.def_choice()?))
+            }
             Keyword(State) => Ok(StateMember::DefState(self.def_state()?)),
             Keyword(Initial) => Ok(StateMember::SpecInitialTransition(
                 self.spec_initial_transition()?,
@@ -1351,9 +1502,16 @@ impl<'a> Parser<'a> {
 
     fn do_expr(&mut self) -> ParseResult<DoExpr> {
         let first = self.consume_keyword(Do)?;
-        self.consume(LeftCurly)?;
-        let actions = self.element_sequence(&Parser::ident, Comma, RightCurly);
-        self.consume(RightCurly)?;
+        self.commit();
+        let actions = self.enclosed(LeftCurly, RightCurly, |p| {
+            p.element_sequence(
+                &|p| {
+                    p.first_alternative();
+                    p.ident()
+                },
+                Comma,
+            )
+        })?;
 
         Ok(DoExpr {
             node_id: self.node(first.span()),
@@ -1373,8 +1531,9 @@ impl<'a> Parser<'a> {
     fn spec_state_transition(&mut self) -> ParseResult<SpecStateTransition> {
         let first = self.consume_keyword(On)?;
         let signal = self.ident()?;
-        let guard = match self.peek(0) {
-            Keyword(If) => {
+        self.commit();
+        let guard = match (self.peek(0), self.peek(1)) {
+            (Keyword(If), Identifier) => {
                 self.next();
                 Some(self.ident()?)
             }
@@ -1399,23 +1558,28 @@ impl<'a> Parser<'a> {
             _ => None,
         };
 
-        match self.peek(0) {
-            Keyword(Enter) => {
+        // After a do expression, the transition alternative needs `enter` and
+        // a target; otherwise the do expression alone is the alternative
+        let is_transition = self.peek(0) == Keyword(Enter)
+            && (do_expr.is_none()
+                || self.peek(1) == Identifier
+                || (self.peek(1) == Dot && self.peek(2) == Identifier));
+
+        match (is_transition, do_expr) {
+            (true, actions) => {
                 self.next();
                 let target = self.qual_ident()?;
                 Ok(TransitionOrDo::Transition(TransitionExpr {
                     node_id: self.node(first_span),
-                    actions: do_expr,
+                    actions,
                     target,
                 }))
             }
-            _ => match do_expr {
-                Some(de) => Ok(TransitionOrDo::Do(de)),
-                None => Err(self.cursor.err_expected_one_of(
-                    "expected transition or do",
-                    vec![Keyword(Do), Keyword(Enter)],
-                )),
-            },
+            (false, Some(de)) => Ok(TransitionOrDo::Do(de)),
+            (false, None) => Err(self.cursor.err_expected_one_of(
+                "expected transition or do",
+                vec![Keyword(Do), Keyword(Enter)],
+            )),
         }
     }
 
@@ -1423,7 +1587,7 @@ impl<'a> Parser<'a> {
         let first_span = self.current_span()?;
 
         let do_expr = match self.peek(0) {
-            Keyword(Do) => Some(self.do_expr()?),
+            Keyword(Do) => Some(self.scoped(|p| p.do_expr())?),
             _ => None,
         };
 
@@ -1439,7 +1603,10 @@ impl<'a> Parser<'a> {
             }
             _ => Err(self.cursor.err_expected_one_of(
                 "expected transition expression",
-                vec![Keyword(Enter), Keyword(Do)],
+                match do_expr {
+                    Some(_) => vec![Keyword(Enter)],
+                    None => vec![Keyword(Enter), Keyword(Do)],
+                },
             )),
         }
     }
@@ -1447,6 +1614,7 @@ impl<'a> Parser<'a> {
     fn def_guard(&mut self) -> ParseResult<DefGuard> {
         let first = self.consume_keyword(Guard)?;
         let name = self.name()?;
+        self.commit();
         let type_name = match self.peek(0) {
             Colon => {
                 self.next();
@@ -1465,6 +1633,7 @@ impl<'a> Parser<'a> {
     fn spec_container(&mut self) -> ParseResult<SpecContainer> {
         let first = self.consume_keyword(Product)?;
         self.consume_keyword(Container)?;
+        self.commit();
         let name = self.name()?;
         let id = self.opt_expr(Id)?;
         let default_priority = match self.peek(0) {
@@ -1487,6 +1656,7 @@ impl<'a> Parser<'a> {
     fn spec_record(&mut self) -> ParseResult<SpecRecord> {
         let first = self.consume_keyword(Product)?;
         self.consume_keyword(Record)?;
+        self.commit();
         let name = self.name()?;
         self.consume(Colon)?;
         let record_type = self.type_name()?;
@@ -1511,6 +1681,7 @@ impl<'a> Parser<'a> {
     fn spec_event(&mut self) -> ParseResult<SpecEvent> {
         let first = self.consume_keyword(Event)?;
         let name = self.name()?;
+        self.commit();
         let params = self.formal_param_list()?;
         self.consume_keyword(Severity)?;
         let severity = match self.peek(0) {
@@ -1593,6 +1764,7 @@ impl<'a> Parser<'a> {
 
     fn event_throttle(&mut self) -> ParseResult<EventThrottle> {
         let first = self.consume_keyword(Throttle)?;
+        self.commit();
         let count = self.expr()?;
         let every = self.opt_expr(Every)?;
 
@@ -1605,6 +1777,7 @@ impl<'a> Parser<'a> {
 
     fn spec_include(&mut self) -> ParseResult<SpecInclude> {
         let first = self.consume_keyword(Include)?;
+        self.commit();
         let file = self.lit_string()?;
         Ok(SpecInclude {
             node_id: self.node(first.span()),
@@ -1614,6 +1787,7 @@ impl<'a> Parser<'a> {
 
     fn spec_import_interface(&mut self) -> ParseResult<SpecInterfaceImport> {
         let first = self.consume_keyword(Import)?;
+        self.commit();
         let interface = self.qual_ident()?;
         Ok(SpecInterfaceImport {
             node_id: self.node(first.span()),
@@ -1623,6 +1797,7 @@ impl<'a> Parser<'a> {
 
     fn spec_internal_port(&mut self) -> ParseResult<SpecInternalPort> {
         let first = self.consume_keyword(Internal)?;
+        self.commit();
         self.consume_keyword(Port)?;
         let name = self.name()?;
         let params = self.formal_param_list()?;
@@ -1639,6 +1814,7 @@ impl<'a> Parser<'a> {
 
     fn spec_port_matching(&mut self) -> ParseResult<SpecPortMatching> {
         let first = self.consume_keyword(Match)?;
+        self.commit();
         let port1 = self.ident()?;
         self.consume_keyword(With)?;
         let port2 = self.ident()?;
@@ -1660,8 +1836,13 @@ impl<'a> Parser<'a> {
         };
 
         self.consume_keyword(Param)?;
-        let name = self.name()?;
+        // The name is committed, but the `:` after it is not
+        let name = self.scoped(|p| {
+            p.commit();
+            p.name()
+        })?;
         self.consume(Colon)?;
+        self.commit();
         let type_name = self.type_name()?;
         let default = self.opt_expr(Default)?;
         let id = self.opt_expr(Id)?;
@@ -1699,6 +1880,7 @@ impl<'a> Parser<'a> {
     fn spec_tlm_channel(&mut self) -> ParseResult<SpecTlmChannel> {
         let first = self.consume_keyword(Telemetry)?;
         let name = self.name()?;
+        self.commit();
         self.consume(Colon)?;
         let type_name = self.type_name()?;
         let id = self.opt_expr(Id)?;
@@ -1760,15 +1942,16 @@ impl<'a> Parser<'a> {
     }
 
     fn limit_sequence(&mut self) -> ParseResult<Vec<TlmChannelLimit>> {
-        self.consume(LeftCurly)?;
-        let out = self.element_sequence(&Parser::limit, Comma, RightCurly);
-        self.consume(RightCurly)?;
-        Ok(out)
+        self.enclosed(LeftCurly, RightCurly, |p| {
+            p.element_sequence(&Parser::limit, Comma)
+        })
     }
 
     fn limit(&mut self) -> ParseResult<TlmChannelLimit> {
+        self.first_alternative();
         let first_span = self.current_span()?;
         let kind = self.limit_kind()?;
+        self.commit();
         let value = self.expr()?;
         Ok(TlmChannelLimit {
             node_id: self.node(first_span),
@@ -1802,20 +1985,14 @@ impl<'a> Parser<'a> {
 
     fn def_struct(&mut self) -> ParseResult<DefStruct> {
         let (first, is_dictionary_def) = self.dictionary_opt(Struct)?;
+        self.commit();
         let name = self.name()?;
 
-        self.consume(LeftCurly)?;
-        let members =
-            self.annotated_element_sequence(&Parser::struct_type_member, Comma, RightCurly);
-        self.consume(RightCurly)?;
+        let members = self.enclosed(LeftCurly, RightCurly, |p| {
+            p.annotated_element_sequence(&Parser::struct_type_member, Comma)
+        })?;
 
-        let default = match self.peek(0) {
-            Keyword(Default) => {
-                self.next();
-                Some(self.expr()?)
-            }
-            _ => None,
-        };
+        let default = self.opt_expr(Default)?;
 
         Ok(DefStruct {
             node_id: self.node(first.span()),
@@ -1827,7 +2004,9 @@ impl<'a> Parser<'a> {
     }
 
     fn struct_type_member(&mut self) -> ParseResult<StructTypeMember> {
+        self.first_alternative();
         let name = self.name()?;
+        self.commit();
         let first_span = name.span();
 
         self.consume(Colon)?;
@@ -1857,15 +2036,10 @@ impl<'a> Parser<'a> {
     fn def_state(&mut self) -> ParseResult<DefState> {
         let first = self.consume_keyword(State)?;
         let name = self.name()?;
+        self.commit();
 
         let members = match self.peek(0) {
-            LeftCurly => {
-                self.next();
-                let members =
-                    self.annotated_element_sequence(&Parser::state_member, Semi, RightCurly);
-                self.consume(RightCurly)?;
-                members
-            }
+            LeftCurly => self.enclosed(LeftCurly, RightCurly, Parser::state_members)?,
             _ => vec![],
         };
 
@@ -1879,6 +2053,7 @@ impl<'a> Parser<'a> {
     fn def_signal(&mut self) -> ParseResult<DefSignal> {
         let first = self.consume_keyword(Signal)?;
         let name = self.name()?;
+        self.commit();
         let type_name = match self.peek(0) {
             Colon => {
                 self.next();
@@ -1940,6 +2115,7 @@ impl<'a> Parser<'a> {
                 ],
             )),
         }?;
+        self.commit();
 
         self.consume_keyword(Port)?;
         let name = self.name()?;
@@ -1955,16 +2131,16 @@ impl<'a> Parser<'a> {
                 self.consume_keyword(Serial)?;
                 None
             }
-            _ => Some(self.qual_ident()?),
+            Identifier | Dot => Some(self.qual_ident()?),
+            _ => {
+                return Err(self.cursor.err_expected_one_of(
+                    "port type expected",
+                    vec![Identifier, Dot, Keyword(Serial)],
+                ));
+            }
         };
 
-        let priority = match self.peek(0) {
-            Keyword(Priority) => {
-                self.next();
-                Some(self.expr()?)
-            }
-            _ => None,
-        };
+        let priority = self.opt_expr(Priority)?;
 
         let queue_full = self.opt_queue_full()?;
 
@@ -2018,73 +2194,73 @@ impl<'a> Parser<'a> {
         };
 
         let kind = match self.peek(0) {
-            Keyword(Command) => match self.peek(1) {
-                Keyword(Recv) => {
-                    self.next();
-                    self.next();
-                    Ok(SpecialPortInstanceKind::CommandRecv)
+            Keyword(Command) => {
+                self.next();
+                match self.peek(0) {
+                    Keyword(Recv) => {
+                        self.next();
+                        Ok(SpecialPortInstanceKind::CommandRecv)
+                    }
+                    Keyword(Reg) => {
+                        self.next();
+                        Ok(SpecialPortInstanceKind::CommandReg)
+                    }
+                    Keyword(Resp) => {
+                        self.next();
+                        Ok(SpecialPortInstanceKind::CommandResp)
+                    }
+                    _ => Err(self.cursor.err_expected_one_of(
+                        "command special port expected",
+                        vec![Keyword(Recv), Keyword(Reg), Keyword(Resp)],
+                    )),
                 }
-                Keyword(Reg) => {
-                    self.next();
-                    self.next();
-                    Ok(SpecialPortInstanceKind::CommandReg)
-                }
-                Keyword(Resp) => {
-                    self.next();
-                    self.next();
-                    Ok(SpecialPortInstanceKind::CommandResp)
-                }
-                _ => Err(self.cursor.err_expected_one_of(
-                    "command special port expected",
-                    vec![Keyword(Recv), Keyword(Reg), Keyword(Resp)],
-                )),
-            },
+            }
             Keyword(Event) => {
                 self.next();
                 Ok(SpecialPortInstanceKind::Event)
             }
-            Keyword(Param) => match self.peek(1) {
-                Keyword(Get) => {
-                    self.next();
-                    self.next();
-                    Ok(SpecialPortInstanceKind::ParamGet)
+            Keyword(Param) => {
+                self.next();
+                match self.peek(0) {
+                    Keyword(Get) => {
+                        self.next();
+                        Ok(SpecialPortInstanceKind::ParamGet)
+                    }
+                    Keyword(Set) => {
+                        self.next();
+                        Ok(SpecialPortInstanceKind::ParamSet)
+                    }
+                    _ => Err(self.cursor.err_expected_one_of(
+                        "param special port expected",
+                        vec![Keyword(Get), Keyword(Set)],
+                    )),
                 }
-                Keyword(Set) => {
-                    self.next();
-                    self.next();
-                    Ok(SpecialPortInstanceKind::ParamSet)
+            }
+            Keyword(Product) => {
+                self.next();
+                match self.peek(0) {
+                    Keyword(Get) => {
+                        self.next();
+                        Ok(SpecialPortInstanceKind::ProductGet)
+                    }
+                    Keyword(Recv) => {
+                        self.next();
+                        Ok(SpecialPortInstanceKind::ProductRecv)
+                    }
+                    Keyword(Request) => {
+                        self.next();
+                        Ok(SpecialPortInstanceKind::ProductRequest)
+                    }
+                    Keyword(Send) => {
+                        self.next();
+                        Ok(SpecialPortInstanceKind::ProductSend)
+                    }
+                    _ => Err(self.cursor.err_expected_one_of(
+                        "product special port expected",
+                        vec![Keyword(Get), Keyword(Recv), Keyword(Request), Keyword(Send)],
+                    )),
                 }
-                _ => Err(self.cursor.err_expected_one_of(
-                    "param special port expected",
-                    vec![Keyword(Get), Keyword(Set)],
-                )),
-            },
-            Keyword(Product) => match self.peek(1) {
-                Keyword(Get) => {
-                    self.next();
-                    self.next();
-                    Ok(SpecialPortInstanceKind::ProductGet)
-                }
-                Keyword(Recv) => {
-                    self.next();
-                    self.next();
-                    Ok(SpecialPortInstanceKind::ProductRecv)
-                }
-                Keyword(Request) => {
-                    self.next();
-                    self.next();
-                    Ok(SpecialPortInstanceKind::ProductRequest)
-                }
-                Keyword(Send) => {
-                    self.next();
-                    self.next();
-                    Ok(SpecialPortInstanceKind::ProductSend)
-                }
-                _ => Err(self.cursor.err_expected_one_of(
-                    "product special port expected",
-                    vec![Keyword(Get), Keyword(Recv), Keyword(Request), Keyword(Send)],
-                )),
-            },
+            }
             Keyword(Telemetry) => {
                 self.next();
                 Ok(SpecialPortInstanceKind::Telemetry)
@@ -2114,15 +2290,10 @@ impl<'a> Parser<'a> {
         }?;
 
         self.consume_keyword(Port)?;
+        self.commit();
         let name = self.name()?;
 
-        let priority = match self.peek(0) {
-            Keyword(Priority) => {
-                self.next();
-                Some(self.expr()?)
-            }
-            _ => None,
-        };
+        let priority = self.opt_expr(Priority)?;
 
         let queue_full = self.opt_queue_full()?;
 
@@ -2173,6 +2344,7 @@ impl<'a> Parser<'a> {
         }?;
 
         let name = self.name()?;
+        self.commit();
         let params = self.formal_param_list()?;
         let opcode = self.opt_expr(Opcode)?;
         let priority = self.opt_expr(Priority)?;
@@ -2262,91 +2434,272 @@ impl<'a> Parser<'a> {
         out
     }
 
-    fn annotated_element<T: fpp_core::Annotated + AstNode>(
+    /// The token that ends the innermost element sequence
+    fn sequence_end(&self) -> TokenKind {
+        self.ends.last().copied().unwrap_or(EOF)
+    }
+
+    /// Run `p` with `end` as the token that ends its element sequences
+    fn until<T>(&mut self, end: TokenKind, p: impl FnOnce(&mut Self) -> T) -> T {
+        self.ends.push(end);
+        let out = p(self);
+        self.ends.pop();
+        out
+    }
+
+    /// Parse `open`, then `p` with `close` as the token that ends its element
+    /// sequences, then `close`
+    fn enclosed<T>(
         &mut self,
-        element_parser: &dyn Fn(&mut Parser<'a>) -> ParseResult<T>,
-        punct: &TokenKind,
-        end: &TokenKind,
-    ) -> ElementParsingResult<T> {
-        let pre_annotation = self.pre_annotation();
+        open: TokenKind,
+        close: TokenKind,
+        p: impl FnOnce(&mut Self) -> T,
+    ) -> ParseResult<T> {
+        self.consume(open)?;
+        let out = self.until(close, p);
+        self.consume(close)?;
+        Ok(out)
+    }
 
-        // Check if we reached the end
-        let next_token = self.peek(0);
-        if next_token == *end || next_token == EOF {
-            // Stop parsing elements
-            return ElementParsingResult::None;
+    /// Mark a commit point of the element being parsed
+    fn commit(&mut self) {
+        self.element.committed = true;
+    }
+
+    /// Run `p`, which may have commit points of its own. If `p` succeeds, the
+    /// element is committed only as far as it was before `p`.
+    fn scoped<T>(&mut self, p: impl FnOnce(&mut Self) -> ParseResult<T>) -> ParseResult<T> {
+        let committed = self.element.committed;
+        let out = p(self);
+        if out.is_ok() {
+            self.element.committed = committed;
         }
+        out
+    }
 
-        let data = match element_parser(self) {
-            Ok(data) => data,
-            Err(err) => return ElementParsingResult::Err(err),
-        };
+    /// Mark the element being parsed as the first alternative of its sequence
+    fn first_alternative(&mut self) {
+        self.element.eof_error_survives = true;
+    }
 
-        // Check if the punctuation exists
-        let punct_tok = self.peek(0);
-        if punct_tok == *punct || punct_tok == Eol || punct_tok == EOF {
-            self.next();
-            let post_annotation = self.post_annotation();
-            fpp_core::Node::annotate(&data.id(), pre_annotation, post_annotation);
-            ElementParsingResult::Terminated(data)
-        } else if self.peek(0) == PostAnnotation {
-            let post_annotation = self.post_annotation();
-            fpp_core::Node::annotate(&data.id(), pre_annotation, post_annotation);
-            ElementParsingResult::Terminated(data)
-        } else if punct_tok == *end {
-            fpp_core::Node::annotate(&data.id(), pre_annotation, vec![]);
-            ElementParsingResult::Unterminated(data)
-        } else {
-            fpp_core::Node::annotate(&data.id(), pre_annotation, vec![]);
-            ElementParsingResult::Err(self.cursor.err_expected_token(
-                "unexpected token",
-                *punct,
-                punct_tok,
-            ))
+    /// The span and kind of the next token, if any
+    fn peek_token(&mut self) -> Option<(fpp_core::Span, TokenKind)> {
+        let span = self.peek_span(0)?;
+        Some((span, self.peek(0)))
+    }
+
+    /// The error for an unexpected next token
+    fn unexpected_token(&mut self) -> ParseError {
+        match self.peek_token() {
+            Some((got_span, got_kind)) => ParseError::UnexpectedToken { got_kind, got_span },
+            None => self.cursor.err_unexpected_eof(),
         }
     }
 
-    #[inline]
+    /// The error for an element sequence that ends at the token `got`: what
+    /// follows the sequence is expected there instead
+    fn sequence_ended_at(&self, (span, got): (fpp_core::Span, TokenKind)) -> ParseError {
+        match self.sequence_end() {
+            EOF => ParseError::UnexpectedToken {
+                got_kind: got,
+                got_span: span,
+            },
+            end => ParseError::ExpectedToken {
+                expected: end,
+                got,
+                last: span,
+                msg: "unexpected token",
+            },
+        }
+    }
+
+    /// The error for an element sequence that ends at the next token
+    fn sequence_ended_at_next(&mut self) -> ParseError {
+        match self.peek_token() {
+            Some(token) => self.sequence_ended_at(token),
+            None => self.cursor.err_unexpected_eof(),
+        }
+    }
+
+    /// Parse an element of a sequence with `elt`. On failure, return the
+    /// error together with the state of the element at the failure.
+    fn element<T>(
+        &mut self,
+        elt: &dyn Fn(&mut Parser<'a>) -> ParseResult<T>,
+    ) -> Result<T, (ParseError, ElementState)> {
+        let outer = std::mem::take(&mut self.element);
+        let out = elt(self);
+        let inner = std::mem::replace(&mut self.element, outer);
+        out.map_err(|err| (err, inner))
+    }
+
+    /// Report the failure of an element of a sequence, and skip what is left
+    /// of it. `annotation_start` is the first pre-annotation of the element,
+    /// if it has any, and `element_start` is the token after the
+    /// pre-annotations, if there is one. Returns whether the sequence goes on.
+    fn element_failed(
+        &mut self,
+        err: ParseError,
+        state: ElementState,
+        annotation_start: Option<(fpp_core::Span, TokenKind)>,
+        element_start: Option<(fpp_core::Span, TokenKind)>,
+        punct: TokenKind,
+    ) -> bool {
+        let at_eof = self.peek(0) == EOF;
+        let file_level = self.sequence_end() == EOF;
+        // An error at the end of the input is the lowest-placed failure, so
+        // unless the element is the first alternative, the failure of an
+        // earlier alternative at the start of the element replaces it
+        let dropped = state.committed && at_eof && !state.eof_error_survives;
+        let err = if state.committed && !dropped {
+            if !at_eof {
+                err
+            } else if file_level {
+                self.eof_error.take().unwrap_or(err)
+            } else {
+                // The error propagates to the enclosing sequence
+                self.eof_error.get_or_insert(err);
+                return false;
+            }
+        } else if let Some(stop) = state.backtrack {
+            // The shorter alternative of the element is the element, and the
+            // sequence ends after it
+            self.sequence_ended_at_stop(err, stop, dropped)
+        } else if let (Some(_), Some(element_start)) = (annotation_start, element_start) {
+            // The pre-annotations commit to the element, which fails where it
+            // stops, or at its start if it stops at the end of the input
+            if at_eof {
+                ParseError::UnexpectedToken {
+                    got_kind: element_start.1,
+                    got_span: element_start.0,
+                }
+            } else {
+                err
+            }
+        } else if let Some(annotation_start) = annotation_start {
+            // Pre-annotations at the end of the input
+            if file_level {
+                self.eof_error.take().unwrap_or(err)
+            } else {
+                self.sequence_ended_at_stop(err, annotation_start, dropped)
+            }
+        } else {
+            // The sequence ends before the element
+            let stop = element_start.expect("an element starts at a token");
+            if self.peek_span(0) == Some(stop.0) {
+                // Nothing was consumed, so the element's own error says what
+                // is expected at its start
+                err
+            } else {
+                self.sequence_ended_at_stop(err, stop, dropped)
+            }
+        };
+
+        fpp_core::Diagnostic::from(err).emit();
+        self.recover(punct)
+    }
+
+    /// The error for an element sequence that ends at the token `stop`
+    /// because its element `err` failed. At the top level, the first error
+    /// that passed a commit point is the error, if there is one.
+    fn sequence_ended_at_stop(
+        &mut self,
+        err: ParseError,
+        stop: (fpp_core::Span, TokenKind),
+        committed: bool,
+    ) -> ParseError {
+        if self.sequence_end() == EOF {
+            match self.eof_error.take() {
+                Some(eof_error) => eof_error,
+                None if committed => err,
+                None => self.sequence_ended_at(stop),
+            }
+        } else {
+            self.eof_error = None;
+            self.sequence_ended_at(stop)
+        }
+    }
+
+    /// Skip the rest of a failed element: past the next separator or end of
+    /// line outside any enclosed tokens, or up to a token that ends an
+    /// enclosing element sequence. Returns whether the sequence goes on.
+    fn recover(&mut self, punct: TokenKind) -> bool {
+        let mut depth = 0usize;
+        loop {
+            let current = self.peek(0);
+            if current == EOF {
+                return false;
+            }
+            if depth == 0 {
+                if current == punct || current == Eol {
+                    self.next();
+                    return true;
+                }
+                if self.ends.contains(&current) {
+                    return false;
+                }
+            }
+            match current {
+                LeftCurly | LeftParen | LeftSquare => depth += 1,
+                RightCurly | RightParen | RightSquare => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+            self.next();
+        }
+    }
+
+    /// Parse a sequence of elements with optional annotations, each terminated
+    /// by `punct` or an end of line, except that the last one need not be.
+    /// The sequence may start with ends of line.
     fn annotated_element_sequence<T: fpp_core::Annotated + AstNode>(
         &mut self,
-        element_parser: &dyn Fn(&mut Parser<'a>) -> ParseResult<T>,
+        elt: &dyn Fn(&mut Parser<'a>) -> ParseResult<T>,
         punct: TokenKind,
-        end: TokenKind,
     ) -> Vec<T> {
-        // Eat up all the EOLs
+        let end = self.sequence_end();
         while self.peek(0) == Eol {
             self.next();
         }
 
-        // Keep reading terminated elements until we can't
         let mut out: Vec<T> = vec![];
-
         loop {
-            match self.annotated_element(element_parser, &punct, &end) {
-                ElementParsingResult::Terminated(el) => {
-                    out.push(el);
-                }
-                ElementParsingResult::Unterminated(el) => {
-                    out.push(el);
-                    break;
-                }
-                ElementParsingResult::None => {
-                    break;
-                }
-                ElementParsingResult::Err(err) => {
-                    fpp_core::Diagnostic::from(err).emit();
+            let annotation_start = match self.peek(0) {
+                PreAnnotation => self.peek_token(),
+                _ => None,
+            };
+            let pre_annotation = self.pre_annotation();
+            let element_start = self.peek_token();
+            let next = self.peek(0);
+            if annotation_start.is_none() && (next == end || next == EOF) {
+                break;
+            }
 
-                    // Recover to an anchor
-                    loop {
-                        let current = self.peek(0);
-                        if current == punct || current == Eol || current == EOF {
-                            self.next();
-                            break;
-                        } else if current == end {
-                            return out;
-                        }
-
+            match self.element(elt) {
+                Ok(data) => {
+                    let terminator = self.peek(0);
+                    if terminator == punct || terminator == Eol {
                         self.next();
+                    }
+                    let post_annotation = self.post_annotation();
+                    let terminated =
+                        terminator == punct || terminator == Eol || !post_annotation.is_empty();
+                    fpp_core::Node::annotate(&data.id(), pre_annotation, post_annotation);
+                    out.push(data);
+
+                    if !terminated {
+                        // An unterminated element ends the sequence
+                        if terminator == end || terminator == EOF {
+                            break;
+                        }
+                        fpp_core::Diagnostic::from(self.sequence_ended_at_next()).emit();
+                        if !self.recover(punct) {
+                            break;
+                        }
+                    }
+                }
+                Err((err, state)) => {
+                    if !self.element_failed(err, state, annotation_start, element_start, punct) {
+                        break;
                     }
                 }
             }
@@ -2355,83 +2708,57 @@ impl<'a> Parser<'a> {
         out
     }
 
-    fn element<T>(
-        &mut self,
-        element_parser: &dyn Fn(&mut Parser<'a>) -> ParseResult<T>,
-        punct: &TokenKind,
-        end: &TokenKind,
-    ) -> ElementParsingResult<T> {
-        // Check if we reached the end
-        let next_token = self.peek(0);
-        if next_token == *end || next_token == EOF {
-            // Stop parsing elements
-            return ElementParsingResult::None;
-        }
-
-        let data = match element_parser(self) {
-            Ok(data) => data,
-            Err(err) => return ElementParsingResult::Err(err),
-        };
-
-        // Check if the punctuation exists
-        let punct_tok = self.peek(0);
-        if punct_tok == *punct || punct_tok == Eol || punct_tok == EOF {
-            self.next();
-            ElementParsingResult::Terminated(data)
-        } else if self.peek(0) == PostAnnotation {
-            ElementParsingResult::Terminated(data)
-        } else if punct_tok == *end {
-            ElementParsingResult::Unterminated(data)
-        } else {
-            ElementParsingResult::Err(self.cursor.err_expected_token(
-                "unexpected token",
-                *punct,
-                punct_tok,
-            ))
-        }
-    }
-
-    #[inline]
+    /// Parse a sequence of elements separated by `sep` or an end of line. A
+    /// separator may follow the last element, or stand alone in an empty
+    /// sequence.
     fn element_sequence<T>(
         &mut self,
-        element_parser: &dyn Fn(&mut Parser<'a>) -> ParseResult<T>,
-        punct: TokenKind,
-        end: TokenKind,
+        elt: &dyn Fn(&mut Parser<'a>) -> ParseResult<T>,
+        sep: TokenKind,
     ) -> Vec<T> {
-        // Eat up all the EOLs
-        while self.peek(0) == Eol {
-            self.next();
-        }
-
-        // Keep reading terminated elements until we can't
+        let end = self.sequence_end();
         let mut out: Vec<T> = vec![];
-
+        let mut at_start = true;
         loop {
-            match self.element(&element_parser, &punct, &end) {
-                ElementParsingResult::Terminated(el) => {
-                    out.push(el);
-                }
-                ElementParsingResult::Unterminated(el) => {
-                    out.push(el);
+            let next = self.peek(0);
+            if next == end || next == EOF {
+                break;
+            }
+            if next == sep || next == Eol {
+                if at_start {
+                    self.next();
                     break;
                 }
-                ElementParsingResult::None => {
+                // A separator where an element should be ends the sequence
+                // at the separator before it
+                fpp_core::Diagnostic::from(self.sequence_ended_at_next()).emit();
+                if !self.recover(sep) {
                     break;
                 }
-                ElementParsingResult::Err(err) => {
-                    fpp_core::Diagnostic::from(err).emit();
+                continue;
+            }
 
-                    // Recover to an anchor
-                    loop {
-                        let current = self.peek(0);
-                        if current == punct || current == Eol || current == EOF {
-                            self.next();
-                            break;
-                        } else if current == end {
-                            return out;
-                        }
-
+            at_start = false;
+            let start = self.peek_token();
+            match self.element(elt) {
+                Ok(data) => {
+                    out.push(data);
+                    let next = self.peek(0);
+                    if next == sep || next == Eol {
                         self.next();
+                    } else if next == end || next == EOF {
+                        break;
+                    } else {
+                        // A missing separator ends the sequence
+                        fpp_core::Diagnostic::from(self.sequence_ended_at_next()).emit();
+                        if !self.recover(sep) {
+                            break;
+                        }
+                    }
+                }
+                Err((err, state)) => {
+                    if !self.element_failed(err, state, None, start, sep) {
+                        break;
                     }
                 }
             }
@@ -2442,6 +2769,7 @@ impl<'a> Parser<'a> {
 
     fn index(&mut self) -> ParseResult<Expr> {
         self.consume(LeftSquare)?;
+        self.commit();
         let out = self.expr()?;
         self.consume(RightSquare)?;
         Ok(out)
@@ -2455,19 +2783,9 @@ impl<'a> Parser<'a> {
 
     fn qual_ident_node_list(&mut self) -> ParseResult<QualIdentNodeList> {
         let mut out = vec![self.ident()?];
-        while self.peek(0) == Dot {
-            let dot_token = self.next().unwrap();
-            if self.peek(0) == Identifier {
-                out.push(self.ident()?)
-            } else {
-                fpp_core::Diagnostic::from(ParseError::ExpectedToken {
-                    expected: Identifier,
-                    got: self.peek(0),
-                    last: dot_token.span,
-                    msg: "expected identifier",
-                })
-                .emit();
-            }
+        while self.peek(0) == Dot && self.peek(1) == Identifier {
+            self.next();
+            out.push(self.ident()?)
         }
 
         Ok(out)
@@ -2522,13 +2840,7 @@ impl<'a> Parser<'a> {
             }
             Keyword(String_) => {
                 self.next();
-                let size = match self.peek(0) {
-                    Keyword(Size) => {
-                        self.next();
-                        Some(self.expr()?)
-                    }
-                    _ => None,
-                };
+                let size = self.opt_expr(Size)?;
                 Ok(TypeNameKind::String(size))
             }
             Identifier | Dot => Ok(TypeNameKind::QualIdent(self.qual_ident()?)),
@@ -2573,6 +2885,7 @@ impl<'a> Parser<'a> {
             match op {
                 Some(op) => {
                     self.next();
+                    self.commit();
                     let right = self.expr_shift_operand()?;
                     left = Expr {
                         node_id: self.node(first_span),
@@ -2602,6 +2915,7 @@ impl<'a> Parser<'a> {
             match op {
                 Some(op) => {
                     self.next();
+                    self.commit();
                     let right = self.expr_add_sub_operand()?;
                     left = Expr {
                         node_id: self.node(first_span),
@@ -2631,6 +2945,7 @@ impl<'a> Parser<'a> {
             match op {
                 Some(op) => {
                     self.next();
+                    self.commit();
                     let right = self.expr_mul_div_operand()?;
                     left = Expr {
                         node_id: self.node(first_span),
@@ -2650,6 +2965,7 @@ impl<'a> Parser<'a> {
         match self.peek(0) {
             Minus => {
                 let first = self.next().unwrap();
+                self.commit();
                 let right = self.expr_postfix()?;
                 Ok(Expr {
                     node_id: self.node(first.span()),
@@ -2680,7 +2996,22 @@ impl<'a> Parser<'a> {
                     }
                 }
                 LeftSquare => {
-                    let e2 = self.index()?;
+                    let bracket = self.peek_token().unwrap();
+                    self.next();
+                    let committed = std::mem::replace(&mut self.element.committed, false);
+                    let e2 = match self.expr() {
+                        Ok(e2) => e2,
+                        Err(_) if !self.element.committed => {
+                            // No subscript follows, so the expression ends
+                            // before the `[`
+                            self.element.committed = true;
+                            return Err(self.sequence_ended_at(bracket));
+                        }
+                        Err(err) => return Err(err),
+                    };
+                    self.element.committed = committed;
+                    self.commit();
+                    self.consume(RightSquare)?;
                     left = Expr {
                         node_id: self.node(first_span),
                         kind: ExprKind::ArraySubscript {
@@ -2688,18 +3019,6 @@ impl<'a> Parser<'a> {
                             e2: Box::new(e2),
                         },
                     }
-                }
-                // Partial dot expression (mid-edits)
-                // Accept the left-hand side and emit the parsing error
-                Dot => {
-                    self.next();
-
-                    let Err(err) = self.ident() else {
-                        unreachable!()
-                    };
-
-                    fpp_core::Diagnostic::from(err).emit();
-                    return Ok(left);
                 }
                 _ => return Ok(left),
             }
@@ -2760,7 +3079,7 @@ impl<'a> Parser<'a> {
             }
             LeftParen => {
                 let first = self.next().unwrap();
-                let e = self.expr()?;
+                let e = self.scoped(|p| p.expr())?;
                 self.consume(RightParen)?;
                 Ok(Expr {
                     node_id: self.node(first.span()),
@@ -2778,7 +3097,7 @@ impl<'a> Parser<'a> {
             Keyword(Sizeof) => {
                 let first = self.next().unwrap();
                 self.consume(LeftParen)?;
-                let type_name = self.type_name()?;
+                let type_name = self.scoped(|p| p.type_name())?;
                 self.consume(RightParen)?;
                 Ok(Expr {
                     node_id: self.node(first.span()),
@@ -2793,6 +3112,7 @@ impl<'a> Parser<'a> {
                     LeftParen,
                     Identifier,
                     Dot,
+                    Minus,
                     Keyword(True),
                     Keyword(False),
                     Keyword(Sizeof),
@@ -2805,29 +3125,41 @@ impl<'a> Parser<'a> {
     }
 
     fn array_expr(&mut self) -> ParseResult<Expr> {
-        let first = self.consume(LeftSquare)?;
-        let members = self.element_sequence(&Parser::expr, Comma, RightSquare);
-        self.consume(RightSquare)?;
+        let first = self.current_span()?;
+        let members = self.enclosed(LeftSquare, RightSquare, |p| {
+            p.commit();
+            p.element_sequence(
+                &|p| {
+                    p.first_alternative();
+                    p.expr()
+                },
+                Comma,
+            )
+        })?;
 
         Ok(Expr {
-            node_id: self.node(first.span()),
+            node_id: self.node(first),
             kind: ExprKind::Array(members),
         })
     }
 
     fn struct_expr(&mut self) -> ParseResult<Expr> {
-        let first = self.consume(LeftCurly)?;
-        let members = self.element_sequence(&Parser::struct_expr_member, Comma, RightCurly);
-        self.consume(RightCurly)?;
+        let first = self.current_span()?;
+        let members = self.enclosed(LeftCurly, RightCurly, |p| {
+            p.commit();
+            p.element_sequence(&Parser::struct_expr_member, Comma)
+        })?;
 
         Ok(Expr {
-            node_id: self.node(first.span()),
+            node_id: self.node(first),
             kind: ExprKind::Struct(members),
         })
     }
 
     fn struct_expr_member(&mut self) -> ParseResult<StructExprMember> {
+        self.first_alternative();
         let name = self.name()?;
+        self.commit();
         self.consume(Equals)?;
         let value = self.expr()?;
         Ok(StructExprMember {
@@ -2877,19 +3209,15 @@ impl<'a> Parser<'a> {
 
     fn formal_param_list(&mut self) -> ParseResult<FormalParamList> {
         match self.peek(0) {
-            LeftParen => {
-                self.next();
-                let members =
-                    self.annotated_element_sequence(&Parser::formal_param, Comma, RightParen);
-
-                self.consume(RightParen)?;
-                Ok(members)
-            }
+            LeftParen => self.enclosed(LeftParen, RightParen, |p| {
+                p.annotated_element_sequence(&Parser::formal_param, Comma)
+            }),
             _ => Ok(vec![]),
         }
     }
 
     fn formal_param(&mut self) -> ParseResult<FormalParam> {
+        self.first_alternative();
         let first_span = self.current_span()?;
 
         let kind = match self.peek(0) {
@@ -2901,6 +3229,7 @@ impl<'a> Parser<'a> {
         };
 
         let name = self.name()?;
+        self.commit();
         self.consume(Colon)?;
 
         let type_name = self.type_name()?;
@@ -2916,6 +3245,7 @@ impl<'a> Parser<'a> {
     fn opt_expr(&mut self, prefix_keyword: KeywordKind) -> ParseResult<Option<Expr>> {
         if self.peek(0) == Keyword(prefix_keyword) {
             self.next();
+            self.commit();
             Ok(Some(self.expr()?))
         } else {
             Ok(None)

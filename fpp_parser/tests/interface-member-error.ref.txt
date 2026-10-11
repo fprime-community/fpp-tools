@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/interface-member-error.fpp:1:15
+  |
+1 | interface I { constant a = 1 }
+  |               ^^^^^^^^ syntax error: interface member expected
+  |
+  = note: expected one of async, guarded, sync, output, command, event, param, product, telemetry, text, time, import
+  = note: got constant
+

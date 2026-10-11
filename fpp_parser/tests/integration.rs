@@ -184,6 +184,11 @@ fn topology_ports() {
 }
 
 #[test]
+fn dictionary_specifier() {
+    run_test("dictionary-specifier")
+}
+
+#[test]
 fn topology() {
     run_test("topology")
 }
@@ -222,4 +227,60 @@ fn template_error_locate_name() {
 #[test]
 fn template_error_locate_file() {
     run_test("template-error-locate-file")
+}
+
+// Rust-only: the element sequences, annotations and commit points of the grammar
+#[test]
+fn stray_brace() {
+    run_test("stray-brace")
+}
+
+#[test]
+fn dangling_annotation() {
+    run_test("dangling-annotation")
+}
+
+#[test]
+fn element_sequence() {
+    run_test("element-sequence")
+}
+
+#[test]
+fn implements_newline_error() {
+    run_test("implements-newline-error")
+}
+
+#[test]
+fn missing_separator() {
+    run_test("missing-separator")
+}
+
+#[test]
+fn post_annotation_element() {
+    run_test("post-annotation-element")
+}
+
+#[test]
+fn locate_dictionary_error() {
+    run_test("locate-dictionary-error")
+}
+
+#[test]
+fn state_machine_dictionary() {
+    run_test("state-machine-dictionary")
+}
+
+#[test]
+fn uncommitted_member() {
+    run_test("uncommitted-member")
+}
+
+#[test]
+fn eof_in_block() {
+    run_test("eof-in-block")
+}
+
+#[test]
+fn interface_member_error() {
+    run_test("interface-member-error")
 }

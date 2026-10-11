@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/implements-newline-error.fpp:2:22
+  |
+2 |   topology T implements
+  |  ______________________^
+3 | |   I {
+  | |__^ syntax error: unexpected token
+  |
+  = note: expected {
+  = note: got identifier
+

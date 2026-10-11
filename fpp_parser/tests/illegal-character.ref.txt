@@ -13,7 +13,7 @@
 3 | tok \     
   | ^^^ syntax error: module member expected
   |
-  = note: expected one of type, array, constant, enum, struct, component, active, passive, queued, interface, module, port, state, system, deployment, topology, include, locate, expand
+  = note: expected one of dictionary, type, array, constant, enum, struct, active, passive, queued, instance, interface, module, port, state, system, deployment, topology, include, locate, expand
   = note: got identifier
 
  --> [ local path prefix ]/illegal-character.fpp:4:8
