@@ -349,10 +349,9 @@ impl<'ast> FinalizeTypeDefs<'ast> {
         };
 
         // `CheckTypeUses` normally gives every type name it reaches an entry.
-        // Fall back to the shared unknown type rather than assuming that: the
-        // operand of a `sizeof` can sit in a position that no earlier pass
-        // visited, and a missing entry must degrade to an unknown type, not
-        // abort the compiler (which would also take down `fpp_lsp_server`).
+        // Fall back to the shared unknown type rather than assuming that: a
+        // type name with no entry must degrade to an unknown type, not abort
+        // the compiler (which would also take down `fpp_lsp_server`).
         let ty = match finalized.or_else(|| a.type_map.get(&node.node_id).cloned()) {
             Some(ty) => ty,
             None => a.unknown_type(node.span()),
