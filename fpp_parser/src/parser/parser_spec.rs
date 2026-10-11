@@ -1043,11 +1043,22 @@ fn trans_unit_all_input_error() {
 /// The line and column of the first error that parsing `s` as a translation
 /// unit reports, if it reports one
 fn first_error_location(s: &str) -> Option<(u32, u32)> {
+    first_error_location_in(s, |p| {
+        p.trans_unit();
+    })
+}
+
+/// An entry point of the grammar
+type EntryPoint = fn(&mut Parser);
+
+/// The line and column of the first error that parsing all of `s` with
+/// `entry` reports, if it reports one
+fn first_error_location_in(s: &str, entry: EntryPoint) -> Option<(u32, u32)> {
     let mut diagnostics = vec![];
     let mut ctx = fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
     fpp_core::run(&mut ctx, || {
         let source_file = SourceFile::new("input.fpp", s.to_string());
-        super::parse(source_file, |p| p.trans_unit(), None);
+        super::parse(source_file, entry, None);
     });
     drop(ctx);
 
@@ -1187,9 +1198,42 @@ fn trans_unit_subscript_error() {
         ("array A = [b[1", (1, 13)),
         ("constant a = sizeof(string size b[1", (1, 34)),
         ("module M {\n  constant a = a[b[1", (2, 19)),
+        ("instance i: C base id 0 {\n  phase b[1", (2, 10)),
+        (
+            "module M {\n  passive component C {\n    event E severity fatal id b[1",
+            (3, 32),
+        ),
     ];
     for (s, location) in cases {
         assert_eq!(first_error_location(s), Some(location), "{s}");
+    }
+
+    // Files of members, such as an included file holds
+    let cases: [(&str, EntryPoint, (u32, u32)); 3] = [
+        (
+            "event E severity fatal id b[1",
+            |p| {
+                p.component_members();
+            },
+            (1, 28),
+        ),
+        (
+            "packet A id b[1",
+            |p| {
+                p.tlm_packet_set_members();
+            },
+            (1, 14),
+        ),
+        (
+            "packet A group b[ * 3\n",
+            |p| {
+                p.tlm_packet_set_members();
+            },
+            (1, 17),
+        ),
+    ];
+    for (s, entry, location) in cases {
+        assert_eq!(first_error_location_in(s, entry), Some(location), "{s}");
     }
 }
 

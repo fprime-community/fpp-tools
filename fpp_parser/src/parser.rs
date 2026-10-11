@@ -1225,15 +1225,9 @@ impl<'a> Parser<'a> {
                         Ok(e2) => e2,
                         // The expression ends before a subscript that is not
                         // a selector, and this subscript requires `]` there
-                        Err(_) if self.selector_failure.is_some() => {
-                            let ((last, got), _) = self.selector_failure.take().unwrap();
+                        Err(err) if self.selector_failure.is_some() => {
                             self.element.committed = true;
-                            return Err(ParseError::ExpectedToken {
-                                expected: RightSquare,
-                                got,
-                                last,
-                                msg: "unexpected token",
-                            });
+                            return self.expression_before(Err(err), RightSquare);
                         }
                         // A subscript that fails before its commit point, or
                         // at the end of the input, is not a selector, so the
@@ -1411,21 +1405,8 @@ impl<'a> Parser<'a> {
     fn index(&mut self) -> ParseResult<Expr> {
         self.consume(LeftSquare)?;
         self.commit();
-        let out = match self.expr_node() {
-            Ok(out) => out,
-            // The expression ends before a subscript that is not a selector,
-            // and `]` is required there
-            Err(_) if self.selector_failure.is_some() => {
-                let ((last, got), _) = self.selector_failure.take().unwrap();
-                return Err(ParseError::ExpectedToken {
-                    expected: RightSquare,
-                    got,
-                    last,
-                    msg: "unexpected token",
-                });
-            }
-            Err(err) => return Err(err),
-        };
+        let out = self.expr_node();
+        let out = self.expression_before(out, RightSquare)?;
         self.consume(RightSquare)?;
         Ok(out)
     }
@@ -1891,7 +1872,8 @@ impl<'a> Parser<'a> {
         self.consume_keyword(Severity)?;
         let severity = severity_level(self)?;
 
-        let id = self.opt_expr(Id)?;
+        let id = self.opt_expr(Id);
+        let id = self.expression_before(id, Keyword(Format))?;
         self.consume_keyword(Format)?;
         let format = self.lit_string()?;
         let throttle = match self.peek(0) {
@@ -1924,7 +1906,8 @@ impl<'a> Parser<'a> {
         self.first_alternative();
         let first = self.consume_keyword(Phase)?;
         self.commit();
-        let phase = self.expr_node()?;
+        let phase = self.expr_node();
+        let phase = self.expression_before(phase, LiteralString)?;
         let code = self.lit_string()?;
 
         Ok(SpecInit {
@@ -2571,9 +2554,11 @@ impl<'a> Parser<'a> {
         let first = self.consume_keyword(Packet)?;
         self.commit();
         let name = self.name()?;
-        let id = self.opt_expr(Id)?;
+        let id = self.opt_expr(Id);
+        let id = self.expression_before(id, Keyword(Group))?;
         self.consume_keyword(Group)?;
-        let group = self.expr_node()?;
+        let group = self.expr_node();
+        let group = self.expression_before(group, LeftCurly)?;
         let members = self.enclosed(LeftCurly, RightCurly, Parser::tlm_packet_members)?;
 
         Ok(SpecTlmPacket {
@@ -3188,6 +3173,21 @@ impl<'a> Parser<'a> {
             last,
             msg: "unexpected token",
         })
+    }
+
+    /// The result `out` of an expression that `expected` must follow. If the
+    /// expression ends before a subscript that is not a selector, `expected`
+    /// is expected at the bracket.
+    fn expression_before<T>(&mut self, out: ParseResult<T>, expected: TokenKind) -> ParseResult<T> {
+        match (out, self.selector_failure.take()) {
+            (Err(_), Some(((last, got), _))) => Err(ParseError::ExpectedToken {
+                expected,
+                got,
+                last,
+                msg: "unexpected token",
+            }),
+            (out, _) => out,
+        }
     }
 
     /// The failure of a parenthesized expression or a size, an alternative
