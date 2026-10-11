@@ -1,19 +1,7 @@
 use crate::errors::SemanticResult;
-use crate::semantics::generic_name_symbol_map::GenericNameSymbolMap;
-use crate::semantics::generic_scope::GenericScope;
 use crate::semantics::state_machine::{
-    StateMachineNameGroup, StateMachineNameGroupMap, StateMachineSymbol,
+    StateMachineNameGroup, StateMachineScope, StateMachineSymbol,
 };
-
-/// A local mapping of unqualified names to state machine symbols
-pub type SmNameSymbolMap = GenericNameSymbolMap<StateMachineSymbol>;
-
-/// A collection of name-symbol maps, one for each name group
-pub type StateMachineScope = GenericScope<
-    StateMachineNameGroup,
-    StateMachineSymbol,
-    StateMachineNameGroupMap<GenericNameSymbolMap<StateMachineSymbol>>,
->;
 
 /// A stack of scopes
 #[derive(Debug, Clone)]
@@ -34,12 +22,13 @@ impl StateMachineNestedScope {
         self.scopes.push(scope);
     }
 
-    /// Pop a scope off the stack, returning it
+    /// Pop a scope off the stack. The popped scope is returned, so the caller
+    /// can store it in the symbol scope map.
     pub fn pop(&mut self) -> StateMachineScope {
         self.scopes.pop().expect("empty scope stack")
     }
 
-    /// Put a name and symbol into the innermost scope
+    /// Put a name and symbol into the map.
     pub fn put(
         &mut self,
         name_group: StateMachineNameGroup,
