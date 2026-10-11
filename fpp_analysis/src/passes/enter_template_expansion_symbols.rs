@@ -98,10 +98,7 @@ impl EnterTemplateExpansionSymbols {
             TemplateExpansion {
                 def_node: tmpl.clone(),
                 expansion: Arc::new(node.clone()),
-                params: params
-                    .iter()
-                    .map(|param| (TemplateExpansion::param_key(param), param.clone()))
-                    .collect(),
+                params: params.clone(),
                 param_scope: Scope::new(),
                 scope: Scope::new(),
                 local_scope_map: HashMap::default(),

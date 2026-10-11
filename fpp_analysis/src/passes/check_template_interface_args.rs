@@ -17,7 +17,7 @@ impl CheckTemplateInterfaceArgs {
         let mut args: Vec<Symbol> = a
             .template_expansion_map
             .values()
-            .flat_map(|expansion| expansion.params.values().cloned())
+            .flat_map(|expansion| expansion.params.iter().cloned())
             .filter(|param| matches!(param, Symbol::TemplateInterfaceArg { .. }))
             .collect();
         args.sort_by(|x, y| cmp_span(&x.node().span(), &y.node().span()));
