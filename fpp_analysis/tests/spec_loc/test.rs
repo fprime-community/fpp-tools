@@ -218,3 +218,8 @@ fn template_body_inconsistent_path_error() {
 fn template_body_expanded_path_error() {
     run_test("spec_loc/template_body_expanded_path_error")
 }
+
+#[test]
+fn shadowed_error() {
+    run_test("spec_loc/shadowed_error")
+}
