@@ -58,7 +58,8 @@ impl SmTypedElementAnalyzer for ComputeTypeOptionMap<'_> {
         match arcs.split_first() {
             None => {
                 // Handle the case where no arc comes into J.
-                // This happens when J is the initial node in the transition graph.
+                // This happens when J is the initial node in the transition graph,
+                // or when J is an unreachable choice that no transition enters.
                 sma.type_option_map.insert(te.clone(), None);
             }
             Some((head, tail)) => {
