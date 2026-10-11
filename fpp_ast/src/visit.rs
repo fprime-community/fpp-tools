@@ -108,14 +108,16 @@ pub trait Visitor<'ast>: Sized {
     type Break;
     type State;
 
-    /// The default node visiting before.
-    /// By default, this will just continue without visiting the children of `node`
+    /// The default behavior of every hook except the one for a translation
+    /// unit. By default, this continues without visiting the children of
+    /// `node`; a deep traversal overrides it to call `node.walk(a, self)`.
     fn super_visit(&self, a: &mut Self::State, node: Node<'ast>) -> ControlFlow<Self::Break> {
         let _ = node;
         let _ = a;
         ControlFlow::Continue(())
     }
 
+    /// Visit the members of a translation unit
     fn visit_trans_unit(
         &self,
         a: &mut Self::State,
@@ -236,12 +238,14 @@ pub trait MutVisitor: Sized {
     type Break;
     type State;
 
-    /// The default node visiting before.
-    /// By default, this will just continue without visiting the children of `node`
+    /// The default behavior of every hook, including the one for a
+    /// translation unit. By default, this continues without visiting the
+    /// children of `node`; a deep traversal overrides it to call
+    /// `node.walk_mut(a, self)`.
     fn super_visit_mut<V: MutWalkable<Self>>(
         &self,
         a: &mut Self::State,
-        node: &V,
+        node: &mut V,
     ) -> ControlFlow<Self::Break> {
         let _ = node;
         let _ = a;
