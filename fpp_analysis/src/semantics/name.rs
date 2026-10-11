@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::fmt::{Debug, Display, Formatter, Write};
+use std::fmt::{Debug, Display, Formatter};
 
 /// A qualified or unqualified name
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -85,10 +85,7 @@ impl From<&fpp_ast::QualIdent> for QualifiedName {
 
 impl Debug for QualifiedName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let v: Vec<String> = self.qualifier.clone().into();
-        f.write_str(&v.join("."))?;
-        f.write_char('.')?;
-        f.write_str(&self.base)
+        Display::fmt(self, f)
     }
 }
 

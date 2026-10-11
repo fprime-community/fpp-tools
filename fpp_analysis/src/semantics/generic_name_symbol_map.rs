@@ -1,15 +1,17 @@
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::SymbolInterface;
-use fpp_core::Spanned;
-use rustc_hash::FxHashMap as HashMap;
+use indexmap::IndexMap;
+use rustc_hash::FxBuildHasher;
 
 /// A type-generic local mapping of unqualified names to symbols
+///
+/// The names iterate in the order they were put into the map.
 #[derive(Debug, Clone)]
-pub struct GenericNameSymbolMap<S: SymbolInterface>(HashMap<String, S>);
+pub struct GenericNameSymbolMap<S: SymbolInterface>(IndexMap<String, S, FxBuildHasher>);
 
 impl<S: SymbolInterface> GenericNameSymbolMap<S> {
     pub fn new() -> Self {
-        Self(HashMap::default())
+        Self(IndexMap::default())
     }
 
     /// Get a symbol from the map. Return none if the name is not there.
@@ -27,8 +29,8 @@ impl<S: SymbolInterface> GenericNameSymbolMap<S> {
             }
             Some(prev) => Err(SemanticError::RedefinedSymbol {
                 name: name.to_string(),
-                loc: symbol.redefined_loc(),
-                prev_loc: prev.node().span(),
+                loc: symbol.get_loc(),
+                prev_loc: prev.get_loc(),
             }),
         }
     }

@@ -1,6 +1,6 @@
-@ A failed constant is reported once, not once per use. Evaluation stops at the
-@ first failure, so the chain of uses below cannot re-report it: each doubling
-@ used to double the diagnostic count.
+@ A failed constant is reported once, at its definition. Evaluation stops at
+@ the first failure, so the chain of uses below reports nothing more, however
+@ many times each constant is used.
 constant z = 1 / 0
 constant a = z + z
 constant b = a + a

@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/module_constant.fpp:2:10
+ --> [ local path prefix ]/redef/module_constant.fpp:2:1
   |
 2 | constant M = 0
-  |          ^ redefinition of symbol M
+  | ^^^^^^^^^^^^^^ redefinition of symbol M
   |
  ::: [ local path prefix ]/redef/module_constant.fpp:1:1
   |

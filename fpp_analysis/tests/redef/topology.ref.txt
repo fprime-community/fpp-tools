@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/topology.fpp:2:10
+ --> [ local path prefix ]/redef/topology.fpp:2:1
   |
 2 | topology T { }
-  |          ^ redefinition of symbol T
+  | ^^^^^^^^^^^^^^ redefinition of symbol T
   |
  ::: [ local path prefix ]/redef/topology.fpp:1:1
   |

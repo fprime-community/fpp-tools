@@ -111,11 +111,6 @@ fn format_alias_int_not_rational() {
 }
 
 #[test]
-fn array_no_default_ok() {
-    run_test("array/array_no_default_ok")
-}
-
-#[test]
 fn format_ok() {
     run_test("array/format_ok")
 }

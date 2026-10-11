@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/struct.fpp:2:8
+ --> [ local path prefix ]/redef/struct.fpp:2:1
   |
 2 | struct S { y: U32 }
-  |        ^ redefinition of symbol S
+  | ^^^^^^^^^^^^^^^^^^^ redefinition of symbol S
   |
  ::: [ local path prefix ]/redef/struct.fpp:1:1
   |

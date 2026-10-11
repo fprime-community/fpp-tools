@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/module_topology.fpp:2:10
+ --> [ local path prefix ]/redef/module_topology.fpp:2:1
   |
 2 | topology M { }
-  |          ^ redefinition of symbol M
+  | ^^^^^^^^^^^^^^ redefinition of symbol M
   |
  ::: [ local path prefix ]/redef/module_topology.fpp:1:1
   |

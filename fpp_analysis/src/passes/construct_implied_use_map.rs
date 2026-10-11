@@ -67,12 +67,9 @@ impl<'ast> Visitor<'ast> for ConstructImpliedUseMap {
             let symbol = a
                 .get_symbol(node)
                 .unwrap_or_else(|| Symbol::StateMachine(Arc::new(node.clone())));
-            let mut idents: Vec<String> = a
-                .get_qualified_name(&symbol)
-                .split('.')
-                .map(str::to_string)
-                .collect();
-            idents.push("State".to_string());
+            let mut idents = Analysis::get_qualified_name_from_map(&a.parent_symbol_map, &symbol)
+                .to_ident_list();
+            idents.push_back("State".to_string());
             let name: QualifiedName = idents.into();
             let mut set = ImpliedUseSet::default();
             set.types

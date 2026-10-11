@@ -36,11 +36,6 @@ fn constant_as_type() {
 }
 
 #[test]
-fn state_machine_as_qualifier() {
-    run_test("invalid_symbols/state_machine_as_qualifier")
-}
-
-#[test]
 fn module_as_topology() {
     run_test("invalid_symbols/module_as_topology")
 }

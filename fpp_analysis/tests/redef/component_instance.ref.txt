@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/component_instance.fpp:6:10
+ --> [ local path prefix ]/redef/component_instance.fpp:6:1
   |
 6 | instance c: C base id 0x200
-  |          ^ redefinition of symbol c
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ redefinition of symbol c
   |
  ::: [ local path prefix ]/redef/component_instance.fpp:5:1
   |

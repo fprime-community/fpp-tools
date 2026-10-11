@@ -1,6 +1,6 @@
 @ A serialized size is a product over the nesting depth of a type, so it leaves
-@ the range of an i128 at 128 levels of doubling. Scala accumulates the size in a
-@ BigInt and reports nothing.
+@ the range of an i128 at 128 levels of doubling, and a size that cannot be
+@ represented is an error.
 array A0 = [2] U8
 array A1 = [2] A0
 array A2 = [2] A1

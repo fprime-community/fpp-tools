@@ -125,6 +125,29 @@ impl<'ast> Visitor<'ast> for CheckUseDefCycles<'ast> {
         self.super_.visit(self, a, node)
     }
 
+    /// Check the translation units for cycles. The pass only checks the
+    /// model: the symbols it visits are not visited for the later passes.
+    fn visit_trans_units(
+        &self,
+        a: &mut Analysis,
+        i: impl Iterator<Item = &'ast TransUnit>,
+    ) -> ControlFlow<Self::Break> {
+        let visited_symbol_set = a.visited_symbol_set.clone();
+        let use_def_symbol_set = a.use_def_symbol_set.clone();
+        let use_def_matching_list = a.use_def_matching_list.clone();
+        let mut res = ControlFlow::Continue(());
+        for tu in i {
+            res = self.visit_trans_unit(a, tu);
+            if res.is_break() {
+                break;
+            }
+        }
+        a.visited_symbol_set = visited_symbol_set;
+        a.use_def_symbol_set = use_def_symbol_set;
+        a.use_def_matching_list = use_def_matching_list;
+        res
+    }
+
     fn visit_def_alias_type(
         &self,
         a: &mut Self::State,

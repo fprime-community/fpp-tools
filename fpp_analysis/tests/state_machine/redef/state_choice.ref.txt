@@ -1,7 +1,7 @@
- --> [ local path prefix ]/state_machine/redef/state_choice.fpp:4:10
+ --> [ local path prefix ]/state_machine/redef/state_choice.fpp:4:3
   |
 4 |   choice S { if g enter S else enter S }
-  |          ^ redefinition of symbol S
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ redefinition of symbol S
   |
  ::: [ local path prefix ]/state_machine/redef/state_choice.fpp:3:3
   |
