@@ -1,4 +1,4 @@
-use crate::{run_test, run_test_with};
+use crate::{run_test, run_test_unconnected, run_test_with};
 
 #[test]
 fn arg_kind_constant_param_instance_arg() {
@@ -122,7 +122,7 @@ fn expand_not_a_template_qualified() {
 
 #[test]
 fn import_two_expansions_ok() {
-    run_test("template/import_two_expansions_ok")
+    run_test_unconnected("template/import_two_expansions_ok")
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn interfaces_invalid_port_instance_name_aliased() {
 
 #[test]
 fn interfaces_pattern_explicit_target_ok() {
-    run_test("template/interfaces_pattern_explicit_target_ok")
+    run_test_unconnected("template/interfaces_pattern_explicit_target_ok")
 }
 
 #[test]
@@ -182,12 +182,12 @@ fn interfaces_topology_arg_deployment() {
 
 #[test]
 fn interfaces_topology_arg_ok() {
-    run_test("template/interfaces_topology_arg_ok")
+    run_test_unconnected("template/interfaces_topology_arg_ok")
 }
 
 #[test]
 fn interfaces_topology_arg_order_ok() {
-    run_test("template/interfaces_topology_arg_order_ok")
+    run_test_unconnected("template/interfaces_topology_arg_order_ok")
 }
 
 #[test]
