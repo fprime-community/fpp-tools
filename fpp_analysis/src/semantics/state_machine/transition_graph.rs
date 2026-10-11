@@ -1,7 +1,7 @@
 use crate::semantics::state_machine::{
     StateMachineSymbol, StateMachineTypedElement, StateOrChoice,
 };
-use fpp_core::Spanned;
+use fpp_core::{Span, Spanned};
 use indexmap::{IndexMap, IndexSet};
 
 /// A node in a transition graph
@@ -74,19 +74,18 @@ impl Arc {
         }
     }
 
+    /// Gets the location of the transition that the arc represents
+    pub(crate) fn get_loc(&self) -> Span {
+        match self {
+            Arc::Initial { a_node, .. } => a_node.span(),
+            Arc::State { a_node, .. } => a_node.span(),
+            Arc::Choice { a_node, .. } => a_node.span(),
+        }
+    }
+
     pub fn show_transition(&self) -> String {
-        let (span, end_node) = match self {
-            Arc::Initial {
-                a_node, end_node, ..
-            } => (a_node.span(), end_node),
-            Arc::State {
-                a_node, end_node, ..
-            } => (a_node.span(), end_node),
-            Arc::Choice {
-                a_node, end_node, ..
-            } => (a_node.span(), end_node),
-        };
-        let end_name = end_node.soc.get_name();
+        let span = self.get_loc();
+        let end_name = self.get_end_node().soc.get_name();
         let start = span.start();
         format!(
             "{} at {}:{}.{} to {}",

@@ -1,6 +1,10 @@
  --> [ local path prefix ]/state_machine/initial_transitions/choice_cycle.fpp:4:3
   |
 4 |   choice C { if g enter C else enter C }
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle:
-  choice transition at [ local path prefix ]/state_machine/initial_transitions/choice_cycle.fpp:4.19 to choice C
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ encountered a choice cycle
+  |
+ ::: [ local path prefix ]/state_machine/initial_transitions/choice_cycle.fpp:4:19
+  |
+4 |   choice C { if g enter C else enter C }
+  |                   ------- choice transition to choice C
 

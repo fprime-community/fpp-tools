@@ -478,7 +478,9 @@ pub enum SemanticError {
     /// A cycle of choices in the transition graph
     ChoiceCycle {
         loc: Span,
-        msg: String,
+        /// The transitions of the cycle, each with its location (rendered as
+        /// notes)
+        path: Vec<(Span, String)>,
     },
     /// A node in the transition graph is unreachable
     UnreachableNode {
@@ -1187,7 +1189,13 @@ impl From<SemanticError> for Diagnostic {
                 }
                 d
             }
-            SemanticError::ChoiceCycle { loc, msg } => Diagnostic::new(loc, Level::Error, msg),
+            SemanticError::ChoiceCycle { loc, path } => {
+                let mut d = Diagnostic::new(loc, Level::Error, "encountered a choice cycle");
+                for (span, transition) in path {
+                    d = d.span_note(span, transition);
+                }
+                d
+            }
             SemanticError::UnreachableNode { name, loc } => {
                 Diagnostic::new(loc, Level::Error, format!("{} is unreachable", name))
             }

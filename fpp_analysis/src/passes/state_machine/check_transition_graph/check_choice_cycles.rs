@@ -114,14 +114,18 @@ impl Cycle {
 
     /// The error that reports the cycle
     fn error(&self) -> SemanticError {
-        let loc = self.choice.get_span();
-        let mut parts = vec!["encountered a choice cycle:".to_string()];
-        for a in self.path_list.iter().rev() {
-            parts.push(a.show_transition());
-        }
+        let path = self
+            .path_list
+            .iter()
+            .rev()
+            .map(|a| {
+                let end_name = a.get_end_node().soc.get_name();
+                (a.get_loc(), format!("{} to {}", a.show_kind(), end_name))
+            })
+            .collect();
         SemanticError::ChoiceCycle {
-            loc,
-            msg: parts.join("\n  "),
+            loc: self.choice.get_span(),
+            path,
         }
     }
 }
