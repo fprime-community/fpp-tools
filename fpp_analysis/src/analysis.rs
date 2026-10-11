@@ -1127,7 +1127,7 @@ impl Analysis {
 
     /// The error for a use at `id` of a symbol of the wrong kind: `msg` says
     /// what the symbol is not, and the note points at its definition
-    fn invalid_symbol(symbol: &Symbol, id: fpp_core::Node, msg: &str) -> SemanticError {
+    pub(crate) fn invalid_symbol(symbol: &Symbol, id: fpp_core::Node, msg: &str) -> SemanticError {
         SemanticError::InvalidSymbol {
             name: symbol.name().data.clone(),
             loc: id.span(),

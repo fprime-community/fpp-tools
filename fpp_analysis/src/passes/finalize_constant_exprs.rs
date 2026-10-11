@@ -245,13 +245,7 @@ impl<'ast> FinalizeConstantExprs<'ast> {
             }
             // Invalid use of a symbol in an expression
             _ => {
-                SemanticError::InvalidSymbol {
-                    name: symbol.name().data.clone(),
-                    loc: node.span(),
-                    msg: "not a constant symbol".to_string(),
-                    def_loc: symbol.node().span(),
-                }
-                .emit();
+                Analysis::invalid_symbol(&symbol, node, "not a constant symbol").emit();
                 return ControlFlow::Break(());
             }
         }
