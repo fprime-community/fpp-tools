@@ -1,7 +1,7 @@
  --> [ local path prefix ]/structs/invalid_size.fpp:1:16
   |
 1 | struct S { x: [-1] U32 }
-  |                ^^ array size must be greater than zero
+  |                ^^ invalid array size -1
   |
-  = note: expression evaluated to `-1`
+  = note: size must be greater than zero
 

@@ -1,4 +1,6 @@
 #![cfg(test)]
+//! Helpers for the semantics specs: general helpers, and helper functions and
+//! values for types and values.
 
 use crate::semantics::{AnonArrayType, AnonStructType, ArrayType, EnumType, StructType, Type};
 use crate::semantics::{
@@ -333,66 +335,73 @@ pub fn assert_common_type_eq(actual: &Option<Arc<Type>>, expected: &Arc<Type>) {
 // Value builders
 // ---------------------------------------------------------------------------
 
-pub fn v_i8(v: i128) -> Value {
-    Value::PrimitiveInteger(PrimitiveIntegerValue {
-        value: v,
-        kind: IntegerKind::I8,
-    })
+/// A primitive integer value of kind `kind`
+fn create_primitive_int(v: i128, kind: IntegerKind) -> Value {
+    Value::PrimitiveInteger(PrimitiveIntegerValue { value: v, kind })
 }
-pub fn v_i16(v: i128) -> Value {
-    Value::PrimitiveInteger(PrimitiveIntegerValue {
-        value: v,
-        kind: IntegerKind::I16,
-    })
+
+pub fn create_i8(v: i128) -> Value {
+    create_primitive_int(v, IntegerKind::I8)
 }
-pub fn v_i32(v: i128) -> Value {
-    Value::PrimitiveInteger(PrimitiveIntegerValue {
-        value: v,
-        kind: IntegerKind::I32,
-    })
+pub fn create_i16(v: i128) -> Value {
+    create_primitive_int(v, IntegerKind::I16)
 }
-pub fn v_i64(v: i128) -> Value {
-    Value::PrimitiveInteger(PrimitiveIntegerValue {
-        value: v,
-        kind: IntegerKind::I64,
-    })
+pub fn create_i32(v: i128) -> Value {
+    create_primitive_int(v, IntegerKind::I32)
 }
-pub fn v_u8(v: i128) -> Value {
-    Value::PrimitiveInteger(PrimitiveIntegerValue {
-        value: v,
-        kind: IntegerKind::U8,
-    })
+pub fn create_i64(v: i128) -> Value {
+    create_primitive_int(v, IntegerKind::I64)
 }
-pub fn v_u32(v: i128) -> Value {
-    Value::PrimitiveInteger(PrimitiveIntegerValue {
-        value: v,
-        kind: IntegerKind::U32,
-    })
+pub fn create_u8(v: i128) -> Value {
+    create_primitive_int(v, IntegerKind::U8)
 }
-pub fn v_integer(v: i128) -> Value {
-    Value::Integer(IntegerValue(v))
+pub fn create_u16(v: i128) -> Value {
+    create_primitive_int(v, IntegerKind::U16)
 }
-pub fn v_f32(v: f64) -> Value {
+pub fn create_u32(v: i128) -> Value {
+    create_primitive_int(v, IntegerKind::U32)
+}
+pub fn create_u64(v: i128) -> Value {
+    create_primitive_int(v, IntegerKind::U64)
+}
+
+pub fn create_f32(v: f64) -> Value {
     Value::Float(FloatValue {
         value: v,
         kind: FloatKind::F32,
     })
 }
-pub fn v_f64(v: f64) -> Value {
+pub fn create_f64(v: f64) -> Value {
     Value::Float(FloatValue {
         value: v,
         kind: FloatKind::F64,
     })
 }
-pub fn v_bool(v: bool) -> Value {
+
+/// An anonymous array value of `size` copies of `v`, sharing the one element
+pub fn create_anon_array(size: usize, v: Value) -> Value {
+    Value::AnonArray(AnonArrayValue::repeated(v, size))
+}
+
+// Rust-only value builders: the Scala specs construct these values directly
+
+/// An `Integer` value
+pub fn create_integer(v: i128) -> Value {
+    Value::Integer(IntegerValue(v))
+}
+
+/// A Boolean value
+pub fn create_boolean(v: bool) -> Value {
     Value::Boolean(BooleanValue(v))
 }
-pub fn v_string(s: &str) -> Value {
+
+/// A string value
+pub fn create_string(s: &str) -> Value {
     Value::String(StringValue(s.to_string()))
 }
 
-/// An enum constant value over `default_enum()`.
-pub fn v_enum_constant(member: &str, value: i128) -> Value {
+/// An enum constant value of `default_enum()`
+pub fn create_enum_constant(member: &str, value: i128) -> Value {
     Value::EnumConstant(EnumConstantValue::new(
         member.to_string(),
         value,
@@ -400,22 +409,17 @@ pub fn v_enum_constant(member: &str, value: i128) -> Value {
     ))
 }
 
-/// An anonymous array value of `size` copies of `v`, sharing the one element.
-pub fn v_anon_array(size: usize, v: Value) -> Value {
-    Value::AnonArray(AnonArrayValue::repeated(v, size))
-}
-
 // ---------------------------------------------------------------------------
 // SerializedSize test analysis
 // ---------------------------------------------------------------------------
 
-/// Builds an [`crate::Analysis`] populated with the framework definitions that
-/// `Type::serialized_size` needs: `FwSizeStoreType = U16` (the string length
-/// prefix type, 2 bytes) and `FW_FIXED_LENGTH_STRING_SIZE = 256` (the default
-/// string data size).
+/// Create analysis data structure and fill in the framework definitions, types,
+/// and values required for computing the serialized size of a type:
+/// `FwSizeStoreType = U16` (the string length prefix type, 2 bytes) and
+/// `FW_FIXED_LENGTH_STRING_SIZE = 256` (the default string data size).
 ///
-/// Note: string sizes are pre-resolved as `i128`, so no per-string
-/// `value_map` entries are needed — only the two framework definitions.
+/// A string type holds its size, so the analysis needs no values for string
+/// sizes, only the two framework definitions.
 pub fn sizeof_test_analysis() -> crate::Analysis {
     use crate::semantics::Symbol;
     use fpp_ast::DefConstant;

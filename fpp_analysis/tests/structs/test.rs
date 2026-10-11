@@ -66,6 +66,16 @@ fn default_ok() {
 }
 
 #[test]
+fn default_shadowed_error() {
+    run_test("structs/default_shadowed_error")
+}
+
+#[test]
+fn default_shadowed_ok() {
+    run_test("structs/default_shadowed_ok")
+}
+
+#[test]
 fn format_ok() {
     run_test("structs/format_ok")
 }
@@ -86,13 +96,43 @@ fn dictionary_ok() {
 }
 
 #[test]
-fn default_shadowed_error() {
-    run_test("structs/default_shadowed_error")
+fn default_member_size_error() {
+    run_test("structs/default_member_size_error")
 }
 
 #[test]
-fn default_shadowed_ok() {
-    run_test("structs/default_shadowed_ok")
+fn format_and_size_error() {
+    run_test("structs/format_and_size_error")
+}
+
+#[test]
+fn default_and_size_error() {
+    run_test("structs/default_and_size_error")
+}
+
+#[test]
+fn member_type_order() {
+    run_test("structs/member_type_order")
+}
+
+#[test]
+fn format_precision_and_type() {
+    run_test("structs/format_precision_and_type")
+}
+
+#[test]
+fn size_out_of_range_high() {
+    run_test("structs/size_out_of_range_high")
+}
+
+#[test]
+fn size_out_of_range_low() {
+    run_test("structs/size_out_of_range_low")
+}
+
+#[test]
+fn default_alias_promote_ok() {
+    run_test("structs/default_alias_promote_ok")
 }
 
 #[test]

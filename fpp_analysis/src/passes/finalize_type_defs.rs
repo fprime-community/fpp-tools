@@ -3,12 +3,12 @@ use crate::analyzers::analyzer::Analyzer;
 use crate::analyzers::nested_analyzer::{NestedAnalyzer, NestedAnalyzerMode};
 use crate::errors::SemanticError;
 use crate::semantics::{
-    AliasType, AnonArrayType, AnonStructType, ArrayType, ArrayValue, Format, IntegerValue,
-    StructType, StructValue, Symbol, SymbolInterface, Type, Value,
+    AliasType, AnonArrayType, AnonStructType, ArrayType, ArrayValue, Format, StructType,
+    StructValue, Symbol, Type, Value,
 };
 use fpp_ast::{
-    AstNode, DefAliasType, DefArray, DefEnum, DefStruct, Expr, Node, TransUnit, TypeName,
-    TypeNameKind, Visitor, Walkable,
+    AstNode, DefAliasType, DefArray, DefEnum, DefModuleTemplate, DefStruct, Expr, LitString, Node,
+    TemplateParam, TransUnit, TypeName, TypeNameKind, Visitor, Walkable,
 };
 use fpp_core::Spanned;
 use std::ops::{ControlFlow, Deref};
@@ -29,94 +29,8 @@ impl<'ast> Default for FinalizeTypeDefs<'ast> {
 impl<'ast> FinalizeTypeDefs<'ast> {
     pub fn new() -> FinalizeTypeDefs<'ast> {
         Self {
-            super_: NestedAnalyzer::new(NestedAnalyzerMode::DEEP),
+            super_: NestedAnalyzer::new(NestedAnalyzerMode::TYPE_EXPRESSION),
         }
-    }
-
-    fn expr_as_integer(&self, a: &mut Analysis, e: &Expr) -> Option<i128> {
-        match a.value_map.get(&e.node_id) {
-            None => None,
-            Some(v) => {
-                if let Some(Value::Integer(IntegerValue(i))) = v.convert(&Arc::new(Type::Integer)) {
-                    Some(i)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-
-    fn expr_as_integer_opt(&self, a: &mut Analysis, e: &Option<Expr>) -> Option<i128> {
-        match e {
-            None => None,
-            Some(e) => self.expr_as_integer(a, e),
-        }
-    }
-
-    /// Finalizes the type named by `node` and returns it.
-    pub(crate) fn ty(&self, a: &mut Analysis, node: &'ast TypeName) -> ControlFlow<(), Arc<Type>> {
-        match &node.kind {
-            TypeNameKind::QualIdent(q) => match a.use_def_map.get(&q.id()).cloned() {
-                None => {}
-                Some(symbol) => {
-                    match &symbol {
-                        Symbol::AbsType(ty) => self.visit_def_abs_type(a, ty.deref()),
-                        Symbol::AliasType(ty) => self.visit_def_alias_type(a, ty.deref()),
-                        Symbol::ArrayType(ty) => self.visit_def_array(a, ty.deref()),
-                        Symbol::EnumType(ty) => self.visit_def_enum(a, ty.deref()),
-                        Symbol::StructType(ty) => self.visit_def_struct(a, ty.deref()),
-                        _ => ControlFlow::Continue(()),
-                    }?;
-
-                    if let Some(def_ty) = a.type_map.get(&symbol.node()).cloned() {
-                        a.type_map.insert(node.node_id, def_ty);
-                    }
-                }
-            },
-            TypeNameKind::String(size) => match self.expr_as_integer_opt(a, size) {
-                None => {}
-                Some(size_v) => {
-                    // TODO(tumbar) Should we disallow 0 size strings?
-                    //    See https://github.com/nasa/fpp/issues/878
-                    if size_v < 0 {
-                        SemanticError::InvalidIntValue {
-                            loc: size.as_ref().unwrap().span(),
-                            v: Some(size_v),
-                            msg: "negative string sizes are not allowed".to_string(),
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    } else if size_v >= 1 << 31 {
-                        SemanticError::InvalidIntValue {
-                            loc: size.as_ref().unwrap().span(),
-                            v: Some(size_v),
-                            msg: "string size must in range [0, 2^31)".to_string(),
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    } else {
-                        a.type_map
-                            .insert(node.node_id, Arc::new(Type::String(Some(size_v))));
-                    }
-                }
-            },
-            _ => {}
-        }
-
-        // `CheckTypeUses` normally gives every type name it reaches an entry.
-        // Fall back to the shared unknown type rather than assuming that: this
-        // is called on demand from `EvalConstantExprs` for `sizeof` operands,
-        // which can sit in positions that no earlier pass visited, and a
-        // missing entry must degrade to an unknown type, not abort the
-        // compiler (which would also take down `fpp_lsp_server`).
-        ControlFlow::Continue(match a.type_map.get(&node.node_id).cloned() {
-            Some(ty) => ty,
-            None => {
-                let ty = a.unknown_type(node.span());
-                a.type_map.insert(node.node_id, ty.clone());
-                ty
-            }
-        })
     }
 }
 
@@ -128,14 +42,219 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         self.super_.visit(self, a, node)
     }
 
-    // No more need to evaluate sub-expressions
+    /// Expressions are not visited: a type name inside an expression (the
+    /// operand of a `sizeof`) is not a use that this pass finalizes.
     fn visit_expr(&self, _: &mut Self::State, _: &'ast Expr) -> ControlFlow<Self::Break> {
         ControlFlow::Continue(())
     }
 
     fn visit_type_name(&self, a: &mut Self::State, node: &'ast TypeName) -> ControlFlow<()> {
-        if matches!(node.kind, TypeNameKind::String(_)) {
-            self.ty(a, node)?;
+        self.type_name_node(a, node)?;
+        ControlFlow::Continue(())
+    }
+
+    fn visit_def_alias_type(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefAliasType,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_if_needed(a, node, |a| {
+            let def = a.interned_def(node);
+            // Visit the referenced type
+            let referenced_type = self.type_name_node(a, &node.type_name)?;
+            // Update A in the type map
+            a.assign_type(
+                node.node_id,
+                Arc::new(Type::Alias(AliasType {
+                    node: def,
+                    alias_type: referenced_type,
+                })),
+            );
+            ControlFlow::Continue(())
+        })
+    }
+
+    fn visit_def_array(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefArray,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_if_needed(a, node, |a| {
+            let def = a.interned_def(node);
+            // The type of this node before it is finalized
+            let def_ty = a.type_map.get(&node.node_id).cloned();
+            // Visit the element type of A, to update its members
+            let elt_type = self.type_name_node(a, &node.elt_type)?;
+            // Update the size and element type in A
+            if a.get_big_int_value(node.size.node_id).is_none() {
+                return ControlFlow::Continue(());
+            }
+            let size = match a.get_array_size(node.size.node_id, node.size.span()) {
+                Ok(size) => size,
+                Err(err) => {
+                    err.emit();
+                    return ControlFlow::Break(());
+                }
+            };
+            let anon_array = AnonArrayType {
+                size: Some(size as usize),
+                elt_type: elt_type.clone(),
+            };
+            let mut array_type = ArrayType {
+                node: def,
+                anon_array,
+                default: None,
+                format: None,
+            };
+            // Compute the default value
+            let array_type_arc = Arc::new(array_type.clone());
+            let default = match &node.default {
+                Some(default) => {
+                    let ty = Arc::new(Type::Array(array_type_arc));
+                    match Self::default_value(a, default, def_ty.as_ref(), &ty)? {
+                        Some(Value::Array(v)) => Some(v),
+                        _ => None,
+                    }
+                }
+                None => {
+                    match Arc::new(Type::AnonArray(array_type.anon_array.clone())).default_value() {
+                        Some(Value::AnonArray(anon_array)) => Some(ArrayValue {
+                            anon_array,
+                            ty: array_type_arc,
+                        }),
+                        _ => None,
+                    }
+                }
+            };
+            // Compute the format
+            let format = node
+                .format
+                .as_ref()
+                .and_then(|format| Self::format(format, &elt_type));
+            // Update the default value and format in A
+            array_type.default = default;
+            array_type.format = format;
+            // Update A in the type map
+            a.assign_type(node.node_id, Arc::new(Type::Array(Arc::new(array_type))));
+            ControlFlow::Continue(())
+        })
+    }
+
+    fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
+        self.visit_if_needed(a, node, |a| {
+            // `CheckTypeUses` always enters an enum type for the definition node.
+            let mut enum_type = match a.type_map.get(&node.node_id).unwrap().deref() {
+                Type::Enum(ty) => ty.deref().clone(),
+                _ => panic!("expected enum type"),
+            };
+            let default = match &node.default {
+                Some(default) => a.value_map.get(&default.node_id).cloned(),
+                None => match node.constants.first() {
+                    None => None,
+                    Some(first_constant) => a.value_map.get(&first_constant.node_id).cloned(),
+                },
+            };
+            enum_type.default = match default {
+                Some(Value::EnumConstant(v)) => Some(v),
+                _ => None,
+            };
+            a.assign_type(node.node_id, Arc::new(Type::Enum(Arc::new(enum_type))));
+            ControlFlow::Continue(())
+        })
+    }
+
+    fn visit_def_struct(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefStruct,
+    ) -> ControlFlow<Self::Break> {
+        self.visit_if_needed(a, node, |a| {
+            let def = a.interned_def(node);
+            // The type of this node before it is finalized
+            let def_ty = a.type_map.get(&node.node_id).cloned();
+            // Visit the anonymous struct type of S, to update its members
+            let mut members = Vec::with_capacity(node.members.len());
+            for member in &node.members {
+                let member_type = self.type_name_node(a, &member.type_name)?;
+                members.push((member.name.data.clone(), member_type));
+            }
+            // Update the anonymous struct type of S
+            let mut struct_type = StructType {
+                node: def,
+                anon_struct: AnonStructType { members },
+                default: None,
+                sizes: Default::default(),
+                formats: Default::default(),
+            };
+            // Compute the default value
+            let struct_type_arc = Arc::new(struct_type.clone());
+            let default = match &node.default {
+                Some(default) => {
+                    let ty = Arc::new(Type::Struct(struct_type_arc));
+                    match Self::default_value(a, default, def_ty.as_ref(), &ty)? {
+                        Some(Value::Struct(v)) => Some(v),
+                        _ => None,
+                    }
+                }
+                None => match Arc::new(Type::AnonStruct(struct_type.anon_struct.clone()))
+                    .default_value()
+                {
+                    Some(Value::AnonStruct(anon_struct)) => Some(StructValue {
+                        anon_struct,
+                        ty: struct_type_arc,
+                    }),
+                    _ => None,
+                },
+            };
+            // Compute the sizes
+            for member in &node.members {
+                let Some(size) = &member.size else { continue };
+                if a.get_big_int_value(size.node_id).is_none() {
+                    continue;
+                }
+                match a.get_array_size(size.node_id, size.span()) {
+                    Ok(n) => {
+                        struct_type.sizes.insert(member.name.data.clone(), n as u32);
+                    }
+                    Err(err) => {
+                        err.emit();
+                        return ControlFlow::Break(());
+                    }
+                }
+            }
+            // Compute the formats
+            for (member, (_, member_type)) in node
+                .members
+                .iter()
+                .zip(struct_type.anon_struct.members.iter())
+            {
+                if let Some(format) = member
+                    .format
+                    .as_ref()
+                    .and_then(|format| Self::format(format, member_type))
+                {
+                    struct_type.formats.insert(member.name.data.clone(), format);
+                }
+            }
+            // Update the default value, sizes, and formats in S
+            struct_type.default = default;
+            // Update S in the type map
+            a.assign_type(node.node_id, Arc::new(Type::Struct(Arc::new(struct_type))));
+            ControlFlow::Continue(())
+        })
+    }
+
+    /// A module template is analyzed where it is expanded. At the definition,
+    /// only the types of its constant parameters are visited.
+    fn visit_def_module_template(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefModuleTemplate,
+    ) -> ControlFlow<Self::Break> {
+        for param in &node.params {
+            if let TemplateParam::Constant(param) = param {
+                self.visit_type_name(a, &param.type_name)?;
+            }
         }
         ControlFlow::Continue(())
     }
@@ -148,273 +267,140 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
         a.visited_symbol_set.clear();
         node.walk(a, self)
     }
+}
 
-    fn visit_def_alias_type(
+impl<'ast> FinalizeTypeDefs<'ast> {
+    /// Runs `visitor` on a definition node unless the definition symbol is in
+    /// the visited symbol set, and then adds the symbol to the set
+    fn visit_if_needed<N: AstNode>(
         &self,
-        a: &mut Self::State,
-        node: &'ast DefAliasType,
-    ) -> ControlFlow<Self::Break> {
+        a: &mut Analysis,
+        node: &N,
+        visitor: impl FnOnce(&mut Analysis) -> ControlFlow<()>,
+    ) -> ControlFlow<()> {
         let Some(symbol) = a.get_symbol(node) else {
             return ControlFlow::Continue(());
         };
         if a.visited_symbol_set.contains(&symbol) {
             return ControlFlow::Continue(());
         }
-
-        let def = a.interned_def(node);
+        visitor(a)?;
         a.visited_symbol_set.insert(symbol);
-        // Finalize the referenced type
-        let ty = self.ty(a, &node.type_name)?;
-        // Update the alias type in the type map
-        a.type_map.insert(
-            node.node_id,
-            Arc::new(Type::Alias(AliasType {
-                node: def,
-                alias_type: ty,
-            })),
-        );
-
         ControlFlow::Continue(())
     }
 
-    fn visit_def_array(
+    /// Finalizes the type named by a type name, as the operand of `sizeof`
+    /// needs it: the definition the name refers to is finalized, and the size of
+    /// a `string size n` type name is evaluated into the type but not checked.
+    /// The finalized type is recorded as the type of the type name and
+    /// returned.
+    pub(crate) fn ty(&self, a: &mut Analysis, node: &'ast TypeName) -> ControlFlow<(), Arc<Type>> {
+        self.finalize_type_name(a, node, false)
+    }
+
+    /// Finalizes the type named by a type name, checking the size of a
+    /// `string size n` type, and records and returns it. This is Scala's
+    /// TypeVisitor applied to the type of the type name: the type of a
+    /// `string size n` type name does not hold the size expression, so the
+    /// type is reached through the type name.
+    fn type_name_node(&self, a: &mut Analysis, node: &'ast TypeName) -> ControlFlow<(), Arc<Type>> {
+        self.finalize_type_name(a, node, true)
+    }
+
+    fn finalize_type_name(
         &self,
-        a: &mut Self::State,
-        node: &'ast DefArray,
-    ) -> ControlFlow<Self::Break> {
-        let Some(symbol) = a.get_symbol(node) else {
-            return ControlFlow::Continue(());
-        };
-        if a.visited_symbol_set.contains(&symbol) {
-            return ControlFlow::Continue(());
-        }
-
-        let def = a.interned_def(node);
-        a.visited_symbol_set.insert(symbol);
-        // Finalize the element type
-        let elt_type = self.ty(a, &node.elt_type)?;
-
-        let size = match self.expr_as_integer(a, &node.size) {
-            None => return ControlFlow::Continue(()),
-            Some(size) => size,
-        };
-
-        if size < i32::MIN as i128 || size > i32::MAX as i128 {
-            SemanticError::InvalidIntValue {
-                loc: node.size.span(),
-                v: Some(size),
-                msg: "value out of range".to_string(),
-            }
-            .emit();
-            return ControlFlow::Break(());
-        }
-
-        if size <= 0 {
-            SemanticError::InvalidIntValue {
-                loc: node.size.span(),
-                v: Some(size),
-                msg: "array size must be greater than zero".to_string(),
-            }
-            .emit();
-            return ControlFlow::Break(());
-        }
-
-        // Update the size and element type
-        let anon_array = AnonArrayType {
-            size: Some(size as usize),
-            elt_type: elt_type.clone(),
-        };
-
-        let anon_array_ty = Arc::new(Type::AnonArray(anon_array.clone()));
-
-        // The array type without its default value or format
-        let mut array_ty = ArrayType {
-            node: def,
-            anon_array,
-            default: None,
-            format: None,
-        };
-        // The array type as it stands, for the default value to name. The
-        // default is part of the type, so the value names the type without it.
-        let array_ty_arc = Arc::new(array_ty.clone());
-        let array_ty_a = Arc::new(Type::Array(array_ty_arc.clone()));
-
-        // Compute the default value
-        array_ty.default = match &node.default {
-            None => match anon_array_ty.default_value() {
-                Some(Value::AnonArray(anon_array)) => Some(ArrayValue {
-                    anon_array,
-                    ty: array_ty_arc.clone(),
-                }),
+        a: &mut Analysis,
+        node: &'ast TypeName,
+        check_string_size: bool,
+    ) -> ControlFlow<(), Arc<Type>> {
+        let finalized = match &node.kind {
+            TypeNameKind::QualIdent(q) => match a.use_def_map.get(&q.id()).cloned() {
+                Some(Symbol::AliasType(def)) => {
+                    self.visit_def_alias_type(a, def.deref())?;
+                    a.type_map.get(&def.node_id).cloned()
+                }
+                Some(Symbol::ArrayType(def)) => {
+                    self.visit_def_array(a, def.deref())?;
+                    a.type_map.get(&def.node_id).cloned()
+                }
+                Some(Symbol::EnumType(def)) => {
+                    self.visit_def_enum(a, def.deref())?;
+                    a.type_map.get(&def.node_id).cloned()
+                }
+                Some(Symbol::StructType(def)) => {
+                    self.visit_def_struct(a, def.deref())?;
+                    a.type_map.get(&def.node_id).cloned()
+                }
+                // A type parameter names the type its argument names
+                Some(Symbol::TemplateTypeArg { value, .. }) => {
+                    Some(self.finalize_type_name(a, value.deref(), check_string_size)?)
+                }
                 _ => None,
             },
-            Some(default) => match a.value_map.get(&default.node_id).cloned() {
-                None => None,
-                Some(default_v) => {
-                    if let Value::AnonArray(v) | Value::Array(ArrayValue { anon_array: v, .. }) =
-                        &default_v
-                        && v.elements.len() != size as usize
-                    {
-                        SemanticError::ArrayDefaultMismatchedSize {
-                            loc: default.span(),
-                            size_loc: node.size.span(),
-                            value_size: v.elements.len(),
-                            type_size: size,
+            TypeNameKind::String(Some(size)) => match a.get_big_int_value(size.node_id) {
+                Some(size_v) => {
+                    if check_string_size && !Type::is_valid_string_size(size_v) {
+                        SemanticError::InvalidStringSize {
+                            loc: size.span(),
+                            size: size_v,
                         }
                         .emit();
                         return ControlFlow::Break(());
                     }
-                    match default_v.convert(&array_ty_a) {
-                        Some(Value::Array(v)) => Some(v),
-                        _ => None,
-                    }
+                    Some(Arc::new(Type::String(Some(size_v))))
                 }
+                None => None,
             },
-        };
-
-        // Compute the format
-        array_ty.format = node
-            .format
-            .as_ref()
-            .map(|format| Format::new(format, vec![(elt_type.clone(), node.elt_type.span())]));
-
-        // Update the array type in the type map
-        a.type_map
-            .insert(node.node_id, Arc::new(Type::Array(Arc::new(array_ty))));
-        ControlFlow::Continue(())
-    }
-
-    fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        let Some(symbol) = a.get_symbol(node) else {
-            return ControlFlow::Continue(());
-        };
-        if a.visited_symbol_set.contains(&symbol) {
-            return ControlFlow::Continue(());
-        }
-
-        a.visited_symbol_set.insert(symbol);
-        // `CheckTypeUses` always enters an enum type for the definition node.
-        let mut enum_ty = match a.type_map.get(&node.node_id).unwrap().deref() {
-            Type::Enum(ty) => ty.deref().clone(),
-            _ => panic!("expected enum type"),
-        };
-
-        let default_value = match &node.default {
-            None => {
-                // Choose the first value
-                match node.constants.first() {
-                    None => None,
-                    Some(first_constant) => a.value_map.get(&first_constant.node_id).cloned(),
-                }
-            }
-            Some(def) => a.value_map.get(&def.node_id).cloned(),
-        };
-        enum_ty.default = match default_value {
-            Some(Value::EnumConstant(v)) => Some(v),
             _ => None,
         };
 
-        a.type_map
-            .insert(node.node_id, Arc::new(Type::Enum(Arc::new(enum_ty))));
-
-        ControlFlow::Continue(())
+        // `CheckTypeUses` normally gives every type name it reaches an entry.
+        // Fall back to the shared unknown type rather than assuming that: the
+        // operand of a `sizeof` can sit in a position that no earlier pass
+        // visited, and a missing entry must degrade to an unknown type, not
+        // abort the compiler (which would also take down `fpp_lsp_server`).
+        let ty = match finalized.or_else(|| a.type_map.get(&node.node_id).cloned()) {
+            Some(ty) => ty,
+            None => a.unknown_type(node.span()),
+        };
+        a.assign_type(node.node_id, ty.clone());
+        ControlFlow::Continue(ty)
     }
 
-    fn visit_def_struct(
-        &self,
-        a: &mut Self::State,
-        node: &'ast DefStruct,
-    ) -> ControlFlow<Self::Break> {
-        let Some(symbol) = a.get_symbol(node) else {
-            return ControlFlow::Continue(());
+    /// Computes a default value for a definition of type `ty`. The value of the
+    /// default expression is converted to the type, which now has its array
+    /// sizes; a default whose expression type does not convert to `def_ty`,
+    /// the type of the definition before it was finalized, is reported by
+    /// `CheckExprTypes` and not checked again here.
+    fn default_value(
+        a: &Analysis,
+        default: &Expr,
+        def_ty: Option<&Arc<Type>>,
+        ty: &Arc<Type>,
+    ) -> ControlFlow<(), Option<Value>> {
+        let Some(v) = a.value_map.get(&default.node_id) else {
+            return ControlFlow::Continue(None);
         };
-        if a.visited_symbol_set.contains(&symbol) {
-            return ControlFlow::Continue(());
+        let checked = match (a.type_map.get(&default.node_id), def_ty) {
+            (Some(expr_ty), Some(def_ty)) => Type::convert(expr_ty, def_ty).is_ok(),
+            _ => true,
+        };
+        if checked && let Err(err) = Analysis::convert_types(default.span(), &v.get_type(), ty) {
+            err.emit();
+            return ControlFlow::Break(());
         }
+        ControlFlow::Continue(v.convert(ty))
+    }
 
-        let def = a.interned_def(node);
-        a.visited_symbol_set.insert(symbol);
-
-        let mut ty = StructType {
-            node: def,
-            anon_struct: AnonStructType {
-                members: Default::default(),
-            },
-            default: None,
-            sizes: Default::default(),
-            formats: Default::default(),
-        };
-
-        for member in &node.members {
-            // Finalize the member's type
-            let member_ty = self.ty(a, &member.type_name)?;
-            ty.anon_struct
-                .members
-                .push((member.name.data.clone(), member_ty.clone()));
-
-            // Compute the size
-            let size = self.expr_as_integer_opt(a, &member.size);
-            match size {
-                None => {}
-                Some(size) if size >= 1 => {
-                    if size < 1 << 31 {
-                        ty.sizes.insert(member.name.data.clone(), size as u32);
-                    } else {
-                        SemanticError::InvalidIntValue {
-                            loc: member.size.clone().unwrap().span(),
-                            v: Some(size),
-                            msg: "array size must be less than 2^31".to_string(),
-                        }
-                        .emit();
-                        return ControlFlow::Break(());
-                    }
-                }
-                Some(size) => {
-                    SemanticError::InvalidIntValue {
-                        loc: member.size.clone().unwrap().span(),
-                        v: Some(size),
-                        msg: "array size must be greater than zero".to_string(),
-                    }
-                    .emit();
-                    return ControlFlow::Break(());
-                }
-            }
-
-            // Compute the format
-            if let Some(format) = &member.format {
-                ty.formats.insert(
-                    member.name.data.clone(),
-                    Format::new(format, vec![(member_ty, member.type_name.span())]),
-                );
+    /// Computes a format for the values of a type, reporting an invalid format
+    /// string
+    fn format(node: &LitString, ty: &Arc<Type>) -> Option<Format> {
+        match Analysis::compute_format(node, std::slice::from_ref(ty)) {
+            Ok(format) => Some(format),
+            Err(err) => {
+                err.emit();
+                None
             }
         }
-
-        // Compute the default value. The value refers to the struct type
-        // without its own default.
-        let struct_ty_arc = Arc::new(ty.clone());
-        let struct_ty_a = Arc::new(Type::Struct(struct_ty_arc.clone()));
-        ty.default = match &node.default {
-            // The convertibility of an explicit default is checked by
-            // `CheckExprTypes`; store the converted value.
-            Some(default) => match a.value_map.get(&default.node_id).cloned() {
-                Some(default_v) => match default_v.convert(&struct_ty_a) {
-                    Some(Value::Struct(v)) => Some(v),
-                    _ => None,
-                },
-                None => None,
-            },
-            None => match Arc::new(Type::AnonStruct(ty.anon_struct.clone())).default_value() {
-                Some(Value::AnonStruct(anon_struct)) => Some(StructValue {
-                    anon_struct,
-                    ty: struct_ty_arc,
-                }),
-                _ => None,
-            },
-        };
-
-        // Update the struct type in the type map
-        a.type_map
-            .insert(node.node_id, Arc::new(Type::Struct(Arc::new(ty))));
-        ControlFlow::Continue(())
     }
 }

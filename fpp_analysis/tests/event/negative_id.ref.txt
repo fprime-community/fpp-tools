@@ -1,7 +1,7 @@
  --> [ local path prefix ]/event/negative_id.fpp:3:36
   |
 3 |   event E severity activity low id -1 format ""
-  |                                    ^^ value may not be negative
+  |                                    ^^ invalid integer value -1
   |
-  = note: expression evaluated to `-1`
+  = note: value may not be negative
 

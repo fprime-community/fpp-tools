@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/template/type_arg_string_size_negative.fpp:6:27
+  |
+6 | expand T(type string size -1)
+  |                           ^^ invalid string size -1
+

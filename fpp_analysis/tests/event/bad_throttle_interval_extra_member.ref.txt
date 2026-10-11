@@ -3,7 +3,7 @@
 5 |     every {seconds=1,minutes=10}
   |           ^^^^^^^^^^^^^^^^^^^^^^ event throttle every must be convertable to a time interval
   |
-  = note: struct missing member `minutes`
+  = note: no member `minutes` in the struct type
 
  --> [ local path prefix ]/event/bad_throttle_interval_extra_member.fpp:1:1
   |

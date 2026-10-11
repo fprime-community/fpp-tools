@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/port_instance/array_size_out_of_range.fpp:3:23
+  |
+3 |   sync input port p: [4294967296] P
+  |                       ^^^^^^^^^^ invalid integer value 4294967296
+  |
+  = note: value out of range
+

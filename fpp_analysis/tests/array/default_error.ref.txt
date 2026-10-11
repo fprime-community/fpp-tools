@@ -1,12 +1,7 @@
  --> [ local path prefix ]/array/default_error.fpp:2:25
   |
 2 | array B = [3] A default [ 1, 2 ]
-  |                         ^^^^^^^^ cannot convert value to array type due to mismatched sizes
+  |                         ^^^^^^^^ cannot convert [2] Integer to array B
   |
-  = note: value size `2`
-  |
- ::: [ local path prefix ]/array/default_error.fpp:2:12
-  |
-2 | array B = [3] A default [ 1, 2 ]
-  |            - array size `3`
+  = note: array sizes do not match 2 != 3
 

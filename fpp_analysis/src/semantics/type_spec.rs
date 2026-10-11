@@ -3,18 +3,6 @@
 use super::test_helpers::*;
 use crate::semantics::{SerializedSizeError, Type};
 
-#[test]
-fn node_id_memo_identity() {
-    with_test_ctx(|| {
-        let e1 = enumeration("E", fpp_ast::IntegerKind::I32, 0);
-        let e2 = enumeration("E", fpp_ast::IntegerKind::I32, 0);
-        assert!(Type::identical(&e1, &e2), "same id -> identical");
-
-        let e3 = enumeration("E", fpp_ast::IntegerKind::I32, 1);
-        assert!(!Type::identical(&e1, &e3), "different id -> not identical");
-    });
-}
-
 // ---------------------------------------------------------------------------
 // "type identity" should ...
 // ---------------------------------------------------------------------------
@@ -467,7 +455,6 @@ fn common_types_disallowed_pairs() {
 #[test]
 fn displayable_types() {
     with_test_ctx(|| {
-        use fpp_ast::IntegerKind::*;
         let displayable: Vec<std::sync::Arc<Type>> = vec![
             i32(),
             f32(),
@@ -508,7 +495,6 @@ fn displayable_types() {
                 25,
             ),
         ];
-        let _ = U8;
         for ty in not_displayable {
             assert!(!ty.is_displayable(), "expected NOT displayable: {ty}");
         }
@@ -518,8 +504,9 @@ fn displayable_types() {
 // ---------------------------------------------------------------------------
 // "size of" should ...
 //
-// String data size default = FW_FIXED_LENGTH_STRING_SIZE = 256; the length
-// prefix type FwSizeStoreType = U16 contributes 2 bytes.
+// The types are built in each test. The analysis is `sizeof_test_analysis`:
+// the string data size default is FW_FIXED_LENGTH_STRING_SIZE = 256, and the
+// length prefix type FwSizeStoreType = U16 contributes 2 bytes.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -569,9 +556,7 @@ fn size_of_alias_types() {
 #[test]
 fn size_of_arrays() {
     with_test_ctx(|| {
-        use fpp_ast::IntegerKind::U16;
         let a = sizeof_test_analysis();
-        let _ = U16;
         // array1 = [3] I64 -> 3 * 8 = 24
         let array1 = array("A", anon_array(Some(3), i64()), 102);
         assert_eq!(array1.serialized_size(&a), Ok(24));
@@ -657,6 +642,16 @@ fn size_of_types_with_no_size() {
 
         let x = alias_type("X", default_abs_type(), 122);
         assert_eq!(x.serialized_size(&a), Err(SerializedSizeError::Unavailable));
+
+        // An anonymous type is not displayable, so it has no serialized size
+        assert_eq!(
+            anon_array(Some(3), i32()).serialized_size(&a),
+            Err(SerializedSizeError::Unavailable)
+        );
+        assert_eq!(
+            anon_struct(&[("m1", i32())]).serialized_size(&a),
+            Err(SerializedSizeError::Unavailable)
+        );
     });
 }
 
@@ -669,8 +664,7 @@ fn size_of_too_large_to_represent() {
     with_test_ctx(|| {
         let a = sizeof_test_analysis();
 
-        // 2^127 fits (it is `i128::MIN` as a bit pattern only, so stop at 126
-        // doublings of a 1-byte element and check the next one)
+        // 2^126 still fits in an i128; one more doubling (2^127) does not
         let mut ty = boolean();
         for id in 0..126 {
             ty = array("A", anon_array(Some(2), ty), 200 + id);
@@ -712,9 +706,20 @@ fn size_of_too_large_to_represent() {
 }
 
 // ---------------------------------------------------------------------------
-// Additional coverage: `Type` predicate/helper methods (many recurse through
-// alias types), exercising the same `Type` surface.
+// Rust-only
 // ---------------------------------------------------------------------------
+
+#[test]
+fn node_id_memo_identity() {
+    with_test_ctx(|| {
+        let e1 = enumeration("E", fpp_ast::IntegerKind::I32, 0);
+        let e2 = enumeration("E", fpp_ast::IntegerKind::I32, 0);
+        assert!(Type::identical(&e1, &e2), "same id -> identical");
+
+        let e3 = enumeration("E", fpp_ast::IntegerKind::I32, 1);
+        assert!(!Type::identical(&e1, &e3), "different id -> not identical");
+    });
+}
 
 use crate::semantics::Value;
 
@@ -808,10 +813,6 @@ fn type_default_values() {
     });
 }
 
-// ---------------------------------------------------------------------------
-// "definition symbol" should ...
-// ---------------------------------------------------------------------------
-
 /// `Type::def_symbol` must yield the symbol that `EnterSymbols` interned for the
 /// same definition.
 #[test]
@@ -832,7 +833,7 @@ struct S { x: U32, y: F64 }
         let source = fpp_core::SourceFile::new("def_symbol_spec.fpp", src.to_string());
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = crate::Analysis::new();
-        let _ = crate::resolve_templates(&mut a, std::slice::from_mut(&mut ast));
+        assert!(crate::resolve_templates(&mut a, std::slice::from_mut(&mut ast)).is_continue());
         let _ = crate::check_semantics(&mut a, vec![&ast]);
 
         // Every type-definition symbol the pipeline entered.

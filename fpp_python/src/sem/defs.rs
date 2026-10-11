@@ -66,6 +66,7 @@ fpp_python_macros::fpp_sem_bindings! {
             get_nonnegative_big_int_value(node: node, loc: span) throws(SemanticError) -> i128,
             get_nonnegative_big_int_value_opt(expr: ref opt(astnode(Expr))) throws(SemanticError) -> opt(i128),
             get_nonnegative_int_value(node: node, loc: span) throws(SemanticError) -> i128,
+            get_nonnegative_int_value_opt(expr: ref opt(astnode(Expr))) throws(SemanticError) -> opt(i128),
             get_qualified_name(symbol: ref union(Symbol)) -> str,
             get_reason_for_non_displayable_type_at(node: node) -> list(tuple(span, str)),
             get_represented_component_instance(id: node) throws(SemanticError) -> opt(rewrap(InterfaceInstance::Component)),
@@ -310,6 +311,7 @@ fpp_python_macros::fpp_sem_bindings! {
             has_numeric_members -> bool,
             assoc identical(t2: ref union(Type)) -> bool,
             is_canonical -> bool,
+            is_convertible_to(t: ref arc(union(Type))) -> bool,
             is_convertible_to_numeric -> bool,
             is_displayable -> bool,
             is_float -> bool,
@@ -450,6 +452,9 @@ fpp_python_macros::fpp_sem_bindings! {
         fields {
             value: tuple(str, i128),
             ty: rewrap(Type::Enum),
+        }
+        methods {
+            convert_to_rep_type -> union(Value),
         }
     }
 

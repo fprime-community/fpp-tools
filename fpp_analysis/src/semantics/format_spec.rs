@@ -1,238 +1,131 @@
 #![cfg(test)]
 
+use super::format::{Field, ParsedFormat, Parser};
+use super::test_helpers::*;
+use crate::Analysis;
+use crate::errors::SemanticError;
 use crate::semantics::{
-    Format, FormatPart, FormatReplacementKind, IntegerFormatKind, RationalFormatKind,
+    Format, FormatReplacementKind, IntegerFormatKind, RationalFormatKind, Type,
 };
 use fpp_ast::LitString;
-use fpp_core::{CompilerContext, DiagnosticData, DiagnosticEmitter, Level, Node, SourceFile, Span};
+use fpp_core::{BytePos, Node, SourceFile, Span};
 use std::sync::Arc;
 
-// ---------------------------------------------------------------------------
-// Comparable, span-free shape for Format's parsed representation.
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, PartialEq, Clone)]
-enum Shape {
-    Literal(String),
-    Default,
-    Integer(IntKind),
-    Rational(Option<i32>, RatKind),
+/// A format string literal `"s"` in a source file of its own, so that its
+/// fields have locations in the source
+fn literal(s: &str) -> LitString {
+    let src = SourceFile::new("format", format!("\"{s}\""));
+    let span = Span::new(src, 0, s.len() as BytePos + 2, None);
+    LitString {
+        data: s.to_string(),
+        inner_span: Span::new(src, 1, s.len() as BytePos, None),
+        node_id: Node::new(span),
+    }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-enum IntKind {
-    Character,
-    Decimal,
-    Hexadecimal,
-    Octal,
+/// Parse a string as a format
+fn parse(s: &str) -> Result<ParsedFormat, SemanticError> {
+    Parser::parse_node(&literal(s))
 }
 
-#[derive(Debug, PartialEq, Clone)]
-enum RatKind {
-    Exponent,
-    Fixed,
-    General,
+/// A parsed format as Scala's `Format(prefix, fields)`, without locations
+fn format_of(f: &ParsedFormat) -> (String, Vec<(Field, String)>) {
+    (
+        f.prefix.clone(),
+        f.fields
+            .iter()
+            .map(|(field, _, s)| (field.clone(), s.clone()))
+            .collect(),
+    )
 }
 
-fn shape(p: &FormatPart) -> Shape {
-    match p {
-        FormatPart::Literal(s) => Shape::Literal(s.clone()),
-        FormatPart::FormatReplacement(f) => match &f.kind {
-            FormatReplacementKind::Default => Shape::Default,
-            FormatReplacementKind::Integer(k) => Shape::Integer(match k {
-                IntegerFormatKind::Character => IntKind::Character,
-                IntegerFormatKind::Decimal => IntKind::Decimal,
-                IntegerFormatKind::Hexadecimal => IntKind::Hexadecimal,
-                IntegerFormatKind::Octal => IntKind::Octal,
-            }),
-            FormatReplacementKind::Rational { precision, kind } => Shape::Rational(
-                *precision,
-                match kind {
-                    RationalFormatKind::Exponent => RatKind::Exponent,
-                    RationalFormatKind::Fixed => RatKind::Fixed,
-                    RationalFormatKind::General => RatKind::General,
-                },
-            ),
-        },
+fn format(prefix: &str, fields: Vec<(Field, &str)>) -> (String, Vec<(Field, String)>) {
+    (
+        prefix.to_string(),
+        fields
+            .into_iter()
+            .map(|(field, s)| (field, s.to_string()))
+            .collect(),
+    )
+}
+
+fn integer_field(t: IntegerFormatKind) -> Field {
+    Field::Integer(t)
+}
+
+fn rational_field(precision: Option<&str>, t: RationalFormatKind) -> Field {
+    Field::Rational {
+        precision: precision.map(str::to_string),
+        kind: t,
+    }
+}
+
+/// The message of an invalid format string
+fn message(err: SemanticError) -> String {
+    match err {
+        SemanticError::InvalidFormatString { msg, .. } => msg,
+        other => panic!("expected an invalid format string, got {other:?}"),
     }
 }
 
 // ---------------------------------------------------------------------------
-// Error-counting emitter: follows the same `WriteEmitter`-buffer pattern used
-// in `types.rs`, but keeps a precise count of error-level diagnostics so we
-// don't have to string-match rendered output.
-// ---------------------------------------------------------------------------
-
-#[derive(Default)]
-struct CountingEmitter {
-    errors: Arc<std::sync::atomic::AtomicUsize>,
-}
-
-impl DiagnosticEmitter for CountingEmitter {
-    fn emit(&mut self, diagnostic: DiagnosticData) {
-        if diagnostic.level == Level::Error {
-            self.errors
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        }
-    }
-}
-
-/// Result of parsing a format string with **no** expected types.
-struct ParseResult {
-    shapes: Vec<Shape>,
-    /// Count of error-level diagnostics emitted while parsing.
-    ///
-    /// With an empty type list, the only non-parser error `Format::new` can
-    /// raise is the length-mismatch (one field vs. zero types). We subtract
-    /// those out here so `parser_errors` reflects *only* the format parser's
-    /// own diagnostics.
-    parser_errors: usize,
-}
-
-fn parse(input: &str) -> ParseResult {
-    let errors = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let mut ctx = CompilerContext::new(CountingEmitter {
-        errors: errors.clone(),
-    });
-    let shapes = fpp_core::run(&mut ctx, || {
-        let src = SourceFile::new("format", input.to_string());
-        // A non-zero length span is required by the underlying span machinery.
-        let span = Span::new(src, 0, input.len().max(1) as u32, None);
-        let lit = LitString {
-            data: input.to_string(),
-            inner_span: span,
-            node_id: Node::new(span),
-        };
-        // Parse with no expected types: this exercises only the parser.
-        let format = Format::new(&lit, vec![]);
-        format.0.iter().map(shape).collect::<Vec<_>>()
-    });
-    drop(ctx);
-
-    // Number of replacement fields actually produced by the parser. With an
-    // empty type list, `Format::new` emits exactly one length-mismatch error
-    // whenever there is at least one field, so subtract that one out to
-    // recover the parser's own error count.
-    let field_count = shapes
-        .iter()
-        .filter(|s| !matches!(s, Shape::Literal(_)))
-        .count();
-    let total = errors.load(std::sync::atomic::Ordering::SeqCst);
-    let length_mismatch_errors = usize::from(field_count > 0);
-    let parser_errors = total.saturating_sub(length_mismatch_errors);
-
-    ParseResult {
-        shapes,
-        parser_errors,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// "format" should parse <input> as <expected>
+// "format" should parse <input> as <format>
 // ---------------------------------------------------------------------------
 
 #[test]
-fn parses_ok_cases() {
-    // (input, expected span-free shape) pairs. The parsed representation
-    // flattens to a `Vec` of interleaved literals and replacement fields.
-    let ok: Vec<(&str, Vec<Shape>)> = vec![
-        ("abcd", vec![Shape::Literal("abcd".into())]),
-        ("ab{{cd", vec![Shape::Literal("ab{cd".into())]),
-        ("ab}}cd", vec![Shape::Literal("ab}cd".into())]),
-        (
-            "ab{}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Default,
-                Shape::Literal("cd".into()),
-            ],
-        ),
-        (
-            "ab{c}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Integer(IntKind::Character),
-                Shape::Literal("cd".into()),
-            ],
-        ),
-        (
-            "ab{d}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Integer(IntKind::Decimal),
-                Shape::Literal("cd".into()),
-            ],
-        ),
-        (
-            "ab{x}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Integer(IntKind::Hexadecimal),
-                Shape::Literal("cd".into()),
-            ],
-        ),
-        (
-            "ab{e}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Rational(None, RatKind::Exponent),
-                Shape::Literal("cd".into()),
-            ],
-        ),
-        (
-            "ab{f}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Rational(None, RatKind::Fixed),
-                Shape::Literal("cd".into()),
-            ],
-        ),
-        (
-            "ab{g}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Rational(None, RatKind::General),
-                Shape::Literal("cd".into()),
-            ],
-        ),
-        (
-            "ab{.3e}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Rational(Some(3), RatKind::Exponent),
-                Shape::Literal("cd".into()),
-            ],
-        ),
-        (
-            "ab{.3f}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Rational(Some(3), RatKind::Fixed),
-                Shape::Literal("cd".into()),
-            ],
-        ),
-        (
-            "ab{.3g}cd",
-            vec![
-                Shape::Literal("ab".into()),
-                Shape::Rational(Some(3), RatKind::General),
-                Shape::Literal("cd".into()),
-            ],
-        ),
-    ];
-
-    for (input, expected) in ok {
-        let result = parse(input);
-        assert_eq!(
-            result.parser_errors, 0,
-            "expected `{input}` to parse without parser errors, got {} error(s)",
-            result.parser_errors
-        );
-        assert_eq!(
-            result.shapes, expected,
-            "parsed shape mismatch for input `{input}`"
-        );
-    }
+fn format_parses() {
+    use IntegerFormatKind::*;
+    use RationalFormatKind::*;
+    with_test_ctx(|| {
+        let ok = vec![
+            ("abcd", format("abcd", vec![])),
+            ("ab{{cd", format("ab{cd", vec![])),
+            ("ab}}cd", format("ab}cd", vec![])),
+            ("ab{}cd", format("ab", vec![(Field::Default, "cd")])),
+            (
+                "ab{c}cd",
+                format("ab", vec![(integer_field(Character), "cd")]),
+            ),
+            (
+                "ab{d}cd",
+                format("ab", vec![(integer_field(Decimal), "cd")]),
+            ),
+            (
+                "ab{x}cd",
+                format("ab", vec![(integer_field(Hexadecimal), "cd")]),
+            ),
+            (
+                "ab{e}cd",
+                format("ab", vec![(rational_field(None, Exponent), "cd")]),
+            ),
+            (
+                "ab{f}cd",
+                format("ab", vec![(rational_field(None, Fixed), "cd")]),
+            ),
+            (
+                "ab{g}cd",
+                format("ab", vec![(rational_field(None, General), "cd")]),
+            ),
+            (
+                "ab{.3e}cd",
+                format("ab", vec![(rational_field(Some("3"), Exponent), "cd")]),
+            ),
+            (
+                "ab{.3f}cd",
+                format("ab", vec![(rational_field(Some("3"), Fixed), "cd")]),
+            ),
+            (
+                "ab{.3g}cd",
+                format("ab", vec![(rational_field(Some("3"), General), "cd")]),
+            ),
+        ];
+        for (input, expected) in ok {
+            match parse(input) {
+                Ok(f) => assert_eq!(format_of(&f), expected, "parse {input}"),
+                Err(err) => panic!("parse {input}: {err:?}"),
+            }
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -240,117 +133,222 @@ fn parses_ok_cases() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn rejects_error_cases() {
-    // These inputs fail to parse; the failure surfaces as one or more
-    // error-level diagnostics emitted by the format parser.
-    let error_inputs = ["{", "}", "ab{1234xyz}cd", "ab{.3b}cd"];
-
-    for input in error_inputs {
-        let result = parse(input);
-        assert!(
-            result.parser_errors > 0,
-            "expected `{input}` to fail parsing (emit a parser error), but none were emitted; \
-             parsed shape: {:?}",
-            result.shapes
-        );
-    }
+fn format_does_not_parse() {
+    with_test_ctx(|| {
+        for input in ["{", "}", "ab{1234xyz}cd", "ab{.3b}cd"] {
+            assert!(parse(input).is_err(), "not parse {input}");
+        }
+    });
 }
 
+// ---------------------------------------------------------------------------
+// Rust-only
+// ---------------------------------------------------------------------------
+
+/// The parser reports the first failure with Scala's message
 #[test]
-fn utf8_literals_do_not_panic() {
-    let cases = [
-        (
-            "café {}",
-            vec![Shape::Literal("café ".into()), Shape::Default],
-        ),
-        (
-            "temp {} °C",
-            vec![
-                Shape::Literal("temp ".into()),
-                Shape::Default,
-                Shape::Literal(" °C".into()),
-            ],
-        ),
-        ("{} µ", vec![Shape::Default, Shape::Literal(" µ".into())]),
-        // Multibyte chars only, no replacement field.
-        ("→λ→", vec![Shape::Literal("→λ→".into())]),
-    ];
-
-    for (input, expected) in cases {
-        let result = parse(input);
-        assert_eq!(
-            result.parser_errors, 0,
-            "unexpected parser error for `{input}`"
-        );
-        assert_eq!(result.shapes, expected, "shape mismatch for `{input}`");
-    }
+fn parse_errors_have_the_scala_messages() {
+    with_test_ctx(|| {
+        let cases = [
+            ("{", "invalid replacement field"),
+            ("}", "illegal character"),
+            ("a}b", "illegal character"),
+            ("{}}", "illegal character"),
+            ("x}}}", "illegal character"),
+            ("ab{1234xyz}cd", "invalid replacement field"),
+            ("{ }", "invalid replacement field"),
+            ("{{{", "invalid replacement field"),
+            ("trailing {", "invalid replacement field"),
+            ("ab{.3b}cd", "e, f, or g expected"),
+            ("{.3", "e, f, or g expected"),
+            ("ab{c", "'}' expected but end of source found"),
+            ("{d", "'}' expected but end of source found"),
+            ("{dx}", "'}' expected but 'x' found"),
+            (
+                "v={.}",
+                "string matching regex '[0-9]+' expected but '}' found",
+            ),
+            (
+                "{.",
+                "string matching regex '[0-9]+' expected but end of source found",
+            ),
+            (
+                "{e}{.}",
+                "string matching regex '[0-9]+' expected but '}' found",
+            ),
+        ];
+        for (input, expected) in cases {
+            match parse(input) {
+                Ok(f) => panic!("{input}: expected an error, got {f:?}"),
+                Err(err) => assert_eq!(message(err), expected, "{input}"),
+            }
+        }
+    });
 }
 
-// ---------------------------------------------------------------------------
-// Additional coverage: the octal specifier, error-recovery cases, and the
-// public `Format` accessor methods (`len`/`is_empty`/`get`/`iter`).
-// ---------------------------------------------------------------------------
+/// A parse error at a multi-byte char is located at that char
+#[test]
+fn parse_errors_at_multi_byte_chars() {
+    with_test_ctx(|| {
+        for (input, expected, offset) in [
+            ("{é}", "invalid replacement field", 1),
+            ("{dé}", "'}' expected but 'é' found", 2),
+            ("{.3é}", "e, f, or g expected", 3),
+            ("ä{é}", "invalid replacement field", 3),
+        ] {
+            match parse(input) {
+                Ok(f) => panic!("{input}: expected an error, got {f:?}"),
+                Err(SemanticError::InvalidFormatString { loc, msg, .. }) => {
+                    assert_eq!(msg, expected, "{input}");
+                    // The location is the char, after the opening quote
+                    assert_eq!(loc.start().pos(), offset + 1, "{input}");
+                    assert_eq!(loc.len(), 'é'.len_utf8(), "{input}");
+                }
+                Err(err) => panic!("{input}: {err:?}"),
+            }
+        }
+    });
+}
 
-/// Builds a `Format` from `input` with no expected types, for exercising the
-/// public accessors directly.
-fn build_format(input: &str) -> (Format, usize) {
-    let errors = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let mut ctx = CompilerContext::new(CountingEmitter {
-        errors: errors.clone(),
+/// A NUL char is a char of the string like any other
+#[test]
+fn nul_does_not_end_the_string() {
+    with_test_ctx(|| {
+        match parse("{}\0{q}") {
+            Ok(f) => panic!("expected an error, got {f:?}"),
+            Err(err) => assert_eq!(message(err), "invalid replacement field"),
+        }
+        let f = parse("a\0{}").expect("parses");
+        assert_eq!(format_of(&f), format("a\0", vec![(Field::Default, "")]));
     });
-    let format = fpp_core::run(&mut ctx, || {
-        let src = SourceFile::new("format", input.to_string());
-        let span = Span::new(src, 0, input.len().max(1) as u32, None);
-        let lit = LitString {
-            data: input.to_string(),
-            inner_span: span,
-            node_id: Node::new(span),
-        };
-        Format::new(&lit, vec![])
-    });
-    drop(ctx);
-    (format, errors.load(std::sync::atomic::Ordering::SeqCst))
 }
 
 #[test]
 fn parses_octal_specifier() {
-    let result = parse("ab{o}cd");
-    assert_eq!(result.parser_errors, 0);
-    assert_eq!(
-        result.shapes,
-        vec![
-            Shape::Literal("ab".into()),
-            Shape::Integer(IntKind::Octal),
-            Shape::Literal("cd".into()),
-        ]
-    );
+    with_test_ctx(|| {
+        let f = parse("ab{o}cd").expect("parses");
+        assert_eq!(
+            format_of(&f),
+            format("ab", vec![(integer_field(IntegerFormatKind::Octal), "cd")])
+        );
+    });
+}
+
+#[test]
+fn utf8_literals_parse() {
+    with_test_ctx(|| {
+        let cases = [
+            ("café {}", format("café ", vec![(Field::Default, "")])),
+            ("temp {} °C", format("temp ", vec![(Field::Default, " °C")])),
+            ("{} µ", format("", vec![(Field::Default, " µ")])),
+            ("→λ→", format("→λ→", vec![])),
+        ];
+        for (input, expected) in cases {
+            let f = parse(input).expect("parses");
+            assert_eq!(format_of(&f), expected, "{input}");
+        }
+    });
+}
+
+/// A precision is kept as written, with no bound, until it is checked
+#[test]
+fn precision_is_unbounded() {
+    with_test_ctx(|| {
+        let large = "99999999999999999999999999999999999999999";
+        for (input, precision) in [
+            ("{.0100f}".to_string(), "100"),
+            ("{.000f}".to_string(), "0"),
+            (format!("{{.{large}f}}"), large),
+        ] {
+            let f = parse(&input).expect("parses");
+            assert_eq!(
+                format_of(&f),
+                format(
+                    "",
+                    vec![(
+                        rational_field(Some(precision), RationalFormatKind::Fixed),
+                        ""
+                    )]
+                ),
+                "{input}"
+            );
+        }
+    });
+}
+
+/// `compute_format` checks the number of fields, and then each field against
+/// its type: the integer check, then the precision, then the rational check
+#[test]
+fn compute_format_checks() {
+    with_test_ctx(|| {
+        let compute = |s: &str, ts: &[Arc<Type>]| Analysis::compute_format(&literal(s), ts);
+        let error = |s: &str, ts: &[Arc<Type>]| match compute(s, ts) {
+            Ok(f) => panic!("{s}: expected an error, got {f:?}"),
+            Err(err) => message(err),
+        };
+        assert_eq!(error("abc", &[u32()]), "missing replacement field");
+        assert_eq!(error("", &[u32()]), "missing replacement field");
+        assert_eq!(error("{}{}", &[u32()]), "too many replacement fields");
+        assert_eq!(
+            error("{.200f}", &[u32(), u32()]),
+            "missing replacement field"
+        );
+        assert_eq!(error("{d}", &[f32()]), "F32 is not an integer type");
+        assert_eq!(error("{f}", &[u32()]), "U32 is not a floating-point type");
+        assert_eq!(error("{x}", &[boolean()]), "bool is not an integer type");
+        assert_eq!(
+            error("{.200f}", &[u32()]),
+            "precision value 200 is out of range"
+        );
+        assert_eq!(
+            error("{.99999999999f}", &[f32()]),
+            "precision value 99999999999 is out of range"
+        );
+        // The first field that does not check is reported
+        assert_eq!(
+            error("{d} {x}", &[f32(), f64()]),
+            "F32 is not an integer type"
+        );
+        assert_eq!(
+            error("{d} {.200f}", &[u32(), u32()]),
+            "precision value 200 is out of range"
+        );
+
+        assert!(compute("{.0100f}", &[f32()]).is_ok());
+        assert!(compute("{.100e}", &[f64()]).is_ok());
+        assert!(compute("{} {d} {f}", &[boolean(), u8(), f32()]).is_ok());
+        assert!(compute("{d}", &[integer()]).is_ok());
+    });
 }
 
 #[test]
 fn format_accessors() {
-    // No fields: len 0, empty, get(0) is None.
-    let (f0, _) = build_format("no fields here");
-    assert_eq!(f0.len(), 0);
-    assert!(f0.is_empty());
-    assert!(f0.get(0).is_none());
-    assert_eq!(f0.iter().count(), 0);
+    with_test_ctx(|| {
+        let format_of = |s: &str| -> Format { parse(s).expect("parses").into() };
 
-    // Two fields: len 2, not empty, get(0)/get(1) present, get(2) None.
-    let (f2, _) = build_format("{d} and {x}");
-    assert_eq!(f2.len(), 2);
-    assert!(!f2.is_empty());
-    assert!(f2.get(0).is_some());
-    assert!(f2.get(1).is_some());
-    assert!(f2.get(2).is_none());
-    assert_eq!(f2.iter().count(), 2);
-}
+        // No fields: len 0, empty, get(0) is None.
+        let f0 = format_of("no fields here");
+        assert_eq!(f0.len(), 0);
+        assert!(f0.is_empty());
+        assert!(f0.get(0).is_none());
+        assert_eq!(f0.iter().count(), 0);
 
-#[test]
-fn rejects_more_error_recovery_cases() {
-    // Unclosed field (`{c` with no `}`): parser emits an error.
-    assert!(parse("ab{c").parser_errors > 0);
-    // Empty precision (`{.}`): parser emits an error.
-    assert!(parse("v={.}").parser_errors > 0);
-    // Bare `{` at end of string.
-    assert!(parse("trailing {").parser_errors > 0);
+        // Two fields: len 2, not empty, get(0)/get(1) present, get(2) None.
+        let f2 = format_of("{d} and {.3f}");
+        assert_eq!(f2.len(), 2);
+        assert!(!f2.is_empty());
+        assert_eq!(
+            f2.get(0).map(|f| f.kind.clone()),
+            Some(FormatReplacementKind::Integer(IntegerFormatKind::Decimal))
+        );
+        assert_eq!(
+            f2.get(1).map(|f| f.kind.clone()),
+            Some(FormatReplacementKind::Rational {
+                precision: Some(3),
+                kind: RationalFormatKind::Fixed
+            })
+        );
+        assert!(f2.get(2).is_none());
+        assert_eq!(f2.iter().count(), 2);
+    });
 }

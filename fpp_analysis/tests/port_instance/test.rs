@@ -184,3 +184,8 @@ fn implied_port_qualifier_not_qualifier() {
 fn implied_port_undef_member() {
     run_test("port_instance/implied_port_undef_member")
 }
+
+#[test]
+fn array_size_out_of_range() {
+    run_test("port_instance/array_size_out_of_range")
+}

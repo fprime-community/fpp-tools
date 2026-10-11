@@ -204,3 +204,8 @@ fn binop_type_use_chain() {
 fn arith_overflow_use_chain() {
     run_test("expr/arith_overflow_use_chain")
 }
+
+#[test]
+fn sizeof_string_size_unchecked() {
+    run_test("expr/sizeof_string_size_unchecked")
+}

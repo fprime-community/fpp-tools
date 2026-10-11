@@ -1,7 +1,7 @@
  --> [ local path prefix ]/framework_defs/invalid_nonnegative_integer_constant.fpp:1:32
   |
 1 | constant FW_ASSERT_COUNT_MAX = -1
-  |                                ^^ framework definition FW_ASSERT_COUNT_MAX must be a nonnegative integer constant
+  |                                ^^ invalid integer value -1
   |
-  = note: expression evaluated to `-1`
+  = note: framework definition FW_ASSERT_COUNT_MAX must be a nonnegative integer constant
 

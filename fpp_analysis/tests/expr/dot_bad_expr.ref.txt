@@ -1,5 +1,5 @@
  --> [ local path prefix ]/expr/dot_bad_expr.fpp:1:14
   |
 1 | constant a = false.x
-  |              ^^^^^ boolean does not have members
+  |              ^^^^^ bool does not have members
 

@@ -109,3 +109,8 @@ fn not_displayable() {
 fn duplicate_id_explicit() {
     run_test("event/duplicate_id_explicit")
 }
+
+#[test]
+fn format_two_bad_fields() {
+    run_test("event/format_two_bad_fields")
+}

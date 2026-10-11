@@ -3,5 +3,5 @@
 1 | constant f = [ 1, 2, 3 ][false]
   |                          ^^^^^ cannot convert expression to integer
   |
-  = note: boolean cannot be converted to Integer
+  = note: bool cannot be converted to Integer
 

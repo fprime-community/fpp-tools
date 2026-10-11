@@ -1,5 +1,5 @@
  --> [ local path prefix ]/array/format_precision_too_large.fpp:1:27
   |
 1 | array A = [3] F32 format "{.1000f}"
-  |                           ^^^^^^^^ precision value `1000` is larger than the maximum (100)
+  |                           ^^^^^^^^ invalid format string: precision value 1000 is out of range
 

@@ -1,7 +1,7 @@
  --> [ local path prefix ]/types/string_implied_constant_order.fpp:4:45
   |
 4 | constant FW_FIXED_LENGTH_STRING_SIZE = true + 1
-  |                                             ^^^ invalid binary operation between boolean and Integer
+  |                                             ^^^ invalid binary operation between bool and Integer
   |
   = note: the symbol FW_FIXED_LENGTH_STRING_SIZE has an implied use at the point of the error
   = note: use of a string type with default size requires this definition

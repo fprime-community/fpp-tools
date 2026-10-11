@@ -1,7 +1,7 @@
  --> [ local path prefix ]/framework_defs/invalid_positive_integer_constant.fpp:1:39
   |
 1 | constant FW_CMD_ARG_BUFFER_MAX_SIZE = 0
-  |                                       ^ framework definition FW_CMD_ARG_BUFFER_MAX_SIZE must be a positive integer constant
+  |                                       ^ invalid integer value 0
   |
-  = note: expression evaluated to `0`
+  = note: framework definition FW_CMD_ARG_BUFFER_MAX_SIZE must be a positive integer constant
 

@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/event/format_two_bad_fields.fpp:2:57
+  |
+2 |   event E(x: F32, y: F32) severity activity low format "{d} {x}"
+  |                                                         ^^^ invalid format string: F32 is not an integer type
+
+ --> [ local path prefix ]/event/format_two_bad_fields.fpp:1:1
+  |
+1 | / passive component C {
+2 | |   event E(x: F32, y: F32) severity activity low format "{d} {x}"
+3 | | }
+  | |_^ component with event specifiers must have event port
+

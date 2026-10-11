@@ -9,7 +9,6 @@ use crate::semantics::{
 };
 use fpp_ast::{DefConstant, Expr, ExprKind, Node, Visitable, Visitor};
 use fpp_core::Spanned;
-use rustc_hash::FxHashMap as HashMap;
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
@@ -234,7 +233,7 @@ impl<'ast> FinalizeConstantExprs<'ast> {
         members: &'ast [fpp_ast::StructExprMember],
     ) -> ControlFlow<()> {
         let mut type_members = Vec::with_capacity(members.len());
-        let mut value_members: HashMap<String, Value> = HashMap::default();
+        let mut value_members = indexmap::IndexMap::new();
         for member in members {
             if let Some(ty) = a.type_map.get(&member.value.node_id) {
                 type_members.push((member.name.data.clone(), ty.clone()));

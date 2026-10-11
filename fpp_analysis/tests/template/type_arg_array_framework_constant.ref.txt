@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/template/type_arg_array_framework_constant.fpp:7:34
+  |
+7 | constant FW_ASSERT_COUNT_MAX = c - 100
+  |                                  ^^^^^ invalid integer value -84
+  |
+  = note: framework definition FW_ASSERT_COUNT_MAX must be a nonnegative integer constant
+

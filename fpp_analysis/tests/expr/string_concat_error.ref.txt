@@ -1,5 +1,5 @@
  --> [ local path prefix ]/expr/string_concat_error.fpp:1:24
   |
 1 | constant a = { x = 1 } + { x = 2 }
-  |                        ^^^^^^^^^^^ cannot convert anonymous struct { x: Integer } to a numeric or string type
+  |                        ^^^^^^^^^^^ cannot convert { x: Integer } to a numeric or string type
 

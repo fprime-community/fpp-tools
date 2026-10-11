@@ -344,3 +344,53 @@ fn use_before_expand() {
 fn use_before_expand_ok() {
     run_test("template/use_before_expand_ok")
 }
+
+#[test]
+fn constant_param_array_default_size_error() {
+    run_test("template/constant_param_array_default_size_error")
+}
+
+#[test]
+fn type_arg_array_sizeof() {
+    run_test("template/type_arg_array_sizeof")
+}
+
+#[test]
+fn type_arg_array_struct_member_sizeof() {
+    run_test("template/type_arg_array_struct_member_sizeof")
+}
+
+#[test]
+fn type_arg_array_alias_sizeof() {
+    run_test("template/type_arg_array_alias_sizeof")
+}
+
+#[test]
+fn type_arg_array_default() {
+    run_test("template/type_arg_array_default")
+}
+
+#[test]
+fn type_arg_array_framework_constant() {
+    run_test("template/type_arg_array_framework_constant")
+}
+
+#[test]
+fn constant_param_type_use_order() {
+    run_test("template/constant_param_type_use_order")
+}
+
+#[test]
+fn type_arg_use_order() {
+    run_test("template/type_arg_use_order")
+}
+
+#[test]
+fn type_arg_string_size_negative() {
+    run_test("template/type_arg_string_size_negative")
+}
+
+#[test]
+fn type_arg_string_size_sizeof() {
+    run_test("template/type_arg_string_size_sizeof")
+}

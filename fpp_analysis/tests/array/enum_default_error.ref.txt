@@ -1,8 +1,8 @@
  --> [ local path prefix ]/array/enum_default_error.fpp:2:25
   |
 2 | array A = [3] E default 0
-  |                         ^ default value cannot be converted to A
+  |                         ^ default value cannot be converted to array A
   |
   = note: single element could not be promoted to array
-  = note: Integer cannot be converted to E
+  = note: Integer cannot be converted to enum E
 

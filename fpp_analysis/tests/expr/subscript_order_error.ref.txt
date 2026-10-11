@@ -1,5 +1,5 @@
  --> [ local path prefix ]/expr/subscript_order_error.fpp:1:14
   |
 1 | constant j = { x = 1 }[false]
-  |              ^^^^^^^^^ anonymous struct { x: Integer } is not an array type
+  |              ^^^^^^^^^ { x: Integer } is not an array type
 

@@ -56,10 +56,10 @@ impl<'ast> CheckExprTypes<'ast> {
         match self.convert_type(a, expr, &Arc::new(Type::Integer)) {
             Ok(_) => {}
             Err(err) => {
-                SemanticError::TypeConversion {
+                SemanticError::TypeMismatch {
                     loc: expr.span(),
                     msg: "cannot convert expression to integer".to_string(),
-                    err: Box::new(err),
+                    reason: Some(Box::new(err)),
                 }
                 .emit();
             }
@@ -92,10 +92,10 @@ impl<'ast> CheckExprTypes<'ast> {
         if let Some(ty) = a.type_map.get(node) {
             match self.convert_type(a, expr, ty) {
                 Ok(_) => {}
-                Err(err) => SemanticError::TypeConversion {
+                Err(err) => SemanticError::TypeMismatch {
                     loc: expr.span(),
                     msg: format!("default value cannot be converted to {}", ty),
-                    err: Box::new(err),
+                    reason: Some(Box::new(err)),
                 }
                 .emit(),
             }
@@ -532,11 +532,11 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
                         })),
                     )
                 {
-                    SemanticError::TypeConversion {
+                    SemanticError::TypeMismatch {
                         loc: every.span(),
                         msg: "event throttle every must be convertable to a time interval"
                             .to_string(),
-                        err: Box::new(err),
+                        reason: Some(Box::new(err)),
                     }
                     .emit()
                 }
@@ -747,10 +747,10 @@ impl<'ast> UseAnalysisPass<'ast, Analysis> for CheckExprTypes<'ast> {
         if let Some(value_ty) = a.type_map.get(&value.node_id).cloned()
             && let Err(err) = Type::convert(&value_ty, &param_ty)
         {
-            SemanticError::TypeConversion {
+            SemanticError::TypeMismatch {
                 loc: value.span(),
                 msg: format!("template argument cannot be converted to {}", param_ty),
-                err: Box::new(err),
+                reason: Some(Box::new(err)),
             }
             .emit();
             return ControlFlow::Break(());

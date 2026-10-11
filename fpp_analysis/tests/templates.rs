@@ -55,8 +55,11 @@ impl<'ast> Visitor<'ast> for CollectNodes {
             node,
             Node::QualIdent(_) | Node::SpecPortInstance(_) | Node::TemplateParam(_)
         );
+        let mut ids = ignored_nodes(&node);
         if !is_union {
-            let id = fpp_ast::AstNode::id(&node);
+            ids.push(fpp_ast::AstNode::id(&node));
+        }
+        for id in ids {
             if !a.seen.insert(id) {
                 a.duplicates.push(id);
             }
@@ -65,8 +68,33 @@ impl<'ast> Visitor<'ast> for CollectNodes {
     }
 }
 
-/// The flattened members of a translation unit or module: an expansion
-/// contributes the members it introduced
+/// The identities of the nodes held by the fields of `node` that a visitor does
+/// not reach, the `#[visitable(ignore)]` fields that carry a node
+fn ignored_nodes(node: &Node) -> Vec<fpp_core::Node> {
+    fn ids<'a, T: fpp_ast::AstNode + 'a>(
+        nodes: impl IntoIterator<Item = &'a T>,
+    ) -> Vec<fpp_core::Node> {
+        nodes.into_iter().map(|n| n.id()).collect()
+    }
+    match node {
+        Node::DefArray(n) => ids(&n.format),
+        Node::DefComponentInstance(n) => ids(n.impl_type.iter().chain(&n.file)),
+        Node::SpecCommand(n) => ids(&n.queue_full),
+        Node::SpecEvent(n) => ids([&n.format]),
+        Node::SpecGeneralPortInstance(n) => ids(&n.queue_full),
+        Node::SpecInclude(n) => ids([&n.file]),
+        Node::SpecInit(n) => ids([&n.code]),
+        Node::SpecLoc(n) => ids([&n.file]),
+        Node::SpecSpecialPortInstance(n) => ids(&n.queue_full),
+        Node::SpecTlmChannel(n) => ids(&n.format),
+        Node::StructTypeMember(n) => ids(&n.format),
+        _ => vec![],
+    }
+}
+
+/// Replace each template expansion specifier with the members that it
+/// introduced, so that the members of an expansion appear as members of the
+/// enclosing module
 fn flatten(members: &[ModuleMember]) -> Vec<&ModuleMember> {
     let mut out = Vec::new();
     for member in members {
@@ -264,6 +292,9 @@ fn a_use_of_a_type_parameter_resolves_to_the_bound_argument() {
         }
     });
 }
+
+// Scoping inside an expansion: a name in the template body resolves at the
+// point of the template definition, not at the point of expansion.
 
 #[test]
 fn a_name_in_the_body_resolves_at_the_point_of_the_definition() {

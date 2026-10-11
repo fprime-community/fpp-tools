@@ -289,10 +289,10 @@ impl Param {
             if let Some(default_ty) = a.type_map.get(&default_node.node_id)
                 && let Err(err) = Type::convert(default_ty, &param_type)
             {
-                return Err(SemanticError::TypeConversion {
+                return Err(SemanticError::TypeMismatch {
                     loc: default_node.span(),
                     msg: format!("default value cannot be converted to {}", param_type),
-                    err: Box::new(err),
+                    reason: Some(Box::new(err)),
                 });
             }
             default = a

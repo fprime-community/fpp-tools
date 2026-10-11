@@ -525,12 +525,14 @@ impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
                 a.value_map.insert(
                     node.node_id,
                     Value::AnonStruct(AnonStructValue {
-                        members: HashMap::from_iter(struct_expr.iter().filter_map(|member| {
-                            Some((
-                                member.name.data.clone(),
-                                a.value_map.get(&member.value.node_id)?.clone(),
-                            ))
-                        })),
+                        members: indexmap::IndexMap::from_iter(struct_expr.iter().filter_map(
+                            |member| {
+                                Some((
+                                    member.name.data.clone(),
+                                    a.value_map.get(&member.value.node_id)?.clone(),
+                                ))
+                            },
+                        )),
                     }),
                 );
             }
