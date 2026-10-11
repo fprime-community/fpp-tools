@@ -1,6 +1,7 @@
 use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::passes::EnterSymbols;
+use crate::passes::enter_module_symbols::EnterModuleSymbols;
 use crate::semantics::{NameGroup, Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion};
 use fpp_ast::{
     AstNode, DefModule, SpecTemplateExpand, TemplateArgKind, TemplateParam, Visitable, Visitor,
@@ -21,9 +22,9 @@ use std::sync::Arc;
 ///
 /// A model that fails this pass cannot be analyzed, so the first error stops the
 /// pass.
-pub struct EnterTemplateSymbols;
+pub struct EnterTemplateExpansionSymbols;
 
-impl EnterTemplateSymbols {
+impl EnterTemplateExpansionSymbols {
     /// Bind each argument of an expansion to the parameter it is given for
     fn bind_params(
         &self,
@@ -227,7 +228,9 @@ impl EnterTemplateSymbols {
     }
 }
 
-impl<'ast> Visitor<'ast> for EnterTemplateSymbols {
+impl<'ast> EnterModuleSymbols<'ast> for EnterTemplateExpansionSymbols {}
+
+impl<'ast> Visitor<'ast> for EnterTemplateExpansionSymbols {
     type Break = ();
     type State = Analysis;
 
@@ -240,15 +243,7 @@ impl<'ast> Visitor<'ast> for EnterTemplateSymbols {
     }
 
     fn visit_def_module(&self, a: &mut Analysis, def: &'ast DefModule) -> ControlFlow<Self::Break> {
-        let Some(symbol) = a.get_symbol(def) else {
-            return ControlFlow::Continue(());
-        };
-        a.nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
-        let saved_parent = a.parent_symbol.replace(symbol);
-        let res = def.walk(a, self);
-        a.parent_symbol = saved_parent;
-        a.nested_scope.pop();
-        res
+        self.def_module(a, def)
     }
 
     fn visit_spec_template_expand(
@@ -257,19 +252,23 @@ impl<'ast> Visitor<'ast> for EnterTemplateSymbols {
         node: &'ast SpecTemplateExpand,
     ) -> ControlFlow<Self::Break> {
         let Some(members) = &node.members else {
-            // This specifier was not expanded, so there is nothing to enter
+            // ExpandTemplates leaves a specifier whose template name did not
+            // resolve unexpanded, so there is nothing to enter
             return ControlFlow::Continue(());
         };
         if a.template_expansion_map.contains_key(&node.node_id) {
             // We already entered this expansion
-            return ControlFlow::Continue(());
+            // Make sure we recursively enter all the symbols
+            a.nested_scope
+                .push(ScopeOwner::TemplateExpansion(node.node_id));
+            let result = members.iter().try_for_each(|member| member.visit(a, self));
+            a.nested_scope.pop();
+            return result;
         }
-        match self.enter_expansion(a, node, members) {
-            Ok(()) => ControlFlow::Continue(()),
-            Err(err) => {
-                err.emit();
-                ControlFlow::Break(())
-            }
+        if let Err(err) = self.enter_expansion(a, node, members) {
+            err.emit();
+            return ControlFlow::Break(());
         }
+        members.iter().try_for_each(|member| member.visit(a, self))
     }
 }

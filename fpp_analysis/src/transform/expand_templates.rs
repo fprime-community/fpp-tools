@@ -12,7 +12,7 @@ use fpp_core::{Span, Spanned};
 /// carrying a copy of the syntax provided by the template definition it refers
 /// to. That syntax behaves as if it were written at the point of the specifier,
 /// except for the special rules for resolving names inside it, which are the
-/// business of [`crate::passes::EnterTemplateSymbols`] and
+/// business of [`crate::passes::EnterTemplateExpansionSymbols`] and
 /// [`crate::passes::CheckUses`].
 ///
 /// Each copy gets its own node identities, so every expansion is a distinct set

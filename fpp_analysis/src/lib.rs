@@ -23,7 +23,7 @@ use crate::passes::{
     CheckPortDefs, CheckSpecLocs, CheckStateMachineDefs, CheckSystemDefs,
     CheckTemplateInterfaceArgs, CheckTemplateUses, CheckTopologyDefs, CheckTopologyInstances,
     CheckTypeUses, CheckUseDefCycles, CheckUses, ConstructDictionaryMap, ConstructImpliedUseMap,
-    EnterSymbols, EnterTemplateSymbols, EvalConstantExprs, EvalImpliedEnumConsts,
+    EnterSymbols, EnterTemplateExpansionSymbols, EvalConstantExprs, EvalImpliedEnumConsts,
     FinalizeConstantExprs, FinalizeTypeDefs,
 };
 pub use analysis::*;
@@ -48,6 +48,8 @@ pub mod analyzers {
 }
 
 pub mod passes {
+    mod enter_module_symbols;
+
     mod enter_symbols;
     pub use enter_symbols::*;
 
@@ -71,8 +73,8 @@ pub mod passes {
     mod check_template_interface_args;
     pub use check_template_interface_args::*;
 
-    mod enter_template_symbols;
-    pub use enter_template_symbols::*;
+    mod enter_template_expansion_symbols;
+    pub use enter_template_expansion_symbols::*;
 
     mod check_use_def_cycles;
     pub use check_use_def_cycles::*;
@@ -264,7 +266,7 @@ pub fn resolve_templates(a: &mut Analysis, ast: &mut [fpp_ast::TransUnit]) -> Co
         err.emit();
         return ControlFlow::Break(());
     }
-    EnterTemplateSymbols.visit_trans_units(a, ast.iter())?;
+    EnterTemplateExpansionSymbols.visit_trans_units(a, ast.iter())?;
     ControlFlow::Continue(())
 }
 
