@@ -832,7 +832,7 @@ struct S { x: U32, y: F64 }
         let source = fpp_core::SourceFile::new("def_symbol_spec.fpp", src.to_string());
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = crate::Analysis::new();
-        let _ = crate::resolve_templates(&mut a, std::slice::from_mut(&mut ast));
+        assert!(crate::resolve_templates(&mut a, std::slice::from_mut(&mut ast)).is_continue());
         let _ = crate::check_semantics(&mut a, vec![&ast]);
 
         // Every type-definition symbol the pipeline entered.

@@ -23,7 +23,7 @@ fn with_analysis(src: &str, f: impl FnOnce(&Analysis)) {
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = Analysis::new();
         add_state_enums(&mut ast);
-        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
+        assert!(resolve_templates(&mut a, std::slice::from_mut(&mut ast)).is_continue());
         let _ = check_semantics(&mut a, vec![&ast]);
         f(&a);
     });

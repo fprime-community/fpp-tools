@@ -6,11 +6,14 @@
 //! that a name in the body resolves at the point of the template definition.
 
 use fpp_analysis::semantics::{Connection, Symbol, Topology, Type};
-use fpp_analysis::{Analysis, add_state_enums, check_semantics, resolve_templates};
+use fpp_analysis::{
+    Analysis, add_state_enums, check_semantics, resolve_includes, resolve_templates,
+};
 use fpp_ast::{
     DefAliasType, DefConstant, ModuleMember, MoveWalkable, Node, TransUnit, Visitable, Visitor,
 };
 use fpp_core::SourceFile;
+use fpp_fs::FsReader;
 use rustc_hash::FxHashSet as HashSet;
 use std::ops::ControlFlow;
 use std::path::PathBuf;
@@ -25,7 +28,10 @@ fn with_analysis<R>(src: &str, f: impl FnOnce(&Analysis, &TransUnit) -> R) -> R 
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = Analysis::new();
         add_state_enums(&mut ast);
-        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
+        assert!(
+            resolve_templates(&mut a, std::slice::from_mut(&mut ast)).is_continue(),
+            "the templates should expand"
+        );
         let _ = check_semantics(&mut a, vec![&ast]);
         f(&a, &ast)
     });
@@ -55,13 +61,40 @@ impl<'ast> Visitor<'ast> for CollectNodes {
             node,
             Node::QualIdent(_) | Node::SpecPortInstance(_) | Node::TemplateParam(_)
         );
+        let mut ids = ignored_nodes(&node);
         if !is_union {
-            let id = fpp_ast::AstNode::id(&node);
+            ids.push(fpp_ast::AstNode::id(&node));
+        }
+        for id in ids {
             if !a.seen.insert(id) {
                 a.duplicates.push(id);
             }
         }
         node.walk(a, self)
+    }
+}
+
+/// The identities of the nodes held by the fields of `node` that a visitor does
+/// not reach, the `#[visitable(ignore)]` fields that carry a node
+fn ignored_nodes(node: &Node) -> Vec<fpp_core::Node> {
+    fn ids<'a, T: fpp_ast::AstNode + 'a>(
+        nodes: impl IntoIterator<Item = &'a T>,
+    ) -> Vec<fpp_core::Node> {
+        nodes.into_iter().map(|n| n.id()).collect()
+    }
+    match node {
+        Node::DefArray(n) => ids(&n.format),
+        Node::DefComponentInstance(n) => ids(n.impl_type.iter().chain(&n.file)),
+        Node::SpecCommand(n) => ids(&n.queue_full),
+        Node::SpecEvent(n) => ids([&n.format]),
+        Node::SpecGeneralPortInstance(n) => ids(&n.queue_full),
+        Node::SpecInclude(n) => ids([&n.file]),
+        Node::SpecInit(n) => ids([&n.code]),
+        Node::SpecLoc(n) => ids([&n.file]),
+        Node::SpecSpecialPortInstance(n) => ids(&n.queue_full),
+        Node::SpecTlmChannel(n) => ids(&n.format),
+        Node::StructTypeMember(n) => ids(&n.format),
+        _ => vec![],
     }
 }
 
@@ -342,27 +375,24 @@ module M {
     });
 }
 
-/// A value of a bound parameter is shared by every use of it, so a copy must not
-/// share a node identity with the syntax it was copied from, or with another
-/// copy. Expand a broad slice of the grammar twice and check that every node in
-/// the result has its own identity.
-#[test]
-fn every_node_of_an_expansion_has_its_own_identity() {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("../fpp_parser/tests/syntax.fpp");
-    let body = std::fs::read_to_string(&path).expect("the syntax fixture");
-    let src = format!(
-        "module template T() {{\n{body}\n}}\n\nmodule M1 {{\n    expand T()\n}}\n\nmodule M2 {{\n    expand T()\n}}\n"
-    );
-
+/// Resolve the includes of a model and expand its templates, and check that
+/// every node in the result has its own identity: a value of a bound parameter
+/// is shared by every use of it, so a copy must not share a node identity with
+/// the syntax it was copied from, or with another copy. `uri` is the path of the
+/// model, against which its includes are found. Returns the number of nodes.
+fn check_expand_unique(uri: &str, src: &str) -> usize {
     let mut diagnostics = vec![];
     let mut ctx = fpp_core::CompilerContext::new(fpp_errors::WriteEmitter::new(&mut diagnostics));
-    fpp_core::run(&mut ctx, || {
-        let source = SourceFile::new("templates_test.fpp", src.clone());
+    let n = fpp_core::run(&mut ctx, || {
+        let source = SourceFile::new(uri, src.to_string());
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = Analysis::new();
+        assert!(resolve_includes(&mut a, FsReader {}, &mut ast).is_continue());
         add_state_enums(&mut ast);
-        let _ = resolve_templates(&mut a, std::slice::from_mut(&mut ast));
+        assert!(
+            resolve_templates(&mut a, std::slice::from_mut(&mut ast)).is_continue(),
+            "the templates should expand"
+        );
 
         let mut seen = SeenNodes::default();
         let _ = ast.visit(&mut seen, &CollectNodes);
@@ -371,8 +401,51 @@ fn every_node_of_an_expansion_has_its_own_identity() {
             "{} nodes are shared between the template body and its expansions",
             seen.duplicates.len()
         );
-        assert!(seen.seen.len() > 100, "the fixture should be substantial");
+        seen.seen.len()
     });
+    let output = String::from_utf8(diagnostics).expect("diagnostics are UTF-8");
+    assert_eq!(output, "", "expected no diagnostics");
+    n
+}
+
+#[test]
+fn simple_expand() {
+    check_expand_unique(
+        "<stdin>",
+        r#"
+module template T(constant c: string) {
+    constant f = c
+}
+
+module M1 {
+    expand T(constant "a")
+}
+
+module M2 {
+    expand T(constant "b")
+}
+
+module M3 {
+    expand T(constant "c")
+}
+"#,
+    );
+}
+
+/// Expand a broad slice of the grammar twice
+#[test]
+fn every_node_of_an_expansion_has_its_own_identity() {
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("../fpp_parser/tests/syntax.fpp");
+    let body = std::fs::read_to_string(&path).expect("the syntax fixture");
+    let src = format!(
+        "module template T() {{\n{body}\n}}\n\nmodule M1 {{\n    expand T()\n}}\n\nmodule M2 {{\n    expand T()\n}}\n"
+    );
+    // The fixture includes files next to it, which are found relative to the
+    // path of the model, so the model takes the path of the fixture
+    let model = path.canonicalize().expect("the syntax fixture");
+    let n = check_expand_unique(model.to_str().expect("a UTF-8 path"), &src);
+    assert!(n > 100, "the fixture should be substantial");
 }
 
 /// Two expansions of one template each contribute a connection copied from the
