@@ -2,14 +2,15 @@
 
 use super::test_helpers::*;
 use crate::semantics::{
-    AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue, FloatValue,
-    IntegerValue, MathError, MathResult, PrimitiveIntegerValue, StringValue, StructValue, Type,
-    Value,
+    AbsTypeValue, AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue,
+    FloatValue, IntegerValue, MathError, MathResult, PrimitiveIntegerValue, StringValue,
+    StructValue, Type, Value,
 };
 use indexmap::IndexMap;
 use std::sync::Arc;
 
-/// Structural equality on `Value` (which does not derive `PartialEq`).
+/// Structural equality on `Value` (which does not derive `PartialEq`): Scala's
+/// case-class equality. Named types compare by definition.
 ///
 /// Floats use exact `f64` equality because every test uses whole/half numbers.
 fn values_eq(a: &Value, b: &Value) -> bool {
@@ -38,39 +39,54 @@ fn values_eq(a: &Value, b: &Value) -> bool {
         (Value::Boolean(BooleanValue(v1)), Value::Boolean(BooleanValue(v2))) => v1 == v2,
         (Value::String(StringValue(v1)), Value::String(StringValue(v2))) => v1 == v2,
         (
-            Value::EnumConstant(EnumConstantValue { value: v1, .. }),
-            Value::EnumConstant(EnumConstantValue { value: v2, .. }),
-        ) => v1 == v2,
+            Value::EnumConstant(EnumConstantValue { value: v1, ty: t1 }),
+            Value::EnumConstant(EnumConstantValue { value: v2, ty: t2 }),
+        ) => v1 == v2 && t1.node.node_id == t2.node.node_id,
+        (Value::AnonArray(a1), Value::AnonArray(a2)) => anon_arrays_eq(a1, a2),
         (
-            Value::AnonArray(AnonArrayValue { elements: e1, .. }),
-            Value::AnonArray(AnonArrayValue { elements: e2, .. }),
-        )
-        | (
             Value::Array(ArrayValue {
-                anon_array: AnonArrayValue { elements: e1, .. },
-                ..
+                anon_array: a1,
+                ty: t1,
             }),
             Value::Array(ArrayValue {
-                anon_array: AnonArrayValue { elements: e2, .. },
-                ..
+                anon_array: a2,
+                ty: t2,
             }),
-        ) => e1.len() == e2.len() && e1.iter().zip(e2.iter()).all(|(x, y)| values_eq(x, y)),
+        ) => anon_arrays_eq(a1, a2) && t1.node.node_id == t2.node.node_id,
         (
             Value::AnonStruct(AnonStructValue { members: m1 }),
             Value::AnonStruct(AnonStructValue { members: m2 }),
-        )
-        | (
+        ) => members_eq(m1, m2),
+        (
             Value::Struct(StructValue {
                 anon_struct: AnonStructValue { members: m1 },
-                ..
+                ty: t1,
             }),
             Value::Struct(StructValue {
                 anon_struct: AnonStructValue { members: m2 },
-                ..
+                ty: t2,
             }),
-        ) => members_eq(m1, m2),
+        ) => members_eq(m1, m2) && t1.node.node_id == t2.node.node_id,
+        (Value::AbsType(AbsTypeValue { ty: t1 }), Value::AbsType(AbsTypeValue { ty: t2 })) => {
+            t1.node.node_id == t2.node.node_id
+        }
         _ => false,
     }
+}
+
+fn anon_arrays_eq(a1: &AnonArrayValue, a2: &AnonArrayValue) -> bool {
+    let scalars_eq = match (&a1.scalar, &a2.scalar) {
+        (Some(s1), Some(s2)) => values_eq(s1, s2),
+        (None, None) => true,
+        _ => false,
+    };
+    scalars_eq
+        && a1.elements.len() == a2.elements.len()
+        && a1
+            .elements
+            .iter()
+            .zip(a2.elements.iter())
+            .all(|(x, y)| values_eq(x, y))
 }
 
 fn members_eq(m1: &IndexMap<String, Value>, m2: &IndexMap<String, Value>) -> bool {
@@ -112,7 +128,8 @@ fn struct_val() -> Value {
 }
 
 /// Drives a table of `(lhs, rhs, expected)` cases through a binary op.
-/// `Some(v)` means `Ok` (checked with `values_eq`); `None` means `Err`.
+/// `Some(v)` means `Ok` (checked with `values_eq`); `None` means that the
+/// operation does not apply to the values.
 #[track_caller]
 fn check_binop(
     op_name: &str,
@@ -125,7 +142,8 @@ fn check_binop(
             (Ok(g), Some(e)) => {
                 assert!(values_eq(g, e), "{a} {op_name} {b}: expected {e}, got {g}")
             }
-            (Err(_), None) => {}
+            (Err(MathError::InvalidInputs), None) => {}
+            (Err(err), None) => panic!("{a} {op_name} {b}: expected InvalidInputs, got {err:?}"),
             (Ok(g), None) => panic!("{a} {op_name} {b}: expected error, got {g}"),
             (Err(_), Some(e)) => panic!("{a} {op_name} {b}: expected {e}, got error"),
         }
@@ -149,6 +167,66 @@ fn check_convert(cases: Vec<(Value, Arc<Type>, Option<Value>)>) {
             (None, Some(e)) => panic!("convert {value} to {ty}: expected {e}, got None"),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// "getType" should ...
+// ---------------------------------------------------------------------------
+
+#[test]
+fn value_get_type() {
+    with_test_ctx(|| {
+        // Every primitive int kind, plus Integer/Float/Boolean/String.
+        let prim = |kind| Value::PrimitiveInteger(PrimitiveIntegerValue { value: 0, kind });
+        use fpp_ast::IntegerKind::*;
+        let scalar_cases: Vec<(Value, Arc<Type>)> = vec![
+            (prim(I8), i8()),
+            (prim(I16), i16()),
+            (prim(I32), i32()),
+            (prim(I64), i64()),
+            (prim(U8), u8()),
+            (prim(U16), u16()),
+            (prim(U32), u32()),
+            (prim(U64), u64()),
+            (v_integer(0), integer()),
+            (v_f32(0.0), f32()),
+            (v_f64(0.0), f64()),
+            (v_bool(false), boolean()),
+            (v_string(""), string(None)),
+        ];
+        for (v, expected) in scalar_cases {
+            assert!(
+                types_structurally_eq(&v.get_type(), &expected),
+                "get_type({v}) expected `{expected}`, got `{}`",
+                v.get_type()
+            );
+        }
+
+        // AnonArray value -> AnonArray(Some(3), U32)
+        let aa = v_anon_array(3, v_u32(0));
+        assert!(types_structurally_eq(
+            &aa.get_type(),
+            &anon_array(Some(3), u32())
+        ));
+
+        // Array value -> its named array type A (= default_array()).
+        assert!(types_structurally_eq(
+            &array_val().get_type(),
+            &default_array()
+        ));
+
+        // Enum constant -> its named enum type (default_enum()).
+        let ec = v_enum_constant("X", 0);
+        assert!(types_structurally_eq(&ec.get_type(), &default_enum()));
+
+        // AnonStruct value -> AnonStruct { a: U32, b: string }.
+        let as_ty = anon_struct(&[("a", u32()), ("b", string(None))]);
+        assert!(types_structurally_eq(&anon_struct_val().get_type(), &as_ty));
+
+        // Struct value -> its named struct type S.
+        let s_ty = struct_ty("S", anon_struct(&[("a", u32()), ("b", string(None))]), 3);
+        assert!(types_structurally_eq(&struct_val().get_type(), &s_ty));
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +333,289 @@ fn value_div() {
     });
 }
 
+// ---------------------------------------------------------------------------
+// "lshift" should ...
+// ---------------------------------------------------------------------------
+
+#[test]
+fn value_lshift() {
+    with_test_ctx(|| {
+        let cases: Vec<(Value, Value, Option<Value>)> = vec![
+            (v_i8(1), v_i8(2), Some(v_i8(4))),
+            (v_i32(1), v_i32(3), Some(v_i32(8))),
+            (v_i8(-1), v_i8(1), Some(v_i8(-2))),
+            (v_i32(1), v_integer(4), Some(v_integer(16))),
+            (v_integer(1), v_i32(5), Some(v_integer(32))),
+            (v_integer(1), v_integer(10), Some(v_integer(1024))),
+            (v_enum_constant("X", 0), v_i32(3), Some(v_i32(0))),
+            (v_enum_constant("X", 0), v_integer(3), Some(v_integer(0))),
+            (v_i32(1), v_enum_constant("X", 0), Some(v_i32(1))),
+            (v_integer(1), v_enum_constant("X", 0), Some(v_integer(1))),
+            (v_i32(1), v_f32(2.0), None),
+            (v_f32(1.0), v_i32(2), None),
+            (v_i32(1), v_string(""), None),
+            (v_string(""), v_i32(2), None),
+            (v_i32(1), v_bool(false), None),
+            (v_bool(false), v_i32(2), None),
+            (v_i32(1), v_anon_array(3, v_u32(0)), None),
+            (v_i32(1), array_val(), None),
+            (v_i32(1), anon_struct_val(), None),
+            (v_i32(1), struct_val(), None),
+        ];
+        check_binop("<<", |a, b| a.shl(b), cases);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// "rshift" should ...
+// ---------------------------------------------------------------------------
+
+#[test]
+fn value_rshift() {
+    with_test_ctx(|| {
+        let cases: Vec<(Value, Value, Option<Value>)> = vec![
+            (v_i8(8), v_i8(1), Some(v_i8(4))),
+            (v_i32(16), v_i32(2), Some(v_i32(4))),
+            (v_i8(-8), v_i8(1), Some(v_i8(-4))),
+            (v_i32(16), v_integer(2), Some(v_integer(4))),
+            (v_integer(32), v_i32(2), Some(v_integer(8))),
+            (v_integer(64), v_integer(3), Some(v_integer(8))),
+            (v_enum_constant("X", 0), v_i32(1), Some(v_i32(0))),
+            (v_enum_constant("X", 0), v_integer(1), Some(v_integer(0))),
+            (v_i32(16), v_enum_constant("X", 0), Some(v_i32(16))),
+            (v_integer(16), v_enum_constant("X", 0), Some(v_integer(16))),
+            (v_i32(16), v_f32(2.0), None),
+            (v_f32(16.0), v_i32(2), None),
+            (v_i32(16), v_string(""), None),
+            (v_string(""), v_i32(2), None),
+            (v_i32(16), v_bool(false), None),
+            (v_bool(false), v_i32(2), None),
+            (v_i32(16), v_anon_array(3, v_u32(0)), None),
+            (v_i32(16), array_val(), None),
+            (v_i32(16), anon_struct_val(), None),
+            (v_i32(16), struct_val(), None),
+        ];
+        check_binop(">>", |a, b| a.shr(b), cases);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// "is zero" should ...
+// ---------------------------------------------------------------------------
+
+#[test]
+fn value_is_zero() {
+    with_test_ctx(|| {
+        assert!(!v_i32(1).is_zero());
+        assert!(v_i32(0).is_zero());
+        // default_enum's "X" constant with value 0 is zero.
+        assert!(v_enum_constant("X", 0).is_zero());
+        assert!(!v_f32(1.0).is_zero());
+        assert!(v_f32(0.0).is_zero());
+        assert!(!array_val().is_zero());
+        assert!(!v_anon_array(3, v_u32(0)).is_zero());
+        assert!(!struct_val().is_zero());
+        assert!(!anon_struct_val().is_zero());
+    });
+}
+
+// ---------------------------------------------------------------------------
+// "convert to type" should ...
+// ---------------------------------------------------------------------------
+
+#[test]
+fn value_convert_to_type() {
+    with_test_ctx(|| {
+        // Expected anon-struct { a = U32(0), b = String(""), c = I8(0) } for the
+        // widening case that adds a defaulted member.
+        let abc_struct = {
+            let mut m: IndexMap<String, Value> = IndexMap::new();
+            m.insert("a".to_string(), v_u32(0));
+            m.insert("b".to_string(), v_string(""));
+            m.insert("c".to_string(), v_i8(0));
+            Value::AnonStruct(AnonStructValue { members: m })
+        };
+        let cases: Vec<(Value, Arc<Type>, Option<Value>)> = vec![
+            (v_i8(1), i8(), Some(v_i8(1))),
+            (v_i8(1), i16(), Some(v_i16(1))),
+            (v_i8(1), f32(), Some(v_f32(1.0))),
+            (v_integer(1), i8(), Some(v_i8(1))),
+            (v_i8(1), integer(), Some(v_integer(1))),
+            (v_f64(1.0), integer(), Some(v_integer(1))),
+            (v_f64(1.0), f32(), Some(v_f32(1.0))),
+            (v_enum_constant("X", 0), f32(), Some(v_f32(0.0))),
+            (v_i32(0), default_enum(), None),
+            (
+                v_i32(42),
+                anon_array(Some(3), u32()),
+                Some(v_anon_array(3, v_u32(42))),
+            ),
+            (anon_struct_val(), anon_array(Some(3), u32()), None),
+            (
+                array_val(),
+                anon_array(Some(3), u32()),
+                Some(v_anon_array(3, v_u32(0))),
+            ),
+            (anon_struct_val(), default_array(), None),
+            (v_anon_array(2, v_i8(1)), anon_array(Some(3), u32()), None),
+            (
+                anon_struct_val(),
+                anon_struct(&[("a", u32()), ("b", string(None))]),
+                Some(anon_struct_val()),
+            ),
+            (anon_struct_val(), anon_struct(&[("a", string(None))]), None),
+            (
+                anon_struct_val(),
+                anon_struct(&[("a", u32()), ("b", string(None)), ("c", i8())]),
+                Some(abc_struct.clone()),
+            ),
+            (
+                struct_val(),
+                anon_struct(&[("a", u32()), ("b", string(None)), ("c", i8())]),
+                Some(abc_struct),
+            ),
+            (
+                v_i32(0),
+                anon_struct(&[("a", u32()), ("b", string(None))]),
+                None,
+            ),
+            (
+                v_i32(0),
+                anon_struct(&[("a", u32())]),
+                Some({
+                    let mut m: IndexMap<String, Value> = IndexMap::new();
+                    m.insert("a".to_string(), v_u32(0));
+                    Value::AnonStruct(AnonStructValue { members: m })
+                }),
+            ),
+        ];
+        check_convert(cases);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// "negate" should ...
+// ---------------------------------------------------------------------------
+
+#[test]
+fn value_negate() {
+    with_test_ctx(|| {
+        assert!(values_eq(&v_i8(1).negate().unwrap(), &v_i8(-1)));
+        assert!(values_eq(&v_f32(1.0).negate().unwrap(), &v_f32(-1.0)));
+        assert!(values_eq(&v_integer(1).negate().unwrap(), &v_integer(-1)));
+        assert!(v_string("").negate().is_err());
+        assert!(v_anon_array(3, v_u32(0)).negate().is_err());
+        assert!(anon_struct_val().negate().is_err());
+        // Enum constant negates through its rep type (default_enum rep is I32).
+        assert!(values_eq(
+            &v_enum_constant("X", 1).negate().unwrap(),
+            &v_i32(-1)
+        ));
+    });
+}
+
+// ---------------------------------------------------------------------------
+// "truncate" should ...
+// ---------------------------------------------------------------------------
+
+#[test]
+fn value_truncate() {
+    with_test_ctx(|| {
+        // Scalar truncation wraps modulo the type width.
+        assert!(values_eq(&v_u8(256).truncate(), &v_u8(0)));
+        assert!(values_eq(&v_i8(256).truncate(), &v_i8(0)));
+        assert!(values_eq(&v_u8(257).truncate(), &v_u8(1)));
+        assert!(values_eq(&v_i8(257).truncate(), &v_i8(1)));
+        assert!(values_eq(&v_u8(-1).truncate(), &v_u8(255)));
+
+        // Array truncation is elementwise.
+        assert!(values_eq(
+            &v_anon_array(3, v_u8(256)).truncate(),
+            &v_anon_array(3, v_u8(0))
+        ));
+        assert!(values_eq(
+            &v_anon_array(3, v_i8(256)).truncate(),
+            &v_anon_array(3, v_i8(0))
+        ));
+        assert!(values_eq(
+            &v_anon_array(3, v_u8(257)).truncate(),
+            &v_anon_array(3, v_u8(1))
+        ));
+        assert!(values_eq(
+            &v_anon_array(3, v_i8(257)).truncate(),
+            &v_anon_array(3, v_i8(1))
+        ));
+        assert!(values_eq(
+            &v_anon_array(3, v_u8(-1)).truncate(),
+            &v_anon_array(3, v_u8(255))
+        ));
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Rust-only
+// ---------------------------------------------------------------------------
+
+/// A primitive integer shifted by a primitive integer of another kind keeps its
+/// own kind
+#[test]
+fn value_shift_keeps_the_left_kind() {
+    with_test_ctx(|| {
+        check_binop(
+            "<<",
+            |a, b| a.shl(b),
+            vec![(v_i8(1), v_i32(2), Some(v_i8(4)))],
+        );
+        check_binop(
+            ">>",
+            |a, b| a.shr(b),
+            vec![(v_i8(16), v_i32(2), Some(v_i8(4)))],
+        );
+    });
+}
+
+/// An arbitrary-precision right shift by an amount at or beyond the width of the
+/// value saturates to `0` or `-1`, which an `i128` shift reproduces.
+#[test]
+fn value_rshift_saturates_past_the_value_width() {
+    with_test_ctx(|| {
+        let cases: Vec<(Value, Value, Option<Value>)> = vec![
+            (v_integer(2), v_integer(200), Some(v_integer(0))),
+            (v_integer(-2), v_integer(200), Some(v_integer(-1))),
+            (v_integer(2), v_integer(255), Some(v_integer(0))),
+            (v_i32(-1), v_i32(255), Some(v_i32(-1))),
+        ];
+        check_binop(">>", |a, b| a.shr(b), cases);
+    });
+}
+
+/// A left shift whose exact result does not fit in an `i128` is reported rather
+/// than silently wrapped.
+#[test]
+fn value_lshift_reports_overflow() {
+    with_test_ctx(|| {
+        // `-1 << 127` is exactly `i128::MIN`, so it is still representable
+        assert!(matches!(
+            v_integer(-1).shl(&v_integer(127)),
+            Ok(Value::Integer(IntegerValue(i128::MIN)))
+        ));
+        // Shifting zero is zero, however large the amount
+        assert!(matches!(
+            v_integer(0).shl(&v_integer(255)),
+            Ok(Value::Integer(IntegerValue(0)))
+        ));
+        for amount in [127, 128, 200, 255] {
+            assert!(
+                matches!(
+                    v_integer(1).shl(&v_integer(amount)),
+                    Err(MathError::ShiftOverflow)
+                ),
+                "1 << {amount} should overflow"
+            );
+        }
+    });
+}
+
 #[test]
 fn value_arithmetic_reports_overflow() {
     with_test_ctx(|| {
@@ -352,85 +713,6 @@ fn value_div_by_zero_uses_is_zero() {
         assert!(v_f64(1.0).div(&v_f64(1e-6)).is_ok());
     });
 }
-
-// ---------------------------------------------------------------------------
-// "convert to type" should ...
-// ---------------------------------------------------------------------------
-
-#[test]
-fn value_convert_to_type() {
-    with_test_ctx(|| {
-        // Expected anon-struct { a = U32(0), b = String(""), c = I8(0) } for the
-        // widening case that adds a defaulted member.
-        let abc_struct = {
-            let mut m: IndexMap<String, Value> = IndexMap::new();
-            m.insert("a".to_string(), v_u32(0));
-            m.insert("b".to_string(), v_string(""));
-            m.insert("c".to_string(), v_i8(0));
-            Value::AnonStruct(AnonStructValue { members: m })
-        };
-        let cases: Vec<(Value, Arc<Type>, Option<Value>)> = vec![
-            (v_i8(1), i8(), Some(v_i8(1))),
-            (v_i8(1), i16(), Some(v_i16(1))),
-            (v_i8(1), f32(), Some(v_f32(1.0))),
-            (v_integer(1), i8(), Some(v_i8(1))),
-            (v_i8(1), integer(), Some(v_integer(1))),
-            (v_f64(1.0), integer(), Some(v_integer(1))),
-            (v_f64(1.0), f32(), Some(v_f32(1.0))),
-            (v_enum_constant("X", 0), f32(), Some(v_f32(0.0))),
-            (v_i32(0), default_enum(), None),
-            (
-                v_i32(42),
-                anon_array(Some(3), u32()),
-                Some(v_anon_array(3, v_u32(42))),
-            ),
-            (anon_struct_val(), anon_array(Some(3), u32()), None),
-            (
-                array_val(),
-                anon_array(Some(3), u32()),
-                Some(v_anon_array(3, v_u32(0))),
-            ),
-            (anon_struct_val(), default_array(), None),
-            (v_anon_array(2, v_i8(1)), anon_array(Some(3), u32()), None),
-            (
-                anon_struct_val(),
-                anon_struct(&[("a", u32()), ("b", string(None))]),
-                Some(anon_struct_val()),
-            ),
-            (anon_struct_val(), anon_struct(&[("a", string(None))]), None),
-            (
-                anon_struct_val(),
-                anon_struct(&[("a", u32()), ("b", string(None)), ("c", i8())]),
-                Some(abc_struct.clone()),
-            ),
-            (
-                struct_val(),
-                anon_struct(&[("a", u32()), ("b", string(None)), ("c", i8())]),
-                Some(abc_struct),
-            ),
-            (
-                v_i32(0),
-                anon_struct(&[("a", u32()), ("b", string(None))]),
-                None,
-            ),
-            (
-                v_i32(0),
-                anon_struct(&[("a", u32())]),
-                Some({
-                    let mut m: IndexMap<String, Value> = IndexMap::new();
-                    m.insert("a".to_string(), v_u32(0));
-                    Value::AnonStruct(AnonStructValue { members: m })
-                }),
-            ),
-        ];
-        check_convert(cases);
-    });
-}
-
-// ---------------------------------------------------------------------------
-// Additional coverage: conversion paths and `Display` not otherwise
-// exercised by the cases above.
-// ---------------------------------------------------------------------------
 
 /// A scalar promotes to a *named* array/struct target, yielding a `Value::Array`
 /// / `Value::Struct` (the promotion arms that build named aggregates).
@@ -583,9 +865,11 @@ fn value_binop_integer_and_float_left() {
         ];
         check_binop("+", |a, b| a.add(b), cases);
 
-        // Integer / 0 -> DivByZero (the i128 div-by-zero guard).
-        let zero: Vec<(Value, Value, Option<Value>)> = vec![(v_integer(1), v_integer(0), None)];
-        check_binop("/", |a, b| a.div(b), zero);
+        // Integer / 0 -> DivByZero (Value::div tests the divisor with is_zero)
+        assert!(matches!(
+            v_integer(1).div(&v_integer(0)),
+            Err(MathError::DivByZero)
+        ));
     });
 }
 
@@ -631,275 +915,5 @@ fn value_display() {
             "{ }"
         );
         assert_eq!(struct_val().to_string(), "{ a = 0: U32, b = \"\" }: S");
-    });
-}
-
-// ---------------------------------------------------------------------------
-// "get_type" should ...
-//
-// Compared with `types_structurally_eq`.
-// ---------------------------------------------------------------------------
-
-#[test]
-fn value_get_type() {
-    with_test_ctx(|| {
-        // Every primitive int kind, plus Integer/Float/Boolean/String.
-        let prim = |kind| Value::PrimitiveInteger(PrimitiveIntegerValue { value: 0, kind });
-        use fpp_ast::IntegerKind::*;
-        let scalar_cases: Vec<(Value, Arc<Type>)> = vec![
-            (prim(I8), i8()),
-            (prim(I16), i16()),
-            (prim(I32), i32()),
-            (prim(I64), i64()),
-            (prim(U8), u8()),
-            (prim(U16), u16()),
-            (prim(U32), u32()),
-            (prim(U64), u64()),
-            (v_integer(0), integer()),
-            (v_f32(0.0), f32()),
-            (v_f64(0.0), f64()),
-            (v_bool(false), boolean()),
-            (v_string(""), string(None)),
-        ];
-        for (v, expected) in scalar_cases {
-            assert!(
-                types_structurally_eq(&v.get_type(), &expected),
-                "get_type({v}) expected `{expected}`, got `{}`",
-                v.get_type()
-            );
-        }
-
-        // AnonArray value -> AnonArray(Some(3), U32)
-        let aa = v_anon_array(3, v_u32(0));
-        assert!(types_structurally_eq(
-            &aa.get_type(),
-            &anon_array(Some(3), u32())
-        ));
-
-        // Array value -> its named array type A (= default_array()).
-        assert!(types_structurally_eq(
-            &array_val().get_type(),
-            &default_array()
-        ));
-
-        // Enum constant -> its named enum type (default_enum()).
-        let ec = v_enum_constant("X", 0);
-        assert!(types_structurally_eq(&ec.get_type(), &default_enum()));
-
-        // AnonStruct value -> AnonStruct { a: U32, b: string }.
-        let as_ty = anon_struct(&[("a", u32()), ("b", string(None))]);
-        assert!(types_structurally_eq(&anon_struct_val().get_type(), &as_ty));
-
-        // Struct value -> its named struct type S.
-        let s_ty = struct_ty("S", anon_struct(&[("a", u32()), ("b", string(None))]), 3);
-        assert!(types_structurally_eq(&struct_val().get_type(), &s_ty));
-    });
-}
-
-// ---------------------------------------------------------------------------
-// "lshift" / "rshift" should ...
-//
-// `Some(v)` => `Ok` (compared with `values_eq`); `None` => a non-shiftable
-// operand. A shift that overflows `i128` is checked separately below.
-// ---------------------------------------------------------------------------
-
-#[track_caller]
-fn check_shift(
-    op_name: &str,
-    op: impl Fn(&Value, &Value) -> MathResult,
-    cases: Vec<(Value, Value, Option<Value>)>,
-) {
-    for (a, b, expected) in cases {
-        let got = op(&a, &b);
-        match (&got, &expected) {
-            (Ok(g), Some(e)) => {
-                assert!(values_eq(g, e), "{a} {op_name} {b}: expected {e}, got {g}")
-            }
-            (Err(MathError::InvalidInputs), None) => {}
-            (Ok(g), None) => panic!("{a} {op_name} {b}: expected an error, got {g}"),
-            (Err(_), Some(e)) => panic!("{a} {op_name} {b}: expected {e}, got an error"),
-            (Err(_), None) => panic!("{a} {op_name} {b}: expected InvalidInputs"),
-        }
-    }
-}
-
-#[test]
-fn value_lshift() {
-    with_test_ctx(|| {
-        let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_i8(1), v_i8(2), Some(v_i8(4))),
-            (v_i32(1), v_i32(3), Some(v_i32(8))),
-            (v_i8(-1), v_i8(1), Some(v_i8(-2))),
-            (v_i8(1), v_i32(2), Some(v_i8(4))),
-            (v_i32(1), v_integer(4), Some(v_integer(16))),
-            (v_integer(1), v_i32(5), Some(v_integer(32))),
-            (v_integer(1), v_integer(10), Some(v_integer(1024))),
-            (v_enum_constant("X", 0), v_i32(3), Some(v_i32(0))),
-            (v_enum_constant("X", 0), v_integer(3), Some(v_integer(0))),
-            (v_i32(1), v_enum_constant("X", 0), Some(v_i32(1))),
-            (v_integer(1), v_enum_constant("X", 0), Some(v_integer(1))),
-            (v_i32(1), v_f32(2.0), None),
-            (v_f32(1.0), v_i32(2), None),
-            (v_i32(1), v_string(""), None),
-            (v_string(""), v_i32(2), None),
-            (v_i32(1), v_bool(false), None),
-            (v_bool(false), v_i32(2), None),
-            (v_i32(1), v_anon_array(3, v_u32(0)), None),
-            (v_i32(1), array_val(), None),
-            (v_i32(1), anon_struct_val(), None),
-            (v_i32(1), struct_val(), None),
-        ];
-        check_shift("<<", |a, b| a.shl(b), cases);
-    });
-}
-
-#[test]
-fn value_rshift() {
-    with_test_ctx(|| {
-        let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_i8(8), v_i8(1), Some(v_i8(4))),
-            (v_i32(16), v_i32(2), Some(v_i32(4))),
-            (v_i8(-8), v_i8(1), Some(v_i8(-4))),
-            (v_i8(16), v_i32(2), Some(v_i8(4))),
-            (v_i32(16), v_integer(2), Some(v_integer(4))),
-            (v_integer(32), v_i32(2), Some(v_integer(8))),
-            (v_integer(64), v_integer(3), Some(v_integer(8))),
-            (v_enum_constant("X", 0), v_i32(1), Some(v_i32(0))),
-            (v_enum_constant("X", 0), v_integer(1), Some(v_integer(0))),
-            (v_i32(16), v_enum_constant("X", 0), Some(v_i32(16))),
-            (v_integer(16), v_enum_constant("X", 0), Some(v_integer(16))),
-            (v_i32(16), v_f32(2.0), None),
-            (v_f32(16.0), v_i32(2), None),
-            (v_i32(16), v_string(""), None),
-            (v_string(""), v_i32(2), None),
-            (v_i32(16), v_bool(false), None),
-            (v_bool(false), v_i32(2), None),
-            (v_i32(16), v_anon_array(3, v_u32(0)), None),
-            (v_i32(16), array_val(), None),
-            (v_i32(16), anon_struct_val(), None),
-            (v_i32(16), struct_val(), None),
-        ];
-        check_shift(">>", |a, b| a.shr(b), cases);
-    });
-}
-
-/// An arbitrary-precision right shift by an amount at or beyond the width of the
-/// value saturates to `0` or `-1`, which an `i128` shift reproduces.
-#[test]
-fn value_rshift_saturates_past_the_value_width() {
-    with_test_ctx(|| {
-        let cases: Vec<(Value, Value, Option<Value>)> = vec![
-            (v_integer(2), v_integer(200), Some(v_integer(0))),
-            (v_integer(-2), v_integer(200), Some(v_integer(-1))),
-            (v_integer(2), v_integer(255), Some(v_integer(0))),
-            (v_i32(-1), v_i32(255), Some(v_i32(-1))),
-        ];
-        check_shift(">>", |a, b| a.shr(b), cases);
-    });
-}
-
-/// A left shift whose exact result does not fit in an `i128` is reported rather
-/// than silently wrapped.
-#[test]
-fn value_lshift_reports_overflow() {
-    with_test_ctx(|| {
-        // `-1 << 127` is exactly `i128::MIN`, so it is still representable
-        assert!(matches!(
-            v_integer(-1).shl(&v_integer(127)),
-            Ok(Value::Integer(IntegerValue(i128::MIN)))
-        ));
-        // Shifting zero is zero, however large the amount
-        assert!(matches!(
-            v_integer(0).shl(&v_integer(255)),
-            Ok(Value::Integer(IntegerValue(0)))
-        ));
-        for amount in [127, 128, 200, 255] {
-            assert!(
-                matches!(
-                    v_integer(1).shl(&v_integer(amount)),
-                    Err(MathError::ShiftOverflow)
-                ),
-                "1 << {amount} should overflow"
-            );
-        }
-    });
-}
-
-// ---------------------------------------------------------------------------
-// "is zero" should ...
-// ---------------------------------------------------------------------------
-
-#[test]
-fn value_is_zero() {
-    with_test_ctx(|| {
-        assert!(!v_i32(1).is_zero());
-        assert!(v_i32(0).is_zero());
-        // default_enum's "X" constant with value 0 is zero.
-        assert!(v_enum_constant("X", 0).is_zero());
-        assert!(!v_f32(1.0).is_zero());
-        assert!(v_f32(0.0).is_zero());
-        assert!(!array_val().is_zero());
-        assert!(!v_anon_array(3, v_u32(0)).is_zero());
-        assert!(!struct_val().is_zero());
-        assert!(!anon_struct_val().is_zero());
-    });
-}
-
-// ---------------------------------------------------------------------------
-// "negate" should ...
-// ---------------------------------------------------------------------------
-
-#[test]
-fn value_negate() {
-    with_test_ctx(|| {
-        assert!(values_eq(&v_i8(1).negate().unwrap(), &v_i8(-1)));
-        assert!(values_eq(&v_f32(1.0).negate().unwrap(), &v_f32(-1.0)));
-        assert!(values_eq(&v_integer(1).negate().unwrap(), &v_integer(-1)));
-        assert!(v_string("").negate().is_err());
-        assert!(v_anon_array(3, v_u32(0)).negate().is_err());
-        assert!(anon_struct_val().negate().is_err());
-        // Enum constant negates through its rep type (default_enum rep is I32).
-        assert!(values_eq(
-            &v_enum_constant("X", 1).negate().unwrap(),
-            &v_i32(-1)
-        ));
-    });
-}
-
-// ---------------------------------------------------------------------------
-// "truncate" should ...
-// ---------------------------------------------------------------------------
-
-#[test]
-fn value_truncate() {
-    with_test_ctx(|| {
-        // Scalar truncation wraps modulo the type width.
-        assert!(values_eq(&v_u8(256).truncate(), &v_u8(0)));
-        assert!(values_eq(&v_i8(256).truncate(), &v_i8(0)));
-        assert!(values_eq(&v_u8(257).truncate(), &v_u8(1)));
-        assert!(values_eq(&v_i8(257).truncate(), &v_i8(1)));
-        assert!(values_eq(&v_u8(-1).truncate(), &v_u8(255)));
-
-        // Array truncation is elementwise.
-        assert!(values_eq(
-            &v_anon_array(3, v_u8(256)).truncate(),
-            &v_anon_array(3, v_u8(0))
-        ));
-        assert!(values_eq(
-            &v_anon_array(3, v_i8(256)).truncate(),
-            &v_anon_array(3, v_i8(0))
-        ));
-        assert!(values_eq(
-            &v_anon_array(3, v_u8(257)).truncate(),
-            &v_anon_array(3, v_u8(1))
-        ));
-        assert!(values_eq(
-            &v_anon_array(3, v_i8(257)).truncate(),
-            &v_anon_array(3, v_i8(1))
-        ));
-        assert!(values_eq(
-            &v_anon_array(3, v_u8(-1)).truncate(),
-            &v_anon_array(3, v_u8(255))
-        ));
     });
 }

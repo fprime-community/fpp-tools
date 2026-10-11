@@ -1,4 +1,6 @@
 #![cfg(test)]
+//! Helpers for the semantics specs: general helpers, and helper functions and
+//! values for types and values.
 
 use crate::semantics::{AnonArrayType, AnonStructType, ArrayType, EnumType, StructType, Type};
 use crate::semantics::{
@@ -409,13 +411,13 @@ pub fn v_anon_array(size: usize, v: Value) -> Value {
 // SerializedSize test analysis
 // ---------------------------------------------------------------------------
 
-/// Builds an [`crate::Analysis`] populated with the framework definitions that
-/// `Type::serialized_size` needs: `FwSizeStoreType = U16` (the string length
-/// prefix type, 2 bytes) and `FW_FIXED_LENGTH_STRING_SIZE = 256` (the default
-/// string data size).
+/// Create analysis data structure and fill in the framework definitions, types,
+/// and values required for computing the serialized size of a type:
+/// `FwSizeStoreType = U16` (the string length prefix type, 2 bytes) and
+/// `FW_FIXED_LENGTH_STRING_SIZE = 256` (the default string data size).
 ///
-/// Note: string sizes are pre-resolved as `i128`, so no per-string
-/// `value_map` entries are needed — only the two framework definitions.
+/// A string type holds its size, so the analysis needs no values for string
+/// sizes, only the two framework definitions.
 pub fn sizeof_test_analysis() -> crate::Analysis {
     use crate::semantics::Symbol;
     use fpp_ast::DefConstant;
