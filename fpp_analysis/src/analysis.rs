@@ -12,13 +12,6 @@ use indexmap::IndexMap;
 use rustc_hash::{FxBuildHasher, FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
-/// Whether to keep or omit a component prefix when computing a short name
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ComponentPrefix {
-    Keep,
-    Omit,
-}
-
 /// The analysis data structure
 #[derive(Debug)]
 pub struct Analysis {
@@ -189,57 +182,9 @@ impl Analysis {
         }
     }
 
-    /// The shared "unknown" type used when a type use fails to resolve.
-    ///
-    /// The use has been reported as an error; the unknown type gives its type
-    /// name an entry in the type map so the analysis can go on. This is a
-    /// synthetic abstract type whose name, `<unknown>`, is not valid FPP
-    /// syntax, so it can never collide with a user-defined type. It is created
-    /// once and reused, so every unknown type is [`Type::identical`] to every
-    /// other, which keeps a single unresolved use from cascading into spurious
-    /// type mismatches downstream; a diagnostic that follows the one reporting
-    /// the unresolved use may still name it. The `span`, the span of the first
-    /// unresolved use, seeds the synthetic definition node the first time the
-    /// type is created. A follow-on diagnostic can show that span as the
-    /// location where the type is defined: the "type is defined here" note of
-    /// a type that is not displayable points at the first unresolved use,
-    /// which may be an unrelated type name elsewhere in the model.
-    pub fn unknown_type(&mut self, span: Span) -> Arc<Type> {
-        if let Some(ty) = &self.unknown_type {
-            return ty.clone();
-        }
-        let node_id = fpp_core::Node::new(span);
-        let ty = Arc::new(Type::Abs(Arc::new(crate::semantics::AbsType {
-            node: Arc::new(fpp_ast::DefAbsType {
-                node_id,
-                name: fpp_ast::Name {
-                    node_id,
-                    data: "<unknown>".to_string(),
-                },
-            }),
-        })));
-        self.unknown_type = Some(ty.clone());
-        ty
-    }
-
     /// Gets the qualified name of a symbol
     pub fn get_qualified_name(&self, symbol: &Symbol) -> String {
         Analysis::get_qualified_name_from_map(&self.parent_symbol_map, symbol).to_string()
-    }
-
-    /// Gets the qualified name of a symbol from a parent-symbol map
-    pub fn get_qualified_name_from_map<S: SymbolInterface + Eq + std::hash::Hash>(
-        parent_symbol_map: &HashMap<S, S>,
-        symbol: &S,
-    ) -> QualifiedName {
-        let mut parts = vec![symbol.name().data.clone()];
-        let mut current = symbol;
-        while let Some(parent) = parent_symbol_map.get(current) {
-            parts.push(parent.name().data.clone());
-            current = parent;
-        }
-        parts.reverse();
-        parts.into()
     }
 
     /// Gets the short name of a symbol
@@ -453,23 +398,6 @@ impl Analysis {
         }
     }
 
-    /// Gets the finalized type of a type-name use node.
-    ///
-    /// `FinalizeTypeDefs` records the finalized type of a definition at the
-    /// definition node and at each type name that it visits. A type name
-    /// that it does not visit, such as the operand of a `sizeof`, keeps the
-    /// type that `CheckTypeUses` gave it, which may not be finalized (an
-    /// array whose size is not known, a struct with no default value).
-    /// Resolving the use through its definition node gives the finalized type
-    /// in either case.
-    pub fn get_finalized_type(&self, node: fpp_core::Node) -> Option<Arc<Type>> {
-        let ty = self.type_map.get(&node)?.clone();
-        match ty.def_node_id() {
-            Some(def_node) => Some(self.type_map.get(&def_node).cloned().unwrap_or(ty)),
-            None => Some(ty),
-        }
-    }
-
     /// Gets a component from the component map
     pub fn get_component(&self, id: fpp_core::Node) -> SemanticResult<Option<Component>> {
         match self.use_def_map.get(&id) {
@@ -507,6 +435,72 @@ impl Analysis {
         Ok(self
             .get_component_instance_symbol(id)?
             .and_then(|cis| self.component_instance_map.get(&cis).cloned()))
+    }
+
+    /// Gets the use represented by a use. A use that refers to a bound template
+    /// parameter represents the use appearing in the template argument, resolved
+    /// recursively; any other use represents itself.
+    pub(crate) fn get_represented_use(&self, id: fpp_core::Node) -> fpp_core::Node {
+        match self.use_def_map.get(&id) {
+            Some(symbol) if symbol.is_template_arg() => self.get_represented_use(symbol.node()),
+            _ => id,
+        }
+    }
+
+    /// Gets the symbol represented by a use, stripping off any bound template
+    /// parameters. Returns `None` if the represented use refers to no symbol,
+    /// for example if the template argument is a literal value or a primitive
+    /// type name.
+    pub fn get_represented_symbol(&self, id: fpp_core::Node) -> Option<&Symbol> {
+        self.use_def_map.get(&self.get_represented_use(id))
+    }
+
+    /// Gets the symbol represented by a symbol. See
+    /// [`Analysis::get_represented_symbol`].
+    pub(crate) fn get_represented_symbol_for_symbol<'a>(
+        &'a self,
+        symbol: &'a Symbol,
+    ) -> Option<&'a Symbol> {
+        if symbol.is_template_arg() {
+            self.get_represented_symbol(symbol.node())
+        } else {
+            Some(symbol)
+        }
+    }
+
+    /// Gets the topology symbol represented by a symbol, if there is one
+    pub fn get_represented_topology_symbol<'a>(&'a self, symbol: &'a Symbol) -> Option<&'a Symbol> {
+        self.get_represented_symbol_for_symbol(symbol)
+            .filter(|represented| matches!(represented, Symbol::Topology(_)))
+    }
+
+    /// Gets the component instance represented by a use. Strip off any template
+    /// args.
+    ///
+    /// An error is reported at the use and names the symbol the use refers to,
+    /// which for a bound parameter is the parameter; its note points at the
+    /// represented definition. Returns `None` if the use, or the template
+    /// argument it stands for, is unresolved, or if it names a component
+    /// instance whose definition failed to check (both already reported).
+    pub fn get_represented_component_instance(
+        &self,
+        id: fpp_core::Node,
+    ) -> SemanticResult<Option<ComponentInstance>> {
+        let Some(symbol) = self.use_def_map.get(&id) else {
+            return Ok(None);
+        };
+        match self.get_represented_symbol(id) {
+            Some(cis @ Symbol::ComponentInstance(_)) => {
+                Ok(self.component_instance_map.get(cis).cloned())
+            }
+            None => Ok(None),
+            Some(represented) => Err(SemanticError::InvalidSymbol {
+                name: symbol.name().data.clone(),
+                loc: id.span(),
+                msg: "not a component instance symbol".to_string(),
+                def_loc: represented.node().span(),
+            }),
+        }
     }
 
     /// Gets an interface instance symbol from the use-def map
@@ -588,6 +582,19 @@ impl Analysis {
             .and_then(|symbol| self.interface_map.get(&symbol).cloned()))
     }
 
+    /// Gets a template symbol from the use-def map
+    pub fn get_template_symbol(&self, id: fpp_core::Node) -> SemanticResult<Option<Symbol>> {
+        match self.use_def_map.get(&id) {
+            Some(symbol @ Symbol::Template(_)) => Ok(Some(symbol.clone())),
+            Some(symbol) => Err(Analysis::invalid_symbol(
+                symbol,
+                id,
+                "not a template symbol",
+            )),
+            None => Ok(None),
+        }
+    }
+
     /// Gets a topology symbol from the use-def map
     pub fn get_topology_symbol(&self, id: fpp_core::Node) -> SemanticResult<Option<Symbol>> {
         match self.use_def_map.get(&id) {
@@ -617,23 +624,6 @@ impl Analysis {
         }
     }
 
-    fn invalid_symbol(symbol: &Symbol, id: fpp_core::Node, msg: &str) -> SemanticError {
-        SemanticError::InvalidSymbol {
-            name: symbol.name().data.clone(),
-            loc: id.span(),
-            msg: msg.to_string(),
-            def_loc: symbol.node().span(),
-        }
-    }
-
-    /// Gets the implied uses for an AST node
-    pub fn get_implied_uses(&self, kind: ImpliedUseKind, id: fpp_core::Node) -> Vec<ImpliedUse> {
-        match self.implied_use_map.get(&id) {
-            Some(uses) => uses.get(kind).to_vec(),
-            None => Vec::new(),
-        }
-    }
-
     /// Gets a BigInt value from an AST node
     pub fn get_big_int_value(&self, node: fpp_core::Node) -> Option<i128> {
         self.get_int_value(node)
@@ -651,9 +641,12 @@ impl Analysis {
         }
     }
 
-    /// Gets an optional BigInt value from an AST node
-    pub fn get_big_int_value_opt(&self, expr: &Option<Expr>) -> Option<i128> {
-        expr.as_ref().and_then(|e| self.get_int_value(e.node_id))
+    /// Gets the implied uses for an AST node
+    pub fn get_implied_uses(&self, kind: ImpliedUseKind, id: fpp_core::Node) -> Vec<ImpliedUse> {
+        match self.implied_use_map.get(&id) {
+            Some(uses) => uses.get(kind).to_vec(),
+            None => Vec::new(),
+        }
     }
 
     /// Gets an int value from an AST node
@@ -667,35 +660,6 @@ impl Analysis {
             })
         } else {
             Ok(v)
-        }
-    }
-
-    /// Gets an array size from an AST node: an int value (in the i32 range)
-    /// that is at least 1. A node with no value has size 1.
-    pub fn get_array_size(
-        &self,
-        node: fpp_core::Node,
-        loc: fpp_core::Span,
-    ) -> SemanticResult<i128> {
-        if self.get_int_value(node).is_none() {
-            return Ok(1);
-        }
-        let v = self.get_int_value_checked(node, loc)?;
-        if v >= 1 {
-            Ok(v)
-        } else {
-            Err(SemanticError::InvalidArraySize { loc, size: v })
-        }
-    }
-
-    /// Gets an optional array size
-    ///
-    /// The size is 1 when the expression is absent. The size of a present
-    /// expression is checked as [`Analysis::get_array_size`] checks it.
-    pub fn get_array_size_opt(&self, expr: &Option<Expr>) -> SemanticResult<i128> {
-        match expr {
-            Some(e) => self.get_array_size(e.node_id, e.span()),
-            None => Ok(1),
         }
     }
 
@@ -714,19 +678,6 @@ impl Analysis {
                 v: Some(v),
                 msg: "value may not be negative".to_string(),
             })
-        }
-    }
-
-    /// Gets an optional nonnegative BigInt value from an AST node
-    pub fn get_nonnegative_big_int_value_opt(
-        &self,
-        expr: &Option<Expr>,
-    ) -> SemanticResult<Option<i128>> {
-        match expr {
-            Some(e) => Ok(Some(
-                self.get_nonnegative_big_int_value(e.node_id, e.span())?,
-            )),
-            None => Ok(None),
         }
     }
 
@@ -755,6 +706,24 @@ impl Analysis {
         }
     }
 
+    /// Gets an optional BigInt value from an AST node
+    pub fn get_big_int_value_opt(&self, expr: &Option<Expr>) -> Option<i128> {
+        expr.as_ref().and_then(|e| self.get_int_value(e.node_id))
+    }
+
+    /// Gets an optional nonnegative BigInt value from an AST node
+    pub fn get_nonnegative_big_int_value_opt(
+        &self,
+        expr: &Option<Expr>,
+    ) -> SemanticResult<Option<i128>> {
+        match expr {
+            Some(e) => Ok(Some(
+                self.get_nonnegative_big_int_value(e.node_id, e.span())?,
+            )),
+            None => Ok(None),
+        }
+    }
+
     /// Gets an optional nonnegative int value from an AST node
     pub fn get_nonnegative_int_value_opt(
         &self,
@@ -766,119 +735,116 @@ impl Analysis {
         }
     }
 
-    /// Checks that the type of an expression converts to a numeric type, so
-    /// that the expression has an integer value to read. `CheckExprTypes`
-    /// leaves the expressions of a component instance definition and the port
-    /// numbers of a connection unchecked; this check runs where their values
-    /// are read. An expression with no type failed to type check, and that
-    /// error is already reported.
-    pub(crate) fn check_numeric_type(&self, e: &Expr) -> SemanticResult {
-        match self.type_map.get(&e.node_id) {
-            Some(t) if !t.is_numeric() && Type::convert(t, &Arc::new(Type::Integer)).is_err() => {
-                Err(SemanticError::InvalidType {
-                    loc: e.span(),
-                    msg: format!("cannot convert {} to a numeric type", t),
-                    notes: vec![],
-                })
-            }
-            _ => Ok(()),
+    /// Gets an optional array size
+    ///
+    /// The size is 1 when the expression is absent. The size of a present
+    /// expression is checked as [`Analysis::get_array_size`] checks it.
+    pub fn get_array_size_opt(&self, expr: &Option<Expr>) -> SemanticResult<i128> {
+        match expr {
+            Some(e) => self.get_array_size(e.node_id, e.span()),
+            None => Ok(1),
         }
     }
 
-    /// Checks the type of an optional expression with
-    /// [`Analysis::check_numeric_type`]
-    pub(crate) fn check_numeric_type_opt(&self, e: &Option<Expr>) -> SemanticResult {
-        match e {
-            Some(e) => self.check_numeric_type(e),
+    /// Gets an array size from an AST node: an int value (in the i32 range)
+    /// that is at least 1. A node with no value has size 1.
+    pub fn get_array_size(
+        &self,
+        node: fpp_core::Node,
+        loc: fpp_core::Span,
+    ) -> SemanticResult<i128> {
+        if self.get_int_value(node).is_none() {
+            return Ok(1);
+        }
+        let v = self.get_int_value_checked(node, loc)?;
+        if v >= 1 {
+            Ok(v)
+        } else {
+            Err(SemanticError::InvalidArraySize { loc, size: v })
+        }
+    }
+
+    /// Checks whether a port instance is the specified general port
+    pub fn is_general_port(
+        &self,
+        pi: &PortInstance,
+        direction: Direction,
+        port_type_name: &str,
+    ) -> bool {
+        match (pi.get_type(), pi.get_direction()) {
+            (Some(PortInstanceType::DefPort(def)), Some(d)) => {
+                self.get_qualified_name(&Symbol::Port(def)) == port_type_name && d == direction
+            }
+            _ => false,
+        }
+    }
+
+    /// Gets the reason for a non-displayable type at an AST node id, as the
+    /// chain of locations that leads from the node to the definition that is not
+    /// displayable.
+    pub fn get_reason_for_non_displayable_type_at(
+        &self,
+        node: fpp_core::Node,
+    ) -> Vec<(Span, String)> {
+        let element_reason = |node: fpp_core::Node| {
+            let mut reason = vec![(
+                node.span(),
+                "because this type is not displayable".to_string(),
+            )];
+            reason.extend(self.get_reason_for_non_displayable_type_at(node));
+            reason
+        };
+        match self.type_map.get(&node).map(|t| t.as_ref()) {
+            Some(Type::Alias(ty)) => element_reason(ty.node.type_name.node_id),
+            Some(Type::Array(ty)) => element_reason(ty.node.elt_type.node_id),
+            Some(Type::Struct(ty)) => {
+                match ty.node.members.iter().find(|m| {
+                    !self
+                        .type_map
+                        .get(&m.type_name.node_id)
+                        .is_none_or(|t| t.is_displayable())
+                }) {
+                    Some(member) => element_reason(member.type_name.node_id),
+                    None => Vec::new(),
+                }
+            }
+            Some(ty) => match ty.def_node_id() {
+                Some(def_node) => vec![(def_node.span(), "type is defined here".to_string())],
+                None => Vec::new(),
+            },
+            None => Vec::new(),
+        }
+    }
+
+    /// Checks for a displayable type
+    pub fn check_displayable_type(
+        &self,
+        node: fpp_core::Node,
+        loc: Span,
+        msg: &str,
+    ) -> SemanticResult {
+        match self.type_map.get(&node) {
+            Some(ty) if ty.is_displayable() => Ok(()),
+            Some(_) => Err(SemanticError::InvalidType {
+                loc,
+                msg: msg.to_string(),
+                notes: self.get_reason_for_non_displayable_type_at(node),
+            }),
             None => Ok(()),
         }
     }
 
-    /// Gets a queue full behavior from an AST node
-    pub fn get_queue_full(opt: &Option<QueueFull>) -> QueueFull {
-        opt.clone().unwrap_or(QueueFull::Assert)
-    }
-
-    /// Gets the number of ref params in a formal param list
-    pub fn get_num_ref_params(params: &[FormalParam]) -> usize {
-        params
-            .iter()
-            .filter(|p| matches!(p.kind, FormalParamKind::Ref))
-            .count()
-    }
-
-    /// Compute a format from a format string and a list of types
-    pub fn compute_format(
-        node: &fpp_ast::LitString,
-        ts: &[Arc<Type>],
-    ) -> SemanticResult<crate::semantics::Format> {
-        use crate::semantics::{Field, Parser};
-        let loc = node.span();
-        let format = Parser::parse_node(node)?;
-        // Check the size
-        if format.fields.len() < ts.len() {
-            return Err(SemanticError::InvalidFormatString {
-                loc,
-                msg: "missing replacement field".to_string(),
-                context: None,
-            });
+    /// Checks that all parameters in a formal param list are displayable
+    pub fn check_displayable_params(&self, params: &[FormalParam], msg: &str) -> SemanticResult {
+        for param in params {
+            self.check_displayable_type(param.type_name.node_id, param.type_name.span(), msg)?;
         }
-        if format.fields.len() > ts.len() {
-            return Err(SemanticError::InvalidFormatString {
-                loc: format.fields[ts.len()].1,
-                msg: "too many replacement fields".to_string(),
-                context: None,
-            });
-        }
-        // Check each numeric field against its type
-        for (t, (field, field_loc, _)) in ts.iter().zip(format.fields.iter()) {
-            let error = |msg: String| SemanticError::InvalidFormatString {
-                loc: *field_loc,
-                msg,
-                context: None,
-            };
-            let u = Type::underlying_type(t);
-            if field.is_integer() && !u.is_int() {
-                return Err(error(format!("{t} is not an integer type")));
-            }
-            if let Field::Rational {
-                precision: Some(precision),
-                ..
-            } = field
-                && Field::exceeds_max_precision(precision)
-            {
-                return Err(error(format!(
-                    "precision value {precision} is out of range"
-                )));
-            }
-            if field.is_rational() && !u.is_float() {
-                return Err(error(format!("{t} is not a floating-point type")));
-            }
-        }
-        Ok(format.into())
+        Ok(())
     }
+}
 
-    /// Convert one type to another
-    pub fn convert_types(loc: Span, from: &Arc<Type>, to: &Arc<Type>) -> SemanticResult<Arc<Type>> {
-        match Type::convert(from, to) {
-            Ok(()) => Ok(to.clone()),
-            Err(reason) => Err(SemanticError::TypeMismatch {
-                loc,
-                msg: format!("cannot convert {} to {}", from, to),
-                reason: match reason {
-                    // The message already names the two types
-                    TypeConversionError::Mismatch { .. } => None,
-                    reason => Some(Box::new(reason)),
-                },
-            }),
-        }
-    }
-
-    /// Displays an ID value
-    pub fn display_id_value(value: i128) -> String {
-        format!("({} dec, {:X} hex)", value, value)
-    }
-
+// The functions of the analysis that do not read its state
+impl Analysis {
     /// Adds a dictionary element mapped by ID, returning the new default ID
     pub fn add_element_to_id_map<T, M: IdMap<T>>(
         map: &mut M,
@@ -998,82 +964,204 @@ impl Analysis {
         )
     }
 
-    /// Checks whether a port instance is the specified general port
-    pub fn is_general_port(
-        &self,
-        pi: &PortInstance,
-        direction: Direction,
-        port_type_name: &str,
-    ) -> bool {
-        match (pi.get_type(), pi.get_direction()) {
-            (Some(PortInstanceType::DefPort(def)), Some(d)) => {
-                self.get_qualified_name(&Symbol::Port(def)) == port_type_name && d == direction
-            }
-            _ => false,
-        }
-    }
-
-    /// Gets the reason for a non-displayable type at an AST node id, as the
-    /// chain of locations that leads from the node to the definition that is not
-    /// displayable.
-    pub fn get_reason_for_non_displayable_type_at(
-        &self,
-        node: fpp_core::Node,
-    ) -> Vec<(Span, String)> {
-        let element_reason = |node: fpp_core::Node| {
-            let mut reason = vec![(
-                node.span(),
-                "because this type is not displayable".to_string(),
-            )];
-            reason.extend(self.get_reason_for_non_displayable_type_at(node));
-            reason
-        };
-        match self.type_map.get(&node).map(|t| t.as_ref()) {
-            Some(Type::Alias(ty)) => element_reason(ty.node.type_name.node_id),
-            Some(Type::Array(ty)) => element_reason(ty.node.elt_type.node_id),
-            Some(Type::Struct(ty)) => {
-                match ty.node.members.iter().find(|m| {
-                    !self
-                        .type_map
-                        .get(&m.type_name.node_id)
-                        .is_none_or(|t| t.is_displayable())
-                }) {
-                    Some(member) => element_reason(member.type_name.node_id),
-                    None => Vec::new(),
-                }
-            }
-            Some(ty) => match ty.def_node_id() {
-                Some(def_node) => vec![(def_node.span(), "type is defined here".to_string())],
-                None => Vec::new(),
-            },
-            None => Vec::new(),
-        }
-    }
-
-    /// Checks for a displayable type
-    pub fn check_displayable_type(
-        &self,
-        node: fpp_core::Node,
-        loc: Span,
-        msg: &str,
-    ) -> SemanticResult {
-        match self.type_map.get(&node) {
-            Some(ty) if ty.is_displayable() => Ok(()),
-            Some(_) => Err(SemanticError::InvalidType {
+    /// Compute a format from a format string and a list of types
+    pub fn compute_format(
+        node: &fpp_ast::LitString,
+        ts: &[Arc<Type>],
+    ) -> SemanticResult<crate::semantics::Format> {
+        use crate::semantics::{Field, Parser};
+        let loc = node.span();
+        let format = Parser::parse_node(node)?;
+        // Check the size
+        if format.fields.len() < ts.len() {
+            return Err(SemanticError::InvalidFormatString {
                 loc,
-                msg: msg.to_string(),
-                notes: self.get_reason_for_non_displayable_type_at(node),
+                msg: "missing replacement field".to_string(),
+                context: None,
+            });
+        }
+        if format.fields.len() > ts.len() {
+            return Err(SemanticError::InvalidFormatString {
+                loc: format.fields[ts.len()].1,
+                msg: "too many replacement fields".to_string(),
+                context: None,
+            });
+        }
+        // Check each numeric field against its type
+        for (t, (field, field_loc, _)) in ts.iter().zip(format.fields.iter()) {
+            let error = |msg: String| SemanticError::InvalidFormatString {
+                loc: *field_loc,
+                msg,
+                context: None,
+            };
+            let u = Type::underlying_type(t);
+            if field.is_integer() && !u.is_int() {
+                return Err(error(format!("{t} is not an integer type")));
+            }
+            if let Field::Rational {
+                precision: Some(precision),
+                ..
+            } = field
+                && Field::exceeds_max_precision(precision)
+            {
+                return Err(error(format!(
+                    "precision value {precision} is out of range"
+                )));
+            }
+            if field.is_rational() && !u.is_float() {
+                return Err(error(format!("{t} is not a floating-point type")));
+            }
+        }
+        Ok(format.into())
+    }
+
+    /// Convert one type to another
+    pub fn convert_types(loc: Span, from: &Arc<Type>, to: &Arc<Type>) -> SemanticResult<Arc<Type>> {
+        match Type::convert(from, to) {
+            Ok(()) => Ok(to.clone()),
+            Err(reason) => Err(SemanticError::TypeMismatch {
+                loc,
+                msg: format!("cannot convert {} to {}", from, to),
+                reason: match reason {
+                    // The message already names the two types
+                    TypeConversionError::Mismatch { .. } => None,
+                    reason => Some(Box::new(reason)),
+                },
             }),
+        }
+    }
+
+    /// Gets the number of ref params in a formal param list
+    pub fn get_num_ref_params(params: &[FormalParam]) -> usize {
+        params
+            .iter()
+            .filter(|p| matches!(p.kind, FormalParamKind::Ref))
+            .count()
+    }
+
+    /// Gets a queue full behavior from an AST node
+    pub fn get_queue_full(opt: &Option<QueueFull>) -> QueueFull {
+        opt.clone().unwrap_or(QueueFull::Assert)
+    }
+
+    /// Displays an ID value
+    pub fn display_id_value(value: i128) -> String {
+        format!("({} dec, {:X} hex)", value, value)
+    }
+
+    /// Gets the qualified name of a symbol from a parent-symbol map
+    pub fn get_qualified_name_from_map<S: SymbolInterface + Eq + std::hash::Hash>(
+        parent_symbol_map: &HashMap<S, S>,
+        symbol: &S,
+    ) -> QualifiedName {
+        let mut parts = vec![symbol.name().data.clone()];
+        let mut current = symbol;
+        while let Some(parent) = parent_symbol_map.get(current) {
+            parts.push(parent.name().data.clone());
+            current = parent;
+        }
+        parts.reverse();
+        parts.into()
+    }
+}
+
+/// Whether to keep or omit a component prefix when computing a short name
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComponentPrefix {
+    Keep,
+    Omit,
+}
+
+// Helpers for symbol lookup in scopes and template expansions, and for the
+// passes
+impl Analysis {
+    /// The shared "unknown" type used when a type use fails to resolve.
+    ///
+    /// The use has been reported as an error; the unknown type gives its type
+    /// name an entry in the type map so the analysis can go on. This is a
+    /// synthetic abstract type whose name, `<unknown>`, is not valid FPP
+    /// syntax, so it can never collide with a user-defined type. It is created
+    /// once and reused, so every unknown type is [`Type::identical`] to every
+    /// other, which keeps a single unresolved use from cascading into spurious
+    /// type mismatches downstream; a diagnostic that follows the one reporting
+    /// the unresolved use may still name it. The `span`, the span of the first
+    /// unresolved use, seeds the synthetic definition node the first time the
+    /// type is created. A follow-on diagnostic can show that span as the
+    /// location where the type is defined: the "type is defined here" note of
+    /// a type that is not displayable points at the first unresolved use,
+    /// which may be an unrelated type name elsewhere in the model.
+    pub fn unknown_type(&mut self, span: Span) -> Arc<Type> {
+        if let Some(ty) = &self.unknown_type {
+            return ty.clone();
+        }
+        let node_id = fpp_core::Node::new(span);
+        let ty = Arc::new(Type::Abs(Arc::new(crate::semantics::AbsType {
+            node: Arc::new(fpp_ast::DefAbsType {
+                node_id,
+                name: fpp_ast::Name {
+                    node_id,
+                    data: "<unknown>".to_string(),
+                },
+            }),
+        })));
+        self.unknown_type = Some(ty.clone());
+        ty
+    }
+
+    /// Gets the finalized type of a type-name use node.
+    ///
+    /// `FinalizeTypeDefs` records the finalized type of a definition at the
+    /// definition node and at each type name that it visits. A type name
+    /// that it does not visit, such as the operand of a `sizeof`, keeps the
+    /// type that `CheckTypeUses` gave it, which may not be finalized (an
+    /// array whose size is not known, a struct with no default value).
+    /// Resolving the use through its definition node gives the finalized type
+    /// in either case.
+    pub fn get_finalized_type(&self, node: fpp_core::Node) -> Option<Arc<Type>> {
+        let ty = self.type_map.get(&node)?.clone();
+        match ty.def_node_id() {
+            Some(def_node) => Some(self.type_map.get(&def_node).cloned().unwrap_or(ty)),
+            None => Some(ty),
+        }
+    }
+
+    /// The error for a use at `id` of a symbol of the wrong kind: `msg` says
+    /// what the symbol is not, and the note points at its definition
+    fn invalid_symbol(symbol: &Symbol, id: fpp_core::Node, msg: &str) -> SemanticError {
+        SemanticError::InvalidSymbol {
+            name: symbol.name().data.clone(),
+            loc: id.span(),
+            msg: msg.to_string(),
+            def_loc: symbol.node().span(),
+        }
+    }
+
+    /// Checks that the type of an expression converts to a numeric type, so
+    /// that the expression has an integer value to read. `CheckExprTypes`
+    /// leaves the expressions of a component instance definition and the port
+    /// numbers of a connection unchecked; this check runs where their values
+    /// are read. An expression with no type failed to type check, and that
+    /// error is already reported.
+    pub(crate) fn check_numeric_type(&self, e: &Expr) -> SemanticResult {
+        match self.type_map.get(&e.node_id) {
+            Some(t) if !t.is_numeric() && Type::convert(t, &Arc::new(Type::Integer)).is_err() => {
+                Err(SemanticError::InvalidType {
+                    loc: e.span(),
+                    msg: format!("cannot convert {} to a numeric type", t),
+                    notes: vec![],
+                })
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Checks the type of an optional expression with
+    /// [`Analysis::check_numeric_type`]
+    pub(crate) fn check_numeric_type_opt(&self, e: &Option<Expr>) -> SemanticResult {
+        match e {
+            Some(e) => self.check_numeric_type(e),
             None => Ok(()),
         }
-    }
-
-    /// Checks that all parameters in a formal param list are displayable
-    pub fn check_displayable_params(&self, params: &[FormalParam], msg: &str) -> SemanticResult {
-        for param in params {
-            self.check_displayable_type(param.type_name.node_id, param.type_name.span(), msg)?;
-        }
-        Ok(())
     }
 
     /// The symbol that [`crate::passes::EnterSymbols`] entered for a definition
@@ -1185,85 +1273,6 @@ impl Analysis {
             nested_scope.push(ScopeOwner::Symbol(symbol.clone()));
         }
         nested_scope
-    }
-
-    /// Gets a template symbol from the use-def map
-    pub fn get_template_symbol(&self, id: fpp_core::Node) -> SemanticResult<Option<Symbol>> {
-        match self.use_def_map.get(&id) {
-            Some(symbol @ Symbol::Template(_)) => Ok(Some(symbol.clone())),
-            Some(symbol) => Err(Analysis::invalid_symbol(
-                symbol,
-                id,
-                "not a template symbol",
-            )),
-            None => Ok(None),
-        }
-    }
-
-    /// Gets the use represented by a use. A use that refers to a bound template
-    /// parameter represents the use appearing in the template argument, resolved
-    /// recursively; any other use represents itself.
-    pub(crate) fn get_represented_use(&self, id: fpp_core::Node) -> fpp_core::Node {
-        match self.use_def_map.get(&id) {
-            Some(symbol) if symbol.is_template_arg() => self.get_represented_use(symbol.node()),
-            _ => id,
-        }
-    }
-
-    /// Gets the symbol represented by a use, stripping off any bound template
-    /// parameters. Returns `None` if the represented use refers to no symbol,
-    /// for example if the template argument is a literal value or a primitive
-    /// type name.
-    pub fn get_represented_symbol(&self, id: fpp_core::Node) -> Option<&Symbol> {
-        self.use_def_map.get(&self.get_represented_use(id))
-    }
-
-    /// Gets the symbol represented by a symbol. See
-    /// [`Analysis::get_represented_symbol`].
-    pub(crate) fn get_represented_symbol_for_symbol<'a>(
-        &'a self,
-        symbol: &'a Symbol,
-    ) -> Option<&'a Symbol> {
-        if symbol.is_template_arg() {
-            self.get_represented_symbol(symbol.node())
-        } else {
-            Some(symbol)
-        }
-    }
-
-    /// Gets the topology symbol represented by a symbol, if there is one
-    pub fn get_represented_topology_symbol<'a>(&'a self, symbol: &'a Symbol) -> Option<&'a Symbol> {
-        self.get_represented_symbol_for_symbol(symbol)
-            .filter(|represented| matches!(represented, Symbol::Topology(_)))
-    }
-
-    /// Gets the component instance represented by a use. Strip off any template
-    /// args.
-    ///
-    /// An error is reported at the use and names the symbol the use refers to,
-    /// which for a bound parameter is the parameter; its note points at the
-    /// represented definition. Returns `None` if the use, or the template
-    /// argument it stands for, is unresolved, or if it names a component
-    /// instance whose definition failed to check (both already reported).
-    pub fn get_represented_component_instance(
-        &self,
-        id: fpp_core::Node,
-    ) -> SemanticResult<Option<ComponentInstance>> {
-        let Some(symbol) = self.use_def_map.get(&id) else {
-            return Ok(None);
-        };
-        match self.get_represented_symbol(id) {
-            Some(cis @ Symbol::ComponentInstance(_)) => {
-                Ok(self.component_instance_map.get(cis).cloned())
-            }
-            None => Ok(None),
-            Some(represented) => Err(SemanticError::InvalidSymbol {
-                name: symbol.name().data.clone(),
-                loc: id.span(),
-                msg: "not a component instance symbol".to_string(),
-                def_loc: represented.node().span(),
-            }),
-        }
     }
 }
 
