@@ -657,6 +657,16 @@ fn size_of_types_with_no_size() {
 
         let x = alias_type("X", default_abs_type(), 122);
         assert_eq!(x.serialized_size(&a), Err(SerializedSizeError::Unavailable));
+
+        // An anonymous type is not displayable, so it has no serialized size
+        assert_eq!(
+            anon_array(Some(3), i32()).serialized_size(&a),
+            Err(SerializedSizeError::Unavailable)
+        );
+        assert_eq!(
+            anon_struct(&[("m1", i32())]).serialized_size(&a),
+            Err(SerializedSizeError::Unavailable)
+        );
     });
 }
 

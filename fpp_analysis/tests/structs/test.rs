@@ -119,3 +119,8 @@ fn size_out_of_range_high() {
 fn size_out_of_range_low() {
     run_test("structs/size_out_of_range_low")
 }
+
+#[test]
+fn default_alias_promote_ok() {
+    run_test("structs/default_alias_promote_ok")
+}

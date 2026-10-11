@@ -288,10 +288,6 @@ impl Type {
                 let n = arr.anon_array.size.ok_or(Unavailable)?;
                 scale(n, arr.anon_array.elt_type.serialized_size(a)?)
             }
-            Type::AnonArray(arr) => {
-                let n = arr.size.ok_or(Unavailable)?;
-                scale(n, arr.elt_type.serialized_size(a)?)
-            }
             Type::String(size) => {
                 let store_symbol = a
                     .framework_definitions
@@ -329,16 +325,10 @@ impl Type {
                 }
                 Ok(total)
             }
-            Type::AnonStruct(ty) => {
-                let mut total = 0i128;
-                for (_, member_ty) in &ty.members {
-                    total = total
-                        .checked_add(member_ty.serialized_size(a)?)
-                        .ok_or(SerializedSizeError::TooLarge)?;
-                }
-                Ok(total)
+            // Only displayable types have a serialized size
+            Type::Integer | Type::Abs(_) | Type::AnonArray(_) | Type::AnonStruct(_) => {
+                Err(Unavailable)
             }
-            Type::Integer | Type::Abs(_) => Err(Unavailable),
         }
     }
 
@@ -754,7 +744,7 @@ impl TypeConversionError {
                 diagnostic.note(format!("{} cannot be promoted to struct", ty))
             }
             TypeConversionError::MissingStructMember(name) => {
-                diagnostic.note(format!("struct missing member `{}`", name))
+                diagnostic.note(format!("no member `{}` in the struct type", name))
             }
             TypeConversionError::StructMember { name, err } => err.annotate(
                 diagnostic.note(format!("struct member `{}` type cannot be converted", name)),

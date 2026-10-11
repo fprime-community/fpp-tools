@@ -189,3 +189,8 @@ fn format_precision_huge() {
 fn format_multiline_bad_syntax() {
     run_test("array/format_multiline_bad_syntax")
 }
+
+#[test]
+fn default_alias_promote_ok() {
+    run_test("array/default_alias_promote_ok")
+}

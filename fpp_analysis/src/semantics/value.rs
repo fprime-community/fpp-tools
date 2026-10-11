@@ -42,8 +42,10 @@ impl Value {
         match (self.convert_impl(ty_a), self.is_promotable_to_aggregate()) {
             (Some(value), _) => Some(value),
             (None, true) => {
-                // Try to promote this single value an array/struct
-                // (if that's what we are trying to convert to)
+                // Try to promote this single value to an array or struct, if
+                // that is what we are converting to. Promotion is defined on the
+                // underlying type, so a value promotes to an alias of an array or
+                // struct type as it does to the array or struct type.
                 let ty = Type::underlying_type(ty_a);
                 match ty.deref() {
                     Type::Array(array_ty) => {
