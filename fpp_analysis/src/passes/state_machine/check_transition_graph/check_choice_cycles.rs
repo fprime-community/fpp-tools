@@ -1,5 +1,5 @@
 use crate::analyzers::state_machine::SmResult;
-use crate::errors::{SemanticError, SemanticResult};
+use crate::errors::SemanticError;
 use crate::semantics::state_machine::transition_graph::{Arc as TgArc, Node as TgNode};
 use crate::semantics::state_machine::{StateMachineAnalysis, StateMachineSymbol, StateOrChoice};
 use rustc_hash::FxHashSet as HashSet;
@@ -26,21 +26,63 @@ impl State {
     }
 }
 
+/// A choice cycle found by the search: the path from the start choice, ending
+/// with the arc that returns to a choice already on the path
+struct Cycle {
+    /// The choice that the path returns to
+    choice: StateMachineSymbol,
+    /// The arcs of the path, latest first
+    path_list: Vec<TgArc>,
+}
+
+impl Cycle {
+    /// The arcs that form the cycle itself, without the arcs that lead to it
+    fn arcs(&self) -> HashSet<TgArc> {
+        let mut arcs = HashSet::default();
+        for a in &self.path_list {
+            arcs.insert(a.clone());
+            if a.get_start_node().soc.get_symbol() == &self.choice {
+                break;
+            }
+        }
+        arcs
+    }
+
+    /// The error that reports the cycle
+    fn error(&self) -> SemanticError {
+        let loc = self.choice.get_span();
+        let mut parts = vec!["encountered a choice cycle:".to_string()];
+        for a in self.path_list.iter().rev() {
+            parts.push(a.show_transition());
+        }
+        SemanticError::ChoiceCycle {
+            loc,
+            msg: parts.join("\n  "),
+        }
+    }
+}
+
 impl CheckChoiceCycles {
     pub fn state_machine_analysis(sma: &mut StateMachineAnalysis) -> SmResult {
         let nodes: Vec<TgNode> = sma.transition_graph.arc_map.keys().cloned().collect();
         let mut s = State::default();
+        let mut reported_cycles: Vec<HashSet<TgArc>> = Vec::new();
         for node in nodes {
             if let StateOrChoice::Choice(c) = node.soc {
-                // Emit each choice cycle and keep scanning the remaining choice
-                // nodes (the DFS state carries over so visited nodes are not
-                // re-reported). A cycle is *blocking*, though: the typed-element
-                // pass walks the choice graph assuming it is acyclic and would
-                // otherwise recurse forever, so mark it so the gate stops there.
                 match Self::visit(sma, s.clear_path(), c) {
                     Ok(next) => s = next,
-                    Err(err) => {
-                        err.emit();
+                    Err(cycle) => {
+                        // The search reaches a cycle again from every other
+                        // choice on it, so emit each cycle once and keep scanning
+                        // the remaining choices for other cycles. A cycle is
+                        // *blocking*: the typed-element pass walks the choice
+                        // graph assuming it is acyclic and would otherwise
+                        // recurse forever, so mark it so the gate stops there.
+                        let arcs = cycle.arcs();
+                        if !reported_cycles.contains(&arcs) {
+                            cycle.error().emit();
+                            reported_cycles.push(arcs);
+                        }
                         sma.blocking_error = true;
                     }
                 }
@@ -49,16 +91,11 @@ impl CheckChoiceCycles {
         ControlFlow::Continue(())
     }
 
-    fn visit(sma: &StateMachineAnalysis, s: State, c: StateMachineSymbol) -> SemanticResult<State> {
+    fn visit(sma: &StateMachineAnalysis, s: State, c: StateMachineSymbol) -> Result<State, Cycle> {
         if s.path_set.contains(&c) {
-            let loc = c.get_span();
-            let mut parts = vec!["encountered a choice cycle:".to_string()];
-            for a in s.path_list.iter().rev() {
-                parts.push(a.show_transition());
-            }
-            return Err(SemanticError::ChoiceCycle {
-                loc,
-                msg: parts.join("\n  "),
+            return Err(Cycle {
+                choice: c,
+                path_list: s.path_list,
             });
         }
         let path_set = s.path_set.clone();

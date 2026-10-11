@@ -39,3 +39,8 @@ fn unreachable_state() {
 fn cycle_and_types() {
     run_test("state_machine/transition_graph/cycle_and_types")
 }
+
+#[test]
+fn two_choice_cycles() {
+    run_test("state_machine/transition_graph/two_choice_cycles")
+}
