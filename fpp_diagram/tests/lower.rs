@@ -237,6 +237,85 @@ fn edges_follow_connection_source_order() {
     });
 }
 
+/// A topology with a connection pattern that imports a topology with another
+/// one. Each pattern lists its targets in an order that is not their name order.
+const PATTERN_MODEL: &str = r#"
+module Fw {
+    port Time
+}
+
+passive component TimeSource {
+    sync input port timeGetIn: Fw.Time
+}
+
+passive component User {
+    time get port timeGetOut
+}
+
+instance source: TimeSource base id 0x100
+instance a: User base id 0x200
+instance b: User base id 0x300
+instance c: User base id 0x400
+instance subSource: TimeSource base id 0x500
+instance x: User base id 0x600
+instance y: User base id 0x700
+instance z: User base id 0x800
+
+topology Sub {
+    instance subSource
+    instance x
+    instance y
+    instance z
+    time connections instance subSource { z, x, y }
+}
+
+topology Sys {
+    import Sub
+    instance source
+    instance a
+    instance b
+    instance c
+    time connections instance source { c, a, b }
+}
+"#;
+
+#[test]
+fn pattern_edges_follow_target_order() {
+    with_analysis(PATTERN_MODEL, |a| {
+        let edges = |name: &str| -> Vec<(String, String)> {
+            fpp_diagram::lower(a, DiagramKind::Topology, name)
+                .expect("topology should lower")
+                .edges
+                .iter()
+                .map(|e| (e.id.clone(), e.from_port.clone()))
+                .collect()
+        };
+        let expected = |ports: &[&str]| -> Vec<(String, String)> {
+            ports
+                .iter()
+                .enumerate()
+                .map(|(i, port)| (format!("Time.connection.{i}"), port.to_string()))
+                .collect()
+        };
+        assert_eq!(
+            edges("Sub"),
+            expected(&["z.timeGetOut.0", "x.timeGetOut.0", "y.timeGetOut.0"])
+        );
+        // The imported pattern, written first, then the local one
+        assert_eq!(
+            edges("Sys"),
+            expected(&[
+                "z.timeGetOut.0",
+                "x.timeGetOut.0",
+                "y.timeGetOut.0",
+                "c.timeGetOut.0",
+                "a.timeGetOut.0",
+                "b.timeGetOut.0",
+            ])
+        );
+    });
+}
+
 #[test]
 fn lowers_to_sprotty_graph() {
     with_analysis(MODEL, |a| {

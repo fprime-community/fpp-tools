@@ -12,6 +12,7 @@ use fpp_analysis::semantics::{
     Component, ComponentInstance, Connection, Direction as SemDirection, GeneralKind,
     InterfaceInstance, PortInstance, PortInstanceType, Symbol, SymbolInterface, Topology,
 };
+use std::collections::BTreeSet;
 
 /// Errors that can occur while lowering an element to a diagram.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -243,9 +244,13 @@ fn port_kind(pi: &PortInstance) -> ir::PortKind {
 /// [`Topology::connection_map`] are not in source order: each holds the most
 /// recently added connection first, and resolution re-adds the direct
 /// connections before it adds the imported and the pattern ones. So the
-/// connections are sorted by location. The connections of one pattern share
-/// the pattern's location; walking the list back to front first keeps them in
-/// the order the pattern generated them.
+/// connections are sorted by location.
+///
+/// The connections of one pattern share the pattern's location, and they keep
+/// the order the pattern generated them in. A topology adds the connections of
+/// its own patterns one at a time, so its list holds them newest first. It
+/// imports the connections of another topology by walking that topology's
+/// local list, which is newest first, so its own list holds them oldest first.
 fn topology_edges(a: &Analysis, topology: &Topology, only_group: Option<&str>) -> Vec<Edge> {
     let mut edges = Vec::new();
     for (graph_name, connections) in &topology.connection_map {
@@ -254,9 +259,25 @@ fn topology_edges(a: &Analysis, topology: &Topology, only_group: Option<&str>) -
         {
             continue;
         }
-        let mut connections: Vec<&Connection> = connections.iter().rev().collect();
-        connections.sort_by(|c1, c2| c1.get_loc().compare(&c2.get_loc()));
-        for (i, connection) in connections.into_iter().enumerate() {
+        let local: BTreeSet<&Connection> = topology
+            .local_connection_map
+            .get(graph_name)
+            .map(|cs| cs.iter().collect())
+            .unwrap_or_default();
+        // The generation order of the connections that share a location: a
+        // local connection counts from the back of the list, an imported one
+        // from the front
+        let generation_key = |i: usize, c: &Connection| {
+            let i = i as isize;
+            if local.contains(c) { (0, -i) } else { (1, i) }
+        };
+        let mut connections: Vec<(usize, &Connection)> = connections.iter().enumerate().collect();
+        connections.sort_by(|(i1, c1), (i2, c2)| {
+            c1.get_loc()
+                .compare(&c2.get_loc())
+                .then_with(|| generation_key(*i1, c1).cmp(&generation_key(*i2, c2)))
+        });
+        for (i, (_, connection)) in connections.into_iter().enumerate() {
             if let Some(edge) = connection_edge(a, topology, graph_name, connection, i) {
                 edges.push(edge);
             }
