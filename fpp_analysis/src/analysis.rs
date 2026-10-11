@@ -186,13 +186,14 @@ impl Analysis {
 
     /// The shared "unknown" type used when a type use fails to resolve.
     ///
-    /// This is a synthetic abstract type whose name is not valid FPP syntax, so
-    /// it can never collide with a user-defined type. It is created once and
-    /// reused, so every unknown type is [`Type::identical`] to every other,
-    /// which keeps a single unresolved use from cascading into spurious type
-    /// mismatches downstream. The `span` seeds the synthetic definition node the
-    /// first time the type is created; it is never rendered (the type only ever
-    /// surfaces through its name), so any use-site span will do.
+    /// This is a synthetic abstract type whose name, `<unknown>`, is not valid
+    /// FPP syntax, so it can never collide with a user-defined type. It is
+    /// created once and reused, so every unknown type is [`Type::identical`] to
+    /// every other, which keeps a single unresolved use from cascading into
+    /// spurious type mismatches downstream; a diagnostic that follows the one
+    /// reporting the unresolved use may still name it. The `span` seeds the
+    /// synthetic definition node the first time the type is created; the type
+    /// only ever surfaces through its name, so any use-site span will do.
     pub fn unknown_type(&mut self, span: Span) -> Arc<Type> {
         if let Some(ty) = &self.unknown_type {
             return ty.clone();
@@ -430,13 +431,17 @@ impl Analysis {
         }
     }
 
-    /// Get an array size (>= 1) for an AST node.
+    /// Gets an array size from an AST node: an int value (in the i32 range)
+    /// that is at least 1. A node with no value has size 1.
     pub fn get_array_size(
         &self,
         node: fpp_core::Node,
         loc: fpp_core::Span,
     ) -> SemanticResult<i128> {
-        let v = self.get_int_value(node).unwrap_or(1);
+        if self.get_int_value(node).is_none() {
+            return Ok(1);
+        }
+        let v = self.get_int_value_checked(node, loc)?;
         if v >= 1 {
             Ok(v)
         } else {
@@ -445,6 +450,8 @@ impl Analysis {
     }
 
     /// Get an optional array size, defaulting to 1 when the expression is absent.
+    /// The size of a present expression is checked as [`Analysis::get_array_size`]
+    /// checks it.
     pub fn get_array_size_opt(&self, expr: &Option<Expr>) -> SemanticResult<i128> {
         match expr {
             Some(e) => self.get_array_size(e.node_id, e.span()),
@@ -508,6 +515,18 @@ impl Analysis {
         }
     }
 
+    /// Gets an optional nonnegative int value (in the i32 range) from an
+    /// optional expression
+    pub fn get_nonnegative_int_value_opt(
+        &self,
+        expr: &Option<Expr>,
+    ) -> SemanticResult<Option<i128>> {
+        match expr {
+            Some(e) => Ok(Some(self.get_nonnegative_int_value(e.node_id, e.span())?)),
+            None => Ok(None),
+        }
+    }
+
     /// Get a queue full behavior, defaulting to `Assert`.
     pub fn get_queue_full(opt: &Option<QueueFull>) -> QueueFull {
         opt.clone().unwrap_or(QueueFull::Assert)
@@ -525,6 +544,27 @@ impl Analysis {
             .iter()
             .filter(|p| matches!(p.kind, FormalParamKind::Ref))
             .count()
+    }
+
+    /// Convert one type to another
+    pub fn convert_types(loc: Span, from: &Arc<Type>, to: &Arc<Type>) -> SemanticResult<Arc<Type>> {
+        match Type::convert(from, to) {
+            Ok(()) => Ok(to.clone()),
+            Err(reason) => Err(SemanticError::TypeMismatch {
+                loc,
+                msg: format!("cannot convert {} to {}", from, to),
+                reason: Some(Box::new(reason)),
+            }),
+        }
+    }
+
+    /// Convert a value to a type
+    ///
+    /// The type checks have accepted the conversion, so a value that does not
+    /// convert is an internal error.
+    pub fn convert_value_to_type(v: &Value, t: &Arc<Type>) -> Value {
+        v.convert(t)
+            .unwrap_or_else(|| panic!("internal error: cannot convert value {} to type {}", v, t))
     }
 
     /// Displays an ID value

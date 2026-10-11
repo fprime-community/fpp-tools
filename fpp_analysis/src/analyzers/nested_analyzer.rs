@@ -1,13 +1,24 @@
 use crate::Analysis;
 use crate::analyzers::analyzer::Analyzer;
 use crate::semantics::{ImpliedUseSet, ScopeOwner, Symbol};
-use fpp_ast::{AstNode, MoveWalkable, Node, Visitable, Visitor};
+use fpp_ast::{
+    AstNode, MoveWalkable, Node, SpecTemplateExpand, TemplateArgKind, Visitable, Visitor,
+};
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 pub enum NestedAnalyzerMode {
+    /// Visit the members of the definitions that have members, and nothing else
     SHALLOW,
+    /// Visit every node
     DEEP,
+    /// Visit every node, and visit the parameters bound by a template expansion
+    /// before the members it introduces, as Scala's TypeExpressionAnalyzer
+    /// (through TemplateExpandAnalyzer) does. A use analyzer is `DEEP`: it
+    /// visits the bound parameters itself, through its template hooks
+    /// ([`crate::analyzers::basic_use_analyzer::UseAnalysisPass::template_param`]).
+    #[allow(non_camel_case_types)]
+    TYPE_EXPRESSION,
 }
 
 /// A basic trait that keeps state of the symbol scope we are under
@@ -81,6 +92,27 @@ impl<'ast, S: NestedScopeState, V: Visitor<'ast, State = S>> NestedAnalyzer<'ast
         }
     }
 
+    /// Analyze the parameters on a template expansion: the expression or type
+    /// name bound to each constant or type parameter. A bound parameter holds a
+    /// copy of its argument with the argument's node identity, so visiting the
+    /// argument visits the bound value, whether or not the expansion exists yet.
+    /// A port interface instance argument names no type or expression.
+    fn visit_template_expand_params(
+        &self,
+        visitor: &V,
+        a: &mut V::State,
+        node: &'ast SpecTemplateExpand,
+    ) -> ControlFlow<V::Break> {
+        for arg in &node.args {
+            match &arg.kind {
+                TemplateArgKind::Constant(e) => e.visit(a, visitor)?,
+                TemplateArgKind::Type(tn) => tn.visit(a, visitor)?,
+                TemplateArgKind::Interface(_) => {}
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
     fn walk_symbol(
         &self,
         visitor: &V,
@@ -114,20 +146,27 @@ impl<'ast, S: NestedScopeState, V: Visitor<'ast, State = S>> Analyzer<'ast, V>
             // members of the enclosing module, so no scope is pushed here; the
             // expansion is recorded so that names inside it resolve against the
             // definitions the expansion introduced.
-            Node::SpecTemplateExpand(def) => match &def.members {
-                None => ControlFlow::Continue(()),
-                Some(members) => {
-                    let saved = a.push_template_expansion(def.node_id);
-                    let out = members.visit(a, visitor);
-                    a.pop_template_expansion(saved);
-                    out
+            Node::SpecTemplateExpand(def) => {
+                if let NestedAnalyzerMode::TYPE_EXPRESSION = self.mode {
+                    self.visit_template_expand_params(visitor, a, def)?;
                 }
-            },
+                match &def.members {
+                    None => ControlFlow::Continue(()),
+                    Some(members) => {
+                        let saved = a.push_template_expansion(def.node_id);
+                        let out = members.visit(a, visitor);
+                        a.pop_template_expansion(saved);
+                        out
+                    }
+                }
+            }
             // Analyze state machine members
             Node::DefStateMachine(def) => self.walk_symbol(visitor, a, a.get_symbol(def), node),
             _ => match self.mode {
                 NestedAnalyzerMode::SHALLOW => ControlFlow::Continue(()),
-                NestedAnalyzerMode::DEEP => node.walk(a, visitor),
+                NestedAnalyzerMode::DEEP | NestedAnalyzerMode::TYPE_EXPRESSION => {
+                    node.walk(a, visitor)
+                }
             },
         }
     }

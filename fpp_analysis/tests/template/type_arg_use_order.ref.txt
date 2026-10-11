@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/template/type_arg_use_order.fpp:4:12
+  |
+4 | array B = [-1] U32
+  |            ^^ invalid array size -1
+  |
+  = note: size must be greater than zero
+

@@ -1,7 +1,7 @@
  --> [ local path prefix ]/event/negative_throttle.fpp:3:52
   |
 3 |   event E severity activity low format "" throttle -1
-  |                                                    ^^ value may not be negative
+  |                                                    ^^ invalid integer value -1
   |
-  = note: expression evaluated to `-1`
+  = note: value may not be negative
 

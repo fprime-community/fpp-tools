@@ -154,3 +154,38 @@ fn no_default_ok() {
 fn size_out_of_range() {
     run_test("array/size_out_of_range")
 }
+
+#[test]
+fn default_nested_size_error() {
+    run_test("array/default_nested_size_error")
+}
+
+#[test]
+fn default_struct_element_size_error() {
+    run_test("array/default_struct_element_size_error")
+}
+
+#[test]
+fn size_error_use_order() {
+    run_test("array/size_error_use_order")
+}
+
+#[test]
+fn format_bad_syntax_utf8() {
+    run_test("array/format_bad_syntax_utf8")
+}
+
+#[test]
+fn format_nul() {
+    run_test("array/format_nul")
+}
+
+#[test]
+fn format_precision_huge() {
+    run_test("array/format_precision_huge")
+}
+
+#[test]
+fn format_multiline_bad_syntax() {
+    run_test("array/format_multiline_bad_syntax")
+}

@@ -432,7 +432,7 @@ def test_a_sized_string_outside_a_type_definition_reaches_the_semantic_type():
 def test_an_invalid_string_size_is_reported_outside_a_type_definition_too():
     bad = f.analyze(source=FRAMEWORK + "module M { port P(m: string size -1) }")
     assert bad.has_errors
-    assert "negative string sizes" in bad.diagnostics[0].message
+    assert "invalid string size -1" in bad.diagnostics[0].message
 
 
 # --- sources vs imports --------------------------------------------------

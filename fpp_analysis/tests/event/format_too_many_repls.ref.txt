@@ -1,7 +1,7 @@
  --> [ local path prefix ]/event/format_too_many_repls.fpp:3:41
   |
 3 |   event E severity activity low format "{}"
-  |                                         ^^ extraneous format replacement field
+  |                                         ^^ invalid format string: too many replacement fields
 
  --> [ local path prefix ]/event/format_too_many_repls.fpp:1:1
   |

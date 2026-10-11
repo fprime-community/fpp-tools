@@ -1,7 +1,7 @@
  --> [ local path prefix ]/container/priority_negative.fpp:3:49
   |
 3 |   product container C id 0x100 default priority -1
-  |                                                 ^^ value may not be negative
+  |                                                 ^^ invalid integer value -1
   |
-  = note: expression evaluated to `-1`
+  = note: value may not be negative
 

@@ -1,0 +1,5 @@
+ --> [ local path prefix ]/array/format_precision_huge.fpp:1:27
+  |
+1 | array A = [1] F32 format "{.99999999999f}"
+  |                           ^^^^^^^^^^^^^^^ invalid format string: precision value 99999999999 is out of range
+

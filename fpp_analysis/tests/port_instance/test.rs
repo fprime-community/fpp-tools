@@ -164,3 +164,8 @@ fn undef_param_set() {
 fn undef_product_send() {
     run_test("port_instance/undef_product_send")
 }
+
+#[test]
+fn array_size_out_of_range() {
+    run_test("port_instance/array_size_out_of_range")
+}

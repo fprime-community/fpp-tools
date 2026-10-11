@@ -487,7 +487,7 @@ fn nested_array_default_shares_its_repeated_element() {
                 .all(|e| Arc::ptr_eq(e, inner_first)),
             "Inner's default does not share its repeated element"
         );
-        assert!(inner.anon_array.iter().all(|e| e.to_string() == "0"));
+        assert!(inner.anon_array.iter().all(|e| e.to_string() == "0: U8"));
     });
 }
 

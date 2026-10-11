@@ -1,12 +1,7 @@
  --> [ local path prefix ]/event/format_not_numeric.fpp:3:50
   |
 3 |   event E(a: bool) severity activity low format "{x}"
-  |                                                  ^^^ Hexadecimal format replacement cannot be used for type `bool`
-  |
- ::: [ local path prefix ]/event/format_not_numeric.fpp:3:14
-  |
-3 |   event E(a: bool) severity activity low format "{x}"
-  |              ---- type defined here
+  |                                                  ^^^ invalid format string: bool is not an integer type
 
  --> [ local path prefix ]/event/format_not_numeric.fpp:1:1
   |

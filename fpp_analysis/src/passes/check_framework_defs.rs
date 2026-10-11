@@ -3,10 +3,10 @@ use crate::analyzers::analyzer::visit_expansion;
 use crate::errors::SemanticError;
 use crate::semantics::{Symbol, SymbolInterface, Type};
 use fpp_ast::{
-    DefAbsType, DefAliasType, DefArray, DefConstant, DefEnum, DefModuleTemplate, DefStruct,
-    IntegerKind, MoveWalkable, Node, SpecTemplateExpand, Visitor,
+    DefAbsType, DefAliasType, DefArray, DefConstant, DefEnum, DefModuleTemplate, DefStateMachine,
+    DefStruct, IntegerKind, MoveWalkable, Node, SpecTemplateExpand, Visitor,
 };
-use fpp_core::Spanned;
+use fpp_core::{Diagnostic, Spanned};
 use std::ops::{ControlFlow, Deref};
 use std::sync::Arc;
 
@@ -38,23 +38,26 @@ impl CheckFrameworkDefs {
     }
 
     fn check_module_qualifiers(&self, a: &Analysis, symbol: &Symbol, loc: fpp_core::Span) -> bool {
-        let name = a.get_qualified_name(symbol);
         let mut current = symbol.clone();
         while let Some(parent) = a.parent_symbol_map.get(&current) {
             match parent {
                 Symbol::Module(_) => current = parent.clone(),
                 other => {
-                    SemanticError::InvalidQualifier {
+                    let error = SemanticError::InvalidQualifier {
                         loc,
                         msg: format!(
-                            "framework definition {} must have module qualifiers: {} is not a module symbol",
-                            name,
+                            "invalid qualifier {}: not a module symbol",
                             a.get_qualified_name(other)
                         ),
-                        def_loc: other.name().span(),
-                        def_msg: "not a module symbol".to_string(),
-                    }
-                    .emit();
+                        def_loc: other.get_loc(),
+                        def_msg: "symbol is defined here".to_string(),
+                    };
+                    Diagnostic::from(error)
+                        .note(format!(
+                            "framework definition {} must have module qualifiers",
+                            a.get_qualified_name(symbol)
+                        ))
+                        .emit();
                     return false;
                 }
             }
@@ -229,6 +232,16 @@ impl<'ast> Visitor<'ast> for CheckFrameworkDefs {
         ControlFlow::Continue(())
     }
 
+    /// Framework definitions are module and component members, so the members
+    /// of a state machine are not analyzed.
+    fn visit_def_state_machine(
+        &self,
+        _a: &mut Self::State,
+        _node: &'ast DefStateMachine,
+    ) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
     fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
         node.walk(a, self)
     }
@@ -238,7 +251,9 @@ impl<'ast> Visitor<'ast> for CheckFrameworkDefs {
         a: &mut Self::State,
         node: &'ast DefAbsType,
     ) -> ControlFlow<Self::Break> {
-        self.analyze_type(a, Symbol::AbsType(Arc::new(node.clone())), node.span());
+        if let Some(symbol) = a.get_symbol(node) {
+            self.analyze_type(a, symbol, node.span());
+        }
         ControlFlow::Continue(())
     }
 
@@ -247,7 +262,9 @@ impl<'ast> Visitor<'ast> for CheckFrameworkDefs {
         a: &mut Self::State,
         node: &'ast DefAliasType,
     ) -> ControlFlow<Self::Break> {
-        self.analyze_type(a, Symbol::AliasType(Arc::new(node.clone())), node.span());
+        if let Some(symbol) = a.get_symbol(node) {
+            self.analyze_type(a, symbol, node.span());
+        }
         ControlFlow::Continue(())
     }
 
@@ -256,12 +273,16 @@ impl<'ast> Visitor<'ast> for CheckFrameworkDefs {
         a: &mut Self::State,
         node: &'ast DefArray,
     ) -> ControlFlow<Self::Break> {
-        self.analyze_type(a, Symbol::ArrayType(Arc::new(node.clone())), node.span());
+        if let Some(symbol) = a.get_symbol(node) {
+            self.analyze_type(a, symbol, node.span());
+        }
         ControlFlow::Continue(())
     }
 
     fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        self.analyze_type(a, Symbol::EnumType(Arc::new(node.clone())), node.span());
+        if let Some(symbol) = a.get_symbol(node) {
+            self.analyze_type(a, symbol, node.span());
+        }
         ControlFlow::Continue(())
     }
 
@@ -270,7 +291,9 @@ impl<'ast> Visitor<'ast> for CheckFrameworkDefs {
         a: &mut Self::State,
         node: &'ast DefStruct,
     ) -> ControlFlow<Self::Break> {
-        self.analyze_type(a, Symbol::StructType(Arc::new(node.clone())), node.span());
+        if let Some(symbol) = a.get_symbol(node) {
+            self.analyze_type(a, symbol, node.span());
+        }
         ControlFlow::Continue(())
     }
 
@@ -279,7 +302,9 @@ impl<'ast> Visitor<'ast> for CheckFrameworkDefs {
         a: &mut Self::State,
         node: &'ast DefConstant,
     ) -> ControlFlow<Self::Break> {
-        let symbol = Symbol::Constant(Arc::new(node.clone()));
+        let Some(symbol) = a.get_symbol(node) else {
+            return ControlFlow::Continue(());
+        };
         let name = a.get_qualified_name(&symbol);
         if is_framework_constant(&name) {
             let ok = match a.type_map.get(&node.node_id) {

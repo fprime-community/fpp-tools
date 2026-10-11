@@ -69,3 +69,13 @@ fn proc_type_not_module_qualified() {
 fn user_data_size_not_module_qualified() {
     run_test("framework_defs/user_data_size_not_module_qualified")
 }
+
+#[test]
+fn state_machine_member_ok() {
+    run_test("framework_defs/state_machine_member_ok")
+}
+
+#[test]
+fn two_invalid_constants() {
+    run_test("framework_defs/two_invalid_constants")
+}

@@ -1,10 +1,5 @@
  --> [ local path prefix ]/array/format_not_numeric.fpp:4:30
   |
 4 | array A = [3] string format "{.3f}"
-  |                              ^^^^^ Fixed format replacement cannot be used for type `string`
-  |
- ::: [ local path prefix ]/array/format_not_numeric.fpp:4:15
-  |
-4 | array A = [3] string format "{.3f}"
-  |               ------ type defined here
+  |                              ^^^^^ invalid format string: string is not a floating-point type
 

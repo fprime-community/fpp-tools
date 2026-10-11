@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/template/type_arg_array_default.fpp:5:28
+  |
+5 |   array Z = [c] U8 default [1, 2]
+  |                            ^^^^^^ cannot convert [2] Integer to array Z
+  |
+  = note: expanded at [ local path prefix ]/template/type_arg_array_default.fpp:7:1
+  = note: array sizes do not match 2 != 16
+

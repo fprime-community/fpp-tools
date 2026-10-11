@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/template/type_arg_array_struct_member_sizeof.fpp:5:14
+  |
+5 |   array Z = [c - 1000] U8
+  |              ^^^^^^^^ invalid array size -992
+  |
+  = note: expanded at [ local path prefix ]/template/type_arg_array_struct_member_sizeof.fpp:7:1
+  = note: size must be greater than zero
+

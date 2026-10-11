@@ -1,10 +1,5 @@
  --> [ local path prefix ]/component/struct_format_not_numeric.fpp:5:27
   |
 5 | struct S2 { x: S1 format "{.3f}" }
-  |                           ^^^^^ Fixed format replacement cannot be used for type `struct S1`
-  |
- ::: [ local path prefix ]/component/struct_format_not_numeric.fpp:5:16
-  |
-5 | struct S2 { x: S1 format "{.3f}" }
-  |                -- type defined here
+  |                           ^^^^^ invalid format string: struct S1 is not a floating-point type
 

@@ -1,7 +1,7 @@
  --> [ local path prefix ]/tlm_channel/format_too_many_repls.fpp:3:31
   |
 3 |   telemetry T: U32 format "{} {}"
-  |                               ^^ extraneous format replacement field
+  |                               ^^ invalid format string: too many replacement fields
 
  --> [ local path prefix ]/tlm_channel/format_too_many_repls.fpp:1:1
   |

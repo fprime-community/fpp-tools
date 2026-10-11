@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/template/type_arg_string_size_sizeof.fpp:5:14
+  |
+5 |   array A = [c - 12] U8
+  |              ^^^^^^ invalid array size 0
+  |
+  = note: expanded at [ local path prefix ]/template/type_arg_string_size_sizeof.fpp:7:1
+  = note: size must be greater than zero
+

@@ -84,3 +84,38 @@ fn dictionary_not_displayable() {
 fn dictionary_ok() {
     run_test("structs/dictionary_ok")
 }
+
+#[test]
+fn default_member_size_error() {
+    run_test("structs/default_member_size_error")
+}
+
+#[test]
+fn format_and_size_error() {
+    run_test("structs/format_and_size_error")
+}
+
+#[test]
+fn default_and_size_error() {
+    run_test("structs/default_and_size_error")
+}
+
+#[test]
+fn member_type_order() {
+    run_test("structs/member_type_order")
+}
+
+#[test]
+fn format_precision_and_type() {
+    run_test("structs/format_precision_and_type")
+}
+
+#[test]
+fn size_out_of_range_high() {
+    run_test("structs/size_out_of_range_high")
+}
+
+#[test]
+fn size_out_of_range_low() {
+    run_test("structs/size_out_of_range_low")
+}

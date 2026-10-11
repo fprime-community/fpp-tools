@@ -1,0 +1,9 @@
+ --> [ local path prefix ]/template/constant_param_array_default_size_error.fpp:5:27
+  |
+5 |   array A = [2] D default c
+  |                           ^ cannot convert array C to array A
+  |
+  = note: expanded at [ local path prefix ]/template/constant_param_array_default_size_error.fpp:7:1
+  = note: array element type cannot be converted
+  = note: array sizes do not match 2 != 3
+

@@ -1,13 +1,16 @@
 use crate::semantics::Symbol;
-use rustc_hash::FxHashMap as HashMap;
+use indexmap::IndexMap;
 
-/// The set of F Prime framework definitions discovered during analysis.
+/// The F Prime framework definitions present in the model
+///
+/// The maps keep the definitions in the order they were added, which is the
+/// order in which the model defines them.
 #[derive(Debug, Default, Clone)]
 pub struct FrameworkDefinitions {
     /// Map from qualified constant name to its symbol.
-    pub constant_map: HashMap<String, Symbol>,
+    pub constant_map: IndexMap<String, Symbol>,
     /// Map from qualified type name to its symbol.
-    pub type_map: HashMap<String, Symbol>,
+    pub type_map: IndexMap<String, Symbol>,
 }
 
 impl FrameworkDefinitions {

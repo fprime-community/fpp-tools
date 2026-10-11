@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/array/default_nested_size_error.fpp:2:25
+  |
+2 | array A = [2] B default [[1, 2, 3], [1, 2, 3]]
+  |                         ^^^^^^^^^^^^^^^^^^^^^^ cannot convert [2] [3] Integer to array A
+  |
+  = note: array element type cannot be converted
+  = note: array sizes do not match 3 != 2
+

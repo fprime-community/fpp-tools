@@ -1,7 +1,7 @@
 use crate::Analysis;
 use crate::errors::SemanticError;
 use crate::semantics::{IntegerValue, Symbol, Type, Value};
-use fpp_core::Spanned;
+use fpp_core::{Diagnostic, Spanned};
 use std::sync::Arc;
 
 /// The constraint applied to a framework constant's value.
@@ -66,26 +66,18 @@ impl CheckFrameworkConstantValues {
                     ),
                 }
                 .emit(),
-                ValueCheck::StringSize if !is_valid_string_size(v) => {
-                    SemanticError::InvalidIntValue {
-                        loc,
-                        v: Some(v),
-                        msg: format!(
+                ValueCheck::StringSize if !Type::is_valid_string_size(v) => {
+                    Diagnostic::from(SemanticError::InvalidStringSize { loc, size: v })
+                        .note(format!(
                             "framework definition {} must be a string size constant",
                             name
-                        ),
-                    }
-                    .emit()
+                        ))
+                        .emit()
                 }
                 _ => {}
             }
         }
     }
-}
-
-/// A valid string size is a nonnegative integer less than 2^31.
-fn is_valid_string_size(v: i128) -> bool {
-    (0..(1 << 31)).contains(&v)
 }
 
 fn value_check_for(name: &str) -> Option<ValueCheck> {

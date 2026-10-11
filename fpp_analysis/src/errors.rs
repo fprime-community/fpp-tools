@@ -63,10 +63,13 @@ pub enum SemanticError {
         loc: Span,
         prev_loc: Span,
     },
-    TypeConversion {
+    /// Type mismatch
+    TypeMismatch {
         loc: Span,
         msg: String,
-        err: Box<TypeConversionError>,
+        /// Why the conversion failed, when the mismatch is a failed type
+        /// conversion. Rendered as notes after the message.
+        reason: Option<Box<TypeConversionError>>,
     },
     /// Empty array
     EmptyArray {
@@ -104,28 +107,22 @@ pub enum SemanticError {
         member: String,
         type_name: String,
     },
-    FormatStringMismatchLength {
-        format_locs: Vec<Span>,
-        type_locs: Vec<Span>,
-    },
-    FormatStringInvalidReplacement {
-        format_loc: Span,
-        type_loc: Span,
+    /// Invalid format string
+    InvalidFormatString {
+        loc: Span,
         msg: String,
-    },
-    FormatStringInvalidPrecision {
-        loc: Span,
-        value: i32,
-        max: i32,
-    },
-    ArrayDefaultMismatchedSize {
-        loc: Span,
-        size_loc: Span,
-        value_size: usize,
-        type_size: i128,
+        /// For a string that does not parse and whose error cannot be pointed
+        /// at in the source: the line of the string holding the error, with a
+        /// caret under the error position
+        context: Option<String>,
     },
     /// Invalid array size
     InvalidArraySize {
+        loc: Span,
+        size: i128,
+    },
+    /// Invalid string size
+    InvalidStringSize {
         loc: Span,
         size: i128,
     },
@@ -609,8 +606,12 @@ impl From<SemanticError> for Diagnostic {
                 prev_loc,
             } => Diagnostic::new(loc, Level::Error, format!("duplicate parameter `{}`", name))
                 .span_note(prev_loc, "previously defined here"),
-            SemanticError::TypeConversion { loc, msg, err } => {
-                err.annotate(Diagnostic::new(loc, Level::Error, msg))
+            SemanticError::TypeMismatch { loc, msg, reason } => {
+                let diag = Diagnostic::new(loc, Level::Error, msg);
+                match reason {
+                    Some(reason) => reason.annotate(diag),
+                    None => diag,
+                }
             }
             SemanticError::EmptyArray { loc } => {
                 Diagnostic::new(loc, Level::Error, "array expression may not be empty")
@@ -633,13 +634,13 @@ impl From<SemanticError> for Diagnostic {
                 format!("duplicate enum constant `{}`", value),
             )
             .span_note(prev_loc, "previously defined here"),
-            SemanticError::InvalidIntValue { loc, v, msg } => {
-                let diag = Diagnostic::new(loc, Level::Error, msg);
-                match v {
-                    None => diag,
-                    Some(v) => diag.note(format!("expression evaluated to `{}`", v)),
+            SemanticError::InvalidIntValue { loc, v, msg } => match v {
+                None => Diagnostic::new(loc, Level::Error, msg),
+                Some(v) => {
+                    Diagnostic::new(loc, Level::Error, format!("invalid integer value {}", v))
+                        .note(msg)
                 }
-            }
+            },
             SemanticError::DivisionByZero { loc } => {
                 Diagnostic::new(loc, Level::Error, "division by zero")
             }
@@ -657,64 +658,24 @@ impl From<SemanticError> for Diagnostic {
                 Level::Error,
                 format!("{} has no member `{}`", type_name, member),
             ),
-            SemanticError::FormatStringMismatchLength {
-                format_locs,
-                type_locs,
-            } => {
-                if format_locs.len() < type_locs.len() {
-                    let diag = Diagnostic::new(
-                        type_locs[format_locs.len()],
-                        Level::Error,
-                        "missing format replacement field",
-                    );
-                    type_locs[format_locs.len() + 1..]
-                        .iter()
-                        .fold(diag, |diag, loc| {
-                            diag.span_note(*loc, "missing format replacement field")
-                        })
-                } else {
-                    let diag = Diagnostic::new(
-                        format_locs[type_locs.len()],
-                        Level::Error,
-                        "extraneous format replacement field",
-                    );
-                    format_locs[type_locs.len() + 1..]
-                        .iter()
-                        .fold(diag, |diag, loc| {
-                            diag.span_annotation(*loc, "extraneous format replacement field")
-                        })
+            SemanticError::InvalidFormatString { loc, msg, context } => {
+                let diag =
+                    Diagnostic::new(loc, Level::Error, format!("invalid format string: {}", msg));
+                match context {
+                    Some(context) => diag.note(context),
+                    None => diag,
                 }
             }
-            SemanticError::FormatStringInvalidReplacement {
-                format_loc,
-                type_loc,
-                msg,
-            } => Diagnostic::new(format_loc, Level::Error, msg)
-                .span_note(type_loc, "type defined here"),
-            SemanticError::FormatStringInvalidPrecision { loc, value, max } => Diagnostic::new(
-                loc,
-                Level::Error,
-                format!(
-                    "precision value `{}` is larger than the maximum ({})",
-                    value, max
-                ),
-            ),
-            SemanticError::ArrayDefaultMismatchedSize {
-                loc,
-                size_loc,
-                value_size,
-                type_size,
-            } => Diagnostic::new(
-                loc,
-                Level::Error,
-                "cannot convert value to array type due to mismatched sizes",
-            )
-            .note(format!("value size `{}`", value_size))
-            .span_note(size_loc, format!("array size `{}`", type_size)),
             SemanticError::InvalidArraySize { loc, size } => Diagnostic::new(
                 loc,
                 Level::Error,
                 format!("invalid array size {}", size),
+            )
+            .note("size must be greater than zero"),
+            SemanticError::InvalidStringSize { loc, size } => Diagnostic::new(
+                loc,
+                Level::Error,
+                format!("invalid string size {}", size),
             ),
             SemanticError::InvalidPriority { loc } => Diagnostic::new(
                 loc,

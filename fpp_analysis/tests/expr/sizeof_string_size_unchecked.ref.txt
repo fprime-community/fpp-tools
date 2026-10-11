@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/expr/sizeof_string_size_unchecked.fpp:4:12
+  |
+4 | array B = [c - 1] U8
+  |            ^^^^^ invalid array size 0
+  |
+  = note: size must be greater than zero
+

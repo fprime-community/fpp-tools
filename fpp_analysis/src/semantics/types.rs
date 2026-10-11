@@ -352,6 +352,12 @@ impl Type {
         }
     }
 
+    /// Whether a size is valid for a string type: a nonnegative value that fits
+    /// in an `i32`
+    pub fn is_valid_string_size(size: i128) -> bool {
+        size >= 0 && size <= i32::MAX as i128
+    }
+
     /// Is this type a primitive type?
     pub fn is_primitive(&self) -> bool {
         match self {

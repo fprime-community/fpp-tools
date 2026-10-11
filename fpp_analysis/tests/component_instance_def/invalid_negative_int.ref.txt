@@ -1,7 +1,7 @@
  --> [ local path prefix ]/component_instance_def/invalid_negative_int.fpp:5:23
   |
 5 | instance c: C base id -1
-  |                       ^^ value may not be negative
+  |                       ^^ invalid integer value -1
   |
-  = note: expression evaluated to `-1`
+  = note: value may not be negative
 
