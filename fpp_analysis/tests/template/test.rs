@@ -251,6 +251,11 @@ fn param_same_name_different_groups_ok() {
 }
 
 #[test]
+fn parameter_shadow_error() {
+    run_test("template/parameter_shadow_error")
+}
+
+#[test]
 fn struct_parameter_anon_array_promote() {
     run_test("template/struct_parameter_anon_array_promote")
 }
