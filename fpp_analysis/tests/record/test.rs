@@ -1,28 +1,13 @@
 use crate::run_test;
 
 #[test]
-fn id_not_numeric() {
-    run_test("record/id_not_numeric")
+fn duplicate_id_explicit() {
+    run_test("record/duplicate_id_explicit")
 }
 
 #[test]
-fn ok() {
-    run_test("record/ok")
-}
-
-#[test]
-fn missing_container() {
-    run_test("record/missing_container")
-}
-
-#[test]
-fn missing_product_recv_port() {
-    run_test("record/missing_product_recv_port")
-}
-
-#[test]
-fn missing_ports() {
-    run_test("record/missing_ports")
+fn duplicate_id_implicit() {
+    run_test("record/duplicate_id_implicit")
 }
 
 #[test]
@@ -36,8 +21,23 @@ fn id_negative() {
 }
 
 #[test]
-fn duplicate_id_implicit() {
-    run_test("record/duplicate_id_implicit")
+fn id_not_numeric() {
+    run_test("record/id_not_numeric")
+}
+
+#[test]
+fn missing_container() {
+    run_test("record/missing_container")
+}
+
+#[test]
+fn missing_ports() {
+    run_test("record/missing_ports")
+}
+
+#[test]
+fn missing_product_recv_port() {
+    run_test("record/missing_product_recv_port")
 }
 
 #[test]
@@ -51,9 +51,11 @@ fn not_displayable() {
 }
 
 #[test]
-fn duplicate_id_explicit() {
-    run_test("record/duplicate_id_explicit")
+fn ok() {
+    run_test("record/ok")
 }
+
+// Rust-only tests (no Scala counterpart)
 
 #[test]
 fn missing_container_order() {

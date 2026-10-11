@@ -1098,25 +1098,20 @@ impl Component {
                 msg: format!("repeated name {}", name1),
             });
         }
-        let get = |name: &str, span: Span| -> SemanticResult<GeneralPortInstance> {
-            match self.port_map().get(name) {
-                Some(PortInstance::General(pi)) => Ok(pi.clone()),
-                Some(_) => Err(SemanticError::InvalidPortMatching {
-                    loc: span,
-                    msg: format!("{} is not a valid port instance for matching", name),
-                }),
-                None => Err(SemanticError::InvalidPortMatching {
-                    loc: span,
-                    msg: format!(
-                        "{} is not a port instance of component {}",
-                        name,
-                        self.component_name()
-                    ),
+        let get_instance = |node: &Ident| -> SemanticResult<GeneralPortInstance> {
+            match self
+                .port_interface
+                .lookup_port_instance(node, self.component_name())?
+            {
+                PortInstance::General(pi) => Ok(pi),
+                _ => Err(SemanticError::InvalidPortMatching {
+                    loc: node.span(),
+                    msg: format!("{} is not a valid port instance for matching", node.data),
                 }),
             }
         };
-        let instance1 = get(name1, node.port1.span())?;
-        let instance2 = get(name2, node.port2.span())?;
+        let instance1 = get_instance(&node.port1)?;
+        let instance2 = get_instance(&node.port2)?;
         let size1 = instance1.get_array_size();
         let size2 = instance2.get_array_size();
         if size1 != size2 {

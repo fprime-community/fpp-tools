@@ -2,7 +2,7 @@ use crate::Analysis;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{Symbol, SymbolInterface};
 use fpp_ast::{
-    AstNode, GeneralPortInstanceKind, InputPortKind, QueueFull, SpecGeneralPortInstance,
+    AstNode, GeneralPortInstanceKind, Ident, InputPortKind, QueueFull, SpecGeneralPortInstance,
     SpecInterfaceImport, SpecInternalPort, SpecSpecialPortInstance, SpecTopPort,
     SpecialPortInstanceKind,
 };
@@ -397,7 +397,17 @@ impl SpecialPortInstance {
         let loc = specifier.span();
         let def = match a.use_def_map.get(&specifier.node_id) {
             Some(Symbol::Port(def)) => def.clone(),
-            _ => {
+            // The implied use names a symbol of another kind, such as a module
+            // Fw.Time
+            Some(symbol) => {
+                return Err(SemanticError::InvalidSymbol {
+                    symbol_name: symbol.name().data.clone(),
+                    loc,
+                    msg: "not a port symbol".to_string(),
+                    def_loc: symbol.node().span(),
+                });
+            }
+            None => {
                 return Err(SemanticError::InvalidSpecialPort {
                     loc,
                     msg: "not a port symbol".to_string(),
@@ -782,9 +792,27 @@ impl PortInterface {
         Ok(result)
     }
 
-    /// Get a port instance by name, erroring if it is not present.
+    /// Gets a port instance by name, if it is present.
     pub fn get_port_instance(&self, name: &str) -> Option<PortInstance> {
         self.port_map.get(name).cloned()
+    }
+
+    /// Gets a port instance by name, reporting a name that names no port of
+    /// the interface `interface_name`.
+    pub(crate) fn lookup_port_instance(
+        &self,
+        name: &Ident,
+        interface_name: &str,
+    ) -> SemanticResult<PortInstance> {
+        self.port_map
+            .get(&name.data)
+            .cloned()
+            .ok_or_else(|| SemanticError::InvalidPortInstanceId {
+                loc: name.span(),
+                port_name: name.data.clone(),
+                instance_type: self.instance_type.clone(),
+                interface_name: interface_name.to_string(),
+            })
     }
 
     /// Merge in every port of `interface`, marking each as imported through
