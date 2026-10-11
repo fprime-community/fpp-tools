@@ -95,6 +95,12 @@ fn time_two_source_ports() {
     run_test("connection_pattern/time_two_source_ports")
 }
 
+// Rust-only: the ports are listed in the order the component declares them
+#[test]
+fn time_two_source_ports_order() {
+    run_test("connection_pattern/time_two_source_ports_order")
+}
+
 #[test]
 fn time_missing_target_port() {
     run_test("connection_pattern/time_missing_target_port")

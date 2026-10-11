@@ -200,9 +200,7 @@ fn resolve_to_single_port(
         1 => Ok(ports.pop().expect("there is one port")),
         0 => missing_port(loc, kind, instance_name),
         _ => {
-            let mut port_names: Vec<&str> =
-                ports.iter().map(|p| p.get_unqualified_name()).collect();
-            port_names.sort();
+            let port_names: Vec<&str> = ports.iter().map(|p| p.get_unqualified_name()).collect();
             Err(SemanticError::InvalidPattern {
                 loc,
                 msg: format!(

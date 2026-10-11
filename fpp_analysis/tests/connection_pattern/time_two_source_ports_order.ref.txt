@@ -1,0 +1,5 @@
+  --> [ local path prefix ]/connection_pattern/time_two_source_ports_order.fpp:19:31
+   |
+19 |     time connections instance $time { c }
+   |                               ^^^^^ ambiguous pattern: instance time has time get input ports timeGetIn2, timeGetIn1
+
