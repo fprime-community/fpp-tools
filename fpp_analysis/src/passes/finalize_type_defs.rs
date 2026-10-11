@@ -8,7 +8,7 @@ use crate::semantics::{
 };
 use fpp_ast::{
     AstNode, DefAliasType, DefArray, DefEnum, DefModuleTemplate, DefStruct, Expr, LitString, Node,
-    TemplateParam, TransUnit, TypeName, TypeNameKind, Visitor, Walkable,
+    TemplateParam, TypeName, TypeNameKind, Visitor,
 };
 use fpp_core::Spanned;
 use std::ops::{ControlFlow, Deref};
@@ -16,6 +16,11 @@ use std::sync::Arc;
 
 /// Finalize type definitions. Update the types of uses (type names) that
 /// refer to the definitions.
+///
+/// The visited symbol set holds the definitions finalized so far, including
+/// the ones that `EvalConstantExprs` finalized on demand, and it is kept for
+/// the whole model, so each definition is finalized, and its errors are
+/// reported, once.
 pub struct FinalizeTypeDefs<'ast> {
     super_: NestedAnalyzer<'ast, Analysis, Self>,
 }
@@ -257,15 +262,6 @@ impl<'ast> Visitor<'ast> for FinalizeTypeDefs<'ast> {
             }
         }
         ControlFlow::Continue(())
-    }
-
-    fn visit_trans_unit(
-        &self,
-        a: &mut Self::State,
-        node: &'ast TransUnit,
-    ) -> ControlFlow<Self::Break> {
-        a.visited_symbol_set.clear();
-        node.walk(a, self)
     }
 }
 

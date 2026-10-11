@@ -196,6 +196,11 @@ fn binop_numeric_error() {
 }
 
 #[test]
+fn binop_enum_common_type_error() {
+    run_test("expr/binop_enum_common_type_error")
+}
+
+#[test]
 fn subscript_order_error() {
     run_test("expr/subscript_order_error")
 }

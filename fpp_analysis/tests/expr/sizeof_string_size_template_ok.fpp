@@ -1,4 +1,4 @@
-# Rust-only: the operand of a sizeof may be a type parameter bound to a
+# The operand of a sizeof may be a type parameter bound to a
 # string type name, whose size the argument gives: c is 2 + 4, and A has
 # size 1
 type FwSizeStoreType = U16

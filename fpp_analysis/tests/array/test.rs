@@ -199,3 +199,8 @@ fn format_multiline_bad_syntax() {
 fn default_alias_promote_ok() {
     run_test("array/default_alias_promote_ok")
 }
+
+#[test]
+fn format_sizeof_error() {
+    run_test("array/format_sizeof_error")
+}

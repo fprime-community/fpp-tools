@@ -1,5 +1,5 @@
-# Rust-only: a dictionary constant whose type is an alias type is rejected,
-# even when the alias names a numeric type
+# A dictionary constant may not have an alias type, even when the alias names
+# a numeric type
 type A = F32
 module template T(constant p: A) {
   constant c = p
