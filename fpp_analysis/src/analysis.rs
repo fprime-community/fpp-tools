@@ -6,9 +6,7 @@ use crate::semantics::{
     Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion, TlmPacketSet, Topology, Type,
     TypeConversionError, UseDefMatching, Value, state_machine::StateMachine,
 };
-use fpp_ast::{
-    AstNode, Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc,
-};
+use fpp_ast::{AstNode, Expr, FormalParam, FormalParamKind, QueueFull, SpecLoc};
 use fpp_core::{File, SourceFile, Span, Spanned};
 use indexmap::IndexMap;
 use rustc_hash::{FxBuildHasher, FxHashMap as HashMap, FxHashSet as HashSet};
@@ -199,9 +197,12 @@ impl Analysis {
     /// once and reused, so every unknown type is [`Type::identical`] to every
     /// other, which keeps a single unresolved use from cascading into spurious
     /// type mismatches downstream; a diagnostic that follows the one reporting
-    /// the unresolved use may still name it. The `span` seeds the synthetic
-    /// definition node the first time the type is created; the type only ever
-    /// surfaces through its name, so any use-site span will do.
+    /// the unresolved use may still name it. The `span`, the span of the first
+    /// unresolved use, seeds the synthetic definition node the first time the
+    /// type is created. A follow-on diagnostic can show that span as the
+    /// location where the type is defined: the "type is defined here" note of
+    /// a type that is not displayable points at the first unresolved use,
+    /// which may be an unrelated type name elsewhere in the model.
     pub fn unknown_type(&mut self, span: Span) -> Arc<Type> {
         if let Some(ty) = &self.unknown_type {
             return ty.clone();
@@ -453,11 +454,13 @@ impl Analysis {
 
     /// Gets the finalized type of a type-name use node.
     ///
-    /// `FinalizeTypeDefs` rewrites the type recorded for a type DEFINITION
-    /// node; the type names that use it keep the type they were given by
-    /// `CheckTypeUses`, which may not be finalized yet (an array whose size is
-    /// not yet known, a struct with no default value). Resolve the use through
-    /// its definition node, so callers always see the finalized type.
+    /// `FinalizeTypeDefs` records the finalized type of a definition at the
+    /// definition node and at each type name that it visits. A type name
+    /// that it does not visit, such as the operand of a `sizeof`, keeps the
+    /// type that `CheckTypeUses` gave it, which may not be finalized (an
+    /// array whose size is not known, a struct with no default value).
+    /// Resolving the use through its definition node gives the finalized type
+    /// in either case.
     pub fn get_finalized_type(&self, node: fpp_core::Node) -> Option<Arc<Type>> {
         let ty = self.type_map.get(&node)?.clone();
         match ty.def_node_id() {
@@ -630,12 +633,12 @@ impl Analysis {
         }
     }
 
-    /// Gets an integer value from an AST node
+    /// Gets a BigInt value from an AST node
     pub fn get_big_int_value(&self, node: fpp_core::Node) -> Option<i128> {
         self.get_int_value(node)
     }
 
-    /// Get an integer value for an AST node from the value map, if present.
+    /// Gets a BigInt value from an AST node
     pub fn get_int_value(&self, node: fpp_core::Node) -> Option<i128> {
         match self
             .value_map
@@ -647,14 +650,12 @@ impl Analysis {
         }
     }
 
-    /// Get an optional integer value for an optional expression.
+    /// Gets an optional BigInt value from an AST node
     pub fn get_big_int_value_opt(&self, expr: &Option<Expr>) -> Option<i128> {
         expr.as_ref().and_then(|e| self.get_int_value(e.node_id))
     }
 
-    /// Gets an int value from an AST node, erroring if it is out of the i32
-    /// range. `phase`/id values are `Int`-typed; an FPP arbitrary-precision
-    /// integer that overflows `Int` is rejected with "value out of range".
+    /// Gets an int value from an AST node
     pub fn get_int_value_checked(&self, node: fpp_core::Node, loc: Span) -> SemanticResult<i128> {
         let v = self.get_int_value(node).unwrap_or(0);
         if v < i32::MIN as i128 || v > i32::MAX as i128 {
@@ -686,9 +687,10 @@ impl Analysis {
         }
     }
 
-    /// Get an optional array size, defaulting to 1 when the expression is absent.
-    /// The size of a present expression is checked as [`Analysis::get_array_size`]
-    /// checks it.
+    /// Gets an optional array size
+    ///
+    /// The size is 1 when the expression is absent. The size of a present
+    /// expression is checked as [`Analysis::get_array_size`] checks it.
     pub fn get_array_size_opt(&self, expr: &Option<Expr>) -> SemanticResult<i128> {
         match expr {
             Some(e) => self.get_array_size(e.node_id, e.span()),
@@ -696,7 +698,7 @@ impl Analysis {
         }
     }
 
-    /// Get a nonnegative integer value for an AST node.
+    /// Gets a nonnegative BigInt value from an AST node
     pub fn get_nonnegative_big_int_value(
         &self,
         node: fpp_core::Node,
@@ -714,7 +716,7 @@ impl Analysis {
         }
     }
 
-    /// Get an optional nonnegative integer value for an optional expression.
+    /// Gets an optional nonnegative BigInt value from an AST node
     pub fn get_nonnegative_big_int_value_opt(
         &self,
         expr: &Option<Expr>,
@@ -727,7 +729,7 @@ impl Analysis {
         }
     }
 
-    /// Get a nonnegative int value (in i32 range) for an AST node.
+    /// Gets a nonnegative int value from an AST node
     pub fn get_nonnegative_int_value(
         &self,
         node: fpp_core::Node,
@@ -752,8 +754,7 @@ impl Analysis {
         }
     }
 
-    /// Gets an optional nonnegative int value (in the i32 range) from an
-    /// optional expression
+    /// Gets an optional nonnegative int value from an AST node
     pub fn get_nonnegative_int_value_opt(
         &self,
         expr: &Option<Expr>,
@@ -764,18 +765,12 @@ impl Analysis {
         }
     }
 
-    /// Get a queue full behavior, defaulting to `Assert`.
+    /// Gets a queue full behavior from an AST node
     pub fn get_queue_full(opt: &Option<QueueFull>) -> QueueFull {
         opt.clone().unwrap_or(QueueFull::Assert)
     }
 
-    /// Get the queue full behavior named by an optional queue full specifier,
-    /// defaulting to `Assert`.
-    pub fn get_specified_queue_full(opt: &Option<QueueFullSpecifier>) -> QueueFull {
-        Self::get_queue_full(&opt.as_ref().map(|spec| spec.kind.clone()))
-    }
-
-    /// Count the number of ref parameters in a formal parameter list.
+    /// Gets the number of ref params in a formal param list
     pub fn get_num_ref_params(params: &[FormalParam]) -> usize {
         params
             .iter()
@@ -848,15 +843,6 @@ impl Analysis {
                 },
             }),
         }
-    }
-
-    /// Convert a value to a type
-    ///
-    /// The type checks have accepted the conversion, so a value that does not
-    /// convert is an internal error.
-    pub fn convert_value_to_type(v: &Value, t: &Arc<Type>) -> Value {
-        v.convert(t)
-            .unwrap_or_else(|| panic!("internal error: cannot convert value {} to type {}", v, t))
     }
 
     /// Displays an ID value
@@ -1035,7 +1021,7 @@ impl Analysis {
         }
     }
 
-    /// Check that the type of an AST node is displayable.
+    /// Checks for a displayable type
     pub fn check_displayable_type(
         &self,
         node: fpp_core::Node,
@@ -1053,7 +1039,7 @@ impl Analysis {
         }
     }
 
-    /// Check that the types of all formal parameters are displayable.
+    /// Checks that all parameters in a formal param list are displayable
     pub fn check_displayable_params(&self, params: &[FormalParam], msg: &str) -> SemanticResult {
         for param in params {
             self.check_displayable_type(param.type_name.node_id, param.type_name.span(), msg)?;

@@ -251,7 +251,9 @@ impl PortInstance {
         let kind = match &specifier.kind {
             GeneralPortInstanceKind::Input(InputPortKind::Async) => GeneralKind::AsyncInput {
                 priority,
-                queue_full: Analysis::get_specified_queue_full(&specifier.queue_full),
+                queue_full: Analysis::get_queue_full(
+                    &specifier.queue_full.as_ref().map(|q| q.kind.clone()),
+                ),
             },
             GeneralPortInstanceKind::Input(InputPortKind::Guarded) => GeneralKind::GuardedInput,
             GeneralPortInstanceKind::Output => GeneralKind::Output,
@@ -326,9 +328,9 @@ impl PortInstance {
         // Get the priority
         let priority = a.get_big_int_value_opt(&specifier.priority);
         let queue_full = match specifier.kind {
-            SpecialPortInstanceKind::ProductRecv => {
-                Some(Analysis::get_specified_queue_full(&specifier.queue_full))
-            }
+            SpecialPortInstanceKind::ProductRecv => Some(Analysis::get_queue_full(
+                &specifier.queue_full.as_ref().map(|q| q.kind.clone()),
+            )),
             _ => None,
         };
         Ok(SpecialPortInstance {
