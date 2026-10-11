@@ -9,7 +9,7 @@
 //! call. Omitting the `super()` call prunes that subtree.
 //!
 //! The consequence is that traversal is **deep by default** here, where the Rust
-//! trait is shallow by default — matching `ast.AstVisitor`, which is what Python
+//! trait is shallow by default — matching `ast.NodeVisitor`, which is what Python
 //! callers expect. A subclass overriding only `visit_DefComponent` still reaches
 //! expressions deep inside a topology, because every other node type's base
 //! `visit_*` recurses.
