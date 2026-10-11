@@ -96,6 +96,16 @@ fn default_ok() {
 }
 
 #[test]
+fn default_shadowed_error() {
+    run_test("array/default_shadowed_error")
+}
+
+#[test]
+fn default_shadowed_ok() {
+    run_test("array/default_shadowed_ok")
+}
+
+#[test]
 fn nested_default_ok() {
     run_test("array/nested_default_ok")
 }

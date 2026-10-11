@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/structs/default_shadowed_error.fpp:4:31
+  |
+4 |   struct S { x: U32 } default s
+  |                               ^ default value cannot be converted to struct S
+  |
+  = note: struct member `x` type cannot be converted
+  = note: bool cannot be converted to U32
+

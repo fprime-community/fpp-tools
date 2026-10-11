@@ -66,6 +66,16 @@ fn default_ok() {
 }
 
 #[test]
+fn default_shadowed_error() {
+    run_test("structs/default_shadowed_error")
+}
+
+#[test]
+fn default_shadowed_ok() {
+    run_test("structs/default_shadowed_ok")
+}
+
+#[test]
 fn format_ok() {
     run_test("structs/format_ok")
 }
