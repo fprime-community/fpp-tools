@@ -1,4 +1,4 @@
-use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor};
+use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor, state_analyzer};
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::state_machine::{StateMachineAnalysis, StateMachineSymbol};
 use fpp_ast::{
@@ -16,7 +16,125 @@ impl CheckInitialTransitions {
     pub fn def_state_machine(sma: &mut StateMachineAnalysis, node: &DefStateMachine) -> SmResult {
         StateMachineAnalysisVisitor::def_state_machine(&CheckInitialTransitions, sma, node)
     }
+}
 
+impl StateMachineAnalysisVisitor for CheckInitialTransitions {
+    fn def_state_machine_internal(
+        &self,
+        sma: &mut StateMachineAnalysis,
+        node: &DefStateMachine,
+        members: &[StateMachineMember],
+    ) -> SmResult {
+        // Check that there is exactly one initial transition specifier. The
+        // error is blocking: without an initial transition the reachability
+        // check has no node to start from.
+        let initial_transitions = members
+            .iter()
+            .filter_map(|m| match m {
+                StateMachineMember::SpecInitialTransition(spec_initial_transition) => {
+                    Some(spec_initial_transition.span())
+                }
+                _ => None,
+            })
+            .collect();
+        if let Err(err) = Self::check_one_initial_transition(
+            initial_transitions,
+            node.name.span(),
+            "state machine",
+        ) {
+            err.emit();
+            sma.blocking_error = true;
+        }
+        // Visit the members
+        sma.parent_state = None;
+        self.visit_sm_members(sma, members)
+    }
+
+    fn spec_initial_transition(
+        &self,
+        sma: &mut StateMachineAnalysis,
+        node: &SpecInitialTransition,
+    ) -> SmResult {
+        // Check that node leads to a state machine or choice
+        // with the same parent symbol as sma
+        let dest_id = node.transition.target.id();
+        let dest_symbol = sma.use_def_map[&dest_id].clone();
+        if let Err(symbols) = Self::check_for_dest_outside_parent(
+            sma,
+            dest_symbol,
+            &sma.parent_state,
+            Vec::new(),
+            HashSet::default(),
+        ) {
+            let loc = node.span();
+            let msg_head = match sma.parent_state {
+                Some(_) => {
+                    "initial transition of state must go to state or choice defined in the same state"
+                }
+                None => {
+                    "initial transition of state machine may not go to a state or choice defined in a substate"
+                }
+            };
+            let path: Vec<Span> = symbols.iter().rev().map(|s| s.get_span()).collect();
+            SemanticError::InvalidInitialTransition {
+                loc,
+                msg: msg_head.to_string(),
+                path,
+                duplicate: Vec::new(),
+            }
+            .emit();
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
+        let loc = node.name.span();
+        let sub_states = node
+            .members
+            .iter()
+            .filter(|m| matches!(m, StateMember::DefState(_)))
+            .count();
+
+        let initial_transitions: Vec<Span> = node
+            .members
+            .iter()
+            .filter_map(|m| match m {
+                StateMember::SpecInitialTransition(spec_initial_transition) => {
+                    Some(spec_initial_transition.span())
+                }
+                _ => None,
+            })
+            .collect();
+
+        match (sub_states, initial_transitions.len()) {
+            // No substates, no initial transition: OK
+            (0, 0) => ControlFlow::Continue(()),
+            // Substates or initial transitions: Check semantics
+            _ => {
+                // Check for exactly one initial transition. The error is
+                // blocking: the reachability check would report the substates
+                // that the state cannot enter as unreachable.
+                if let Err(err) = Self::check_one_initial_transition(
+                    initial_transitions,
+                    loc,
+                    "state with substates",
+                ) {
+                    err.emit();
+                    sma.blocking_error = true;
+                }
+                // Visit the members
+                let parent_state = sma.parent_state.clone();
+                sma.parent_state =
+                    Some(StateMachineSymbol::State(std::sync::Arc::new(node.clone())));
+                state_analyzer::def_state(self, sma, node)?;
+                sma.parent_state = parent_state;
+                ControlFlow::Continue(())
+            }
+        }
+    }
+}
+
+impl CheckInitialTransitions {
     // Checks that there is exactly one initial transition specifier
     fn check_one_initial_transition(
         initial_transitions: Vec<Span>,
@@ -73,11 +191,12 @@ impl CheckInitialTransitions {
         };
         // Recursively check choice targets
         if let StateMachineSymbol::Choice(a_node) = &dest_symbol {
+            // Choice: check it
             let mut next_error_symbols = error_symbols.clone();
             next_error_symbols.insert(0, dest_symbol.clone());
             // Recursively check the if transition
             let if_dest = &a_node.if_transition.target;
-            let if_dest_symbol = sma.use_def_map.get(&if_dest.id()).unwrap().clone();
+            let if_dest_symbol = sma.use_def_map[&if_dest.id()].clone();
             visited_symbols = Self::check_for_dest_outside_parent(
                 sma,
                 if_dest_symbol,
@@ -87,7 +206,7 @@ impl CheckInitialTransitions {
             )?;
             // Recursively check the else transition
             let else_dest = &a_node.else_transition.target;
-            let else_dest_symbol = sma.use_def_map.get(&else_dest.id()).unwrap().clone();
+            let else_dest_symbol = sma.use_def_map[&else_dest.id()].clone();
             visited_symbols = Self::check_for_dest_outside_parent(
                 sma,
                 else_dest_symbol,
@@ -96,125 +215,7 @@ impl CheckInitialTransitions {
                 visited_symbols,
             )?;
         }
+        // Not a choice: nothing to do
         Ok(visited_symbols)
-    }
-}
-
-impl StateMachineAnalysisVisitor for CheckInitialTransitions {
-    fn def_state_machine(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &DefStateMachine,
-    ) -> SmResult {
-        let members: &[StateMachineMember] = node.members.as_deref().unwrap_or(&[]);
-        // Check that there is exactly one initial transition specifier. This is
-        // blocking: reachability reads the transition graph's `initial_node`,
-        // which is only set when a well-formed initial transition exists.
-        let initial_transitions = members
-            .iter()
-            .filter_map(|m| match m {
-                StateMachineMember::SpecInitialTransition(spec_initial_transition) => {
-                    Some(spec_initial_transition.span())
-                }
-                _ => None,
-            })
-            .collect();
-        if let Err(err) = Self::check_one_initial_transition(
-            initial_transitions,
-            node.name.span(),
-            "state machine",
-        ) {
-            err.emit();
-            sma.blocking_error = true;
-        }
-        // Visit the members
-        sma.parent_state = None;
-        self.visit_sm_members(sma, members)
-    }
-
-    fn spec_initial_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecInitialTransition,
-    ) -> SmResult {
-        // Check that node leads to a state machine or choice
-        // with the same parent symbol as sma.
-        //
-        // If use-resolution failed for this transition target there is no
-        // `use_def_map` entry (a blocking error already emitted), so skip.
-        let dest_id = node.transition.target.id();
-        let Some(dest_symbol) = sma.use_def_map.get(&dest_id).cloned() else {
-            return ControlFlow::Continue(());
-        };
-        if let Err(symbols) = Self::check_for_dest_outside_parent(
-            sma,
-            dest_symbol,
-            &sma.parent_state,
-            Vec::new(),
-            HashSet::default(),
-        ) {
-            let loc = node.span();
-            let msg_head = match sma.parent_state {
-                Some(_) => {
-                    "initial transition of state must go to state or choice defined in the same state"
-                }
-                None => {
-                    "initial transition of state machine may not go to a state or choice defined in a substate"
-                }
-            };
-            let path: Vec<Span> = symbols.iter().rev().map(|s| s.get_span()).collect();
-            SemanticError::InvalidInitialTransition {
-                loc,
-                msg: msg_head.to_string(),
-                path,
-                duplicate: Vec::new(),
-            }
-            .emit();
-        }
-        ControlFlow::Continue(())
-    }
-
-    fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
-        let loc = node.name.span();
-        let sub_states = node
-            .members
-            .iter()
-            .filter(|m| matches!(m, StateMember::DefState(_)))
-            .count();
-
-        let initial_transitions: Vec<Span> = node
-            .members
-            .iter()
-            .filter_map(|m| match m {
-                StateMember::SpecInitialTransition(spec_initial_transition) => {
-                    Some(spec_initial_transition.span())
-                }
-                _ => None,
-            })
-            .collect();
-
-        match (sub_states, initial_transitions.len()) {
-            // No substates, no initial transition: OK
-            (0, 0) => ControlFlow::Continue(()),
-            // Substates or initial transitions: Check semantics
-            _ => {
-                // Check for exactly one initial transition (blocking, as above)
-                if let Err(err) = Self::check_one_initial_transition(
-                    initial_transitions,
-                    loc,
-                    "state with substates",
-                ) {
-                    err.emit();
-                    sma.blocking_error = true;
-                }
-                // Visit the members
-                let saved = sma.parent_state.clone();
-                sma.parent_state =
-                    Some(StateMachineSymbol::State(std::sync::Arc::new(node.clone())));
-                self.state_analyzer_def_state(sma, node)?;
-                sma.parent_state = saved;
-                ControlFlow::Continue(())
-            }
-        }
     }
 }

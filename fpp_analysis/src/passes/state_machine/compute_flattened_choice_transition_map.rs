@@ -10,7 +10,6 @@ use fpp_ast::{
     TransitionExpr,
 };
 use std::ops::ControlFlow;
-use std::sync::Arc;
 
 /// Compute the flattened choice transition map
 pub struct ComputeFlattenedChoiceTransitionMap;
@@ -76,10 +75,6 @@ impl StateMachineAnalysisVisitor for ComputeFlattenedChoiceTransitionMap {
     }
 
     fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
-        let saved = sma.parent_state.clone();
-        sma.parent_state = Some(StateMachineSymbol::State(Arc::new(node.clone())));
-        self.state_analyzer_def_state(sma, node)?;
-        sma.parent_state = saved;
-        ControlFlow::Continue(())
+        self.def_state_texpr(sma, node)
     }
 }

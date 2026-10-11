@@ -1,4 +1,4 @@
-use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor};
+use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor, state_analyzer};
 use crate::errors::SemanticError;
 use crate::semantics::state_machine::{StateMachineAnalysis, StateMachineSymbol};
 use fpp_ast::{AstNode, DefState, SpecStateTransition, StateMember};
@@ -41,6 +41,6 @@ impl StateMachineAnalysisVisitor for CheckSignalUses {
             }
         }
         // Visit members
-        self.state_analyzer_def_state(sma, node)
+        state_analyzer::def_state(self, sma, node)
     }
 }

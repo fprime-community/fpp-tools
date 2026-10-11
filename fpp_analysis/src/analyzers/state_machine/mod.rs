@@ -1,6 +1,8 @@
 mod state_machine_analysis_visitor;
 pub use state_machine_analysis_visitor::*;
 
+pub mod state_analyzer;
+
 mod state_machine_use_analyzer;
 pub use state_machine_use_analyzer::*;
 

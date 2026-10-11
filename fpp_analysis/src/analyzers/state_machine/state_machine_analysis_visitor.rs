@@ -1,3 +1,4 @@
+use crate::analyzers::state_machine::state_analyzer;
 use crate::semantics::state_machine::StateMachineAnalysis;
 use fpp_ast::{
     DefAction, DefChoice, DefGuard, DefSignal, DefState, DefStateMachine, SpecInitialTransition,
@@ -8,10 +9,7 @@ use std::ops::ControlFlow;
 /// The result type of a state machine analysis step
 pub type SmResult = ControlFlow<(), ()>;
 
-/// A generic analysis visitor for state machine semantics.
-///
-/// The default `def_state` pushes the state name onto the scope name list and
-/// visits the state members.
+/// A generic analysis visitor for state machine semantics
 pub trait StateMachineAnalysisVisitor {
     /// The default action: return the analysis unchanged
     fn default(&self, sma: &mut StateMachineAnalysis) -> SmResult {
@@ -59,36 +57,33 @@ pub trait StateMachineAnalysisVisitor {
         self.default(sma)
     }
 
-    /// Analyze a state definition: push the state name onto the scope name
-    /// list, visit the members, and restore the scope name list.
+    /// Analyze a state definition. Every state machine analysis analyzes the
+    /// state definition members ([`state_analyzer::def_state`]).
     fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
-        self.state_analyzer_def_state(sma, node)
+        state_analyzer::def_state(self, sma, node)
     }
 
-    /// The default implementation of `def_state`, available to passes that
-    /// override `def_state` and need to invoke the default behavior directly.
-    fn state_analyzer_def_state(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &DefState,
-    ) -> SmResult {
-        let saved = sma.scope_name_list.clone();
-        sma.scope_name_list.insert(0, node.name.data.clone());
-        self.visit_state_members(sma, &node.members)?;
-        sma.scope_name_list = saved;
-        ControlFlow::Continue(())
-    }
-
-    /// Analyze a state machine definition, visiting its members
+    /// Analyze a state machine definition: an internal definition goes to
+    /// `def_state_machine_internal`, and an external one has no members to visit
     fn def_state_machine(
         &self,
         sma: &mut StateMachineAnalysis,
         node: &DefStateMachine,
     ) -> SmResult {
         match &node.members {
-            Some(members) => self.visit_sm_members(sma, members),
-            None => ControlFlow::Continue(()),
+            Some(members) => self.def_state_machine_internal(sma, node, members),
+            None => self.default(sma),
         }
+    }
+
+    /// Analyze an internal state machine definition, visiting its members
+    fn def_state_machine_internal(
+        &self,
+        sma: &mut StateMachineAnalysis,
+        _node: &DefStateMachine,
+        members: &[StateMachineMember],
+    ) -> SmResult {
+        self.visit_sm_members(sma, members)
     }
 
     fn visit_sm_members(

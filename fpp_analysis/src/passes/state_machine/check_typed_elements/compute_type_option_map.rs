@@ -7,8 +7,8 @@ use crate::semantics::state_machine::{
     StateMachineAnalysis, StateMachineSymbol, StateMachineTypedElement, StateOrChoice,
 };
 use fpp_ast::{
-    AstNode, DefChoice, DefState, DefStateMachine, SpecInitialTransition, SpecStateEntry,
-    SpecStateExit, SpecStateTransition,
+    AstNode, DefChoice, DefStateMachine, SpecInitialTransition, SpecStateEntry, SpecStateExit,
+    SpecStateTransition,
 };
 use std::ops::ControlFlow;
 
@@ -162,9 +162,5 @@ impl StateMachineAnalysisVisitor for ComputeTypeOptionMap<'_> {
         node: &SpecStateTransition,
     ) -> SmResult {
         self.spec_state_transition_te(sma, node)
-    }
-
-    fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
-        self.state_analyzer_def_state(sma, node)
     }
 }

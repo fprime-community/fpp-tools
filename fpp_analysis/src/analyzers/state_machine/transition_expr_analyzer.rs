@@ -1,9 +1,10 @@
-use crate::analyzers::state_machine::SmResult;
+use crate::analyzers::state_machine::{SmResult, StateMachineAnalysisVisitor, state_analyzer};
 use crate::semantics::state_machine::{StateMachineAnalysis, StateMachineSymbol};
 use fpp_ast::{
-    DefChoice, SpecInitialTransition, SpecStateTransition, TransitionExpr, TransitionOrDo,
+    DefChoice, DefState, SpecInitialTransition, SpecStateTransition, TransitionExpr, TransitionOrDo,
 };
 use std::ops::ControlFlow;
+use std::sync::Arc;
 
 /// Analyze transition expressions
 pub trait TransitionExprAnalyzer {
@@ -63,8 +64,20 @@ pub trait TransitionExprAnalyzer {
     // ----------------------------------------------------------------------
 
     fn def_choice_texpr(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
-        let choice = StateMachineSymbol::Choice(std::sync::Arc::new(node.clone()));
+        let choice = StateMachineSymbol::Choice(Arc::new(node.clone()));
         self.choice_transition_expr_pair(sma, &choice, &node.if_transition, &node.else_transition)
+    }
+
+    /// Analyze a state definition with the state as the parent state
+    fn def_state_texpr(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult
+    where
+        Self: StateMachineAnalysisVisitor,
+    {
+        let parent_state = sma.parent_state.clone();
+        sma.parent_state = Some(StateMachineSymbol::State(Arc::new(node.clone())));
+        state_analyzer::def_state(self, sma, node)?;
+        sma.parent_state = parent_state;
+        ControlFlow::Continue(())
     }
 
     fn spec_initial_transition_texpr(

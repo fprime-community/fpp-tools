@@ -20,15 +20,39 @@ impl ConstructTransitionGraph {
     ) -> SmResult {
         StateMachineAnalysisVisitor::def_state_machine(&ConstructTransitionGraph, sma, node)
     }
+}
 
-    fn get_node_from_expr(sma: &StateMachineAnalysis, expr_node: &TransitionExpr) -> TgNode {
-        let sym = sma.use_def_map.get(&expr_node.target.id()).unwrap();
-        let soc = match sym {
-            StateMachineSymbol::State(_) => StateOrChoice::State(sym.clone()),
-            StateMachineSymbol::Choice(_) => StateOrChoice::Choice(sym.clone()),
-            _ => panic!("transition should go to state or choice"),
-        };
-        TgNode { soc }
+impl StateMachineAnalysisVisitor for ConstructTransitionGraph {
+    fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
+        let sym = StateMachineSymbol::State(Arc::new(node.clone()));
+        let soc = StateOrChoice::State(sym);
+        let graph_node = TgNode { soc };
+        sma.transition_graph = sma.transition_graph.add_node(graph_node);
+        self.def_state_texpr(sma, node)
+    }
+
+    fn def_choice(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
+        let sym = StateMachineSymbol::Choice(Arc::new(node.clone()));
+        let soc = StateOrChoice::Choice(sym);
+        let graph_node = TgNode { soc };
+        sma.transition_graph = sma.transition_graph.add_node(graph_node);
+        self.def_choice_texpr(sma, node)
+    }
+
+    fn spec_initial_transition(
+        &self,
+        sma: &mut StateMachineAnalysis,
+        node: &SpecInitialTransition,
+    ) -> SmResult {
+        self.spec_initial_transition_texpr(sma, node)
+    }
+
+    fn spec_state_transition(
+        &self,
+        sma: &mut StateMachineAnalysis,
+        node: &SpecStateTransition,
+    ) -> SmResult {
+        self.spec_state_transition_texpr(sma, node)
     }
 }
 
@@ -96,41 +120,14 @@ impl TransitionExprAnalyzer for ConstructTransitionGraph {
     }
 }
 
-impl StateMachineAnalysisVisitor for ConstructTransitionGraph {
-    fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
-        let sym = StateMachineSymbol::State(Arc::new(node.clone()));
-        let soc = StateOrChoice::State(sym.clone());
-        let graph_node = TgNode { soc };
-        sma.transition_graph = sma.transition_graph.add_node(graph_node);
-        // super: TransitionExprAnalyzer sets parent state and visits members
-        let saved = sma.parent_state.clone();
-        sma.parent_state = Some(sym);
-        self.state_analyzer_def_state(sma, node)?;
-        sma.parent_state = saved;
-        ControlFlow::Continue(())
-    }
-
-    fn def_choice(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
-        let sym = StateMachineSymbol::Choice(Arc::new(node.clone()));
-        let soc = StateOrChoice::Choice(sym);
-        let graph_node = TgNode { soc };
-        sma.transition_graph = sma.transition_graph.add_node(graph_node);
-        self.def_choice_texpr(sma, node)
-    }
-
-    fn spec_initial_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecInitialTransition,
-    ) -> SmResult {
-        self.spec_initial_transition_texpr(sma, node)
-    }
-
-    fn spec_state_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecStateTransition,
-    ) -> SmResult {
-        self.spec_state_transition_texpr(sma, node)
+impl ConstructTransitionGraph {
+    fn get_node_from_expr(sma: &StateMachineAnalysis, expr_node: &TransitionExpr) -> TgNode {
+        let sym = sma.use_def_map.get(&expr_node.target.id()).unwrap();
+        let soc = match sym {
+            StateMachineSymbol::State(_) => StateOrChoice::State(sym.clone()),
+            StateMachineSymbol::Choice(_) => StateOrChoice::Choice(sym.clone()),
+            _ => panic!("transition should go to state or choice"),
+        };
+        TgNode { soc }
     }
 }

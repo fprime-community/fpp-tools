@@ -1,5 +1,5 @@
 use crate::analyzers::state_machine::{
-    SmResult, StateMachineAnalysisVisitor, StateMachineUseAnalyzer,
+    SmResult, StateMachineAnalysisVisitor, StateMachineUseAnalyzer, state_analyzer,
 };
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::SymbolInterface;
@@ -183,7 +183,7 @@ impl StateMachineAnalysisVisitor for CheckStateMachineUses {
         let symbol = StateMachineSymbol::State(Arc::new(node.clone()));
         let scope = sma.symbol_scope_map.get(&symbol).unwrap().clone();
         sma.nested_scope.push(scope);
-        self.state_analyzer_def_state(sma, node)?;
+        state_analyzer::def_state(self, sma, node)?;
         sma.nested_scope.pop();
         ControlFlow::Continue(())
     }
