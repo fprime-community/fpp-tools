@@ -134,6 +134,13 @@ fn expr_primary(p: &mut Parser) -> Option<CompletedMarker> {
             p.bump(IDENT);
             Some(m.complete(p, EXPR_IDENT))
         }
+        // An absolute name
+        DOT if p.nth_at(1, IDENT) => {
+            let m = p.start();
+            p.bump(DOT);
+            p.bump(IDENT);
+            Some(m.complete(p, EXPR_IDENT))
+        }
         SIZEOF_KW => Some(expr_sizeof(p)),
         _ => {
             p.expect(EXPR);
@@ -196,12 +203,12 @@ fn expr_struct(p: &mut Parser) -> CompletedMarker {
 const EXPR_STRUCT_RECOVER: TokenSet = TokenSet::new(&[EOL, COMMA, RIGHT_CURLY, IDENT]);
 
 fn expr_struct_member(p: &mut Parser) {
-    let m = p.start();
-    if !name(p) {
-        m.abandon(p);
-        p.err_recover("struct member expected", EXPR_STRUCT_RECOVER);
+    if !p.at(IDENT) {
+        p.err_recover("identifier expected", EXPR_STRUCT_RECOVER);
         return;
     }
+    let m = p.start();
+    name(p);
 
     p.expect(EQUALS);
     expr(p);

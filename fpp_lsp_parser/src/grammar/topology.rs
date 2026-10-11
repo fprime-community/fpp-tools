@@ -5,18 +5,21 @@ pub(super) fn def_topology(p: &mut Parser) {
     let m = p.start();
     p.eat(DEPLOYMENT_KW);
     p.bump(TOPOLOGY_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
 
     if p.at(IMPLEMENTS_KW) {
+        // `implements` takes an element sequence of qualified identifiers
         let m = p.start();
         p.bump(IMPLEMENTS_KW);
-        qual_ident(p);
-        while p.at(COMMA) {
-            p.bump(COMMA);
-            qual_ident(p);
+        if p.at(COMMA) || p.at(EOL) {
+            p.bump_any();
+        } else {
+            while at_name_start(p) {
+                qual_ident(p);
+                if !p.eat(COMMA) && !p.eat(EOL) {
+                    break;
+                }
+            }
         }
         m.complete(p, IMPLEMENTS_CLAUSE);
     }
@@ -78,13 +81,15 @@ fn spec_instance(p: &mut Parser) {
     m.complete(p, SPEC_INSTANCE);
 }
 
+/// Parse an interface instance name followed by the name of one of its
+/// members, optionally written with a leading dot that makes the instance
+/// name absolute (Scala `opt(dot) ~ node(ident) ~! (dot ~>! qualIdentNodeList)`).
 fn interface_instance_member(p: &mut Parser) {
-    p.expect(IDENT);
-    while p.at(DOT) {
+    if p.at(DOT) && p.nth_at(1, IDENT) {
         p.bump(DOT);
-        if !p.expect(IDENT) {
-            break;
-        }
+    }
+    if p.expect(IDENT) && p.expect(DOT) {
+        qual_ident_node_list(p);
     }
 }
 
@@ -117,10 +122,7 @@ fn spec_tlm_packet_set(p: &mut Parser) {
     p.bump(TELEMETRY_KW);
     p.bump(PACKETS_KW);
 
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
     if p.at(LEFT_CURLY) {
         member_list(
             p,
@@ -172,10 +174,7 @@ fn spec_tlm_packet(p: &mut Parser) {
     assert!(p.at(PACKET_KW));
     let m = p.start();
     p.bump(PACKET_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
 
     expr_opt(p, ID_KW, ID);
 
@@ -206,7 +205,7 @@ fn spec_tlm_packet(p: &mut Parser) {
 pub(super) fn tlm_packet_member(p: &mut Parser) {
     match p.current() {
         INCLUDE_KW => spec_include(p),
-        IDENT => tlm_channel_identifier(p),
+        _ if at_name_start(p) => tlm_channel_identifier(p),
         _ => {
             p.err_and_bump("telemetry packet member expected");
         }
@@ -257,10 +256,7 @@ fn spec_connection_graph_direct(p: &mut Parser) {
     let m = p.start();
     p.bump(CONNECTIONS_KW);
 
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
     if p.at(LEFT_CURLY) {
         member_list(
             p,

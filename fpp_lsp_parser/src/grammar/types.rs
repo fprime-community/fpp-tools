@@ -6,12 +6,16 @@ use super::*;
 pub(super) fn type_alias_or_abstract(p: &mut Parser) {
     assert!(p.at(TYPE_KW) || p.at(DICTIONARY_KW));
     let m = p.start();
-    p.eat(DICTIONARY_KW);
+    let is_dictionary_def = p.eat(DICTIONARY_KW);
     p.bump(TYPE_KW);
     name_r(p, MEMBER_RECOVERY_SET);
     if p.at(EQUALS) {
         p.bump(EQUALS);
         type_name(p);
+        m.complete(p, DEF_ALIAS_TYPE);
+    } else if is_dictionary_def {
+        // Only an alias type may be a dictionary definition
+        p.expect(EQUALS);
         m.complete(p, DEF_ALIAS_TYPE);
     } else {
         m.complete(p, DEF_ABSTRACT_TYPE);
@@ -144,7 +148,7 @@ pub(super) fn type_name(p: &mut Parser) {
                 expr::expr(p)
             }
         }
-        IDENT => qual_ident(p),
+        _ if at_name_start(p) => qual_ident(p),
         _ => {
             m.abandon(p);
             p.expect(TYPE_NAME);

@@ -12,6 +12,7 @@ const STATE_MACHINE_MEMBER_RECOVERY_SET: TokenSet = TokenSet::new(&[
     TYPE_KW,
     ARRAY_KW,
     CONSTANT_KW,
+    DICTIONARY_KW,
     ENUM_KW,
     STRUCT_KW,
     INCLUDE_KW,
@@ -26,10 +27,7 @@ pub(super) fn def_state_machine(p: &mut Parser) {
     let m = p.start();
     p.bump(STATE_KW);
     p.expect(MACHINE_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
     if p.at(LEFT_CURLY) {
         member_list(
             p,
@@ -47,10 +45,15 @@ pub(super) fn def_state_machine(p: &mut Parser) {
 
 pub(super) fn state_machine_member(p: &mut Parser) {
     match p.current() {
+        DICTIONARY_KW if p.nth_at(1, TYPE_KW) => types::type_alias_or_abstract(p),
         TYPE_KW => types::type_alias_or_abstract(p),
+        DICTIONARY_KW if p.nth_at(1, ARRAY_KW) => types::def_array(p),
         ARRAY_KW => types::def_array(p),
+        DICTIONARY_KW if p.nth_at(1, CONSTANT_KW) => module::def_constant(p),
         CONSTANT_KW => module::def_constant(p),
+        DICTIONARY_KW if p.nth_at(1, ENUM_KW) => types::def_enum(p),
         ENUM_KW => types::def_enum(p),
+        DICTIONARY_KW if p.nth_at(1, STRUCT_KW) => types::def_struct(p),
         STRUCT_KW => types::def_struct(p),
         INCLUDE_KW => spec_include(p),
         INITIAL_KW => spec_initial_transition(p),
@@ -80,10 +83,7 @@ fn def_state(p: &mut Parser) {
     assert!(p.at(STATE_KW));
     let m = p.start();
     p.bump(STATE_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
 
     if p.at(LEFT_CURLY) {
         member_list(

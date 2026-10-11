@@ -4,10 +4,7 @@ pub(super) fn def_module(p: &mut Parser) {
     assert!(p.at(MODULE_KW));
     let m = p.start();
     p.bump(MODULE_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
     if p.at(LEFT_CURLY) {
         member_list(
             p,
@@ -63,10 +60,7 @@ fn def_module_template(p: &mut Parser) {
     let m = p.start();
     p.bump(MODULE_KW);
     p.bump(TEMPLATE_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
 
     template_param_list(p);
 
@@ -189,6 +183,17 @@ fn spec_loc(p: &mut Parser) {
     let m = p.start();
     p.bump(LOCATE_KW);
     match p.current() {
+        // Only a constant or a type may be a dictionary definition
+        DICTIONARY_KW if matches!(p.nth(1), CONSTANT_KW | TYPE_KW) => {
+            p.bump(DICTIONARY_KW);
+            p.bump_any();
+        }
+        DICTIONARY_KW => {
+            p.bump(DICTIONARY_KW);
+            m.abandon(p);
+            p.err_recover("constant or type expected", MEMBER_RECOVERY_SET);
+            return;
+        }
         COMPONENT_KW | CONSTANT_KW | INSTANCE_KW | PORT_KW | TEMPLATE_KW | TYPE_KW
         | INTERFACE_KW | SYSTEM_KW => {
             p.bump_any();
@@ -199,7 +204,10 @@ fn spec_loc(p: &mut Parser) {
         }
         _ => {
             m.abandon(p);
-            p.err_recover("expected locate specifier", MEMBER_RECOVERY_SET);
+            p.err_recover(
+                "dictionary specifier or location kind expected",
+                MEMBER_RECOVERY_SET,
+            );
             return;
         }
     }
@@ -292,10 +300,7 @@ fn def_interface(p: &mut Parser) {
     assert!(p.at(INTERFACE_KW));
     let m = p.start();
     p.bump(INTERFACE_KW);
-    if !name(p) {
-        m.abandon(p);
-        return;
-    }
+    name(p);
 
     if p.at(LEFT_CURLY) {
         member_list(
@@ -305,8 +310,10 @@ fn def_interface(p: &mut Parser) {
             interface_member,
             SEMI,
             INTERFACE_MEMBER_LIST,
-            "expected interface member",
+            "component member expected",
         )
+    } else {
+        p.error("{ expected");
     }
 
     m.complete(p, DEF_INTERFACE);

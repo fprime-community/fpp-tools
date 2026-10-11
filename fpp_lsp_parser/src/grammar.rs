@@ -33,23 +33,28 @@ pub(super) const MEMBER_RECOVERY_SET: TokenSet = TokenSet::new(&[
     // LOCATE_KW,
 ]);
 
+/// Parse the name of a definition, or report that it is missing and recover
+/// at a token in `recovery`.
 fn name_r(p: &mut Parser<'_>, recovery: TokenSet) {
     if p.at(IDENT) {
         let m = p.start();
         p.bump(IDENT);
         m.complete(p, NAME);
     } else {
-        p.err_recover("expected a name", recovery);
+        p.err_recover("identifier expected", recovery);
     }
 }
 
+/// Parse the name of a definition, or report that it is missing. Returns
+/// whether the name is present.
 fn name(p: &mut Parser<'_>) -> bool {
-    let m = p.start();
-    if p.eat(IDENT) {
+    if p.at(IDENT) {
+        let m = p.start();
+        p.bump(IDENT);
         m.complete(p, NAME);
         true
     } else {
-        m.abandon(p);
+        p.error("identifier expected");
         false
     }
 }
@@ -60,7 +65,7 @@ fn name_ref_r(p: &mut Parser<'_>, recovery: TokenSet) {
         p.bump(IDENT);
         m.complete(p, NAME_REF);
     } else {
-        p.err_recover("expected a name", recovery);
+        p.err_recover("identifier expected", recovery);
     }
 }
 
@@ -80,13 +85,28 @@ fn error_block(p: &mut Parser<'_>, message: &str) {
     m.complete(p, ERROR);
 }
 
+/// Whether the parser is at the start of a name, which may be absolute
+/// (written with a leading dot).
+fn at_name_start(p: &Parser) -> bool {
+    p.at(IDENT) || (p.at(DOT) && p.nth_at(1, IDENT))
+}
+
+/// Parse a qualified identifier, optionally written with a leading dot that
+/// makes it absolute (Scala `qualIdent`: `opt(dot) ~ qualIdentNodeList`).
 pub(super) fn qual_ident(p: &mut Parser) {
-    if p.current() != IDENT {
+    if !at_name_start(p) {
         p.expect(QUAL_IDENT);
         return;
     }
 
     let m = p.start();
+    p.eat(DOT);
+    qual_ident_node_list(p);
+    m.complete(p, QUAL_IDENT);
+}
+
+/// Parse identifiers separated by dots (Scala `qualIdentNodeList`).
+fn qual_ident_node_list(p: &mut Parser) {
     p.expect(IDENT);
     while p.at(DOT) {
         p.bump(DOT);
@@ -94,8 +114,6 @@ pub(super) fn qual_ident(p: &mut Parser) {
             break;
         }
     }
-
-    m.complete(p, QUAL_IDENT);
 }
 
 /// Whether a sequence of `kind` is an annotated element sequence (Scala

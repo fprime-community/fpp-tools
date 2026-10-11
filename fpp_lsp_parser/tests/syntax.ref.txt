@@ -1366,13 +1366,12 @@ ROOT@0..8355
           PRE_ANNOTATION@4256..4318 "@ Public instance spe ..."
           EOL@4318..4319 "\n"
           WHITESPACE@4319..4323 "    "
-          SPEC_INSTANCE@4323..4332
+          SPEC_INSTANCE@4323..4338
             INSTANCE_KW@4323..4331 "instance"
             WHITESPACE@4331..4332 " "
-          ERROR@4332..4333
-            DOT@4332..4333 "."
-          ERROR@4333..4338
-            IDENT@4333..4338 "i1Abs"
+            QUAL_IDENT@4332..4338
+              DOT@4332..4333 "."
+              IDENT@4333..4338 "i1Abs"
           EOL@4338..4339 "\n"
           WHITESPACE@4339..4343 "    "
           POST_ANNOTATION@4343..4406 "@< Public instance sp ..."
@@ -1591,13 +1590,10 @@ ROOT@0..8355
                     IDENT@4966..4968 "c2"
                   EOL@4968..4969 "\n"
                   WHITESPACE@4969..4977 "        "
-                  ERROR@4977..4978
+                  TLM_CHANNEL_IDENTIFIER@4977..4983
                     DOT@4977..4978 "."
-                  ERROR@4978..4980
                     IDENT@4978..4980 "i1"
-                  ERROR@4980..4981
                     DOT@4980..4981 "."
-                  ERROR@4981..4983
                     IDENT@4981..4983 "c3"
                   EOL@4983..4984 "\n"
                   WHITESPACE@4984..4990 "      "
@@ -1785,21 +1781,18 @@ ROOT@0..8355
       PRE_ANNOTATION@5822..5876 "@ System definition w ..."
       EOL@5876..5877 "\n"
       WHITESPACE@5877..5879 "  "
-      DEF_SYSTEM@5879..5892
+      DEF_SYSTEM@5879..5896
         SYSTEM_KW@5879..5885 "system"
         WHITESPACE@5885..5886 " "
         NAME@5886..5890
           IDENT@5886..5890 "SAbs"
         COLON@5890..5891 ":"
         WHITESPACE@5891..5892 " "
-      ERROR@5892..5893
-        DOT@5892..5893 "."
-      ERROR@5893..5894
-        IDENT@5893..5894 "M"
-      ERROR@5894..5895
-        DOT@5894..5895 "."
-      ERROR@5895..5896
-        IDENT@5895..5896 "T"
+        QUAL_IDENT@5892..5896
+          DOT@5892..5893 "."
+          IDENT@5893..5894 "M"
+          DOT@5894..5895 "."
+          IDENT@5895..5896 "T"
       EOL@5896..5897 "\n"
       WHITESPACE@5897..5899 "  "
       POST_ANNOTATION@5899..5954 "@< System definition  ..."
@@ -1827,20 +1820,17 @@ ROOT@0..8355
       PRE_ANNOTATION@6045..6100 "@ Location specifier  ..."
       EOL@6100..6101 "\n"
       WHITESPACE@6101..6103 "  "
-      SPEC_LOC@6103..6119
+      SPEC_LOC@6103..6140
         LOCATE_KW@6103..6109 "locate"
         WHITESPACE@6109..6110 " "
         INSTANCE_KW@6110..6118 "instance"
         WHITESPACE@6118..6119 " "
-      ERROR@6119..6120
-        DOT@6119..6120 "."
-      ERROR@6120..6121
-        IDENT@6120..6121 "i"
-      WHITESPACE@6121..6122 " "
-      ERROR@6122..6124
+        QUAL_IDENT@6119..6121
+          DOT@6119..6120 "."
+          IDENT@6120..6121 "i"
+        WHITESPACE@6121..6122 " "
         AT_KW@6122..6124 "at"
-      WHITESPACE@6124..6125 " "
-      ERROR@6125..6140
+        WHITESPACE@6124..6125 " "
         LITERAL_STRING@6125..6140 "\"instances.fpp\""
       EOL@6140..6141 "\n"
       WHITESPACE@6141..6143 "  "
@@ -1987,7 +1977,7 @@ ROOT@0..8355
             IDENT@6535..6536 "c"
       EOL@6536..6537 "\n"
       WHITESPACE@6537..6539 "  "
-      DEF_ARRAY@6539..6572
+      DEF_ARRAY@6539..6578
         ARRAY_KW@6539..6544 "array"
         WHITESPACE@6544..6545 " "
         NAME@6545..6564
@@ -2002,18 +1992,14 @@ ROOT@0..8355
               LITERAL_INT@6568..6570 "10"
           RIGHT_SQUARE@6570..6571 "]"
         WHITESPACE@6571..6572 " "
-      ERROR@6572..6573
-        DOT@6572..6573 "."
-      ERROR@6573..6574
-        IDENT@6573..6574 "a"
-      ERROR@6574..6575
-        DOT@6574..6575 "."
-      ERROR@6575..6576
-        IDENT@6575..6576 "b"
-      ERROR@6576..6577
-        DOT@6576..6577 "."
-      ERROR@6577..6578
-        IDENT@6577..6578 "c"
+        TYPE_NAME@6572..6578
+          QUAL_IDENT@6572..6578
+            DOT@6572..6573 "."
+            IDENT@6573..6574 "a"
+            DOT@6574..6575 "."
+            IDENT@6575..6576 "b"
+            DOT@6576..6577 "."
+            IDENT@6577..6578 "c"
       EOL@6578..6580 "\n\n"
       RIGHT_CURLY@6580..6581 "}"
   EOL@6581..6582 "\n"
@@ -2338,7 +2324,7 @@ ROOT@0..8355
       PRE_ANNOTATION@7219..7259 "@ Dot with absolute q ..."
       EOL@7259..7260 "\n"
       WHITESPACE@7260..7262 "  "
-      DEF_CONSTANT@7262..7288
+      DEF_CONSTANT@7262..7294
         CONSTANT_KW@7262..7270 "constant"
         WHITESPACE@7270..7271 " "
         NAME@7271..7285
@@ -2346,18 +2332,17 @@ ROOT@0..8355
         WHITESPACE@7285..7286 " "
         EQUALS@7286..7287 "="
         WHITESPACE@7287..7288 " "
-      ERROR@7288..7289
-        DOT@7288..7289 "."
-      ERROR@7289..7290
-        IDENT@7289..7290 "a"
-      ERROR@7290..7291
-        DOT@7290..7291 "."
-      ERROR@7291..7292
-        IDENT@7291..7292 "b"
-      ERROR@7292..7293
-        DOT@7292..7293 "."
-      ERROR@7293..7294
-        IDENT@7293..7294 "c"
+        EXPR@7288..7294
+          EXPR_POSTFIX@7288..7294
+            EXPR_MEMBER@7288..7294
+              EXPR_MEMBER@7288..7292
+                EXPR_IDENT@7288..7290
+                  DOT@7288..7289 "."
+                  IDENT@7289..7290 "a"
+                DOT@7290..7291 "."
+                IDENT@7291..7292 "b"
+              DOT@7292..7293 "."
+              IDENT@7293..7294 "c"
       EOL@7294..7295 "\n"
       WHITESPACE@7295..7297 "  "
       POST_ANNOTATION@7297..7338 "@< Dot with absolute  ..."
@@ -2404,7 +2389,7 @@ ROOT@0..8355
       PRE_ANNOTATION@7463..7510 "@ Identifier with abs ..."
       EOL@7510..7511 "\n"
       WHITESPACE@7511..7513 "  "
-      DEF_CONSTANT@7513..7541
+      DEF_CONSTANT@7513..7543
         CONSTANT_KW@7513..7521 "constant"
         WHITESPACE@7521..7522 " "
         NAME@7522..7538
@@ -2412,10 +2397,10 @@ ROOT@0..8355
         WHITESPACE@7538..7539 " "
         EQUALS@7539..7540 "="
         WHITESPACE@7540..7541 " "
-      ERROR@7541..7542
-        DOT@7541..7542 "."
-      ERROR@7542..7543
-        IDENT@7542..7543 "x"
+        EXPR@7541..7543
+          EXPR_IDENT@7541..7543
+            DOT@7541..7542 "."
+            IDENT@7542..7543 "x"
       EOL@7543..7544 "\n"
       WHITESPACE@7544..7546 "  "
       POST_ANNOTATION@7546..7594 "@< Identifier with ab ..."
@@ -2651,43 +2636,3 @@ ROOT@0..8355
   EOL@8339..8340 "\n"
   POST_ANNOTATION@8340..8354 "@< Expressions"
   EOL@8354..8355 "\n"
-error 4331..4332: expected QUAL_IDENT
-error 4332..4332: } expected
-error 4333..4333: topology member expected
-error 4567..4567: expected IDENT
-error 4577..4577: expected IDENT
-error 4977..4977: telemetry packet member expected
-error 4978..4978: } expected
-error 4980..4980: telemetry packet member expected
-error 4981..4981: } expected
-error 5132..5132: expected IDENT
-error 5336..5336: expected IDENT
-error 5892..5892: expected QUAL_IDENT
-error 5892..5892: } expected
-error 5893..5893: module member expected
-error 5894..5894: } expected
-error 5895..5895: module member expected
-error 6118..6119: expected QUAL_IDENT
-error 6119..6119: expected AT_KW
-error 6119..6119: expected LITERAL_STRING
-error 6119..6119: } expected
-error 6120..6120: module member expected
-error 6122..6122: } expected
-error 6125..6125: module member expected
-error 6571..6572: expected TYPE_NAME
-error 6572..6572: } expected
-error 6573..6573: module member expected
-error 6574..6574: } expected
-error 6575..6575: module member expected
-error 6576..6576: } expected
-error 6577..6577: module member expected
-error 7288..7288: expected EXPR
-error 7288..7288: } expected
-error 7289..7289: module member expected
-error 7290..7290: } expected
-error 7291..7291: module member expected
-error 7292..7292: } expected
-error 7293..7293: module member expected
-error 7541..7541: expected EXPR
-error 7541..7541: } expected
-error 7542..7542: module member expected
