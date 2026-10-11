@@ -1,7 +1,7 @@
- --> [ local path prefix ]/state_machine/redef/state_enum.fpp:8:8
+ --> [ local path prefix ]/state_machine/redef/state_enum.fpp:8:3
   |
 8 |   type State = U32
-  |        ^^^^^ redefinition of symbol State
+  |   ^^^^^^^^^^^^^^^^ redefinition of symbol State
   |
  ::: [ local path prefix ]/state_machine/redef/state_enum.fpp:1:1
   |

@@ -1,6 +1,5 @@
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::SymbolInterface;
-use fpp_core::Spanned;
 use rustc_hash::FxHashMap as HashMap;
 
 /// A type-generic local mapping of unqualified names to symbols
@@ -27,8 +26,8 @@ impl<S: SymbolInterface> GenericNameSymbolMap<S> {
             }
             Some(prev) => Err(SemanticError::RedefinedSymbol {
                 name: name.to_string(),
-                loc: symbol.redefined_loc(),
-                prev_loc: prev.node().span(),
+                loc: symbol.get_loc(),
+                prev_loc: prev.get_loc(),
             }),
         }
     }

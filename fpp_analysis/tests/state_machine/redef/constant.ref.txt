@@ -1,7 +1,7 @@
- --> [ local path prefix ]/state_machine/redef/constant.fpp:3:12
+ --> [ local path prefix ]/state_machine/redef/constant.fpp:3:3
   |
 3 |   constant c = 1
-  |            ^ redefinition of symbol c
+  |   ^^^^^^^^^^^^^^ redefinition of symbol c
   |
  ::: [ local path prefix ]/state_machine/redef/constant.fpp:2:3
   |

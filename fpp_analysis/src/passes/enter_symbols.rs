@@ -197,8 +197,8 @@ impl<'ast> Visitor<'ast> for EnterSymbols {
                     Some(other) => {
                         SemanticError::RedefinedSymbol {
                             name: def.name.data.clone(),
-                            loc: def.name.span(),
-                            prev_loc: other.name().span(),
+                            loc: def.span(),
+                            prev_loc: other.get_loc(),
                         }
                         .emit();
                         false

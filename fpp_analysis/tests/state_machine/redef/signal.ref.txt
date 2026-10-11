@@ -1,7 +1,7 @@
- --> [ local path prefix ]/state_machine/redef/signal.fpp:3:10
+ --> [ local path prefix ]/state_machine/redef/signal.fpp:3:3
   |
 3 |   signal s
-  |          ^ redefinition of symbol s
+  |   ^^^^^^^^ redefinition of symbol s
   |
  ::: [ local path prefix ]/state_machine/redef/signal.fpp:2:3
   |

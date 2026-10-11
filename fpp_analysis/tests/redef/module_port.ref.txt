@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/module_port.fpp:2:6
+ --> [ local path prefix ]/redef/module_port.fpp:2:1
   |
 2 | port P
-  |      ^ redefinition of symbol P
+  | ^^^^^^ redefinition of symbol P
   |
  ::: [ local path prefix ]/redef/module_port.fpp:1:1
   |

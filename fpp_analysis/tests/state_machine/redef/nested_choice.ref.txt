@@ -1,7 +1,7 @@
- --> [ local path prefix ]/state_machine/redef/nested_choice.fpp:6:12
+ --> [ local path prefix ]/state_machine/redef/nested_choice.fpp:6:5
   |
 6 |     choice C { if g enter S else enter S }
-  |            ^ redefinition of symbol C
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ redefinition of symbol C
   |
  ::: [ local path prefix ]/state_machine/redef/nested_choice.fpp:5:5
   |

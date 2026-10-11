@@ -1,7 +1,7 @@
- --> [ local path prefix ]/redef/array.fpp:2:7
+ --> [ local path prefix ]/redef/array.fpp:2:1
   |
 2 | array A = [2] U32
-  |       ^ redefinition of symbol A
+  | ^^^^^^^^^^^^^^^^^ redefinition of symbol A
   |
  ::: [ local path prefix ]/redef/array.fpp:1:1
   |

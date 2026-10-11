@@ -14,11 +14,6 @@ pub trait SymbolInterface: Clone {
     fn get_loc(&self) -> Span {
         self.node().span()
     }
-    /// Gets the location to report when this symbol conflicts with one that is
-    /// already in scope
-    fn redefined_loc(&self) -> Span {
-        self.name().span()
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -172,18 +167,6 @@ impl SymbolInterface for Symbol {
             Symbol::TemplateConstantArg { param_def, .. } => &param_def.name,
             Symbol::TemplateTypeArg { param_def, .. } => &param_def.name,
             Symbol::TemplateInterfaceArg { param_def, .. } => &param_def.name,
-        }
-    }
-
-    fn redefined_loc(&self) -> Span {
-        if self.is_template_arg() {
-            // The name of a bound parameter is in the template definition, which
-            // may be expanded many times. It is this expansion's arguments that
-            // put two parameters of the same name in scope together, so report
-            // the conflict there.
-            self.get_loc()
-        } else {
-            self.name().span()
         }
     }
 }
