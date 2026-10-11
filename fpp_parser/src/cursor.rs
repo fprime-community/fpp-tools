@@ -114,10 +114,9 @@ impl<'a> Cursor<'a> {
     }
 
     /// The end-of-line token for the run of newlines and comments that starts at
-    /// `start`. The token is located at the comment that starts the run, or
-    /// else at the start of the line after the first newline of the run, so
-    /// that a syntax error at an end of line is reported on the line that
-    /// follows it.
+    /// `start`. The token is empty and is located where a syntax error at an
+    /// end of line is reported: at the comment that starts the run, or else at
+    /// the start of the line after the first newline of the run.
     fn eol_token(&self, start: usize) -> Token {
         let rest = &self.content[start..];
         let loc = if rest.starts_with('#') {
