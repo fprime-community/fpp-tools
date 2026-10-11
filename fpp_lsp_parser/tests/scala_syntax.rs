@@ -38,6 +38,16 @@ const CASES: &[(TopEntryPoint, &str, bool)] = &[
     (Module, "constant a = 1 +\n  2\n", true),
     (Module, "constant a = 1 <<\n  2\n", false),
     (Module, "constant a = 4 >>\n  1\n", false),
+    // A line continuation ends a run of newlines
+    (Module, "constant a = (1\n\\\n)\n", false),
+    (Module, "constant a = (1 # comment\n\\\n)\n", false),
+    (Module, "constant a = (1 \\\n)\n", true),
+    (Module, "constant a = (1 \\\n\n)\n", true),
+    (Module, "constant a = [1\n\\\n]\n", true),
+    (Module, "constant a = (\\\n1)\n", true),
+    (Module, "constant a = (\\\n\n1)\n", false),
+    (Module, "constant a = 1 +\n\\\n  2\n", true),
+    (Module, "constant a = 1 + \\\n\n  2\n", false),
     // Annotations
     (
         Module,

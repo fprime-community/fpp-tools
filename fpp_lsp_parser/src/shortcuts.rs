@@ -50,10 +50,12 @@ impl LexedStr<'_> {
     /// Return the token index of the next other token.
     ///
     /// This mirrors the Scala lexer's `eatNewlines`, which stops at an
-    /// annotation.
+    /// annotation and at a line continuation.
     fn eat_newlines(&self, i: usize) -> usize {
         for ii in i..self.len() {
             match self.kind(ii) {
+                // A line continuation is lexed as whitespace
+                WHITESPACE if self.text(ii).starts_with('\\') => return ii,
                 EOL | COMMENT | WHITESPACE => (),
                 _ => return ii,
             }
