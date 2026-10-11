@@ -35,48 +35,8 @@ impl<'ast> FinalizeConstantExprs<'ast> {
         }
     }
 
-    /// Recompute the type and value of a use of a constant symbol
-    fn constant_use_node(&self, a: &mut Analysis, node: fpp_core::Node) -> ControlFlow<()> {
-        let Some(symbol) = a.use_def_map.get(&node).cloned() else {
-            return ControlFlow::Continue(());
-        };
-        match &symbol {
-            // Constant symbol: visit the constant definition to recompute its
-            // type and value
-            Symbol::Constant(def) => {
-                def.visit(a, self)?;
-            }
-            // Enum symbol: if this is in scope, then we are in the enum
-            // definition, so it already has a type and value
-            Symbol::EnumConstant(_) => {}
-            Symbol::TemplateConstantArg { .. } => {
-                self.template_constant_arg(a, &symbol)?;
-            }
-            // Invalid use of a symbol in an expression
-            _ => {
-                SemanticError::InvalidSymbol {
-                    symbol_name: symbol.name().data.clone(),
-                    msg: "not a constant symbol".to_string(),
-                    loc: node.span(),
-                    def_loc: symbol.node().span(),
-                }
-                .emit();
-                return ControlFlow::Break(());
-            }
-        }
-
-        let id = symbol.node();
-        if let Some(ty) = a.type_map.get(&id).cloned() {
-            a.assign_type(node, ty);
-        }
-        if let Some(v) = a.value_map.get(&id).cloned() {
-            a.assign_value(node, v);
-        }
-        ControlFlow::Continue(())
-    }
-
     /// Recompute the type and value of an array expression
-    fn finalize_array(
+    fn expr_array_node(
         &self,
         a: &mut Analysis,
         node: &'ast Expr,
@@ -136,7 +96,7 @@ impl<'ast> FinalizeConstantExprs<'ast> {
     }
 
     /// Recompute the type and value of an array subscript expression
-    fn finalize_array_subscript(
+    fn expr_array_subscript_node(
         &self,
         a: &mut Analysis,
         node: &'ast Expr,
@@ -159,6 +119,7 @@ impl<'ast> FinalizeConstantExprs<'ast> {
             _ => return ControlFlow::Continue(()),
         };
 
+        // Check if the index is in bounds
         // For a scalar value promoted to an array, the size is not known until
         // the array type is finalized, so this is the first place where the upper
         // bound can be checked
@@ -202,7 +163,7 @@ impl<'ast> FinalizeConstantExprs<'ast> {
     }
 
     /// Recompute the type and value of a struct member selection
-    fn finalize_dot(
+    fn expr_dot_node(
         &self,
         a: &mut Analysis,
         node: &'ast Expr,
@@ -235,7 +196,7 @@ impl<'ast> FinalizeConstantExprs<'ast> {
     }
 
     /// Recompute the type and value of a struct expression
-    fn finalize_struct(
+    fn expr_struct_node(
         &self,
         a: &mut Analysis,
         node: &'ast Expr,
@@ -265,6 +226,46 @@ impl<'ast> FinalizeConstantExprs<'ast> {
         );
         ControlFlow::Continue(())
     }
+
+    /// Recompute the type and value of a use of a constant symbol
+    fn constant_use_node(&self, a: &mut Analysis, node: fpp_core::Node) -> ControlFlow<()> {
+        let Some(symbol) = a.use_def_map.get(&node).cloned() else {
+            return ControlFlow::Continue(());
+        };
+        match &symbol {
+            // Constant symbol: visit the constant definition to recompute its
+            // type and value
+            Symbol::Constant(def) => {
+                def.visit(a, self)?;
+            }
+            // Enum symbol: if this is in scope, then we are in the enum
+            // definition, so it already has a type and value
+            Symbol::EnumConstant(_) => {}
+            Symbol::TemplateConstantArg { .. } => {
+                self.template_constant_arg(a, &symbol)?;
+            }
+            // Invalid use of a symbol in an expression
+            _ => {
+                SemanticError::InvalidSymbol {
+                    symbol_name: symbol.name().data.clone(),
+                    msg: "not a constant symbol".to_string(),
+                    loc: node.span(),
+                    def_loc: symbol.node().span(),
+                }
+                .emit();
+                return ControlFlow::Break(());
+            }
+        }
+
+        let id = symbol.node();
+        if let Some(ty) = a.type_map.get(&id).cloned() {
+            a.assign_type(node, ty);
+        }
+        if let Some(v) = a.value_map.get(&id).cloned() {
+            a.assign_value(node, v);
+        }
+        ControlFlow::Continue(())
+    }
 }
 
 impl<'ast> Visitor<'ast> for FinalizeConstantExprs<'ast> {
@@ -283,12 +284,13 @@ impl<'ast> Visitor<'ast> for FinalizeConstantExprs<'ast> {
         }
         self.super_visit(a, Node::Expr(node))?;
         match &node.kind {
-            ExprKind::Array(elts) => self.finalize_array(a, node, elts),
-            ExprKind::ArraySubscript { e1, e2 } => self.finalize_array_subscript(a, node, e1, e2),
-            ExprKind::Dot { e, id } => self.finalize_dot(a, node, e, &id.data),
-            ExprKind::Struct(members) => self.finalize_struct(a, node, members),
-            // Every other kind of expression keeps the type and value it was
-            // given before the type definitions were finalized
+            ExprKind::Array(elts) => self.expr_array_node(a, node, elts),
+            ExprKind::ArraySubscript { e1, e2 } => self.expr_array_subscript_node(a, node, e1, e2),
+            ExprKind::Dot { e, id } => self.expr_dot_node(a, node, e, &id.data),
+            ExprKind::Struct(members) => self.expr_struct_node(a, node, members),
+            // An identifier use was updated by constant_use during super_visit,
+            // and every other kind of expression keeps the type and value it had
+            // before the type definitions were finalized
             _ => ControlFlow::Continue(()),
         }
     }

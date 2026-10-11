@@ -5,9 +5,9 @@ use crate::analyzers::use_analyzer::UseAnalyzer;
 use crate::errors::{SemanticError, SemanticResult};
 use crate::passes::FinalizeTypeDefs;
 use crate::semantics::{
-    AnonArrayValue, AnonStructValue, ArrayValue, BooleanValue, EnumConstantValue, FloatValue,
-    IntegerValue, QualifiedName, SerializedSizeError, StringValue, StructValue, Symbol,
-    SymbolInterface, Type, Value,
+    AliasType, AnonArrayValue, AnonStructValue, ArrayType, ArrayValue, BooleanValue,
+    EnumConstantValue, EnumType, FloatValue, IntegerValue, QualifiedName, SerializedSizeError,
+    StringValue, StructType, StructValue, Symbol, SymbolInterface, Type, Value,
 };
 use fpp_ast::{
     Binop, DefConstant, DefEnum, DefEnumConstant, Expr, ExprKind, Ident, Node, StructExprMember,
@@ -35,23 +35,228 @@ impl<'ast> EvalConstantExprs<'ast> {
             super_: UseAnalyzer::new(),
         }
     }
+}
 
-    /// Evaluates the definition that a constant use resolves to, then copies its
-    /// value to the use.
-    fn eval_constant_use(&self, a: &mut Analysis, node: fpp_core::Node) -> ControlFlow<()> {
-        let symbol = match a.use_def_map.get(&node) {
-            Some(sym @ Symbol::Constant(def)) => {
-                let sym = sym.clone();
-                def.clone().visit(a, self)?;
-                sym
+impl<'ast> UseAnalysisPass<'ast, Analysis> for EvalConstantExprs<'ast> {
+    fn constant_use(
+        &self,
+        a: &mut Analysis,
+        node: &'ast Expr,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.constant_use_node(a, node.node_id)
+    }
+
+    fn implied_constant_use(
+        &self,
+        a: &mut Analysis,
+        node: &Expr,
+        _: QualifiedName,
+    ) -> ControlFlow<Self::Break> {
+        self.constant_use_node(a, node.node_id)
+    }
+
+    /// The value of a bound constant parameter is the value of the argument
+    /// bound to it, converted to the type declared in the parameter.
+    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        let Symbol::TemplateConstantArg { param_def, value } = arg else {
+            return ControlFlow::Continue(());
+        };
+        let param_def = param_def.clone();
+        let value = value.clone();
+        let loc = value.span();
+
+        // Compute the value of the argument
+        visit_template_arg(self, a, arg)?;
+
+        // The type of the parameter may name an array or struct whose size or
+        // default value is not known until it is finalized
+        if let Some(ty) = a.type_map.get(&param_def.type_name.node_id).cloned() {
+            FinalizeType(self).finalize_if_needed(a, &ty)?;
+        }
+        let ty = FinalizeTypeDefs::new().ty(a, &param_def.type_name)?;
+
+        let Some(v) = a.value_map.get(&value.node_id).cloned() else {
+            return ControlFlow::Continue(());
+        };
+        match v.convert(&ty) {
+            Some(new_value) => {
+                a.assign_type(value.node_id, ty);
+                a.assign_value(value.node_id, new_value);
+                ControlFlow::Continue(())
             }
+            None => {
+                SemanticError::TypeMismatch {
+                    loc,
+                    msg: format!("cannot convert value {} to type {}", v, ty),
+                    reason: None,
+                }
+                .emit();
+                // The bound parameter has no usable value, so every use of it
+                // would report a further error
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
+        visit_template_arg(self, a, arg)
+    }
+}
+
+impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
+    type Break = ();
+    type State = Analysis;
+
+    fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
+        self.super_.visit(self, a, node)
+    }
+
+    fn visit_trans_units(
+        &self,
+        a: &mut Self::State,
+        i: impl Iterator<Item = &'ast TransUnit>,
+    ) -> ControlFlow<Self::Break> {
+        // The visited symbol set records the type definitions that this pass
+        // finalizes on demand. CheckUseDefCycles leaves the symbols it visits
+        // in the set, so the pass starts with an empty set.
+        a.visited_symbol_set.clear();
+        for tu in i {
+            self.visit_trans_unit(a, tu)?;
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn visit_def_constant(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefConstant,
+    ) -> ControlFlow<Self::Break> {
+        if a.value_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
+
+        self.super_visit(a, Node::DefConstant(node))?;
+        if let Some(v) = a.value_map.get(&node.value.node_id).cloned() {
+            a.assign_value(node.node_id, v);
+        }
+
+        ControlFlow::Continue(())
+    }
+
+    fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
+        fn check_for_duplicate_value(
+            a: &Analysis,
+            constants: &[DefEnumConstant],
+        ) -> SemanticResult {
+            let mut values: HashMap<i128, Span> = HashMap::default();
+            for constant in constants {
+                // A constant with no value failed to evaluate
+                if let Some(Value::EnumConstant(EnumConstantValue { value, .. })) =
+                    a.value_map.get(&constant.node_id)
+                    && let Some(prev_loc) = values.insert(value.1, constant.span())
+                {
+                    return Err(SemanticError::DuplicateEnumValue {
+                        value: value.1.to_string(),
+                        loc: constant.span(),
+                        prev_loc,
+                    });
+                }
+            }
+            Ok(())
+        }
+
+        self.super_visit(a, Node::DefEnum(node))?;
+        match check_for_duplicate_value(a, &node.constants) {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(err) => {
+                err.emit();
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    fn visit_def_enum_constant(
+        &self,
+        a: &mut Self::State,
+        node: &'ast DefEnumConstant,
+    ) -> ControlFlow<Self::Break> {
+        if a.value_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
+        // An implied enum constant with no value belongs to an enum whose
+        // constants are invalid, and that error is already reported
+        let Some(e) = &node.value else {
+            return ControlFlow::Continue(());
+        };
+
+        self.super_visit(a, Node::DefEnumConstant(node))?;
+        // A value that does not convert to Integer does not have a numeric
+        // type, and that error is already reported
+        let int_value = match a
+            .value_map
+            .get(&e.node_id)
+            .and_then(|v| v.convert(&Arc::new(Type::Integer)))
+        {
+            Some(Value::Integer(IntegerValue(int_value))) => int_value,
+            _ => return ControlFlow::Continue(()),
+        };
+        let enum_type = match a.type_map.get(&node.node_id).map(|t| t.deref()) {
+            Some(Type::Enum(enum_type)) => enum_type.clone(),
+            _ => return ControlFlow::Continue(()),
+        };
+        let enum_value = EnumConstantValue::new(node.name.data.clone(), int_value, enum_type);
+        a.assign_value(node.node_id, Value::EnumConstant(enum_value));
+        ControlFlow::Continue(())
+    }
+
+    fn visit_expr(&self, a: &mut Self::State, node: &'ast Expr) -> ControlFlow<Self::Break> {
+        // If we've already visited the expression, don't analyze it again
+        if a.value_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
+        // An expression with no type failed to type check, and that error is
+        // already reported, so it has no value
+        if !a.type_map.contains_key(&node.node_id) {
+            return ControlFlow::Continue(());
+        }
+
+        match &node.kind {
+            ExprKind::Array(elts) => self.expr_array_node(a, node, elts),
+            ExprKind::ArraySubscript { e1, e2 } => self.expr_array_subscript_node(a, node, e1, e2),
+            ExprKind::Binop { left, op, right } => self.expr_binop_node(a, node, left, op, right),
+            ExprKind::Dot { e, id } => self.expr_dot_node(a, node, e, id),
+            // An identifier is a constant use, evaluated by constant_use
+            ExprKind::Ident { .. } => self.super_visit(a, Node::Expr(node)),
+            ExprKind::LiteralBool(b) => self.expr_literal_bool_node(a, node, *b),
+            ExprKind::LiteralFloat(value) => self.expr_literal_float_node(a, node, value),
+            ExprKind::LiteralInt(value) => self.expr_literal_int_node(a, node, value),
+            ExprKind::LiteralString(value) => self.expr_literal_string_node(a, node, value),
+            ExprKind::Paren(e) => self.expr_paren_node(a, node, e),
+            ExprKind::SizeOf(type_name) => self.expr_size_of_node(a, node, type_name),
+            ExprKind::Struct(members) => self.expr_struct_node(a, node, members),
+            ExprKind::Unop { e, .. } => self.expr_unop_node(a, node, e),
+        }
+    }
+}
+
+impl<'ast> EvalConstantExprs<'ast> {
+    /// The body of a constant use: evaluate the definition that the use
+    /// refers to, then copy its value to the use node
+    fn constant_use_node(&self, a: &mut Analysis, node: fpp_core::Node) -> ControlFlow<()> {
+        let symbol = match a.use_def_map.get(&node) {
             Some(sym @ Symbol::EnumConstant(def)) => {
                 let sym = sym.clone();
                 def.clone().visit(a, self)?;
                 sym
             }
-            // Bound constant parameter: evaluate the bound argument to ensure
-            // that it has a value
+            Some(sym @ Symbol::Constant(def)) => {
+                let sym = sym.clone();
+                def.clone().visit(a, self)?;
+                sym
+            }
+            // Template constant argument symbol: evaluate the bound argument to
+            // ensure that it has a value
             Some(sym @ Symbol::TemplateConstantArg { value, .. }) => {
                 let sym = sym.clone();
                 if !a.value_map.contains_key(&value.node_id) {
@@ -62,61 +267,8 @@ impl<'ast> EvalConstantExprs<'ast> {
             _ => return ControlFlow::Continue(()),
         };
 
-        if let Some(value) = a.value_map.get(&symbol.node()).cloned() {
-            a.assign_value(node, value);
-        }
-
-        ControlFlow::Continue(())
-    }
-
-    /// Whether `ty` is finalized: either it has a definition symbol that has
-    /// been visited, or it has no definition symbol at all.
-    fn type_is_finalized(a: &Analysis, ty: &Arc<Type>) -> bool {
-        match ty.def_symbol() {
-            Some(symbol) => a.visited_symbol_set.contains(&symbol),
-            None => true,
-        }
-    }
-
-    /// Finalizes `ty` unless it is already finalized.
-    fn finalize_if_needed(&self, a: &mut Analysis, ty: &Arc<Type>) -> ControlFlow<()> {
-        if Self::type_is_finalized(a, ty) {
-            return ControlFlow::Continue(());
-        }
-        self.finalize_type(a, ty)
-    }
-
-    /// Evaluates a type definition with this pass and then hands it to
-    /// `FinalizeTypeDefs`, recursing into element and member types
-    fn finalize_type(&self, a: &mut Analysis, ty: &Arc<Type>) -> ControlFlow<()> {
-        let finalize_defs = FinalizeTypeDefs::new();
-        match ty.deref() {
-            Type::Alias(alias) => {
-                let def = alias.node.clone();
-                self.visit_def_alias_type(a, &def)?;
-                self.finalize_if_needed(a, &alias.alias_type)?;
-                finalize_defs.visit_def_alias_type(a, &def)?;
-            }
-            Type::Array(array) => {
-                let def = array.node.clone();
-                self.visit_def_array(a, &def)?;
-                self.finalize_if_needed(a, &array.anon_array.elt_type)?;
-                finalize_defs.visit_def_array(a, &def)?;
-            }
-            Type::Enum(enum_ty) => {
-                let def = enum_ty.node.clone();
-                self.visit_def_enum(a, &def)?;
-                finalize_defs.visit_def_enum(a, &def)?;
-            }
-            Type::Struct(struct_ty) => {
-                let def = struct_ty.node.clone();
-                self.visit_def_struct(a, &def)?;
-                for (_, member_type) in &struct_ty.anon_struct.members {
-                    self.finalize_if_needed(a, member_type)?;
-                }
-                finalize_defs.visit_def_struct(a, &def)?;
-            }
-            _ => {}
+        if let Some(v) = a.value_map.get(&symbol.node()).cloned() {
+            a.assign_value(node, v);
         }
 
         ControlFlow::Continue(())
@@ -346,20 +498,14 @@ impl<'ast> EvalConstantExprs<'ast> {
         self.super_visit(a, Node::Expr(node))?;
         // Finalize the type so we can compute the size
         if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
-            self.finalize_if_needed(a, &ty)?;
+            FinalizeType(self).finalize_if_needed(a, &ty)?;
         }
         // A `string size N` type name has no definition to evaluate,
         // but its size still has to be resolved into the type.
         FinalizeTypeDefs::new().ty(a, type_name)?;
         if let Some(ty) = a.type_map.get(&type_name.node_id).cloned() {
-            // Get the finalized type. For a type with a definition,
-            // the finalized type is mapped to the definition in the
-            // type map; otherwise the type is already the finalized
-            // type.
-            let finalized = match ty.def_node_id() {
-                Some(def_node) => a.type_map.get(&def_node).cloned().unwrap_or(ty),
-                None => ty,
-            };
+            // Get the finalized type
+            let finalized = FinalizeType::get_finalized_type(a, &ty);
             // Use the finalized type to compute the size
             match finalized.serialized_size(a) {
                 Ok(size) => {
@@ -475,205 +621,78 @@ impl<'ast> EvalConstantExprs<'ast> {
     }
 }
 
-impl<'ast> Visitor<'ast> for EvalConstantExprs<'ast> {
-    type Break = ();
-    type State = Analysis;
+// Visit nodes and member types, and finalize type defs
+// The FinalizeTypeDefs methods update the visited symbol set
+struct FinalizeType<'p, 'ast>(&'p EvalConstantExprs<'ast>);
 
-    fn super_visit(&self, a: &mut Analysis, node: Node<'ast>) -> ControlFlow<Self::Break> {
-        self.super_.visit(self, a, node)
-    }
-
-    fn visit_trans_units(
-        &self,
-        a: &mut Self::State,
-        i: impl Iterator<Item = &'ast TransUnit>,
-    ) -> ControlFlow<Self::Break> {
-        // The visited symbol set records the type definitions that this pass
-        // finalizes on demand. CheckUseDefCycles leaves the symbols it visits
-        // in the set, so the pass starts with an empty set.
-        a.visited_symbol_set.clear();
-        for tu in i {
-            self.visit_trans_unit(a, tu)?;
-        }
-        ControlFlow::Continue(())
-    }
-
-    fn visit_def_constant(
-        &self,
-        a: &mut Self::State,
-        node: &'ast DefConstant,
-    ) -> ControlFlow<Self::Break> {
-        if a.value_map.contains_key(&node.node_id) {
-            return ControlFlow::Continue(());
-        }
-
-        self.super_visit(a, Node::DefConstant(node))?;
-        if let Some(v) = a.value_map.get(&node.value.node_id).cloned() {
-            a.assign_value(node.node_id, v);
-        }
-
-        ControlFlow::Continue(())
-    }
-
-    fn visit_def_enum(&self, a: &mut Self::State, node: &'ast DefEnum) -> ControlFlow<Self::Break> {
-        fn check_for_duplicate_value(
-            a: &Analysis,
-            constants: &[DefEnumConstant],
-        ) -> SemanticResult {
-            let mut values: HashMap<i128, Span> = HashMap::default();
-            for constant in constants {
-                // A constant with no value failed to evaluate
-                if let Some(Value::EnumConstant(EnumConstantValue { value, .. })) =
-                    a.value_map.get(&constant.node_id)
-                    && let Some(prev_loc) = values.insert(value.1, constant.span())
-                {
-                    return Err(SemanticError::DuplicateEnumValue {
-                        value: value.1.to_string(),
-                        loc: constant.span(),
-                        prev_loc,
-                    });
-                }
-            }
-            Ok(())
-        }
-
-        self.super_visit(a, Node::DefEnum(node))?;
-        match check_for_duplicate_value(a, &node.constants) {
-            Ok(()) => ControlFlow::Continue(()),
-            Err(err) => {
-                err.emit();
-                ControlFlow::Break(())
-            }
+impl<'p, 'ast> FinalizeType<'p, 'ast> {
+    fn ty(&self, a: &mut Analysis, t: &Arc<Type>) -> ControlFlow<()> {
+        match t.deref() {
+            Type::Alias(t) => self.alias_type(a, t),
+            Type::Array(t) => self.array(a, t),
+            Type::Enum(t) => self.enumeration(a, t),
+            Type::Struct(t) => self.struct_(a, t),
+            _ => ControlFlow::Continue(()),
         }
     }
 
-    fn visit_def_enum_constant(
-        &self,
-        a: &mut Self::State,
-        node: &'ast DefEnumConstant,
-    ) -> ControlFlow<Self::Break> {
-        if a.value_map.contains_key(&node.node_id) {
-            return ControlFlow::Continue(());
-        }
-        // An implied enum constant with no value belongs to an enum whose
-        // constants are invalid, and that error is already reported
-        let Some(e) = &node.value else {
-            return ControlFlow::Continue(());
-        };
-
-        self.super_visit(a, Node::DefEnumConstant(node))?;
-        // A value that does not convert to Integer does not have a numeric
-        // type, and that error is already reported
-        let int_value = match a
-            .value_map
-            .get(&e.node_id)
-            .and_then(|v| v.convert(&Arc::new(Type::Integer)))
-        {
-            Some(Value::Integer(IntegerValue(int_value))) => int_value,
-            _ => return ControlFlow::Continue(()),
-        };
-        let enum_type = match a.type_map.get(&node.node_id).map(|t| t.deref()) {
-            Some(Type::Enum(enum_type)) => enum_type.clone(),
-            _ => return ControlFlow::Continue(()),
-        };
-        let enum_value = EnumConstantValue::new(node.name.data.clone(), int_value, enum_type);
-        a.assign_value(node.node_id, Value::EnumConstant(enum_value));
-        ControlFlow::Continue(())
+    fn alias_type(&self, a: &mut Analysis, t: &AliasType) -> ControlFlow<()> {
+        let node = t.node.clone();
+        self.0.visit_def_alias_type(a, &node)?;
+        self.finalize_if_needed(a, &t.alias_type)?;
+        FinalizeTypeDefs::new().visit_def_alias_type(a, &node)
     }
 
-    fn visit_expr(&self, a: &mut Self::State, node: &'ast Expr) -> ControlFlow<Self::Break> {
-        // If we've already visited the expression, don't analyze it again
-        if a.value_map.contains_key(&node.node_id) {
-            return ControlFlow::Continue(());
-        }
-        // An expression with no type failed to type check, and that error is
-        // already reported, so it has no value
-        if !a.type_map.contains_key(&node.node_id) {
-            return ControlFlow::Continue(());
-        }
-
-        match &node.kind {
-            ExprKind::Array(elts) => self.expr_array_node(a, node, elts),
-            ExprKind::ArraySubscript { e1, e2 } => self.expr_array_subscript_node(a, node, e1, e2),
-            ExprKind::Binop { left, op, right } => self.expr_binop_node(a, node, left, op, right),
-            ExprKind::Dot { e, id } => self.expr_dot_node(a, node, e, id),
-            // An identifier is a constant use, evaluated by constant_use
-            ExprKind::Ident { .. } => self.super_visit(a, Node::Expr(node)),
-            ExprKind::LiteralBool(b) => self.expr_literal_bool_node(a, node, *b),
-            ExprKind::LiteralFloat(value) => self.expr_literal_float_node(a, node, value),
-            ExprKind::LiteralInt(value) => self.expr_literal_int_node(a, node, value),
-            ExprKind::LiteralString(value) => self.expr_literal_string_node(a, node, value),
-            ExprKind::Paren(e) => self.expr_paren_node(a, node, e),
-            ExprKind::SizeOf(type_name) => self.expr_size_of_node(a, node, type_name),
-            ExprKind::Struct(members) => self.expr_struct_node(a, node, members),
-            ExprKind::Unop { e, .. } => self.expr_unop_node(a, node, e),
-        }
-    }
-}
-
-impl<'ast> UseAnalysisPass<'ast, Analysis> for EvalConstantExprs<'ast> {
-    fn constant_use(
-        &self,
-        a: &mut Analysis,
-        node: &'ast Expr,
-        _: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.eval_constant_use(a, node.node_id)
+    fn array(&self, a: &mut Analysis, t: &ArrayType) -> ControlFlow<()> {
+        let node = t.node.clone();
+        self.0.visit_def_array(a, &node)?;
+        self.finalize_if_needed(a, &t.anon_array.elt_type)?;
+        FinalizeTypeDefs::new().visit_def_array(a, &node)
     }
 
-    fn implied_constant_use(
-        &self,
-        a: &mut Analysis,
-        node: &Expr,
-        _: QualifiedName,
-    ) -> ControlFlow<Self::Break> {
-        self.eval_constant_use(a, node.node_id)
+    fn enumeration(&self, a: &mut Analysis, t: &EnumType) -> ControlFlow<()> {
+        let node = t.node.clone();
+        self.0.visit_def_enum(a, &node)?;
+        FinalizeTypeDefs::new().visit_def_enum(a, &node)
     }
 
-    /// The value of a bound constant parameter is the value of the argument
-    /// bound to it, converted to the type declared in the parameter.
-    fn template_constant_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
-        let Symbol::TemplateConstantArg { param_def, value } = arg else {
-            return ControlFlow::Continue(());
-        };
-        let param_def = param_def.clone();
-        let value = value.clone();
-        let loc = value.span();
-
-        // Compute the value of the argument
-        visit_template_arg(self, a, arg)?;
-
-        // The type of the parameter may name an array or struct whose size or
-        // default value is not known until it is finalized
-        if let Some(ty) = a.type_map.get(&param_def.type_name.node_id).cloned() {
-            self.finalize_if_needed(a, &ty)?;
+    fn struct_(&self, a: &mut Analysis, t: &StructType) -> ControlFlow<()> {
+        let node = t.node.clone();
+        self.0.visit_def_struct(a, &node)?;
+        for (_, t1) in &t.anon_struct.members {
+            self.finalize_if_needed(a, t1)?;
         }
-        let ty = FinalizeTypeDefs::new().ty(a, &param_def.type_name)?;
+        FinalizeTypeDefs::new().visit_def_struct(a, &node)
+    }
 
-        let Some(v) = a.value_map.get(&value.node_id).cloned() else {
-            return ControlFlow::Continue(());
-        };
-        match v.convert(&ty) {
-            Some(new_value) => {
-                a.assign_type(value.node_id, ty);
-                a.assign_value(value.node_id, new_value);
-                ControlFlow::Continue(())
-            }
-            None => {
-                SemanticError::TypeMismatch {
-                    loc,
-                    msg: format!("cannot convert value {} to type {}", v, ty),
-                    reason: None,
-                }
-                .emit();
-                // The bound parameter has no usable value, so every use of it
-                // would report a further error
-                ControlFlow::Break(())
-            }
+    // Query whether a type is finalized
+    // A type is finalized if (1) it has a definition symbol S
+    // and S is in the visited symbol set; or (2)
+    // it has no definition symbol
+    fn type_is_finalized(a: &Analysis, t: &Arc<Type>) -> bool {
+        match t.def_symbol() {
+            Some(sym) => a.visited_symbol_set.contains(&sym),
+            None => true,
         }
     }
 
-    fn template_type_arg(&self, a: &mut Analysis, arg: &Symbol) -> ControlFlow<Self::Break> {
-        visit_template_arg(self, a, arg)
+    // Finalize a type if not already finalized
+    fn finalize_if_needed(&self, a: &mut Analysis, t: &Arc<Type>) -> ControlFlow<()> {
+        if !Self::type_is_finalized(a, t) {
+            self.ty(a, t)
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+
+    // Get the finalized type for a type
+    // For a type with a definition, the finalized type
+    // is mapped to the definition in the type map
+    // Otherwise the type is the finalized type
+    fn get_finalized_type(a: &Analysis, t: &Arc<Type>) -> Arc<Type> {
+        match t.def_node_id() {
+            Some(id) => a.type_map.get(&id).cloned().unwrap_or_else(|| t.clone()),
+            None => t.clone(),
+        }
     }
 }
