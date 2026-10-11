@@ -282,6 +282,36 @@ expand M.
     );
 }
 
+/// The implements clause of a topology is a list of port interface names, so
+/// completion after `implements` or after a comma in the list offers port
+/// interfaces. The list may be empty, so nothing there is a syntax error.
+#[test]
+fn completion_in_implements_clause_offers_interfaces() {
+    let dir = fixture_dir("ws_implements_completion");
+    // Lines 2 and 4 leave a name of the list empty.
+    let text = "\
+interface Iface { }
+passive component Comp { }
+topology T implements  {
+}
+topology U implements Iface,  {
+}
+";
+    let (state, uri) = state_with_open_document(&dir, text);
+
+    for (line, character) in [(2, 22), (4, 29)] {
+        let labels = completion_labels_at(&state, &uri, line, character);
+        assert!(
+            labels.contains(&"Iface".to_string()),
+            "line {line}: the implements clause should offer port interfaces, got {labels:?}"
+        );
+        assert!(
+            !labels.contains(&"Comp".to_string()),
+            "line {line}: the implements clause must not offer components, got {labels:?}"
+        );
+    }
+}
+
 /// An `instance` template argument is a bare qualified identifier, so completion
 /// there must offer interface instances. The other two argument kinds are an
 /// expression and a type name, which the generic expression/type paths handle.
@@ -491,7 +521,10 @@ constant d = 3
     let other = dir.join("Other.fpp");
     assert_eq!(
         messages,
-        vec![(4, format!("incorrect location path {}", other.display()).as_str())]
+        vec![(
+            4,
+            format!("incorrect location path {}", other.display()).as_str()
+        )]
     );
 }
 
