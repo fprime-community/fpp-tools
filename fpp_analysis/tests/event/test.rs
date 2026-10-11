@@ -21,6 +21,11 @@ fn bad_throttle() {
 }
 
 #[test]
+fn bad_throttle_count_and_interval() {
+    run_test("event/bad_throttle_count_and_interval")
+}
+
+#[test]
 fn format_alias_not_numeric() {
     run_test("event/format_alias_not_numeric")
 }

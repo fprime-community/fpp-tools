@@ -283,7 +283,7 @@ impl<'ast> Visitor<'ast> for CheckExprTypes<'ast> {
         self.super_visit(a, Node::SpecEvent(node))?;
         Self::emit_error(Self::convert_node_to_numeric_opt(a, &node.id));
         if let Some(throttle) = &node.throttle {
-            Self::emit_error(Self::check_throttle(a, throttle));
+            Self::check_throttle(a, throttle);
         }
 
         ControlFlow::Continue(())
@@ -800,11 +800,13 @@ impl<'ast> CheckExprTypes<'ast> {
     }
 
     /// Check an event throttle
-    fn check_throttle(a: &Analysis, throttle: &EventThrottle) -> SemanticResult {
-        Self::convert_node_to_numeric(a, &throttle.count)?;
-        match &throttle.every {
-            Some(every) => Self::check_throttle_interval(a, every),
-            None => Ok(()),
+    ///
+    /// The count and the interval are separate expressions, so each one is
+    /// checked even when the other fails.
+    fn check_throttle(a: &Analysis, throttle: &EventThrottle) {
+        Self::emit_error(Self::convert_node_to_numeric(a, &throttle.count));
+        if let Some(every) = &throttle.every {
+            Self::emit_error(Self::check_throttle_interval(a, every));
         }
     }
 
