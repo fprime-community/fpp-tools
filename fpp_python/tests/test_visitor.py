@@ -1,6 +1,6 @@
-"""AST traversal: the `AstNode.children` primitive and the `NodeVisitor` base class.
+"""AST traversal: the `AstNode.children` primitive and the `AstVisitor` base class.
 
-`NodeVisitor` is the Python counterpart of `fpp_ast::Visitor`. Because Python has
+`AstVisitor` is the Python counterpart of `fpp_ast::Visitor`. Because Python has
 inheritance, `super().visit_<TypeName>(node)` plays the role of the Rust trait's
 explicit `node.walk(..)`, which makes traversal deep by default here (the Rust
 default is shallow). These tests pin that contract down: what counts as a child,
@@ -8,7 +8,8 @@ deep-vs-pruned recursion, the `generic_visit` funnel, and early exit by raising.
 """
 
 import fpp as f
-from fpp import AstNode, DefComponent, NodeVisitor
+from fpp import AstVisitor
+from fpp.ast import AstNode, DefComponent
 
 MODULE_SRC = """
 module M {
@@ -19,8 +20,8 @@ module M {
 """
 
 # Mirrors fpp_analysis/tests/port_numbering/ok.fpp, trimmed to one connection.
-# Exercises `Connection` and `PortInstanceIdentifier` — the two `shadowed` node
-# types, whose generated `visit_*` methods take the `AstNode` base.
+# Exercises `Connection` and `PortInstanceIdentifier` — two node types whose names
+# a semantic entity also carries.
 TOPOLOGY_SRC = """
 port P
 
@@ -73,7 +74,7 @@ def _model(src: str, uri: str = "t.fpp"):
     return m
 
 
-class _Trace(NodeVisitor):
+class _Trace(AstVisitor):
     """Records every node the traversal reaches, via the `generic_visit` funnel."""
 
     def __init__(self):
@@ -110,7 +111,7 @@ def test_children_flatten_through_kind_enums():
     # are the sub-expressions inside it rather than the kind wrapper.
     (mod,) = _roots(_model(MODULE_SRC))
     expr = mod.children[0].value
-    assert type(expr.kind).__name__ == "ExprBinop"
+    assert type(expr.kind).__qualname__ == "ExprKind.Binop"
     left, right = expr.children
     assert _type_names([left, right]) == ["Expr", "Expr"]
     # 1 + (2 * 3): the right operand is itself a binop with two operands.
@@ -152,7 +153,7 @@ def test_children_preserve_node_identity():
 
 
 # --------------------------------------------------------------------------
-# NodeVisitor dispatch
+# AstVisitor dispatch
 # --------------------------------------------------------------------------
 
 
@@ -170,7 +171,7 @@ def test_traversal_is_deep_by_default():
 
 
 def test_override_receives_the_concrete_node_type():
-    class Collect(NodeVisitor):
+    class Collect(AstVisitor):
         def __init__(self):
             self.names = []
 
@@ -187,7 +188,7 @@ def test_override_receives_the_concrete_node_type():
 
 
 def test_super_call_descends_and_omitting_it_prunes():
-    class Deep(NodeVisitor):
+    class Deep(AstVisitor):
         def __init__(self):
             self.ports = []
 
@@ -214,7 +215,7 @@ def test_generic_visit_override_makes_the_pass_shallow():
     # `generic_visit` is the single funnel every base `visit_*` delegates to, so
     # overriding it without calling super stops all recursion — the analogue of
     # the Rust trait's default (shallow) `super_visit`.
-    class Shallow(NodeVisitor):
+    class Shallow(AstVisitor):
         def __init__(self):
             self.hits = []
 
@@ -233,7 +234,7 @@ def test_shallow_pass_descends_via_the_base_generic_visit():
     # descend one level anyway, call the base funnel directly. This is how the
     # Rust trait's shallow-pass idiom (override the containers, walk explicitly)
     # translates.
-    class Selective(NodeVisitor):
+    class Selective(AstVisitor):
         def __init__(self):
             self.hits = []
 
@@ -254,7 +255,7 @@ def test_raising_aborts_the_traversal():
         def __init__(self, node):
             self.node = node
 
-    class Find(NodeVisitor):
+    class Find(AstVisitor):
         def __init__(self):
             self.visited = []
 
@@ -279,11 +280,11 @@ def test_raising_aborts_the_traversal():
     assert len(v.visited) < len(_trace(_model(MODULE_SRC)))
 
 
-def test_shadowed_node_types_are_visitable():
-    # `Connection` and `PortInstanceIdentifier` collide with semantic-layer class
-    # names, so their generated methods take the `AstNode` base. Dispatch is by
-    # runtime class name, so they still resolve, and super() still descends.
-    class Conns(NodeVisitor):
+def test_nodes_sharing_an_entity_name_are_visitable():
+    # `Connection` and `PortInstanceIdentifier` are semantic-layer class names too.
+    # Dispatch is by `type(node).__name__`, which is the bare name in either
+    # namespace, so these resolve like any other node and super() still descends.
+    class Conns(AstVisitor):
         def __init__(self):
             self.connections = 0
             self.endpoints = []
@@ -306,7 +307,7 @@ def test_shadowed_node_types_are_visitable():
 def test_subclass_may_define_its_own_init_signature():
     # The base `__new__` swallows any arguments, so a subclass needs no
     # `super().__init__()` call and may take whatever arguments it likes.
-    class Tagged(NodeVisitor):
+    class Tagged(AstVisitor):
         def __init__(self, tag, *, limit=0):
             self.tag = tag
             self.limit = limit
@@ -320,7 +321,7 @@ def test_subclass_may_define_its_own_init_signature():
 def test_plain_visitor_traverses_without_error():
     # Every node type has a base `visit_*`, so an un-overridden visitor is a
     # complete no-op walk.
-    v = NodeVisitor()
+    v = AstVisitor()
     for src, uri in (
         (MODULE_SRC, "t.fpp"),
         (TOPOLOGY_SRC, "top.fpp"),
@@ -332,7 +333,7 @@ def test_plain_visitor_traverses_without_error():
 
 def test_visit_rejects_a_non_node():
     try:
-        NodeVisitor().visit("not a node")
+        AstVisitor().visit("not a node")
     except TypeError:
         pass
     else:

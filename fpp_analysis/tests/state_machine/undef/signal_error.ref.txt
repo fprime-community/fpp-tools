@@ -1,5 +1,7 @@
  --> [ local path prefix ]/state_machine/undef/signal_error.fpp:3:16
   |
 3 |   state S { on s enter S }
-  |                ^ cannot find signal `s` in scope
+  |                ^ symbol s is not defined
+  |
+  = note: looking for a signal here
 

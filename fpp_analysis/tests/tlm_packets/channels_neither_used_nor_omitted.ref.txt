@@ -1,0 +1,9 @@
+ --> [ local path prefix ]/tlm_packets/channels_neither_used_nor_omitted.fpp:9:21
+  |
+9 |   telemetry packets P {
+  |                     ^ invalid telemetry packet set P
+  |
+  = note: 2 telemetry channels are neither used nor marked as omitted
+  = note: c1.T
+  = note: c3.T
+

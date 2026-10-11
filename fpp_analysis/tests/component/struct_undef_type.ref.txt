@@ -1,5 +1,7 @@
  --> [ local path prefix ]/component/struct_undef_type.fpp:2:17
   |
 2 |   struct S { x: T }
-  |                 ^ cannot find type `T` in scope
+  |                 ^ symbol T is not defined
+  |
+  = note: looking for a type here
 

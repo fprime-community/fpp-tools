@@ -1,14 +1,10 @@
-  --> [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:12:5
+  --> [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:12:12
    |
-12 | /     packet P2 id 0 group 1 {
-13 | |       c2.T
-14 | |     }
-   | |_____^ duplicate identifier value (0 dec, 0 hex)
+12 |     packet P2 id 0 group 1 {
+   |            ^^ duplicate identifier value (0 dec, 0 hex)
    |
-  ::: [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:8:5
+  ::: [ local path prefix ]/tlm_packets/duplicate_id_explicit.fpp:8:12
    |
- 8 | /     packet P1 id 0 group 0 {
- 9 | |       c1.T
-10 | |     }
-   | |_____- previous occurrence is here
+ 8 |     packet P1 id 0 group 0 {
+   |            -- previous occurrence is here
 

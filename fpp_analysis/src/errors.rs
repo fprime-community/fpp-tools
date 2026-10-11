@@ -349,8 +349,23 @@ pub enum SemanticError {
         loc: Span,
         name: String,
         msg: String,
-        /// The locations that explain the error, rendered as span notes
-        notes: Vec<(Span, String)>,
+    },
+    /// Telemetry channels of a packet set that are neither used nor marked as
+    /// omitted
+    TlmPacketSetChannelsNotCovered {
+        loc: Span,
+        name: String,
+        /// The qualified names of the uncovered channels, in dictionary order
+        channels: Vec<String>,
+    },
+    /// Telemetry channels of a packet set that are both used and marked as
+    /// omitted
+    TlmPacketSetChannelsUsedAndOmitted {
+        loc: Span,
+        name: String,
+        /// For each channel, its qualified name, a location where it is used,
+        /// and a location where it is marked as omitted, in dictionary order
+        channels: Vec<(String, Span, Span)>,
     },
     /// Invalid type
     InvalidType {
@@ -605,6 +620,11 @@ impl SemanticError {
         });
         Into::<Diagnostic>::into(error).emit();
     }
+}
+
+/// Renders `n` as a count of telemetry channels, e.g. `1 telemetry channel`
+fn count_telemetry_channels(n: usize) -> String {
+    format!("{} telemetry channel{}", n, if n == 1 { "" } else { "s" })
 }
 
 /// The notes that several errors share
@@ -1067,21 +1087,50 @@ impl From<SemanticError> for Diagnostic {
                     channel_name, component_name
                 ),
             ),
-            SemanticError::InvalidTlmPacketSet {
+            SemanticError::InvalidTlmPacketSet { loc, name, msg } => Diagnostic::new(
+                loc,
+                Level::Error,
+                format!("invalid telemetry packet set {}", name),
+            )
+            .note(msg),
+            SemanticError::TlmPacketSetChannelsNotCovered {
                 loc,
                 name,
-                msg,
-                notes,
+                channels,
             } => {
                 let diag = Diagnostic::new(
                     loc,
                     Level::Error,
                     format!("invalid telemetry packet set {}", name),
                 )
-                .note(msg);
-                notes
+                .note(format!(
+                    "{} {} neither used nor marked as omitted",
+                    count_telemetry_channels(channels.len()),
+                    if channels.len() == 1 { "is" } else { "are" },
+                ));
+                channels.into_iter().fold(diag, Diagnostic::note)
+            }
+            SemanticError::TlmPacketSetChannelsUsedAndOmitted {
+                loc,
+                name,
+                channels,
+            } => {
+                let diag = Diagnostic::new(
+                    loc,
+                    Level::Error,
+                    format!("invalid telemetry packet set {}", name),
+                )
+                .note(format!(
+                    "{} {} both used and marked as omitted",
+                    count_telemetry_channels(channels.len()),
+                    if channels.len() == 1 { "is" } else { "are" },
+                ));
+                channels
                     .into_iter()
-                    .fold(diag, |diag, (loc, note)| diag.span_note(loc, note))
+                    .fold(diag, |diag, (channel, used_loc, omitted_loc)| {
+                        diag.span_note(used_loc, format!("{} is used here", channel))
+                            .span_note(omitted_loc, format!("{} is marked omitted here", channel))
+                    })
             }
             SemanticError::InvalidType { loc, msg, notes } => notes
                 .into_iter()
@@ -1333,11 +1382,8 @@ impl From<SemanticError> for Diagnostic {
                 name,
                 symbol_kind,
                 loc,
-            } => Diagnostic::new(
-                loc,
-                Level::Error,
-                format!("cannot find {} `{}` in scope", symbol_kind, name),
-            ),
+            } => Diagnostic::new(loc, Level::Error, format!("symbol {} is not defined", name))
+                .note(format!("looking for a {} here", symbol_kind)),
             SemanticError::UseDefCycle {
                 loc,
                 use_def_matching_list,

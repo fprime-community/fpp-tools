@@ -246,3 +246,22 @@ fn channel_order_ids() {
 fn used_channel_order() {
     run_test_with(&["tlm_packets/instances"], "tlm_packets/used_channel_order")
 }
+
+/// Every channel that is neither used nor omitted is listed in one error
+#[test]
+fn channels_neither_used_nor_omitted() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/channels_neither_used_nor_omitted",
+    )
+}
+
+/// The first offending channel in dictionary order decides which error is
+/// reported, even when a later channel is neither used nor omitted
+#[test]
+fn used_and_omitted_before_not_covered() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/used_and_omitted_before_not_covered",
+    )
+}

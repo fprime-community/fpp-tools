@@ -7,7 +7,7 @@ pub(super) fn type_alias_or_abstract(p: &mut Parser) {
     assert!(p.at(TYPE_KW) || p.at(DICTIONARY_KW));
     let m = p.start();
     let is_dictionary_def = p.eat(DICTIONARY_KW);
-    p.bump(TYPE_KW);
+    p.expect(TYPE_KW);
     name_r(p, MEMBER_RECOVERY_SET);
     if p.at(EQUALS) {
         p.bump(EQUALS);
@@ -26,7 +26,7 @@ pub(super) fn def_array(p: &mut Parser) {
     assert!(p.at(ARRAY_KW) || p.at(DICTIONARY_KW));
     let m = p.start();
     p.eat(DICTIONARY_KW);
-    p.bump(ARRAY_KW);
+    p.expect(ARRAY_KW);
     name_r(p, MEMBER_RECOVERY_SET);
 
     if !p.eat(EQUALS) {
@@ -51,7 +51,7 @@ pub(super) fn def_struct(p: &mut Parser) {
 
     let m = p.start();
     p.eat(DICTIONARY_KW);
-    p.bump(STRUCT_KW);
+    p.expect(STRUCT_KW);
     name_r(p, MEMBER_RECOVERY_SET);
 
     if p.at(LEFT_CURLY) {
@@ -93,7 +93,7 @@ pub(super) fn def_enum(p: &mut Parser) {
     assert!(p.at(ENUM_KW) || p.at(DICTIONARY_KW));
     let m = p.start();
     p.eat(DICTIONARY_KW);
-    p.bump(ENUM_KW);
+    p.expect(ENUM_KW);
 
     name_r(p, MEMBER_RECOVERY_SET);
 

@@ -1,20 +1,9 @@
-  --> [ local path prefix ]/tlm_packets/channel_order_ids.fpp:16:3
+  --> [ local path prefix ]/tlm_packets/channel_order_ids.fpp:16:21
    |
-16 | /   telemetry packets P {
-17 | |     packet A group 0 {
-18 | |     }
-19 | |   }
-   | |___^ invalid telemetry packet set P
+16 |   telemetry packets P {
+   |                     ^ invalid telemetry packet set P
    |
-   = note: telemetry channel c1.T2 is neither used nor marked as omitted
-   |
-  ::: [ local path prefix ]/tlm_packets/channel_order_ids.fpp:15:3
-   |
-15 |     instance c1
-   |     ----------- component instance is specified here
-   |
-  ::: [ local path prefix ]/tlm_packets/channel_order_ids.fpp:10:3
-   |
-10 |     telemetry T2: U32 id 5
-   |     ---------------------- telemetry channel is specified here
+   = note: 2 telemetry channels are neither used nor marked as omitted
+   = note: c1.T2
+   = note: c1.T1
 

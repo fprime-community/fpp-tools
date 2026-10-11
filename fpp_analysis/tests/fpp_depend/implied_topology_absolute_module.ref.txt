@@ -1,0 +1,1 @@
+[ local path prefix ]/compiler/tools/fpp-depend/test/implied_topology_absolute_module_chan.fpp

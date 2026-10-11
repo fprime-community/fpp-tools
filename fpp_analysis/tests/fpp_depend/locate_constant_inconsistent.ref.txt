@@ -1,0 +1,10 @@
+ --> [ local path prefix ]/compiler/tools/fpp-depend/test/locate_constant_inconsistent.fpp:2:22
+  |
+2 | locate constant c at "b.fpp"
+  |                      ^^^^^^^ inconsistent location path [ local path prefix ]/compiler/tools/fpp-depend/test/b.fpp
+  |
+ ::: [ local path prefix ]/compiler/tools/fpp-depend/test/locate_constant_inconsistent.fpp:1:22
+  |
+1 | locate constant c at "a.fpp"
+  |                      ------- previous path [ local path prefix ]/compiler/tools/fpp-depend/test/a.fpp is here
+

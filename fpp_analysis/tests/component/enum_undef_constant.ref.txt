@@ -1,5 +1,7 @@
  --> [ local path prefix ]/component/enum_undef_constant.fpp:2:16
   |
 2 |   enum E { X = a }
-  |                ^ cannot find constant `a` in scope
+  |                ^ symbol a is not defined
+  |
+  = note: looking for a constant here
 

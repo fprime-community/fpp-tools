@@ -13,6 +13,7 @@ expansion made it — which is the only thing distinguishing two copies of one l
 """
 
 import fpp as f
+import fpp.ast as fa
 
 # A constant parameter and a type parameter, expanded once. `width` folds from the
 # bound `4` and `Frame.body` resolves to the bound `Telem`, so what each argument
@@ -98,7 +99,7 @@ def analyzed(source: str = SRC):
 def one_expansion(units):
     """The one module of a one-unit model, and the one `expand` specifier in it."""
     (module,) = units[0].members
-    (spec,) = [x for x in module.members if isinstance(x, f.SpecTemplateExpand)]
+    (spec,) = [x for x in module.members if isinstance(x, fa.SpecTemplateExpand)]
     return module, spec
 
 
@@ -106,12 +107,12 @@ def test_an_expansion_contributes_definitions_bound_to_its_arguments():
     m = analyzed()
     # `width` exists only because the template was expanded, and its value is the
     # body's `factor * 8` with `factor` bound to the argument.
-    width = m.lookup("M.width", kind=f.SymbolConstant)
+    width = m.lookup("M.width", kind=f.Symbol.Constant)
     assert width is not None
     assert width.definition.value.resolved_value.value == 32
     # The type argument flowed the same way: the struct member declared as the
     # parameter `Payload` resolves to the `Telem` that was passed.
-    frame = m.lookup("M.Frame", kind=f.SymbolStructType)
+    frame = m.lookup("M.Frame", kind=f.Symbol.StructType)
     body = m.analysis.type_map[frame.node_id].anon_struct.get_member("body")
     assert body.def_symbol == m.lookup("M.Telem")
 
@@ -119,7 +120,7 @@ def test_an_expansion_contributes_definitions_bound_to_its_arguments():
 def test_the_expanded_body_hangs_off_the_specifier():
     m = analyzed()
     module, spec = one_expansion(m.ast)
-    (template,) = [x for x in module.members if isinstance(x, f.DefModuleTemplate)]
+    (template,) = [x for x in module.members if isinstance(x, fa.DefModuleTemplate)]
     body = [type(x).__name__ for x in template.members]
     assert body == ["DefConstant", "DefStruct"]
     # The copy is the same syntax with its own node identities, so a walk sees the
@@ -139,7 +140,7 @@ def test_the_expanded_body_hangs_off_the_specifier():
 def test_a_copy_keeps_the_location_of_the_body_it_came_from():
     m = analyzed()
     module, spec = one_expansion(m.ast)
-    (template,) = [x for x in module.members if isinstance(x, f.DefModuleTemplate)]
+    (template,) = [x for x in module.members if isinstance(x, fa.DefModuleTemplate)]
     # A copy points at the text a reader has to look at to change it, which is the
     # template body — above the specifier, not at it.
     for copy, original in zip(spec.members, template.members):
@@ -156,17 +157,17 @@ def test_parse_leaves_the_specifier_unexpanded():
     assert spec.members is None
     assert spec.template.name.data == "Scaled"
     assert not spec.template.is_absolute
-    assert [type(a.kind).__name__ for a in spec.args] == [
-        "TemplateArgConstant",
-        "TemplateArgType",
+    assert [type(a.kind).__qualname__ for a in spec.args] == [
+        "TemplateArgKind.Constant",
+        "TemplateArgKind.Type",
     ]
 
 
 def test_a_template_definition_is_its_own_symbol_kind():
     m = analyzed()
-    template = m.lookup("M.Scaled", kind=f.SymbolTemplate)
+    template = m.lookup("M.Scaled", kind=f.Symbol.Template)
     assert template is not None
-    assert isinstance(template.definition, f.DefModuleTemplate)
+    assert isinstance(template.definition, fa.DefModuleTemplate)
     assert [(type(p).__name__, p.name) for p in template.definition.params] == [
         ("TemplateParamConstant", "factor"),
         ("TemplateParamType", "Payload"),
@@ -176,16 +177,16 @@ def test_a_template_definition_is_its_own_symbol_kind():
 def test_the_expansion_reports_the_argument_bound_to_each_parameter():
     m = analyzed()
     module, spec = one_expansion(m.ast)
-    (template,) = [x for x in module.members if isinstance(x, f.DefModuleTemplate)]
+    (template,) = [x for x in module.members if isinstance(x, fa.DefModuleTemplate)]
     expansion = m.analysis.template_expansion_map[spec.node_id]
     assert expansion.expansion is spec and expansion.def_node is template
     assert m.analysis.expansion_at(spec).def_node is template
 
     factor, payload = expansion.params
-    assert isinstance(factor, f.SymbolTemplateConstantArg)
+    assert isinstance(factor, f.Symbol.TemplateConstantArg)
     assert factor.param_def.name == "factor"
     assert factor.value.kind.value == "4"
-    assert isinstance(payload, f.SymbolTemplateTypeArg)
+    assert isinstance(payload, f.Symbol.TemplateTypeArg)
     assert payload.param_def.name == "Payload"
     # A bound parameter is not a global definition, so it is a symbol that says so.
     assert all(p.is_template_arg for p in expansion.params)
@@ -201,18 +202,18 @@ def test_two_expansions_of_one_template_are_two_sets_of_definitions():
 
 def test_an_instance_argument_becomes_an_instance_of_the_topology():
     m = analyzed(INSTANCE_SRC)
-    (spec,) = [x for x in m.ast[0].members if isinstance(x, f.SpecTemplateExpand)]
+    (spec,) = [x for x in m.ast[0].members if isinstance(x, fa.SpecTemplateExpand)]
     (bound,) = m.analysis.template_expansion_map[spec.node_id].params
-    assert isinstance(bound, f.SymbolTemplateInterfaceArg)
+    assert isinstance(bound, f.Symbol.TemplateInterfaceArg)
     assert bound.param_def.name == "i" and bound.is_interface_instance
 
-    topology = m.analysis.topology_map[m.lookup("Top", kind=f.SymbolTopology)]
+    topology = m.analysis.topology_map[m.lookup("Top", kind=f.Symbol.Topology)]
     (instance,) = topology.instance_map
     # The topology instantiates the parameter, so the instance is the parameter —
     # carrying the component instance the expansion passed for it.
-    assert isinstance(instance, f.TemplateArgInterfaceInstance)
+    assert isinstance(instance, f.InterfaceInstance.TemplateArg)
     assert instance.qualified_name == "i"
-    assert isinstance(instance.instance, f.ComponentInterfaceInstance)
+    assert isinstance(instance.instance, f.InterfaceInstance.Component)
     assert instance.instance.node.node_id == m.lookup("c").node_id
     # Only the interface the parameter declared is visible inside the expansion, so
     # the ports of the instance are that interface's — `c`'s `extra` is not among

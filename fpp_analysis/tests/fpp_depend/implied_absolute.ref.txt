@@ -1,0 +1,2 @@
+[ local path prefix ]/compiler/tools/fpp-depend/test/implied_absolute_len.fpp
+[ local path prefix ]/compiler/tools/fpp-depend/test/implied_absolute_size.fpp

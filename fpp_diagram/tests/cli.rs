@@ -48,7 +48,7 @@ fn a_failed_template_resolution_stops_the_analysis() {
         "{text}"
     );
     assert!(
-        !text.contains("cannot find constant"),
+        !text.contains("is not defined"),
         "the semantic check ran anyway: {text}"
     );
 }

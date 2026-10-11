@@ -1,14 +1,10 @@
-  --> [ local path prefix ]/tlm_packets/duplicate_packet_name.fpp:11:5
+  --> [ local path prefix ]/tlm_packets/duplicate_packet_name.fpp:11:12
    |
-11 | /     packet P group 1 {
-12 | |       c1.T
-13 | |     }
-   | |_____^ duplicate packet name P
+11 |     packet P group 1 {
+   |            ^ duplicate packet name P
    |
-  ::: [ local path prefix ]/tlm_packets/duplicate_packet_name.fpp:7:5
+  ::: [ local path prefix ]/tlm_packets/duplicate_packet_name.fpp:7:12
    |
- 7 | /     packet P group 0 {
- 8 | |       c1.T
- 9 | |     }
-   | |_____- previous occurrence is here
+ 7 |     packet P group 0 {
+   |            - previous occurrence is here
 
