@@ -1,7 +1,7 @@
  --> [ local path prefix ]/structs/default_error.fpp:4:11
   |
 4 |   default { x = 0, e = E.X, a = [ 1, 2, 3 ], b = 5 }
-  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ default value cannot be converted to S
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ default value cannot be converted to struct S
   |
   = note: struct missing member `b`
 

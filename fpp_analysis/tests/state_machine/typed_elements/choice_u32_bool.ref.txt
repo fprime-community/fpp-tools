@@ -6,7 +6,7 @@
   ::: [ local path prefix ]/state_machine/typed_elements/choice_u32_bool.fpp:10:5
    |
 10 |     on s2 enter C
-   |     ------------- type of transition is boolean
+   |     ------------- type of transition is bool
    |
   ::: [ local path prefix ]/state_machine/typed_elements/choice_u32_bool.fpp:9:5
    |

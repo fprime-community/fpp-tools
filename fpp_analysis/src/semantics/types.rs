@@ -5,6 +5,7 @@ use crate::semantics::{
 };
 use fpp_ast::{FloatKind, IntegerKind};
 use fpp_core::Diagnostic;
+use indexmap::IndexMap;
 use rustc_hash::FxHashMap as HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
@@ -98,7 +99,7 @@ impl Type {
                 }
 
                 Some(Value::AnonStruct(AnonStructValue {
-                    members: HashMap::from_iter(members),
+                    members: IndexMap::from_iter(members),
                 }))
             }
         }
@@ -673,48 +674,36 @@ impl Type {
     }
 }
 
-/// A type rendered by its [`Display`] inside a `Debug` builder, which is what
-/// [`Formatter::debug_struct`]'s `field` takes.
-struct Displayed<'a>(&'a Type);
-
-impl Debug for Displayed<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(self.0, f)
-    }
-}
-
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::PrimitiveInt(kind) => Debug::fmt(kind, f),
             Type::Float(kind) => Debug::fmt(kind, f),
             Type::String(_) => f.write_str("string"),
-            Type::Boolean => f.write_str("boolean"),
+            Type::Boolean => f.write_str("bool"),
             Type::Integer => f.write_str("Integer"),
             Type::Abs(ty) => f.write_str(&ty.node.name.data),
             Type::Alias(ty) => f.write_str(&ty.node.name.data),
-            Type::Array(arr) => f.write_str(&arr.node.name.data),
-            Type::AnonArray(anon_arr) => {
-                match anon_arr.size {
-                    None => f.write_str("[] ")?,
-                    Some(size) => f.write_fmt(format_args!("[{}] ", size))?,
+            Type::Array(arr) => write!(f, "array {}", arr.node.name.data),
+            Type::AnonArray(anon_arr) => match anon_arr.size {
+                Some(n) => write!(f, "[{}] {}", n, anon_arr.elt_type),
+                None => write!(f, "array of {}", anon_arr.elt_type),
+            },
+            Type::Enum(ty) => write!(f, "enum {}", ty.node.name.data),
+            Type::Struct(ty) => write!(f, "struct {}", ty.node.name.data),
+            Type::AnonStruct(anon_struct) => match anon_struct.members.len() {
+                0 => f.write_str("{ }"),
+                _ => {
+                    f.write_str("{ ")?;
+                    for (i, (name, member_ty)) in anon_struct.members.iter().enumerate() {
+                        if i > 0 {
+                            f.write_str(", ")?;
+                        }
+                        write!(f, "{}: {}", name, member_ty)?;
+                    }
+                    f.write_str(" }")
                 }
-
-                Display::fmt(&anon_arr.elt_type, f)
-            }
-            Type::Enum(ty) => f.write_str(&ty.node.name.data),
-            Type::Struct(ty) => f.write_str(&ty.node.name.data),
-            Type::AnonStruct(anon_struct) => {
-                let mut s = f.debug_struct("anonymous struct");
-                let mut members: Vec<(String, Arc<Type>)> =
-                    anon_struct.members.clone().into_iter().collect();
-                members.sort_by(|a, b| a.0.cmp(&b.0));
-                for (name, member_ty) in &members {
-                    s.field(name, &Displayed(member_ty.deref()));
-                }
-
-                s.finish()
-            }
+            },
         }
     }
 }
@@ -1027,7 +1016,7 @@ mod tests {
 
         // Reading the value is unaffected by the sharing
         assert_eq!(inner_default.iter().count(), N);
-        assert!(inner_default.iter().all(|e| e.to_string() == "0"));
+        assert!(inner_default.iter().all(|e| e.to_string() == "0: U8"));
         assert!(inner_default.get(N - 1).is_some());
         assert!(inner_default.get(N).is_none());
     }

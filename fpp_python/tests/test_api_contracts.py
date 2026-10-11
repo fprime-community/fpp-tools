@@ -790,9 +790,9 @@ module Ref {
         return str(a.type_map[m.lookup(name).node_id])
 
     assert spelled("Ref.Abs") == "Abs"
-    assert spelled("Ref.Arr") == "Arr"
-    assert spelled("Ref.E") == "E"
-    assert spelled("Ref.Simple") == "Simple"
+    assert spelled("Ref.Arr") == "array Arr"
+    assert spelled("Ref.E") == "enum E"
+    assert spelled("Ref.Simple") == "struct Simple"
 
     simple = a.type_map[m.lookup("Ref.Simple").node_id]
     anon = simple.anon_struct
@@ -803,7 +803,7 @@ module Ref {
     # Every member renders by `Display` too, so an aggregate stays one line.
     assert (
         str(simple.anon_struct)
-        == "anonymous struct { b: boolean, f: F32, x: U32, y: string }"
+        == "{ x: U32, y: string, b: bool, f: F32 }"
     )
 
     arr = a.type_map[m.lookup("Ref.Arr").node_id]

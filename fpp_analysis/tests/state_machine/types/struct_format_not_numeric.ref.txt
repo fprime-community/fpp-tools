@@ -1,7 +1,7 @@
  --> [ local path prefix ]/state_machine/types/struct_format_not_numeric.fpp:6:29
   |
 6 |   struct S2 { x: S1 format "{.3f}" }
-  |                             ^^^^^ Fixed format replacement cannot be used for type `S1`
+  |                             ^^^^^ Fixed format replacement cannot be used for type `struct S1`
   |
  ::: [ local path prefix ]/state_machine/types/struct_format_not_numeric.fpp:6:18
   |

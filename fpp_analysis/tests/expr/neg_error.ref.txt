@@ -3,5 +3,5 @@
 1 | constant a = - { x = 1 }
   |                ^^^^^^^^^ cannot convert expression to integer
   |
-  = note: anonymous struct { x: Integer } cannot be converted to Integer
+  = note: { x: Integer } cannot be converted to Integer
 

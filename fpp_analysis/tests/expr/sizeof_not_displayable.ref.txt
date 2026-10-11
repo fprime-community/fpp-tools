@@ -1,5 +1,5 @@
  --> [ local path prefix ]/expr/sizeof_not_displayable.fpp:9:14
   |
 9 | constant c = sizeof(S)
-  |              ^^^^^^^^^ size of type S is not known in the model
+  |              ^^^^^^^^^ size of type struct S is not known in the model
 

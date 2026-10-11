@@ -1,5 +1,5 @@
  --> [ local path prefix ]/constant/invalid_array_type.fpp:2:14
   |
 2 | constant j = k[0]
-  |              ^ anonymous struct { x: Integer } is not an array type
+  |              ^ { x: Integer } is not an array type
 

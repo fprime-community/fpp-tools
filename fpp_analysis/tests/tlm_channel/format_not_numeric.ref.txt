@@ -1,7 +1,7 @@
  --> [ local path prefix ]/tlm_channel/format_not_numeric.fpp:3:29
   |
 3 |   telemetry T: bool format "{x}"
-  |                             ^^^ Hexadecimal format replacement cannot be used for type `boolean`
+  |                             ^^^ Hexadecimal format replacement cannot be used for type `bool`
   |
  ::: [ local path prefix ]/tlm_channel/format_not_numeric.fpp:3:16
   |

@@ -2,7 +2,7 @@ use crate::semantics::{
     AbsType, AnonArrayType, AnonStructType, ArrayType, EnumType, StructType, Type,
 };
 use fpp_ast::{FloatKind, IntegerKind};
-use rustc_hash::FxHashMap as HashMap;
+use indexmap::IndexMap;
 use std::fmt;
 use std::fmt::Formatter;
 use std::ops::Deref;
@@ -62,7 +62,7 @@ impl Value {
                         )))
                     }
                     Type::Struct(struct_ty) => {
-                        let mut out_value = HashMap::default();
+                        let mut out_value = IndexMap::new();
                         for (name, member_ty) in &struct_ty.anon_struct.members {
                             out_value.insert(name.clone(), self.clone().convert(member_ty)?);
                         }
@@ -73,7 +73,7 @@ impl Value {
                         }))
                     }
                     Type::AnonStruct(struct_ty) => {
-                        let mut out_value = HashMap::default();
+                        let mut out_value = IndexMap::new();
                         for (name, member_ty) in &struct_ty.members {
                             out_value.insert(name.clone(), self.clone().convert(member_ty)?);
                         }
@@ -201,7 +201,7 @@ impl Value {
             }
 
             Value::AnonStruct(anon_struct) | Value::Struct(StructValue { anon_struct, .. }) => {
-                let mut members = HashMap::default();
+                let mut members = IndexMap::new();
 
                 let to_ty = ty.as_anon_struct()?;
 
@@ -645,22 +645,119 @@ fn shift_int(value: i128, amount: i128, dir: ShiftDirection) -> Result<i128, Mat
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Value::PrimitiveInteger(PrimitiveIntegerValue { value, .. }) => {
-                f.write_fmt(format_args!("{value}"))
+            Value::PrimitiveInteger(PrimitiveIntegerValue { value, kind }) => {
+                write!(f, "{value}: {kind:?}")
             }
-            Value::AbsType(_) => f.write_str("[default value]"),
-            Value::Integer(IntegerValue(value)) => f.write_fmt(format_args!("{value}")),
-            Value::Float(FloatValue { value, .. }) => f.write_fmt(format_args!("{value}")),
-            Value::Boolean(BooleanValue(value)) => f.write_fmt(format_args!("{value}")),
-            Value::String(StringValue(value)) => f.write_fmt(format_args!("\"{value}\"")),
+            Value::AbsType(AbsTypeValue { ty }) => {
+                write!(f, "value of type {}", Type::Abs(ty.clone()))
+            }
+            Value::Integer(IntegerValue(value)) => write!(f, "{value}"),
+            Value::Float(FloatValue { value, kind }) => {
+                write!(f, "{}: {kind:?}", java_double_to_string(*value))
+            }
+            Value::Boolean(BooleanValue(value)) => write!(f, "{value}"),
+            Value::String(StringValue(value)) => write!(f, "\"{value}\""),
             Value::EnumConstant(EnumConstantValue {
-                value: (_, value), ..
-            }) => f.write_fmt(format_args!("{value}")),
-            Value::AnonArray(_) => f.write_str("[array value]"),
-            Value::Array(_) => f.write_str("[array value]"),
-            Value::AnonStruct(_) => f.write_str("{struct value}"),
-            Value::Struct(_) => f.write_str("{struct value}"),
+                value: (name, value),
+                ty,
+            }) => write!(f, "({name},{value}): {}", ty.node.name.data),
+            Value::AnonArray(anon_array) => fmt::Display::fmt(anon_array, f),
+            Value::Array(ArrayValue { anon_array, ty }) => {
+                write!(f, "{}: {}", anon_array, ty.node.name.data)
+            }
+            Value::AnonStruct(anon_struct) => fmt::Display::fmt(anon_struct, f),
+            Value::Struct(StructValue { anon_struct, ty }) => {
+                write!(f, "{}: {}", anon_struct, ty.node.name.data)
+            }
         }
+    }
+}
+
+impl fmt::Display for AnonArrayValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match &self.scalar {
+            Some(scalar) => write!(f, "[ {}, ... ]", scalar),
+            None => {
+                f.write_str("[ ")?;
+                for (i, elt) in self.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    fmt::Display::fmt(elt, f)?;
+                }
+                f.write_str(" ]")
+            }
+        }
+    }
+}
+
+impl fmt::Display for AnonStructValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.members.len() {
+            0 => f.write_str("{ }"),
+            _ => {
+                f.write_str("{ ")?;
+                for (i, (name, v)) in self.members.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{} = {}", name, v)?;
+                }
+                f.write_str(" }")
+            }
+        }
+    }
+}
+
+/// Formats a double the way Java's `Double.toString` does, which is how an FPP
+/// floating-point value is written in a message: the shortest decimal that
+/// identifies the value, with at least one digit after the decimal point, in
+/// plain notation when the magnitude is in `[10^-3, 10^7)` and in computerized
+/// scientific notation (`1.0E10`, `1.5E-5`) otherwise.
+fn java_double_to_string(v: f64) -> String {
+    if v.is_nan() {
+        return "NaN".to_string();
+    }
+    if v.is_infinite() {
+        return if v > 0.0 { "Infinity" } else { "-Infinity" }.to_string();
+    }
+    if v == 0.0 {
+        return if v.is_sign_negative() { "-0.0" } else { "0.0" }.to_string();
+    }
+    // `{:e}` gives the shortest digits that identify the value, as
+    // `d[.ddd]e[-]n`
+    let sci = format!("{:e}", v.abs());
+    let (mantissa, exponent) = sci.split_once('e').expect("exponent in {:e} output");
+    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let exponent: i32 = exponent.parse().expect("integer exponent in {:e} output");
+    let sign = if v < 0.0 { "-" } else { "" };
+    if (-3..7).contains(&exponent) {
+        let point = exponent + 1;
+        let (int_part, frac_part) = if point <= 0 {
+            (
+                "0".to_string(),
+                format!("{}{}", "0".repeat(point.unsigned_abs() as usize), digits),
+            )
+        } else {
+            let point = point as usize;
+            if digits.len() > point {
+                (digits[..point].to_string(), digits[point..].to_string())
+            } else {
+                (
+                    format!("{}{}", digits, "0".repeat(point - digits.len())),
+                    String::new(),
+                )
+            }
+        };
+        let frac_part = if frac_part.is_empty() {
+            "0".to_string()
+        } else {
+            frac_part
+        };
+        format!("{sign}{int_part}.{frac_part}")
+    } else {
+        let frac_part = if digits.len() > 1 { &digits[1..] } else { "0" };
+        format!("{sign}{}.{}E{}", &digits[..1], frac_part, exponent)
     }
 }
 
@@ -831,7 +928,8 @@ impl EnumConstantValue {
 /// Anonymous struct values
 #[derive(Debug, Clone)]
 pub struct AnonStructValue {
-    pub members: HashMap<String, Value>,
+    /// The members, in insertion order
+    pub members: IndexMap<String, Value>,
 }
 
 /// Struct values

@@ -1,7 +1,7 @@
  --> [ local path prefix ]/component/array_format_not_numeric.fpp:5:25
   |
 5 | array A = [3] S format "{.3f}"
-  |                         ^^^^^ Fixed format replacement cannot be used for type `S`
+  |                         ^^^^^ Fixed format replacement cannot be used for type `struct S`
   |
  ::: [ local path prefix ]/component/array_format_not_numeric.fpp:5:15
   |

@@ -1,5 +1,5 @@
   --> [ local path prefix ]/template/struct_parameter_bad_arg.fpp:10:19
    |
 10 | expand M(constant { a = [1], b = [2, 3, 5] })
-   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot convert value {struct value} to type S
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot convert value { a = [ 1 ], b = [ 2, 3, 5 ] } to type struct S
 

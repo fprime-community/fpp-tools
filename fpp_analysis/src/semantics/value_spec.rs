@@ -6,7 +6,7 @@ use crate::semantics::{
     IntegerValue, MathError, MathResult, PrimitiveIntegerValue, StringValue, StructValue, Type,
     Value,
 };
-use rustc_hash::FxHashMap;
+use indexmap::IndexMap;
 use std::sync::Arc;
 
 /// Structural equality on `Value` (which does not derive `PartialEq`).
@@ -73,7 +73,7 @@ fn values_eq(a: &Value, b: &Value) -> bool {
     }
 }
 
-fn members_eq(m1: &FxHashMap<String, Value>, m2: &FxHashMap<String, Value>) -> bool {
+fn members_eq(m1: &IndexMap<String, Value>, m2: &IndexMap<String, Value>) -> bool {
     m1.len() == m2.len()
         && m1
             .iter()
@@ -82,7 +82,7 @@ fn members_eq(m1: &FxHashMap<String, Value>, m2: &FxHashMap<String, Value>) -> b
 
 /// The anon-struct value `{ a = U32(0), b = String("") }`.
 fn anon_struct_val() -> Value {
-    let mut m: FxHashMap<String, Value> = FxHashMap::default();
+    let mut m: IndexMap<String, Value> = IndexMap::new();
     m.insert("a".to_string(), v_u32(0));
     m.insert("b".to_string(), v_string(""));
     Value::AnonStruct(AnonStructValue { members: m })
@@ -98,7 +98,7 @@ fn array_val() -> Value {
 
 /// The struct value `{ a = U32(0), b = String("") }: S`.
 fn struct_val() -> Value {
-    let mut m: FxHashMap<String, Value> = FxHashMap::default();
+    let mut m: IndexMap<String, Value> = IndexMap::new();
     m.insert("a".to_string(), v_u32(0));
     m.insert("b".to_string(), v_string(""));
     Value::Struct(StructValue {
@@ -363,7 +363,7 @@ fn value_convert_to_type() {
         // Expected anon-struct { a = U32(0), b = String(""), c = I8(0) } for the
         // widening case that adds a defaulted member.
         let abc_struct = {
-            let mut m: FxHashMap<String, Value> = FxHashMap::default();
+            let mut m: IndexMap<String, Value> = IndexMap::new();
             m.insert("a".to_string(), v_u32(0));
             m.insert("b".to_string(), v_string(""));
             m.insert("c".to_string(), v_i8(0));
@@ -417,7 +417,7 @@ fn value_convert_to_type() {
                 v_i32(0),
                 anon_struct(&[("a", u32())]),
                 Some({
-                    let mut m: FxHashMap<String, Value> = FxHashMap::default();
+                    let mut m: IndexMap<String, Value> = IndexMap::new();
                     m.insert("a".to_string(), v_u32(0));
                     Value::AnonStruct(AnonStructValue { members: m })
                 }),
@@ -589,26 +589,48 @@ fn value_binop_integer_and_float_left() {
     });
 }
 
-/// `Display` for every `Value` variant.
+/// `Display` for every `Value` variant: the Scala `Value.toString`.
 #[test]
 fn value_display() {
     with_test_ctx(|| {
-        assert_eq!(v_i8(5).to_string(), "5");
-        assert_eq!(v_u8(200).to_string(), "200");
+        assert_eq!(v_i8(5).to_string(), "5: I8");
+        assert_eq!(v_u8(200).to_string(), "200: U8");
         assert_eq!(v_integer(-3).to_string(), "-3");
-        assert_eq!(v_f64(1.5).to_string(), "1.5");
+        assert_eq!(v_f64(1.5).to_string(), "1.5: F64");
+        assert_eq!(v_f64(2.0).to_string(), "2.0: F64");
+        assert_eq!(
+            v_f32(0.1_f32 as f64).to_string(),
+            "0.10000000149011612: F32"
+        );
+        assert_eq!(v_f64(1.0e300).to_string(), "1.0E300: F64");
+        assert_eq!(v_f64(1.5e-5).to_string(), "1.5E-5: F64");
+        assert_eq!(v_f64(0.001).to_string(), "0.001: F64");
+        assert_eq!(v_f64(1234567.0).to_string(), "1234567.0: F64");
+        assert_eq!(v_f64(12345678.0).to_string(), "1.2345678E7: F64");
+        assert_eq!(v_f64(-0.5).to_string(), "-0.5: F64");
         assert_eq!(v_bool(true).to_string(), "true");
         assert_eq!(v_string("hi").to_string(), "\"hi\"");
-        assert_eq!(v_enum_constant("X", 7).to_string(), "7");
+        assert_eq!(v_enum_constant("X", 7).to_string(), "(X,7): E");
         // An enum constant wider than 32 bits displays in full
         assert_eq!(
             v_enum_constant("X", 0xFFFFFFFFFFFFFFFF_u64 as i128).to_string(),
-            "18446744073709551615"
+            "(X,18446744073709551615): E"
         );
-        assert_eq!(v_anon_array(2, v_u32(0)).to_string(), "[array value]");
-        assert_eq!(array_val().to_string(), "[array value]");
-        assert_eq!(anon_struct_val().to_string(), "{struct value}");
-        assert_eq!(struct_val().to_string(), "{struct value}");
+        assert_eq!(v_anon_array(2, v_u32(0)).to_string(), "[ 0: U32, 0: U32 ]");
+        assert_eq!(
+            Value::AnonArray(AnonArrayValue::promoted(v_u32(1))).to_string(),
+            "[ 1: U32, ... ]"
+        );
+        assert_eq!(array_val().to_string(), "[ 0: I32, 0: I32, 0: I32 ]: A");
+        assert_eq!(anon_struct_val().to_string(), "{ a = 0: U32, b = \"\" }");
+        assert_eq!(
+            Value::AnonStruct(AnonStructValue {
+                members: IndexMap::new()
+            })
+            .to_string(),
+            "{ }"
+        );
+        assert_eq!(struct_val().to_string(), "{ a = 0: U32, b = \"\" }: S");
     });
 }
 
