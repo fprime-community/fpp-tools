@@ -206,7 +206,8 @@ impl QualIdent {
     /// also the constructor of a qualified identifier node from a node list. The
     /// node of each level spans the identifiers of that level: `A.B` in `A.B.C`
     /// covers `A.B` only, and the outermost level covers the whole list. A leading
-    /// `.` that makes the identifier absolute is not part of any of these spans.
+    /// `.` that makes the identifier absolute is not part of any of these spans
+    /// (see [`QualIdent::from_node_list_at`]).
     ///
     /// Panics if the node list is empty.
     pub fn from_node_list(node_list: QualIdentNodeList, is_absolute: bool) -> QualIdent {
@@ -220,15 +221,45 @@ impl QualIdent {
                 name,
                 is_absolute,
             }),
-            (qualifier, name) => {
-                let qualifier = QualIdent::from_node_list(qualifier, is_absolute);
-                QualIdent::Qualified(Qualified {
-                    node_id: fpp_core::Node::new(span_through(head, name.span())),
-                    qualifier: Box::new(qualifier),
-                    name,
-                })
-            }
+            (qualifier, name) => QualIdent::qualified(head, qualifier, name, is_absolute),
         }
+    }
+
+    /// Construct a qualified identifier from a node list, as
+    /// [`QualIdent::from_node_list`] does, with its outermost node starting at
+    /// `start`: the leading `.` of an absolute identifier, so that the node of
+    /// the identifier as written covers the whole of it. The nodes of the
+    /// inner levels span their identifiers only.
+    ///
+    /// Panics if the node list is empty.
+    pub fn from_node_list_at(
+        start: fpp_core::Span,
+        node_list: QualIdentNodeList,
+        is_absolute: bool,
+    ) -> QualIdent {
+        match qual_ident_node_list::split(node_list) {
+            (qualifier, name) if qualifier.is_empty() => QualIdent::Unqualified(Unqualified {
+                node_id: fpp_core::Node::new(span_through(start, name.span())),
+                name,
+                is_absolute,
+            }),
+            (qualifier, name) => QualIdent::qualified(start, qualifier, name, is_absolute),
+        }
+    }
+
+    /// The qualified identifier `qualifier.name`, whose node starts at `start`
+    fn qualified(
+        start: fpp_core::Span,
+        qualifier: QualIdentNodeList,
+        name: Ident,
+        is_absolute: bool,
+    ) -> QualIdent {
+        let qualifier = QualIdent::from_node_list(qualifier, is_absolute);
+        QualIdent::Qualified(Qualified {
+            node_id: fpp_core::Node::new(span_through(start, name.span())),
+            qualifier: Box::new(qualifier),
+            name,
+        })
     }
 }
 

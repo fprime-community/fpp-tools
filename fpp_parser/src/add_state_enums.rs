@@ -50,8 +50,8 @@ fn component_member(member: &mut ComponentMember) {
 
 /// Add the state enum to an internal state machine. An external state machine
 /// (one with no members) gets none.
-fn def_state_machine(sm: &mut DefStateMachine) {
-    if sm.members.is_none() {
+fn def_state_machine(node: &mut DefStateMachine) {
+    if node.members.is_none() {
         return;
     }
 
@@ -60,16 +60,16 @@ fn def_state_machine(sm: &mut DefStateMachine) {
     // the synthesized `State` enum (and its constants) cover every inner
     // definition, so position-based lookups (hover, go-to-definition, semantic
     // tokens) would resolve inner items to the synthesized enum instead.
-    let sm_span = sm.span();
-    let span = Span::new(
-        sm_span.file(),
-        sm_span.start().pos(),
+    let node_span = node.span();
+    let loc = Span::new(
+        node_span.file(),
+        node_span.start().pos(),
         0,
-        sm_span.including_span(),
+        node_span.including_span(),
     );
 
-    match get_state_enum(sm, span) {
-        Ok(state_enum) => sm
+    match get_state_enum(node, loc) {
+        Ok(state_enum) => node
             .members
             .as_mut()
             .unwrap()
@@ -80,7 +80,7 @@ fn def_state_machine(sm: &mut DefStateMachine) {
 
 /// The representation type of a state enum with `n` constants: the smallest
 /// unsigned integer type that holds them
-fn get_state_enum_type(n: usize, span: Span) -> TypeName {
+fn get_state_enum_type(n: usize, loc: Span) -> TypeName {
     let type_int = if n < 256 {
         IntegerKind::U8
     } else if n < 65536 {
@@ -90,24 +90,24 @@ fn get_state_enum_type(n: usize, span: Span) -> TypeName {
     };
     TypeName {
         kind: TypeNameKind::Integer(type_int),
-        node_id: Node::new(span),
+        node_id: Node::new(loc),
     }
 }
 
-/// The state enum of the state machine `sm`, located at `span`
-fn get_state_enum(sm: &DefStateMachine, span: Span) -> Result<DefEnum, TooManyLeafStates> {
-    let enum_constants = get_enum_constants::get(sm, span, get_enum_constants::MAX_LEAF_STATES)?;
-    let type_name = get_state_enum_type(enum_constants.len(), span);
+/// The state enum of the state machine `node`, located at `loc`
+fn get_state_enum(node: &DefStateMachine, loc: Span) -> Result<DefEnum, TooManyLeafStates> {
+    let enum_constants = get_enum_constants::get(node, loc, get_enum_constants::MAX_LEAF_STATES)?;
+    let type_name = get_state_enum_type(enum_constants.len(), loc);
     Ok(DefEnum {
         name: Name {
             data: "State".to_string(),
-            node_id: Node::new(span),
+            node_id: Node::new(loc),
         },
         type_name: Some(type_name),
         constants: enum_constants,
         default: None,
         is_dictionary_def: false,
-        node_id: Node::new(span),
+        node_id: Node::new(loc),
     })
 }
 
@@ -194,13 +194,13 @@ mod get_enum_constants {
             .collect()
     }
 
-    /// The constants of the state enum of `sm`, located at `span`: the
+    /// The constants of the state enum of `node`, located at `loc`: the
     /// uninitialized state, then one constant per leaf state, sorted by name.
     /// Identical annotated names are collapsed, as in a set, so two leaf
     /// states with the same qualified name and annotations yield one constant.
     pub(super) fn get(
-        sm: &DefStateMachine,
-        span: Span,
+        node: &DefStateMachine,
+        loc: Span,
         max_leaf_states: usize,
     ) -> Result<Vec<DefEnumConstant>, TooManyLeafStates> {
         let mut s = State {
@@ -209,7 +209,7 @@ mod get_enum_constants {
             a_name_set: FxHashSet::default(),
             max_leaf_states,
         };
-        for member in sm.members.iter().flatten() {
+        for member in node.members.iter().flatten() {
             if let StateMachineMember::DefState(state) = member {
                 def_state(&mut s, state)?;
             }
@@ -228,10 +228,10 @@ mod get_enum_constants {
                 let constant = DefEnumConstant {
                     name: fpp_ast::Name {
                         data: a_name.name,
-                        node_id: Node::new(span),
+                        node_id: Node::new(loc),
                     },
                     value: None,
-                    node_id: Node::new(span),
+                    node_id: Node::new(loc),
                 };
                 Node::annotate(&constant.node_id, a_name.pre, a_name.post);
                 constant

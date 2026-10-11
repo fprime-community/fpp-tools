@@ -1,0 +1,383 @@
+TransUnit(
+    [
+        DefModuleTemplate {
+            name: Name {
+                data: "Tmpl",
+                node_id: Span {
+                    start: [ local path prefix ]/template.fpp:1:17,
+                    end: [ local path prefix ]/template.fpp:1:21,
+                },
+            },
+            params: [
+                TemplateParamConstant {
+                    name: Name {
+                        data: "c",
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:3:14,
+                            end: [ local path prefix ]/template.fpp:3:15,
+                        },
+                    },
+                    type_name: TypeName {
+                        kind: QualIdent(
+                            Unqualified {
+                                name: Ident {
+                                    data: "SomeType",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/template.fpp:3:17,
+                                        end: [ local path prefix ]/template.fpp:3:25,
+                                    },
+                                },
+                                is_absolute: false,
+                                node_id: Span {
+                                    start: [ local path prefix ]/template.fpp:3:17,
+                                    end: [ local path prefix ]/template.fpp:3:25,
+                                },
+                            },
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:3:17,
+                            end: [ local path prefix ]/template.fpp:3:25,
+                        },
+                    },
+                    node_id: Span {
+                        start: [ local path prefix ]/template.fpp:3:5,
+                        end: [ local path prefix ]/template.fpp:3:25,
+                    },
+                    pre_annotation: [
+                        "Constant template parameter",
+                    ],
+                    post_annotation: [
+                        "Constant parameter",
+                    ],
+                },
+                TemplateParamType {
+                    name: Name {
+                        data: "TypeParam",
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:6:10,
+                            end: [ local path prefix ]/template.fpp:6:19,
+                        },
+                    },
+                    node_id: Span {
+                        start: [ local path prefix ]/template.fpp:6:5,
+                        end: [ local path prefix ]/template.fpp:6:19,
+                    },
+                    pre_annotation: [
+                        "Type template parameter",
+                    ],
+                    post_annotation: [
+                        "Type parameter",
+                    ],
+                },
+                TemplateParamInterface {
+                    name: Name {
+                        data: "inst",
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:9:14,
+                            end: [ local path prefix ]/template.fpp:9:18,
+                        },
+                    },
+                    interface: Unqualified {
+                        name: Ident {
+                            data: "InterfaceDef",
+                            node_id: Span {
+                                start: [ local path prefix ]/template.fpp:9:20,
+                                end: [ local path prefix ]/template.fpp:9:32,
+                            },
+                        },
+                        is_absolute: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:9:20,
+                            end: [ local path prefix ]/template.fpp:9:32,
+                        },
+                    },
+                    node_id: Span {
+                        start: [ local path prefix ]/template.fpp:9:5,
+                        end: [ local path prefix ]/template.fpp:9:32,
+                    },
+                    pre_annotation: [
+                        "Interface instance template parameter",
+                    ],
+                    post_annotation: [
+                        "Instance parameter",
+                    ],
+                },
+            ],
+            members: [
+                DefArray {
+                    name: Name {
+                        data: "Arr",
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:11:11,
+                            end: [ local path prefix ]/template.fpp:11:14,
+                        },
+                    },
+                    size: Expr {
+                        kind: LiteralInt(
+                            "3",
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:11:18,
+                            end: [ local path prefix ]/template.fpp:11:19,
+                        },
+                    },
+                    elt_type: TypeName {
+                        kind: QualIdent(
+                            Unqualified {
+                                name: Ident {
+                                    data: "TypeParam",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/template.fpp:11:21,
+                                        end: [ local path prefix ]/template.fpp:11:30,
+                                    },
+                                },
+                                is_absolute: false,
+                                node_id: Span {
+                                    start: [ local path prefix ]/template.fpp:11:21,
+                                    end: [ local path prefix ]/template.fpp:11:30,
+                                },
+                            },
+                        ),
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:11:21,
+                            end: [ local path prefix ]/template.fpp:11:30,
+                        },
+                    },
+                    default: None,
+                    format: None,
+                    is_dictionary_def: false,
+                    node_id: Span {
+                        start: [ local path prefix ]/template.fpp:11:5,
+                        end: [ local path prefix ]/template.fpp:11:30,
+                    },
+                },
+                DefTopology {
+                    is_deployment: false,
+                    name: Name {
+                        data: "Top",
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:13:14,
+                            end: [ local path prefix ]/template.fpp:13:17,
+                        },
+                    },
+                    members: [
+                        SpecInstance {
+                            instance: Unqualified {
+                                name: Ident {
+                                    data: "inst",
+                                    node_id: Span {
+                                        start: [ local path prefix ]/template.fpp:14:18,
+                                        end: [ local path prefix ]/template.fpp:14:22,
+                                    },
+                                },
+                                is_absolute: false,
+                                node_id: Span {
+                                    start: [ local path prefix ]/template.fpp:14:18,
+                                    end: [ local path prefix ]/template.fpp:14:22,
+                                },
+                            },
+                            node_id: Span {
+                                start: [ local path prefix ]/template.fpp:14:9,
+                                end: [ local path prefix ]/template.fpp:14:22,
+                            },
+                        },
+                    ],
+                    implements: [],
+                    node_id: Span {
+                        start: [ local path prefix ]/template.fpp:13:5,
+                        end: [ local path prefix ]/template.fpp:15:6,
+                    },
+                },
+            ],
+            node_id: Span {
+                start: [ local path prefix ]/template.fpp:1:1,
+                end: [ local path prefix ]/template.fpp:16:2,
+            },
+        },
+        SpecTemplateExpand {
+            template: Unqualified {
+                name: Ident {
+                    data: "Tmpl",
+                    node_id: Span {
+                        start: [ local path prefix ]/template.fpp:19:8,
+                        end: [ local path prefix ]/template.fpp:19:12,
+                    },
+                },
+                is_absolute: false,
+                node_id: Span {
+                    start: [ local path prefix ]/template.fpp:19:8,
+                    end: [ local path prefix ]/template.fpp:19:12,
+                },
+            },
+            args: [
+                TemplateArg {
+                    kind: Constant(
+                        Expr {
+                            kind: LiteralInt(
+                                "10",
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/template.fpp:19:22,
+                                end: [ local path prefix ]/template.fpp:19:24,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template.fpp:19:13,
+                        end: [ local path prefix ]/template.fpp:19:24,
+                    },
+                },
+                TemplateArg {
+                    kind: Type(
+                        TypeName {
+                            kind: QualIdent(
+                                Unqualified {
+                                    name: Ident {
+                                        data: "Type",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/template.fpp:19:31,
+                                            end: [ local path prefix ]/template.fpp:19:35,
+                                        },
+                                    },
+                                    is_absolute: false,
+                                    node_id: Span {
+                                        start: [ local path prefix ]/template.fpp:19:31,
+                                        end: [ local path prefix ]/template.fpp:19:35,
+                                    },
+                                },
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/template.fpp:19:31,
+                                end: [ local path prefix ]/template.fpp:19:35,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template.fpp:19:26,
+                        end: [ local path prefix ]/template.fpp:19:35,
+                    },
+                },
+                TemplateArg {
+                    kind: Interface(
+                        Unqualified {
+                            name: Ident {
+                                data: "instance1",
+                                node_id: Span {
+                                    start: [ local path prefix ]/template.fpp:19:47,
+                                    end: [ local path prefix ]/template.fpp:19:56,
+                                },
+                            },
+                            is_absolute: true,
+                            node_id: Span {
+                                start: [ local path prefix ]/template.fpp:19:46,
+                                end: [ local path prefix ]/template.fpp:19:56,
+                            },
+                        },
+                    ),
+                    node_id: Span {
+                        start: [ local path prefix ]/template.fpp:19:37,
+                        end: [ local path prefix ]/template.fpp:19:56,
+                    },
+                },
+            ],
+            members: Some(
+                [
+                    DefArray {
+                        name: Name {
+                            data: "Arr",
+                            node_id: Span {
+                                start: [ local path prefix ]/template.fpp:11:11,
+                                end: [ local path prefix ]/template.fpp:11:14,
+                            },
+                        },
+                        size: Expr {
+                            kind: LiteralInt(
+                                "3",
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/template.fpp:11:18,
+                                end: [ local path prefix ]/template.fpp:11:19,
+                            },
+                        },
+                        elt_type: TypeName {
+                            kind: QualIdent(
+                                Unqualified {
+                                    name: Ident {
+                                        data: "TypeParam",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/template.fpp:11:21,
+                                            end: [ local path prefix ]/template.fpp:11:30,
+                                        },
+                                    },
+                                    is_absolute: false,
+                                    node_id: Span {
+                                        start: [ local path prefix ]/template.fpp:11:21,
+                                        end: [ local path prefix ]/template.fpp:11:30,
+                                    },
+                                },
+                            ),
+                            node_id: Span {
+                                start: [ local path prefix ]/template.fpp:11:21,
+                                end: [ local path prefix ]/template.fpp:11:30,
+                            },
+                        },
+                        default: None,
+                        format: None,
+                        is_dictionary_def: false,
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:11:5,
+                            end: [ local path prefix ]/template.fpp:11:30,
+                        },
+                    },
+                    DefTopology {
+                        is_deployment: false,
+                        name: Name {
+                            data: "Top",
+                            node_id: Span {
+                                start: [ local path prefix ]/template.fpp:13:14,
+                                end: [ local path prefix ]/template.fpp:13:17,
+                            },
+                        },
+                        members: [
+                            SpecInstance {
+                                instance: Unqualified {
+                                    name: Ident {
+                                        data: "inst",
+                                        node_id: Span {
+                                            start: [ local path prefix ]/template.fpp:14:18,
+                                            end: [ local path prefix ]/template.fpp:14:22,
+                                        },
+                                    },
+                                    is_absolute: false,
+                                    node_id: Span {
+                                        start: [ local path prefix ]/template.fpp:14:18,
+                                        end: [ local path prefix ]/template.fpp:14:22,
+                                    },
+                                },
+                                node_id: Span {
+                                    start: [ local path prefix ]/template.fpp:14:9,
+                                    end: [ local path prefix ]/template.fpp:14:22,
+                                },
+                            },
+                        ],
+                        implements: [],
+                        node_id: Span {
+                            start: [ local path prefix ]/template.fpp:13:5,
+                            end: [ local path prefix ]/template.fpp:15:6,
+                        },
+                    },
+                ],
+            ),
+            node_id: Span {
+                start: [ local path prefix ]/template.fpp:19:1,
+                end: [ local path prefix ]/template.fpp:19:57,
+            },
+            pre_annotation: [
+                "Expansion specifier",
+            ],
+            post_annotation: [
+                "Expansion specifier",
+            ],
+        },
+    ],
+)

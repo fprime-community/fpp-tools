@@ -64,7 +64,7 @@ impl Span {
         with(|w| w.span_start(self))
     }
 
-    /// Creates an empty span pointing to directly after this span.
+    /// Gets the position directly after the end of the span
     pub fn end(&self) -> Position {
         with(|w| w.span_end(self))
     }

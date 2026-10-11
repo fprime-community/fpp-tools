@@ -2320,7 +2320,7 @@ TransUnit(
                                 },
                                 is_absolute: true,
                                 node_id: Span {
-                                    start: <stdin>:188:15,
+                                    start: <stdin>:188:14,
                                     end: <stdin>:188:20,
                                 },
                             },
@@ -3331,7 +3331,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: <stdin>:256:17,
+                            start: <stdin>:256:16,
                             end: <stdin>:256:20,
                         },
                     },
@@ -3397,7 +3397,7 @@ TransUnit(
                         },
                         is_absolute: true,
                         node_id: Span {
-                            start: <stdin>:264:20,
+                            start: <stdin>:264:19,
                             end: <stdin>:264:21,
                         },
                     },
@@ -3756,7 +3756,7 @@ TransUnit(
                                     },
                                 },
                                 node_id: Span {
-                                    start: <stdin>:282:37,
+                                    start: <stdin>:282:36,
                                     end: <stdin>:282:42,
                                 },
                             },

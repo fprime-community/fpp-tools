@@ -30,10 +30,10 @@
   = note: expected one of [, {, (, identifier, ., -, true, false, sizeof, literal float, literal integer, literal string
   = note: got )
 
-  --> [ local path prefix ]/template-error.fpp:10:7
+  --> [ local path prefix ]/template-error.fpp:11:1
    |
-10 | expand
-   |       ^ syntax error: unexpected token
+11 |
+   | ^ syntax error: unexpected token
    |
    = note: expected identifier
    = note: got end of line

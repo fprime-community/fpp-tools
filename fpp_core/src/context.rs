@@ -15,6 +15,7 @@ pub struct SpanData {
     pub file: Weak<SourceFileData>,
     pub start: BytePos,
     pub length: BytePos,
+    /// Location where this location is included
     pub include_span: Option<Box<SpanData>>,
     /// Span of the template expansion specifier that copied this span here
     pub expand_span: Option<Box<SpanData>>,
@@ -207,6 +208,7 @@ impl From<&SourceFileData> for SourceFile {
     }
 }
 
+/// The span and the annotations of an AST node
 pub struct NodeData {
     pub span_handle: usize,
     pub pre_annotation: Vec<String>,
@@ -274,6 +276,7 @@ pub trait DiagnosticEmitter {
 pub struct CompilerContext<E: DiagnosticEmitter> {
     spans: IdMap<SpanData>,
     files: IdMap<Arc<SourceFileData>>,
+    /// Manage spans and annotations of AST nodes
     nodes: IdMap<NodeData>,
     emitter: E,
 

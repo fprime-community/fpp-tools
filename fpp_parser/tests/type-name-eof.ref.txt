@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/type-name-eof.fpp:1:10
+  |
+1 | port P ->
+  |          ^ syntax error: type name expected
+  |
+  = note: expected one of bool, I8, U8, I16, U16, I32, U32, I64, U64, F32, F64, string, identifier, .
+  = note: got end of input
+

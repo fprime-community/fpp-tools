@@ -137,6 +137,7 @@ pub mod passes {
 
 pub mod transform {
     pub use fpp_parser::add_state_enums;
+    pub use fpp_parser::{IncludeParentKind, ResolveIncludes};
 
     mod expand_templates;
     pub use expand_templates::*;

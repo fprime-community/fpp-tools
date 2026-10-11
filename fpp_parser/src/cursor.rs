@@ -1,4 +1,4 @@
-use crate::error::{ParseError, ParseResult};
+use crate::error::{ParseResult, SyntaxError};
 use crate::token::Token;
 use fpp_core::{BytePos, Diagnostic, Level, SourceFile, Span, Spanned};
 use fpp_lexer::{Lexer, LexerError, TokenKind};
@@ -113,6 +113,29 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// The end-of-line token for the run of newlines and comments that starts at
+    /// `start`. The token is empty and is located where a syntax error at an
+    /// end of line is reported: at the comment that starts the run, or else at
+    /// the start of the line after the first newline of the run.
+    fn eol_token(&self, start: usize) -> Token {
+        let rest = &self.content[start..];
+        let loc = if rest.starts_with('#') {
+            start
+        } else if rest.starts_with("\r\n") {
+            start + 2
+        } else {
+            start + 1
+        };
+        Token::new(
+            TokenKind::Eol,
+            None,
+            self.file,
+            loc as BytePos,
+            0,
+            self.include_span,
+        )
+    }
+
     fn next_internal(&mut self) -> Option<Token> {
         loop {
             let prev = self.pos;
@@ -132,14 +155,7 @@ impl<'a> Cursor<'a> {
                     // Check the next token
                     // Some tokens eat newlines and others don't
                     return match self.eat_newlines() {
-                        None => Some(Token::new(
-                            TokenKind::Eol,
-                            None,
-                            self.file,
-                            prev as BytePos,
-                            (self.pos - prev) as BytePos,
-                            self.include_span,
-                        )),
+                        None => Some(self.eol_token(prev)),
                         Some(lookahead) => {
                             match lookahead.kind {
                                 TokenKind::RightParen
@@ -162,14 +178,7 @@ impl<'a> Cursor<'a> {
                                     self.lookahead = Some(lookahead);
 
                                     // This is actually a newline delimiter
-                                    Some(Token::new(
-                                        TokenKind::Eol,
-                                        None,
-                                        self.file,
-                                        prev as BytePos,
-                                        (self.pos - prev) as BytePos,
-                                        self.include_span,
-                                    ))
+                                    Some(self.eol_token(prev))
                                 }
                             }
                         }
@@ -349,16 +358,9 @@ impl<'a> Cursor<'a> {
         self.last_consumed_span
     }
 
-    /// The location of the next token, or the end of the input if there is none.
-    /// An end-of-line token, which spans the run of newlines and comments it
-    /// stands for, is located where the run starts.
-    fn next_token_span(&mut self) -> Span {
-        let file = self.file;
-        let include_span = self.include_span;
+    /// The location of the next token, or the end of the input if there is none
+    pub(crate) fn next_token_span(&mut self) -> Span {
         match self.peek_internal(0) {
-            Some(tok) if tok.kind() == TokenKind::Eol => {
-                Span::new(file, tok.span().start().pos(), 0, include_span)
-            }
             Some(tok) => tok.span(),
             None => self.end_of_input_span(),
         }
@@ -383,18 +385,18 @@ impl<'a> Cursor<'a> {
         msg: &'static str,
         expected: TokenKind,
         got: TokenKind,
-    ) -> ParseError {
-        ParseError::ExpectedToken {
+    ) -> SyntaxError {
+        SyntaxError::ExpectedToken {
             expected,
             got,
-            last: self.next_token_span(),
+            got_span: self.next_token_span(),
             msg,
         }
     }
 
-    pub fn err_unexpected_eof(&self) -> ParseError {
-        ParseError::UnexpectedEof {
-            last: self.end_of_input_span(),
+    pub fn err_unexpected_eof(&self) -> SyntaxError {
+        SyntaxError::UnexpectedEof {
+            loc: self.end_of_input_span(),
         }
     }
 
@@ -402,13 +404,13 @@ impl<'a> Cursor<'a> {
         &mut self,
         msg: &'static str,
         expected_one_of: Vec<TokenKind>,
-    ) -> ParseError {
+    ) -> SyntaxError {
         let (got_kind, got_span) = match self.peek_internal(0) {
             None => (TokenKind::EOF, self.end_of_input_span()),
             Some(got) => (got.kind, got.span),
         };
 
-        ParseError::ExpectedOneOf {
+        SyntaxError::ExpectedOneOf {
             expected: expected_one_of,
             got_span,
             got_kind,
@@ -542,7 +544,7 @@ mod lexer_spec;
 #[cfg(test)]
 mod test {
     use crate::cursor::Cursor;
-    use crate::error::ParseError;
+    use crate::error::SyntaxError;
     use crate::token::Token;
     use fpp_core::{SourceFile, Spanned};
     use fpp_lexer::TokenKind::*;
@@ -585,13 +587,13 @@ mod test {
     fn lex_texts(content: &str) -> Vec<(TokenKind, String)> {
         lex(content)
             .iter()
-            .map(|tok| (tok.kind(), tok.text().to_string()))
+            .map(|tok| (tok.kind(), tok.str().to_string()))
             .collect()
     }
 
     fn assert_token_eq(token: &Token, kind: TokenKind, text: &str) {
         assert_eq!(token.kind(), kind);
-        assert_eq!(token.text(), text);
+        assert_eq!(token.str(), text);
     }
 
     #[test]
@@ -958,8 +960,8 @@ mod test {
             cursor.next();
 
             match cursor.consume(Equals) {
-                Err(ParseError::ExpectedToken { last, got, .. }) => {
-                    assert_eq!(last, b);
+                Err(SyntaxError::ExpectedToken { got_span, got, .. }) => {
+                    assert_eq!(got_span, b);
                     assert_eq!(got, Identifier);
                 }
                 other => panic!("{other:?}"),
@@ -972,9 +974,9 @@ mod test {
             assert_eq!(cursor.peek(1), Identifier);
 
             match cursor.consume(Identifier) {
-                Err(ParseError::ExpectedToken { last, got, .. }) => {
+                Err(SyntaxError::ExpectedToken { got_span, got, .. }) => {
                     assert_eq!(got, Eol);
-                    assert_eq!(last.start().line(), 0);
+                    assert_eq!(got_span.start().line(), 0);
                 }
                 other => panic!("{other:?}"),
             }
@@ -985,12 +987,51 @@ mod test {
     }
 
     #[test]
+    fn end_of_line_errors_are_located_on_the_next_line() {
+        // At the start of the line after the first newline of the run
+        for content in [
+            "constant\n  a",
+            "constant   \n\n\n  a",
+            "constant\r\n  a",
+            "constant\n",
+        ] {
+            with_cursor(content, |cursor| {
+                cursor.next();
+                match cursor.consume(Identifier) {
+                    Err(SyntaxError::ExpectedToken { got_span, got, .. }) => {
+                        assert_eq!(got, Eol);
+                        assert_eq!(got_span.start().line(), 1, "{content:?}");
+                        assert_eq!(got_span.start().column(), 0, "{content:?}");
+                        assert!(got_span.is_empty());
+                    }
+                    other => panic!("{other:?}"),
+                }
+            });
+        }
+
+        // At the comment that starts the run
+        with_cursor("constant # c\n  a", |cursor| {
+            cursor.next();
+            match cursor.err_expected_one_of("identifier expected", vec![Identifier]) {
+                SyntaxError::ExpectedOneOf {
+                    got_kind, got_span, ..
+                } => {
+                    assert_eq!(got_kind, Eol);
+                    assert_eq!(got_span.start().pos(), 9);
+                    assert!(got_span.is_empty());
+                }
+                other => panic!("{other:?}"),
+            }
+        });
+    }
+
+    #[test]
     fn end_of_input_errors_keep_the_expectation() {
         with_cursor("a", |cursor| {
             cursor.next();
 
             match cursor.err_expected_one_of("expression expected", vec![LiteralInt]) {
-                ParseError::ExpectedOneOf {
+                SyntaxError::ExpectedOneOf {
                     got_kind,
                     got_span,
                     msg,

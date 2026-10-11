@@ -2320,7 +2320,7 @@ TransUnit(
                                 },
                                 is_absolute: true,
                                 node_id: Span {
-                                    start: [ local path prefix ]/syntax.fpp:188:15,
+                                    start: [ local path prefix ]/syntax.fpp:188:14,
                                     end: [ local path prefix ]/syntax.fpp:188:20,
                                 },
                             },
@@ -3331,7 +3331,7 @@ TransUnit(
                             },
                         },
                         node_id: Span {
-                            start: [ local path prefix ]/syntax.fpp:256:17,
+                            start: [ local path prefix ]/syntax.fpp:256:16,
                             end: [ local path prefix ]/syntax.fpp:256:20,
                         },
                     },
@@ -3397,7 +3397,7 @@ TransUnit(
                         },
                         is_absolute: true,
                         node_id: Span {
-                            start: [ local path prefix ]/syntax.fpp:264:20,
+                            start: [ local path prefix ]/syntax.fpp:264:19,
                             end: [ local path prefix ]/syntax.fpp:264:21,
                         },
                     },
@@ -3756,7 +3756,7 @@ TransUnit(
                                     },
                                 },
                                 node_id: Span {
-                                    start: [ local path prefix ]/syntax.fpp:282:37,
+                                    start: [ local path prefix ]/syntax.fpp:282:36,
                                     end: [ local path prefix ]/syntax.fpp:282:42,
                                 },
                             },

@@ -10,13 +10,13 @@ pub struct Token {
     /// The location of the token
     pub span: Span,
     /// The string value of an identifier, annotation or literal
-    pub text: Option<String>,
+    pub str: Option<String>,
 }
 
 impl Token {
     pub fn new(
         kind: TokenKind,
-        text: Option<String>,
+        str: Option<String>,
         file: SourceFile,
         start: BytePos,
         length: BytePos,
@@ -25,7 +25,7 @@ impl Token {
         Token {
             kind,
             span: Span::new(file, start, length, include_span),
-            text,
+            str,
         }
     }
 
@@ -34,8 +34,8 @@ impl Token {
     }
 
     /// The string value of the token, empty if it has none
-    pub fn text(&self) -> &str {
-        match self.text.as_ref() {
+    pub fn str(&self) -> &str {
+        match self.str.as_ref() {
             None => "",
             Some(txt) => txt,
         }

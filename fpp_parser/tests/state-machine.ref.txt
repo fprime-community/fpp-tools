@@ -647,7 +647,7 @@ TransUnit(
                                 },
                                 is_absolute: true,
                                 node_id: Span {
-                                    start: [ local path prefix ]/state-machine.fpp:54:41,
+                                    start: [ local path prefix ]/state-machine.fpp:54:40,
                                     end: [ local path prefix ]/state-machine.fpp:54:43,
                                 },
                             },
@@ -906,7 +906,7 @@ TransUnit(
                                             },
                                         },
                                         node_id: Span {
-                                            start: [ local path prefix ]/state-machine.fpp:69:71,
+                                            start: [ local path prefix ]/state-machine.fpp:69:70,
                                             end: [ local path prefix ]/state-machine.fpp:69:76,
                                         },
                                     },

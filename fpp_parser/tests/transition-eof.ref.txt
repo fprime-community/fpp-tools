@@ -1,0 +1,15 @@
+ --> [ local path prefix ]/transition-eof.fpp:3:3
+  |
+3 |   initial
+  |   ^^^^^^^ syntax error: unexpected token
+  |
+  = note: got initial
+
+ --> [ local path prefix ]/transition-eof.fpp:3:10
+  |
+3 |   initial
+  |          ^ syntax error: unexpected token
+  |
+  = note: expected }
+  = note: got end of input
+
