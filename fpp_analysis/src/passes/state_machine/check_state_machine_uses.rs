@@ -1,15 +1,13 @@
+use crate::analyzers::state_machine::state_machine_use_analyzer::state_machine_use_analyzer_hooks;
 use crate::analyzers::state_machine::{
     SmResult, StateMachineAnalysisVisitor, StateMachineUseAnalyzer, state_analyzer,
 };
 use crate::errors::{SemanticError, SemanticResult};
-use crate::semantics::SymbolInterface;
 use crate::semantics::state_machine::{
     StateMachineAnalysis, StateMachineNameGroup, StateMachineSymbol,
 };
-use fpp_ast::{
-    AstNode, DefChoice, DefState, Ident, QualIdent, SpecInitialTransition, SpecStateEntry,
-    SpecStateExit, SpecStateTransition,
-};
+use crate::semantics::{QualifiedName, SymbolInterface};
+use fpp_ast::{AstNode, DefState, Ident, QualIdent};
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -133,51 +131,30 @@ impl CheckStateMachineUses {
 }
 
 impl StateMachineUseAnalyzer for CheckStateMachineUses {
-    fn action_use(&self, sma: &mut StateMachineAnalysis, node: &Ident) -> SmResult {
+    fn action_use(&self, sma: &mut StateMachineAnalysis, node: &Ident, _name: &str) -> SmResult {
         self.visit_ident_node(sma, StateMachineNameGroup::Action, node)
     }
 
-    fn guard_use(&self, sma: &mut StateMachineAnalysis, node: &Ident) -> SmResult {
+    fn guard_use(&self, sma: &mut StateMachineAnalysis, node: &Ident, _name: &str) -> SmResult {
         self.visit_ident_node(sma, StateMachineNameGroup::Guard, node)
     }
 
-    fn signal_use(&self, sma: &mut StateMachineAnalysis, node: &Ident) -> SmResult {
+    fn signal_use(&self, sma: &mut StateMachineAnalysis, node: &Ident, _name: &str) -> SmResult {
         self.visit_ident_node(sma, StateMachineNameGroup::Signal, node)
     }
 
-    fn state_or_choice_use(&self, sma: &mut StateMachineAnalysis, node: &QualIdent) -> SmResult {
+    fn state_or_choice_use(
+        &self,
+        sma: &mut StateMachineAnalysis,
+        node: &QualIdent,
+        _name: QualifiedName,
+    ) -> SmResult {
         self.visit_qual_ident_node(sma, StateMachineNameGroup::State, node)
     }
 }
 
 impl StateMachineAnalysisVisitor for CheckStateMachineUses {
-    fn def_choice(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
-        self.def_choice_uses(sma, node)
-    }
-
-    fn spec_state_entry(&self, sma: &mut StateMachineAnalysis, node: &SpecStateEntry) -> SmResult {
-        self.spec_state_entry_uses(sma, node)
-    }
-
-    fn spec_state_exit(&self, sma: &mut StateMachineAnalysis, node: &SpecStateExit) -> SmResult {
-        self.spec_state_exit_uses(sma, node)
-    }
-
-    fn spec_initial_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecInitialTransition,
-    ) -> SmResult {
-        self.spec_initial_transition_uses(sma, node)
-    }
-
-    fn spec_state_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecStateTransition,
-    ) -> SmResult {
-        self.spec_state_transition_uses(sma, node)
-    }
+    state_machine_use_analyzer_hooks!();
 
     fn def_state(&self, sma: &mut StateMachineAnalysis, node: &DefState) -> SmResult {
         let symbol = StateMachineSymbol::State(Arc::new(node.clone()));

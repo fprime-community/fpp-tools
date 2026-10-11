@@ -1,3 +1,6 @@
+use crate::analyzers::state_machine::transition_expr_analyzer::{
+    self, transition_expr_analyzer_hooks,
+};
 use crate::analyzers::state_machine::{
     SmResult, StateMachineAnalysisVisitor, TransitionExprAnalyzer,
 };
@@ -28,7 +31,7 @@ impl StateMachineAnalysisVisitor for ConstructTransitionGraph {
         let soc = StateOrChoice::State(sym);
         let graph_node = TgNode { soc };
         sma.transition_graph = sma.transition_graph.add_node(graph_node);
-        self.def_state_texpr(sma, node)
+        transition_expr_analyzer::def_state(self, sma, node)
     }
 
     fn def_choice(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
@@ -36,24 +39,10 @@ impl StateMachineAnalysisVisitor for ConstructTransitionGraph {
         let soc = StateOrChoice::Choice(sym);
         let graph_node = TgNode { soc };
         sma.transition_graph = sma.transition_graph.add_node(graph_node);
-        self.def_choice_texpr(sma, node)
+        transition_expr_analyzer::def_choice(self, sma, node)
     }
 
-    fn spec_initial_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecInitialTransition,
-    ) -> SmResult {
-        self.spec_initial_transition_texpr(sma, node)
-    }
-
-    fn spec_state_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecStateTransition,
-    ) -> SmResult {
-        self.spec_state_transition_texpr(sma, node)
-    }
+    transition_expr_analyzer_hooks!(spec_initial_transition, spec_state_transition);
 }
 
 impl TransitionExprAnalyzer for ConstructTransitionGraph {

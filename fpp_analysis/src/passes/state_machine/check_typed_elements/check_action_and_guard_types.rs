@@ -1,4 +1,5 @@
 use crate::Analysis;
+use crate::analyzers::state_machine::sm_typed_element_analyzer::sm_typed_element_analyzer_hooks;
 use crate::analyzers::state_machine::{
     SmResult, SmTypedElementAnalyzer, StateMachineAnalysisVisitor,
 };
@@ -6,10 +7,7 @@ use crate::semantics::Type;
 use crate::semantics::state_machine::{
     StateMachineAnalysis, StateMachineSymbol, StateMachineTypedElement,
 };
-use fpp_ast::{
-    AstNode, DefChoice, DefStateMachine, Ident, SpecInitialTransition, SpecStateEntry,
-    SpecStateExit, SpecStateTransition, TransitionExpr, TransitionOrDo,
-};
+use fpp_ast::{AstNode, DefStateMachine, Ident, TransitionExpr, TransitionOrDo};
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -115,33 +113,7 @@ impl SmTypedElementAnalyzer for CheckActionAndGuardTypes<'_> {
 }
 
 impl StateMachineAnalysisVisitor for CheckActionAndGuardTypes<'_> {
-    fn def_choice(&self, sma: &mut StateMachineAnalysis, node: &DefChoice) -> SmResult {
-        self.def_choice_te(sma, node)
-    }
-
-    fn spec_state_entry(&self, sma: &mut StateMachineAnalysis, node: &SpecStateEntry) -> SmResult {
-        self.spec_state_entry_te(sma, node)
-    }
-
-    fn spec_state_exit(&self, sma: &mut StateMachineAnalysis, node: &SpecStateExit) -> SmResult {
-        self.spec_state_exit_te(sma, node)
-    }
-
-    fn spec_initial_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecInitialTransition,
-    ) -> SmResult {
-        self.spec_initial_transition_te(sma, node)
-    }
-
-    fn spec_state_transition(
-        &self,
-        sma: &mut StateMachineAnalysis,
-        node: &SpecStateTransition,
-    ) -> SmResult {
-        self.spec_state_transition_te(sma, node)
-    }
+    sm_typed_element_analyzer_hooks!();
 }
 
 impl CheckActionAndGuardTypes<'_> {
