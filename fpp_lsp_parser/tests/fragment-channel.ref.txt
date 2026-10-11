@@ -1,0 +1,6 @@
+ROOT@0..6
+  TLM_CHANNEL_IDENTIFIER@0..5
+    IDENT@0..2 "i5"
+    DOT@2..3 "."
+    IDENT@3..5 "c5"
+  EOL@5..6 "\n"
