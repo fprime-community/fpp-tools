@@ -385,6 +385,19 @@ fn unclosed_strings() {
     );
 }
 
+/// The spec allows any character but a newline after a backslash in a
+/// single-line string literal
+#[test]
+fn backslash_newline_in_string_is_unclosed() {
+    assert_eq!(
+        errors("\"ab\\\ncd\""),
+        expected_errors(&[
+            ("\"ab\\", "missing string double quote closure"),
+            ("\"", "missing string double quote closure"),
+        ])
+    );
+}
+
 /// The spec allows no whitespace character other than the space
 #[test]
 fn form_feed_is_not_whitespace() {

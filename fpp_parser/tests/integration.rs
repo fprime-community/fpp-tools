@@ -94,6 +94,11 @@ fn empty() {
 }
 
 #[test]
+fn escaped_include_path() {
+    run_test("escaped-include-path")
+}
+
+#[test]
 fn escaped_strings() {
     run_test("escaped-strings")
 }
