@@ -3,17 +3,20 @@ use crate::token::TokenKind::*;
 use crate::token::{KeywordKind, Token, TokenKind};
 use std::str::Chars;
 
-/// A lexer error: an invalid token
+/// A lexer error
 #[derive(Debug, Clone)]
-pub struct LexerError {
-    /// The byte offset where the error starts
-    pub pos: usize,
-    /// The number of bytes the error covers
-    pub len: usize,
-    /// The error message
-    pub msg: String,
-    /// Notes that follow the message
-    pub notes: Vec<String>,
+pub enum LexerError {
+    /// Invalid token
+    InvalidToken {
+        /// The byte offset where the error starts
+        pos: usize,
+        /// The number of bytes the error covers
+        len: usize,
+        /// The error message
+        msg: String,
+        /// Notes that follow the message
+        notes: Vec<String>,
+    },
 }
 
 /// The scanner of FPP source text.
@@ -115,7 +118,7 @@ impl<'a> Lexer<'a> {
 
     /// Generate an error covering `len` bytes at `pos`
     fn error_at<T: Into<String>>(&mut self, pos: usize, len: usize, msg: T, notes: Vec<String>) {
-        self.errors.push(LexerError {
+        self.errors.push(LexerError::InvalidToken {
             pos,
             len,
             msg: msg.into(),

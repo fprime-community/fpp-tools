@@ -30,11 +30,17 @@ impl<'a> LexedStr<'a> {
 
         let mut res = conv.finalize_with_eof();
         for err in lexer.errors() {
-            let token = res.token_at_error(err.pos, err.len);
-            let mut msg = format!("invalid token: {}", err.msg);
-            if !err.notes.is_empty() {
+            let fpp_lexer::LexerError::InvalidToken {
+                pos,
+                len,
+                msg,
+                notes,
+            } = err;
+            let token = res.token_at_error(*pos, *len);
+            let mut msg = format!("invalid token: {}", msg);
+            if !notes.is_empty() {
                 msg.push_str("\nnote: ");
-                msg.push_str(&err.notes.join("\n"));
+                msg.push_str(&notes.join("\n"));
             }
             res.error.push(LexError {
                 msg,
@@ -327,12 +333,15 @@ mod tests {
         let expected: Vec<(usize, String)> = lexer
             .errors()
             .map(|e| {
-                let mut msg = format!("invalid token: {}", e.msg);
-                if !e.notes.is_empty() {
+                let fpp_lexer::LexerError::InvalidToken {
+                    pos, msg, notes, ..
+                } = e;
+                let mut msg = format!("invalid token: {}", msg);
+                if !notes.is_empty() {
                     msg.push_str("\nnote: ");
-                    msg.push_str(&e.notes.join("\n"));
+                    msg.push_str(&notes.join("\n"));
                 }
-                (e.pos, msg)
+                (*pos, msg)
             })
             .collect();
 

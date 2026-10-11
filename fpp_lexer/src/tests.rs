@@ -22,10 +22,8 @@ fn lex_with_errors(content: &'_ str) -> (Vec<TokenStr<'_>>, Vec<ErrorStr>) {
     let errors = lexer
         .errors()
         .map(|err| {
-            (
-                content[err.pos..err.pos + err.len].to_string(),
-                err.msg.clone(),
-            )
+            let crate::LexerError::InvalidToken { pos, len, msg, .. } = err;
+            (content[*pos..*pos + *len].to_string(), msg.clone())
         })
         .collect();
     (out, errors)
@@ -362,8 +360,9 @@ fn invalid_tokens() {
 
     let mut lexer = crate::Lexer::new("\t");
     lexer.by_ref().for_each(drop);
+    let crate::LexerError::InvalidToken { notes, .. } = lexer.errors().next().unwrap();
     assert_eq!(
-        lexer.errors().next().unwrap().notes,
+        *notes,
         vec![
             "embedded tab characters are not allowed in FPP source files",
             "try configuring your editor to convert tabs to spaces",

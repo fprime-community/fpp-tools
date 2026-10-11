@@ -72,18 +72,19 @@ impl<'a> Cursor<'a> {
     /// Emit the lexer errors that have not been emitted
     pub fn emit_errors(&mut self) {
         for err in std::mem::take(&mut self.errors) {
+            let LexerError::InvalidToken {
+                pos,
+                len,
+                msg,
+                notes,
+            } = err;
             let diagnostic = Diagnostic::new(
-                Span::new(
-                    self.file,
-                    err.pos as BytePos,
-                    err.len as BytePos,
-                    self.include_span,
-                ),
+                Span::new(self.file, pos as BytePos, len as BytePos, self.include_span),
                 Level::Error,
-                format!("invalid token: {}", err.msg),
+                format!("invalid token: {}", msg),
             );
 
-            err.notes
+            notes
                 .into_iter()
                 .fold(diagnostic, |diagnostic, note| diagnostic.note(note))
                 .emit();
