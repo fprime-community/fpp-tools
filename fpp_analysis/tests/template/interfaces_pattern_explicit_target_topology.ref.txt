@@ -1,7 +1,9 @@
-  --> [ local path prefix ]/template/interfaces_pattern_explicit_target_topology.fpp:29:19
+  --> [ local path prefix ]/template/interfaces_pattern_explicit_target_topology.fpp:25:44
    |
-29 |   expand T(instance Sub)
-   |                     ^^^ invalid use of symbol Sub: not a component instance symbol
+25 |       time connections instance timeSource { i }
+   |                                              ^ invalid use of symbol i: not a component instance symbol
+   |
+   = note: expanded at [ local path prefix ]/template/interfaces_pattern_explicit_target_topology.fpp:29:1
    |
   ::: [ local path prefix ]/template/interfaces_pattern_explicit_target_topology.fpp:16:1
    |

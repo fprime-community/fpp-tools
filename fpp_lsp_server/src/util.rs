@@ -947,7 +947,8 @@ pub(crate) fn port_instance_at_position<'a>(
     // compiler context is set on this thread).
     let interface_instance = state
         .analysis
-        .get_interface_instance(pii.interface_instance.id())?;
+        .get_interface_instance(pii.interface_instance.id())
+        .ok()??;
     let port_instance = interface_instance
         .lookup_port_instance(&state.analysis, &pii.port_name)
         .ok()?;

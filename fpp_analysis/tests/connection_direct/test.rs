@@ -54,3 +54,8 @@ fn instance_not_in_topology() {
 fn internal_port() {
     run_test("connection_direct/internal_port")
 }
+
+#[test]
+fn unresolved_topology() {
+    run_test("connection_direct/unresolved_topology")
+}

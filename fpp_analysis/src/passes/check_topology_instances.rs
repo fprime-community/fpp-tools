@@ -65,12 +65,16 @@ impl<'ast> Visitor<'ast> for CheckTopologyInstances {
         a: &mut Self::State,
         node: &'ast SpecInstance,
     ) -> ControlFlow<Self::Break> {
-        // An instance/import reference resolves to a component instance symbol
-        // (for `instance c`) or a topology symbol (for `import A`). Undefined
-        // references are already reported by CheckUses.
-        if let Some(symbol) = a.use_def_map.get(&node.instance.id()).cloned()
-            && let Some(mut top) = a.topology.take()
-        {
+        let symbol = match a.get_interface_instance_symbol(node.instance.id()) {
+            Ok(Some(symbol)) => symbol,
+            // The use is unresolved: CheckUses reported it
+            Ok(None) => return ControlFlow::Continue(()),
+            Err(err) => {
+                err.emit();
+                return ControlFlow::Continue(());
+            }
+        };
+        if let Some(mut top) = a.topology.take() {
             if let Err(err) = top.add_instance_symbol(a, symbol, node.span()) {
                 err.emit();
             }

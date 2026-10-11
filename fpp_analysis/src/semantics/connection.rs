@@ -330,13 +330,14 @@ impl PortInstanceIdentifier {
         )
     }
 
-    /// Build a port instance identifier from an AST node. Returns `None` if the
-    /// interface instance is unresolved (already reported by CheckUses).
+    /// Creates a port instance identifier from an AST node. Returns `None` if
+    /// the interface instance use is unresolved, or names an instance whose
+    /// definition failed to check (both already reported).
     pub fn from_node(
         a: &Analysis,
         node: &ast::PortInstanceIdentifier,
     ) -> SemanticResult<Option<PortInstanceIdentifier>> {
-        let Some(interface_instance) = a.get_interface_instance(node.interface_instance.id())
+        let Some(interface_instance) = a.get_interface_instance(node.interface_instance.id())?
         else {
             return Ok(None);
         };
@@ -693,59 +694,6 @@ impl Connection {
 }
 
 impl Analysis {
-    /// Resolve a use node to an interface instance
-    pub fn get_interface_instance(&self, id: fpp_core::Node) -> Option<InterfaceInstance> {
-        match self.use_def_map.get(&id) {
-            Some(symbol @ Symbol::ComponentInstance(_)) => self
-                .component_instance_map
-                .get(symbol)
-                .cloned()
-                .map(InterfaceInstance::Component),
-            Some(symbol @ Symbol::Topology(_)) => self
-                .topology_map
-                .get(symbol)
-                .map(InterfaceInstance::from_topology),
-            Some(Symbol::TemplateInterfaceArg { param_def, value }) => {
-                let instance = self.get_interface_instance(value.id())?;
-                let interface = self.get_interface(param_def.interface.id())?;
-                Some(InterfaceInstance::from_template_arg(
-                    param_def.clone(),
-                    interface,
-                    instance,
-                ))
-            }
-            _ => None,
-        }
-    }
-
-    // Resolve a use (by node ID) to a component instance
-    pub fn get_component_instance(
-        &self,
-        id: fpp_core::Node,
-    ) -> SemanticResult<Option<ComponentInstance>> {
-        match self.use_def_map.get(&id) {
-            Some(symbol @ Symbol::ComponentInstance(_)) => {
-                Ok(self.component_instance_map.get(symbol).cloned())
-            }
-            Some(symbol) => Err(SemanticError::InvalidSymbol {
-                symbol_name: symbol.name().data.clone(),
-                msg: "not a component instance symbol".to_string(),
-                loc: id.span(),
-                def_loc: symbol.node().span(),
-            }),
-            // Unresolved use: CheckUses already reported the error.
-            None => Ok(None),
-        }
-    }
-
-    /// Resolve a use node to an interface.
-    pub fn get_interface(&self, id: fpp_core::Node) -> Option<Interface> {
-        match self.use_def_map.get(&id) {
-            Some(symbol @ Symbol::Interface(_)) => self.interface_map.get(symbol).cloned(),
-            _ => None,
-        }
-    }
-
     /// Whether a port instance is a general port with the given direction and
     /// fully qualified port type name.
     pub fn is_general_port(

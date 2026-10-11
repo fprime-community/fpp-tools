@@ -64,3 +64,28 @@ fn module_as_state_machine() {
 fn module_as_component_instance() {
     run_test("invalid_symbols/module_as_component_instance")
 }
+
+#[test]
+fn module_as_connection_endpoint() {
+    run_test("invalid_symbols/module_as_connection_endpoint")
+}
+
+#[test]
+fn module_as_implemented_interface() {
+    run_test("invalid_symbols/module_as_implemented_interface")
+}
+
+#[test]
+fn module_as_interface_instance_arg() {
+    run_test("invalid_symbols/module_as_interface_instance_arg")
+}
+
+#[test]
+fn module_as_interface_param_type() {
+    run_test("invalid_symbols/module_as_interface_param_type")
+}
+
+#[test]
+fn module_as_topology_port() {
+    run_test("invalid_symbols/module_as_topology_port")
+}

@@ -44,10 +44,10 @@ pub fn resolve(a: &Analysis, t: &mut Topology) -> SemanticResult {
             let Symbol::TemplateInterfaceArg { param_def, value } = &sym else {
                 continue;
             };
-            let Some(ii) = a.get_interface_instance(value.id()) else {
+            let Some(ii) = a.get_interface_instance(value.id())? else {
                 continue;
             };
-            let Some(interface) = a.get_interface(param_def.interface.id()) else {
+            let Some(interface) = a.get_interface(param_def.interface.id())? else {
                 continue;
             };
             t.add_instance(

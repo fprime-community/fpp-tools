@@ -1,12 +1,15 @@
 use crate::errors::{SemanticError, SemanticResult};
 use crate::semantics::{
     Component, ComponentInstance, Dictionary, FppSystem, FrameworkDefinitions, ImpliedUse,
-    ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, NameGroup, NestedScope, QualifiedName,
-    Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion, TlmPacketSet, Topology, Type,
-    UseDefMatching, Value, state_machine::StateMachine,
+    ImpliedUseKind, ImpliedUseSet, IntegerValue, Interface, InterfaceInstance, NameGroup,
+    NestedScope, QualifiedName, Scope, ScopeOwner, Symbol, SymbolInterface, TemplateExpansion,
+    TlmPacketSet, Topology, Type, UseDefMatching, Value, state_machine::StateMachine,
 };
-use fpp_ast::{Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc};
+use fpp_ast::{
+    AstNode, Expr, FormalParam, FormalParamKind, QueueFull, QueueFullSpecifier, SpecLoc,
+};
 use fpp_core::{File, SourceFile, Span, Spanned};
+use indexmap::IndexMap;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
@@ -107,8 +110,9 @@ pub struct Analysis {
     pub(crate) tlm_packet_set: Option<TlmPacketSet>,
     /// The mapping from nodes to implied uses
     pub implied_use_map: HashMap<fpp_core::Node, ImpliedUseSet>,
-    /// The mapping from template expansion specifier nodes to their expansions
-    pub template_expansion_map: HashMap<fpp_core::Node, TemplateExpansion>,
+    /// The mapping from template expansion specifier nodes to their expansions,
+    /// in the order the expansions are entered
+    pub template_expansion_map: IndexMap<fpp_core::Node, TemplateExpansion>,
     /// The node of the template expansion specifier whose expansion we are
     /// currently analyzing inside of
     pub(crate) template_expansion: Option<fpp_core::Node>,
@@ -313,6 +317,16 @@ impl Analysis {
         }
     }
 
+    /// Gets a component instance from the component instance map
+    pub fn get_component_instance(
+        &self,
+        id: fpp_core::Node,
+    ) -> SemanticResult<Option<ComponentInstance>> {
+        Ok(self
+            .get_component_instance_symbol(id)?
+            .and_then(|cis| self.component_instance_map.get(&cis).cloned()))
+    }
+
     /// Gets an interface instance symbol from the use-def map
     pub fn get_interface_instance_symbol(
         &self,
@@ -333,6 +347,45 @@ impl Analysis {
         }
     }
 
+    /// Gets an interface instance from the topology or component instance map
+    pub fn get_interface_instance(
+        &self,
+        id: fpp_core::Node,
+    ) -> SemanticResult<Option<InterfaceInstance>> {
+        let Some(iis) = self.get_interface_instance_symbol(id)? else {
+            return Ok(None);
+        };
+        match &iis {
+            Symbol::ComponentInstance(_) => Ok(self
+                .component_instance_map
+                .get(&iis)
+                .cloned()
+                .map(InterfaceInstance::from_component_instance)),
+            Symbol::Topology(_) => match self.topology_map.get(&iis) {
+                Some(t) => Ok(Some(InterfaceInstance::from_topology(t))),
+                None => Err(Analysis::invalid_symbol(
+                    &iis,
+                    id,
+                    "this topology could not be resolved before it was used here",
+                )),
+            },
+            Symbol::TemplateInterfaceArg { param_def, value } => {
+                let Some(ii) = self.get_interface_instance(value.id())? else {
+                    return Ok(None);
+                };
+                let Some(iface) = self.get_interface(param_def.interface.id())? else {
+                    return Ok(None);
+                };
+                Ok(Some(InterfaceInstance::from_template_arg(
+                    param_def.clone(),
+                    iface,
+                    ii,
+                )))
+            }
+            _ => unreachable!("get_interface_instance_symbol returns an interface instance symbol"),
+        }
+    }
+
     /// Gets an interface symbol from the use-def map
     pub fn get_interface_symbol(&self, id: fpp_core::Node) -> SemanticResult<Option<Symbol>> {
         match self.use_def_map.get(&id) {
@@ -344,6 +397,13 @@ impl Analysis {
             )),
             None => Ok(None),
         }
+    }
+
+    /// Gets an interface from the interface definition map
+    pub fn get_interface(&self, id: fpp_core::Node) -> SemanticResult<Option<Interface>> {
+        Ok(self
+            .get_interface_symbol(id)?
+            .and_then(|s| self.interface_map.get(&s).cloned()))
     }
 
     /// Gets a topology symbol from the use-def map
@@ -793,11 +853,30 @@ impl Analysis {
 
     /// Gets the component instance represented by a use, stripping off any bound
     /// template parameters
+    ///
+    /// An error is reported at the use and names the symbol the use refers to,
+    /// which for a bound parameter is the parameter; its note points at the
+    /// represented definition. Returns `None` if the use, or the template
+    /// argument it stands for, is unresolved (CheckUses reported it).
     pub fn get_represented_component_instance(
         &self,
         id: fpp_core::Node,
     ) -> SemanticResult<Option<ComponentInstance>> {
-        self.get_component_instance(self.get_represented_use(id))
+        let Some(symbol) = self.use_def_map.get(&id) else {
+            return Ok(None);
+        };
+        match self.get_represented_symbol(id) {
+            Some(cis @ Symbol::ComponentInstance(_)) => {
+                Ok(self.component_instance_map.get(cis).cloned())
+            }
+            None => Ok(None),
+            Some(represented) => Err(SemanticError::InvalidSymbol {
+                symbol_name: symbol.name().data.clone(),
+                msg: "not a component instance symbol".to_string(),
+                loc: id.span(),
+                def_loc: represented.node().span(),
+            }),
+        }
     }
 }
 

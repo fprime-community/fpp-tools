@@ -210,8 +210,9 @@ impl Topology {
             // A bound parameter stands for whatever instance the argument names,
             // which is not known until the argument is resolved
             Symbol::TemplateInterfaceArg { .. } => &mut self.direct_template_args,
-            // Other symbol kinds are rejected earlier during use resolution.
-            _ => return Ok(()),
+            _ => {
+                unreachable!("the symbol of an instance specifier is an interface instance symbol")
+            }
         };
         if let Some(prev_loc) = map.get(&symbol) {
             return Err(SemanticError::DuplicateInstance {

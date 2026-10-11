@@ -134,6 +134,22 @@ fn channel_instance_not_component_instance() {
 }
 
 #[test]
+fn template_arg_channel() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/template_arg_channel",
+    )
+}
+
+#[test]
+fn template_arg_topology() {
+    run_test_with(
+        &["tlm_packets/instances"],
+        "tlm_packets/template_arg_topology",
+    )
+}
+
+#[test]
 fn template_ok() {
     run_test_with(&["tlm_packets/instances"], "tlm_packets/template_ok")
 }

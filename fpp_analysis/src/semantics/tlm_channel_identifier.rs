@@ -66,7 +66,8 @@ impl TlmChannelIdentifier {
         a: &Analysis,
         node: &ast::TlmChannelIdentifier,
     ) -> SemanticResult<Option<TlmChannelIdentifier>> {
-        let Some(component_instance) = a.get_component_instance(node.component_instance.id())?
+        let Some(component_instance) =
+            a.get_represented_component_instance(node.component_instance.id())?
         else {
             return Ok(None);
         };
