@@ -69,10 +69,11 @@ impl LexedStr<'_> {
     ///
     /// The rules are those of the Scala lexer:
     ///   * A newline or a comment, with the newlines, comments and whitespace
-    ///     after it, is one end-of-line token, which is dropped before `)`,
-    ///     `]` or `}`.
+    ///     after it up to a line continuation, is one end-of-line token, which
+    ///     is dropped before `)`, `]` or `}`.
     ///   * An annotation and the symbols `*`, `/`, `-`, `->`, `+`, `=`, `;`,
-    ///     `:`, `,`, `(`, `{` and `[` absorb the newlines after them.
+    ///     `:`, `,`, `(`, `{` and `[` absorb the newlines after them, up to a
+    ///     line continuation.
     ///   * Whitespace and characters that cannot begin a token are skipped.
     fn as_trivia(&self, i: usize) -> TriviaRegion {
         assert!(i < self.len(), "{} < {}", i, self.len());

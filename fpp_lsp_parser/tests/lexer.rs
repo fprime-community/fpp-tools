@@ -46,7 +46,7 @@ fn error() {
 #[test]
 fn ok() {
     for file in input_files("ok") {
-        // Signed exponents (`123e-10`) need the fpp_lexer fix.
+        // ok_literals checks literals.fpp
         if file.file_name().unwrap() == "literals.fpp" {
             continue;
         }
@@ -57,7 +57,7 @@ fn ok() {
 }
 
 #[test]
-#[ignore = "signed exponents are lexed by the fpp_lexer fix"]
+#[ignore = "fpp_lexer rejects signed exponents such as 123e-10"]
 fn ok_literals() {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests/lexer/ok/literals.fpp");
