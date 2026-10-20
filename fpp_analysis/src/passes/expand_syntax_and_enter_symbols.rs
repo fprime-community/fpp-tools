@@ -1,5 +1,8 @@
 use crate::analysis::Analysis;
-use crate::passes::{CheckTemplateUses, EnterSymbols, EnterTemplateExpansionSymbols};
+use crate::passes::{
+    CheckTemplateDefs, CheckTemplateExpansions, CheckTemplateUses, EnterSymbols,
+    EnterTemplateExpansionSymbols,
+};
 use crate::transform::ExpandTemplates;
 use fpp_ast::{TransUnit, Visitor};
 use fpp_core::{Error, FileReader, SourceFile};
@@ -26,9 +29,10 @@ impl ExpandSyntaxAndEnterSymbols {
     }
 
     /// The steps of [`ExpandSyntaxAndEnterSymbols::tu_list`] that follow include
-    /// resolution and the synthesis of the state enums: enter the symbols, match
-    /// each template expansion specifier to its template, expand the templates,
-    /// and enter the symbols the expansions introduce.
+    /// resolution and the synthesis of the state enums: enter the symbols, check
+    /// the template definitions and the expanded templates, match each template
+    /// expansion specifier to its template, expand the templates, and enter the
+    /// symbols the expansions introduce.
     ///
     /// The language server parses each file once and keeps the parsed unit, with
     /// its includes resolved and its state enums added, across analyses. Each
@@ -38,6 +42,8 @@ impl ExpandSyntaxAndEnterSymbols {
         tul: &mut [TransUnit],
     ) -> ControlFlow<()> {
         EnterSymbols.visit_trans_units(a, tul.iter())?;
+        CheckTemplateDefs.visit_trans_units(a, tul.iter())?;
+        CheckTemplateExpansions.visit_trans_units(a, tul.iter())?;
         CheckTemplateUses.visit_trans_units(a, tul.iter())?;
         if let Err(err) = ExpandTemplates::transform_list(a, tul) {
             err.emit();

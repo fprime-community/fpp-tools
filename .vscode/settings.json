@@ -6,10 +6,11 @@
     "search.exclude": {
         "out": true // set this to false to include "out" folder in search results
     },
-    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
     "python.defaultInterpreterPath": "${workspaceFolder}/fpp_python/venv/bin/python",
     "python.analysis.extraPaths": [
-        "${workspaceFolder}/fpp_python"
+        "${workspaceFolder}/fpp_python",
+        "./fpp_python/python"
     ],
     "python.testing.pytestArgs": [
         "fpp_python"

@@ -104,12 +104,16 @@ pub struct Analysis {
     pub(crate) tlm_packet_set: Option<TlmPacketSet>,
     /// The mapping from nodes to implied uses
     pub implied_use_map: HashMap<fpp_core::Node, ImpliedUseSet>,
-    /// The mapping from template expansion specifier nodes to their expansions,
-    /// in the order the expansions are entered
-    pub template_expansion_map: IndexMap<fpp_core::Node, TemplateExpansion>,
+    /// Node of the current template definition
+    pub(crate) template_def_id: Option<fpp_core::Node>,
     /// The node of the template expansion specifier whose expansion we are
     /// currently analyzing inside of
     pub(crate) template_expansion: Option<fpp_core::Node>,
+    /// Node of the current template expansion specifier
+    pub(crate) template_expansion_id: Option<fpp_core::Node>,
+    /// The mapping from template expansion specifier nodes to their expansions,
+    /// in the order the expansions are entered
+    pub template_expansion_map: IndexMap<fpp_core::Node, TemplateExpansion>,
     /// The set of symbols defined with a dictionary specifier
     pub dictionary_symbol_set: HashSet<Symbol>,
     /// The mapping from system symbols to systems
@@ -174,8 +178,10 @@ impl Analysis {
             dictionary: None,
             tlm_packet_set: None,
             implied_use_map: Default::default(),
-            template_expansion_map: Default::default(),
+            template_def_id: None,
             template_expansion: None,
+            template_expansion_id: None,
+            template_expansion_map: Default::default(),
             dictionary_symbol_set: Default::default(),
             system_map: Default::default(),
             unknown_type: None,

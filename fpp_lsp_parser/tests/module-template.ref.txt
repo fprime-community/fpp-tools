@@ -1,0 +1,218 @@
+ROOT@0..677
+  DEF_MODULE_TEMPLATE@0..353
+    MODULE_KW@0..6 "module"
+    WHITESPACE@6..7 " "
+    TEMPLATE_KW@7..15 "template"
+    WHITESPACE@15..16 " "
+    NAME@16..20
+      IDENT@16..20 "Tmpl"
+    TEMPLATE_PARAM_LIST@20..271
+      LEFT_PAREN@20..21 "("
+      EOL@21..22 "\n"
+      WHITESPACE@22..26 "    "
+      PRE_ANNOTATION@26..55 "@ Constant template p ..."
+      EOL@55..56 "\n"
+      WHITESPACE@56..60 "    "
+      TEMPLATE_PARAM@60..80
+        CONSTANT_KW@60..68 "constant"
+        WHITESPACE@68..69 " "
+        NAME@69..70
+          IDENT@69..70 "c"
+        COLON@70..71 ":"
+        WHITESPACE@71..72 " "
+        TYPE_NAME@72..80
+          QUAL_IDENT@72..80
+            IDENT@72..80 "SomeType"
+      WHITESPACE@80..81 " "
+      POST_ANNOTATION@81..102 "@< Constant parameter"
+      EOL@102..104 "\n\n"
+      WHITESPACE@104..108 "    "
+      PRE_ANNOTATION@108..133 "@ Type template param ..."
+      EOL@133..134 "\n"
+      WHITESPACE@134..138 "    "
+      TEMPLATE_PARAM@138..152
+        TYPE_KW@138..142 "type"
+        WHITESPACE@142..143 " "
+        NAME@143..152
+          IDENT@143..152 "TypeParam"
+      WHITESPACE@152..153 " "
+      POST_ANNOTATION@153..170 "@< Type parameter"
+      EOL@170..172 "\n\n"
+      WHITESPACE@172..176 "    "
+      PRE_ANNOTATION@176..215 "@ Interface instance  ..."
+      EOL@215..216 "\n"
+      WHITESPACE@216..220 "    "
+      TEMPLATE_PARAM@220..247
+        INSTANCE_KW@220..228 "instance"
+        WHITESPACE@228..229 " "
+        NAME@229..233
+          IDENT@229..233 "inst"
+        COLON@233..234 ":"
+        WHITESPACE@234..235 " "
+        QUAL_IDENT@235..247
+          IDENT@235..247 "InterfaceDef"
+      WHITESPACE@247..248 " "
+      POST_ANNOTATION@248..269 "@< Instance parameter"
+      EOL@269..270 "\n"
+      RIGHT_PAREN@270..271 ")"
+    WHITESPACE@271..272 " "
+    MODULE_MEMBER_LIST@272..353
+      LEFT_CURLY@272..273 "{"
+      EOL@273..274 "\n"
+      WHITESPACE@274..278 "    "
+      DEF_ARRAY@278..303
+        ARRAY_KW@278..283 "array"
+        WHITESPACE@283..284 " "
+        NAME@284..287
+          IDENT@284..287 "Arr"
+        WHITESPACE@287..288 " "
+        EQUALS@288..289 "="
+        WHITESPACE@289..290 " "
+        INDEX_OR_SIZE@290..293
+          LEFT_SQUARE@290..291 "["
+          EXPR@291..292
+            EXPR_LITERAL@291..292
+              LITERAL_INT@291..292 "3"
+          RIGHT_SQUARE@292..293 "]"
+        WHITESPACE@293..294 " "
+        TYPE_NAME@294..303
+          QUAL_IDENT@294..303
+            IDENT@294..303 "TypeParam"
+      EOL@303..305 "\n\n"
+      WHITESPACE@305..309 "    "
+      DEF_TOPOLOGY@309..351
+        TOPOLOGY_KW@309..317 "topology"
+        WHITESPACE@317..318 " "
+        NAME@318..321
+          IDENT@318..321 "Top"
+        WHITESPACE@321..322 " "
+        TOPOLOGY_MEMBER_LIST@322..351
+          LEFT_CURLY@322..323 "{"
+          EOL@323..324 "\n"
+          WHITESPACE@324..332 "        "
+          SPEC_INSTANCE@332..345
+            INSTANCE_KW@332..340 "instance"
+            WHITESPACE@340..341 " "
+            QUAL_IDENT@341..345
+              IDENT@341..345 "inst"
+          EOL@345..346 "\n"
+          WHITESPACE@346..350 "    "
+          RIGHT_CURLY@350..351 "}"
+      EOL@351..352 "\n"
+      RIGHT_CURLY@352..353 "}"
+  EOL@353..355 "\n\n"
+  DEF_MODULE@355..508
+    MODULE_KW@355..361 "module"
+    WHITESPACE@361..362 " "
+    NAME@362..372
+      IDENT@362..372 "Unexpanded"
+    WHITESPACE@372..373 " "
+    MODULE_MEMBER_LIST@373..508
+      LEFT_CURLY@373..374 "{"
+      EOL@374..376 "\n\n"
+      WHITESPACE@376..378 "  "
+      PRE_ANNOTATION@378..410 "@ Unexpanded expansio ..."
+      EOL@410..411 "\n"
+      WHITESPACE@411..413 "  "
+      SPEC_TEMPLATE_EXPAND@413..469
+        EXPAND_KW@413..419 "expand"
+        WHITESPACE@419..420 " "
+        QUAL_IDENT@420..424
+          IDENT@420..424 "Tmpl"
+        TEMPLATE_ARG_LIST@424..469
+          LEFT_PAREN@424..425 "("
+          TEMPLATE_ARG@425..436
+            CONSTANT_KW@425..433 "constant"
+            WHITESPACE@433..434 " "
+            EXPR@434..436
+              EXPR_LITERAL@434..436
+                LITERAL_INT@434..436 "10"
+          COMMA@436..437 ","
+          WHITESPACE@437..438 " "
+          TEMPLATE_ARG@438..447
+            TYPE_KW@438..442 "type"
+            WHITESPACE@442..443 " "
+            TYPE_NAME@443..447
+              QUAL_IDENT@443..447
+                IDENT@443..447 "Type"
+          COMMA@447..448 ","
+          WHITESPACE@448..449 " "
+          TEMPLATE_ARG@449..468
+            INSTANCE_KW@449..457 "instance"
+            WHITESPACE@457..458 " "
+            QUAL_IDENT@458..468
+              DOT@458..459 "."
+              IDENT@459..468 "instance1"
+          RIGHT_PAREN@468..469 ")"
+      EOL@469..470 "\n"
+      WHITESPACE@470..472 "  "
+      POST_ANNOTATION@472..505 "@< Unexpanded expansi ..."
+      EOL@505..507 "\n\n"
+      RIGHT_CURLY@507..508 "}"
+  EOL@508..510 "\n\n"
+  DEF_MODULE@510..676
+    MODULE_KW@510..516 "module"
+    WHITESPACE@516..517 " "
+    NAME@517..525
+      IDENT@517..525 "Expanded"
+    WHITESPACE@525..526 " "
+    MODULE_MEMBER_LIST@526..676
+      LEFT_CURLY@526..527 "{"
+      EOL@527..529 "\n\n"
+      WHITESPACE@529..531 "  "
+      PRE_ANNOTATION@531..561 "@ Expanded expansion  ..."
+      EOL@561..562 "\n"
+      WHITESPACE@562..564 "  "
+      SPEC_TEMPLATE_EXPAND@564..639
+        EXPAND_KW@564..570 "expand"
+        WHITESPACE@570..571 " "
+        QUAL_IDENT@571..575
+          IDENT@571..575 "Tmpl"
+        TEMPLATE_ARG_LIST@575..620
+          LEFT_PAREN@575..576 "("
+          TEMPLATE_ARG@576..587
+            CONSTANT_KW@576..584 "constant"
+            WHITESPACE@584..585 " "
+            EXPR@585..587
+              EXPR_LITERAL@585..587
+                LITERAL_INT@585..587 "10"
+          COMMA@587..588 ","
+          WHITESPACE@588..589 " "
+          TEMPLATE_ARG@589..598
+            TYPE_KW@589..593 "type"
+            WHITESPACE@593..594 " "
+            TYPE_NAME@594..598
+              QUAL_IDENT@594..598
+                IDENT@594..598 "Type"
+          COMMA@598..599 ","
+          WHITESPACE@599..600 " "
+          TEMPLATE_ARG@600..619
+            INSTANCE_KW@600..608 "instance"
+            WHITESPACE@608..609 " "
+            QUAL_IDENT@609..619
+              DOT@609..610 "."
+              IDENT@610..619 "instance1"
+          RIGHT_PAREN@619..620 ")"
+        WHITESPACE@620..621 " "
+        MODULE_MEMBER_LIST@621..639
+          LEFT_CURLY@621..622 "{"
+          WHITESPACE@622..623 " "
+          DEF_CONSTANT@623..637
+            CONSTANT_KW@623..631 "constant"
+            WHITESPACE@631..632 " "
+            NAME@632..633
+              IDENT@632..633 "a"
+            WHITESPACE@633..634 " "
+            EQUALS@634..635 "="
+            WHITESPACE@635..636 " "
+            EXPR@636..637
+              EXPR_LITERAL@636..637
+                LITERAL_INT@636..637 "0"
+          WHITESPACE@637..638 " "
+          RIGHT_CURLY@638..639 "}"
+      EOL@639..640 "\n"
+      WHITESPACE@640..642 "  "
+      POST_ANNOTATION@642..673 "@< Expanded expansion ..."
+      EOL@673..675 "\n\n"
+      RIGHT_CURLY@675..676 "}"
+  EOL@676..677 "\n"

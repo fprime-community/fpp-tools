@@ -87,6 +87,11 @@ fn comments() {
 }
 
 #[test]
+fn dictionary_specifier() {
+    run_test("dictionary-specifier")
+}
+
+#[test]
 fn embedded_tab() {
     run_test("embedded-tab")
 }
@@ -137,6 +142,16 @@ fn include_module() {
 }
 
 #[test]
+fn include_module_template() {
+    run_test("include-module-template")
+}
+
+#[test]
+fn include_module_template_expand() {
+    run_test("include-module-template-expand")
+}
+
+#[test]
 fn include_parent_dir() {
     run_test("subdir/include-parent-dir")
 }
@@ -159,6 +174,16 @@ fn include_subdir() {
 #[test]
 fn include_topology() {
     run_test("include-topology")
+}
+
+#[test]
+fn module_template() {
+    run_test("module-template")
+}
+
+#[test]
+fn numeric_shift() {
+    run_test("numeric-shift")
 }
 
 #[test]
@@ -187,11 +212,6 @@ fn syntax_kwd_names() {
 }
 
 #[test]
-fn template() {
-    run_test("template")
-}
-
-#[test]
 fn topology_ports() {
     run_test("topology-ports")
 }
@@ -199,16 +219,6 @@ fn topology_ports() {
 #[test]
 fn two_input_files() {
     run_test_files(&["include-module", "include-component"], "two-input-files")
-}
-
-#[test]
-fn dictionary_specifier() {
-    run_test("dictionary-specifier")
-}
-
-#[test]
-fn numeric_shift() {
-    run_test("numeric-shift")
 }
 
 // Rust-only: the cycle entered at its third file

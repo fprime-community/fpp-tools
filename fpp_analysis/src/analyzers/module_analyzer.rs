@@ -41,6 +41,11 @@ where
 /// names inside it resolve against the definitions the expansion introduced
 /// rather than same-named definitions at the expansion site.
 ///
+/// The members are visited only once the analysis has recorded the expansion,
+/// which [`crate::passes::EnterTemplateExpansionSymbols`] does. Before that, the
+/// members of an expansion written in the source, in the form `expand T { ... }`,
+/// have no expansion to resolve against, so they are not visited.
+///
 /// This is the analysis of a template expansion specifier by
 /// [`ModuleAnalyzer`]. A pass that visits module members without a
 /// [`ModuleAnalyzer`] calls it from [`Visitor::visit_spec_template_expand`].
@@ -52,11 +57,15 @@ pub fn visit_expansion<'ast, V>(
 where
     V: Visitor<'ast, State = Analysis>,
 {
-    // Check if this template has been expanded
     let Some(members) = &node.members else {
         return ControlFlow::Continue(());
     };
-    // Mark the analysis with the proper expansion
+    if !a.template_expansion_map.contains_key(&node.node_id) {
+        // This node has not yet been expanded by analysis
+        return ControlFlow::Continue(());
+    }
+    // This node has been expanded by analysis.
+    // Mark the analysis with the proper expansion.
     let saved = a.template_expansion.replace(node.node_id);
     let out = members.visit(a, visitor);
     a.template_expansion = saved;

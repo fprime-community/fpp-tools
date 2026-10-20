@@ -136,6 +136,17 @@ fn spec_template_expand(p: &mut Parser) {
     p.bump(EXPAND_KW);
     qual_ident(p);
     template_arg_list(p);
+    if p.at(LEFT_CURLY) {
+        member_list(
+            p,
+            LEFT_CURLY,
+            RIGHT_CURLY,
+            module_member,
+            SEMI,
+            MODULE_MEMBER_LIST,
+            "module member expected",
+        )
+    }
     m.complete(p, SPEC_TEMPLATE_EXPAND);
 }
 

@@ -402,15 +402,17 @@ pub enum SemanticError {
         param_loc: Span,
         def_loc: Span,
     },
-    /// Nested template definition
-    NestedTemplateDefinition {
-        nested_loc: Span,
-        parent_loc: Span,
+    /// Error in a member of a module template definition
+    TemplateDefError {
+        loc: Span,
+        msg: String,
+        def_loc: Span,
     },
-    /// Template expansion specifier nested inside a template
-    TemplateExpansionInTemplate {
+    /// Error in a member of a template expansion
+    TemplateExpandError {
+        loc: Span,
+        msg: String,
         expand_loc: Span,
-        template_loc: Span,
     },
     /// Missing async input
     MissingAsync {
@@ -1195,24 +1197,16 @@ impl From<SemanticError> for Diagnostic {
                 ),
             )
             .span_note(def_loc, "conflicting definition is here"),
-            SemanticError::NestedTemplateDefinition {
-                nested_loc,
-                parent_loc,
-            } => Diagnostic::new(
-                nested_loc,
-                Level::Error,
-                "module template definitions cannot be nested",
-            )
-            .span_note(parent_loc, "parent template defined here"),
-            SemanticError::TemplateExpansionInTemplate {
+            SemanticError::TemplateDefError { loc, msg, def_loc } => {
+                Diagnostic::new(loc, Level::Error, msg)
+                    .span_note(def_loc, "enclosing template is defined here")
+            }
+            SemanticError::TemplateExpandError {
+                loc,
+                msg,
                 expand_loc,
-                template_loc,
-            } => Diagnostic::new(
-                expand_loc,
-                Level::Error,
-                "template expansion specifiers cannot appear inside a module template",
-            )
-            .span_note(template_loc, "enclosing template defined here"),
+            } => Diagnostic::new(loc, Level::Error, msg)
+                .span_note(expand_loc, "enclosing template expansion is here"),
             SemanticError::MissingAsync { kind, loc } => Diagnostic::new(
                 loc,
                 Level::Error,

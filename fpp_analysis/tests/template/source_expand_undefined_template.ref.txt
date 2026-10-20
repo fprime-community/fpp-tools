@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/template/source_expand_undefined_template.fpp:3:8
+  |
+3 | expand T {
+  |        ^ symbol T is not defined
+  |
+  = note: looking for a template here
+

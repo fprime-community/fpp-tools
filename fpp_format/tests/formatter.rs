@@ -131,6 +131,7 @@ fmt_test!(port, "port");
 fmt_test!(topology, "topology");
 fmt_test!(state_machine, "state-machine");
 fmt_test!(template, "template");
+fmt_test!(template_expanded, "template-expanded");
 fmt_test!(state_machine_defs, "state-machine-defs");
 fmt_test!(instances_locate, "instances-locate");
 fmt_test!(interface_include, "interface-include");

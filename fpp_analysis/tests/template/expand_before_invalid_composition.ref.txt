@@ -1,10 +1,10 @@
- --> [ local path prefix ]/template/expand_before_invalid_composition.fpp:9:23
+ --> [ local path prefix ]/template/expand_before_invalid_composition.fpp:7:23
   |
-9 | module template B() { expand Y() }
+7 | module template A() { expand X() }
   |                       ^^^^^^^^^^ template expansion specifiers cannot appear inside a module template
   |
- ::: [ local path prefix ]/template/expand_before_invalid_composition.fpp:9:1
+ ::: [ local path prefix ]/template/expand_before_invalid_composition.fpp:7:1
   |
-9 | module template B() { expand Y() }
-  | ---------------------------------- enclosing template defined here
+7 | module template A() { expand X() }
+  | ---------------------------------- enclosing template is defined here
 

@@ -91,7 +91,8 @@ the same reason — a setting that quietly did nothing would drop files from the
 `expand` specifier, which still selects as a `SpecTemplateExpand` of its own. The
 body of a `module template` is never matched either way — its definitions come into
 being where the template is expanded, so a group reaches them only through an
-expansion `templates` has materialized.
+expansion `templates` has materialized, or through one the source writes out in the
+form `expand T { ... }`. `templates` leaves a specifier written that way as it is.
 
 ## Template expansion
 

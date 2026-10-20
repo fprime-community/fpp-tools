@@ -1,0 +1,7 @@
+ --> [ local path prefix ]/template/source_expand_undefined_symbol.fpp:7:16
+  |
+7 |   constant a = b
+  |                ^ symbol b is not defined
+  |
+  = note: looking for a constant here
+

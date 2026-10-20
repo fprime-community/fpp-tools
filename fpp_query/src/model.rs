@@ -66,10 +66,10 @@ pub fn parse(inputs: Vec<Input>) -> Vec<TransUnit> {
 ///
 /// An external (bodyless) state machine declares no states, so it gets none.
 ///
-/// Reaches a state machine written in a `module template` body, and not the members
-/// an expansion specifier has materialized, so it belongs before
-/// [`expand_templates`]: run in that order every copy of a template carries the enums
-/// the body's state machines were given.
+/// Reaches a state machine written in a `module template` body or in the members an
+/// expansion specifier is written with, and not the members [`expand_templates`]
+/// materializes, so it belongs before [`expand_templates`]: run in that order every
+/// copy of a template carries the enums the body's state machines were given.
 pub fn add_state_enums(units: &mut [TransUnit]) {
     for unit in units {
         fpp_parser::add_state_enums(unit);
@@ -78,6 +78,8 @@ pub fn add_state_enums(units: &mut [TransUnit]) {
 
 /// Replace each template expansion specifier with the members of the template it
 /// names, so that the definitions an expansion contributes are part of the model.
+/// A specifier written with its members, in the form `expand T { ... }`, is already
+/// expanded and keeps them.
 ///
 /// The template name is resolved syntactically, by the scoping rules for a
 /// qualified identifier: the innermost enclosing module outward. `fpp-check`
@@ -160,6 +162,10 @@ fn expand_member(
             scope.pop();
         }
         ModuleMember::SpecTemplateExpand(spec) => {
+            // An expansion written in the source is already expanded
+            if spec.members.is_some() {
+                return;
+            }
             let Some(def) = look_up(templates, scope, &spec.template) else {
                 return;
             };

@@ -481,11 +481,31 @@ const CASES: &[(&str, &str, bool)] = &[
         true,
     ),
     ("spec template expand OK", "expand T", true),
+    (
+        "spec template expand OK",
+        "expand T { constant a = 0 }",
+        true,
+    ),
     ("spec template expand OK", "expand M.T()", true),
+    (
+        "spec template expand OK",
+        "expand M.T() { constant a = 0 }",
+        true,
+    ),
     ("spec template expand OK", "expand M.T(constant 1)", true),
     (
         "spec template expand OK",
+        "expand M.T(constant 1) { constant a = 0 }",
+        true,
+    ),
+    (
+        "spec template expand OK",
         "expand M.T(constant 1, constant 2)",
+        true,
+    ),
+    (
+        "spec template expand OK",
+        "expand M.T(constant 1, constant 2) { constant a = 0 }",
         true,
     ),
     (
@@ -495,7 +515,17 @@ const CASES: &[(&str, &str, bool)] = &[
     ),
     (
         "spec template expand OK",
+        "expand M.T(constant 1, constant 2, instance mod.$instance) { constant a = 0 }",
+        true,
+    ),
+    (
+        "spec template expand OK",
         "expand M.T(constant 1, constant 2, instance .mod.$instance, type Type.Name)",
+        true,
+    ),
+    (
+        "spec template expand OK",
+        "expand M.T(constant 1, constant 2, instance .mod.$instance, type Type.Name) { constant a = 0 }",
         true,
     ),
     (
@@ -505,7 +535,17 @@ const CASES: &[(&str, &str, bool)] = &[
     ),
     (
         "spec template expand OK",
+        "expand M.T(constant 1, instance .inst1, type U32) { constant a = 0 }",
+        true,
+    ),
+    (
+        "spec template expand OK",
         "expand M.T(constant 1, constant 2, constant {member=1}, constant [1, 2])",
+        true,
+    ),
+    (
+        "spec template expand OK",
+        "expand M.T(constant 1, constant 2, constant {member=1}, constant [1, 2]) { constant a = 0 }",
         true,
     ),
     ("spec include OK", "include \"file.fpp\"", true),

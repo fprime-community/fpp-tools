@@ -150,6 +150,16 @@ fn include_module() {
 }
 
 #[test]
+fn include_module_template() {
+    run_test_from_fpp_parser("include-module-template")
+}
+
+#[test]
+fn include_module_template_expand() {
+    run_test_from_fpp_parser("include-module-template-expand")
+}
+
+#[test]
 fn include_parse_error() {
     run_test_from_fpp_parser("include-parse-error")
 }
@@ -282,6 +292,6 @@ fn guarded_command_nested_array() {
 }
 
 #[test]
-fn template() {
-    run_test_from_fpp_parser("template")
+fn module_template() {
+    run_test_from_fpp_parser("module-template")
 }

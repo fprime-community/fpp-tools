@@ -53,6 +53,13 @@ impl<'ast> Visitor<'ast> for EnterTemplateExpansionSymbols {
             // resolve unexpanded, so there is nothing to enter
             return ControlFlow::Continue(());
         };
+        let Ok(Some(Symbol::Template(tmpl))) = a.get_template_symbol(node.template.id()) else {
+            // CheckTemplateUses reports a template name that does not resolve,
+            // and the analysis goes on past that error. The members of an
+            // expansion written in the source as `expand T { ... }` have no
+            // parameters to bind then, so there is nothing to enter.
+            return ControlFlow::Continue(());
+        };
 
         if a.template_expansion_map.contains_key(&node.node_id) {
             // We already entered this expansion
@@ -65,7 +72,7 @@ impl<'ast> Visitor<'ast> for EnterTemplateExpansionSymbols {
             return result;
         }
 
-        if let Err(err) = self.enter_expansion(a, node, members) {
+        if let Err(err) = self.enter_expansion(a, &tmpl, node, members) {
             err.emit();
             return ControlFlow::Break(());
         }
@@ -80,16 +87,12 @@ impl EnterTemplateExpansionSymbols {
     fn enter_expansion(
         &self,
         a: &mut Analysis,
+        tmpl: &Arc<DefModuleTemplate>,
         node: &SpecTemplateExpand,
         members: &[ModuleMember],
     ) -> SemanticResult {
-        let tmpl = match a.get_template_symbol(node.template.id()) {
-            Ok(Some(Symbol::Template(tmpl))) => tmpl,
-            _ => panic!("template symbol should already be resolved"),
-        };
-
         // Build the parameter set of the expansion
-        let params = Self::bind_params(&tmpl, node)?;
+        let params = Self::bind_params(tmpl, node)?;
 
         // The parameter scope and the expansion scope are reached through the
         // expansion, so record it before filling either one in

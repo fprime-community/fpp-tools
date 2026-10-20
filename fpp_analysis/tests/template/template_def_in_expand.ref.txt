@@ -1,0 +1,16 @@
+  --> [ local path prefix ]/template/template_def_in_expand.fpp:7:3
+   |
+ 7 | /   module template T2 {
+ 8 | |
+ 9 | |   }
+   | |___^ module template definitions cannot appear inside a template expansion
+   |
+  ::: [ local path prefix ]/template/template_def_in_expand.fpp:5:1
+   |
+ 5 | / expand T1 {
+ 6 | |
+ 7 | |   module template T2 {
+...  |
+11 | | }
+   | |_- enclosing template expansion is here
+

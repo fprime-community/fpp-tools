@@ -92,6 +92,12 @@ pub mod passes {
     mod check_uses_helpers;
     pub use check_uses_helpers::*;
 
+    mod check_template_defs;
+    pub use check_template_defs::*;
+
+    mod check_template_expansions;
+    pub use check_template_expansions::*;
+
     mod check_template_uses;
     pub use check_template_uses::*;
 
@@ -336,8 +342,8 @@ pub fn resolve_includes<Reader: FileReader>(
 /// driver that resolves the includes and adds the state enums of each
 /// translation unit itself ([`resolve_includes`], [`add_state_enums`]). It
 /// runs before [`check_semantics`], on the same analysis, and it rewrites the
-/// translation units, replacing each template expansion specifier with the
-/// expanded template. A `Break` result means the caller must not go on to
+/// translation units, replacing each unexpanded template expansion specifier
+/// with the expanded template. A `Break` result means the caller must not go on to
 /// [`check_semantics`].
 pub fn resolve_templates(a: &mut Analysis, tul: &mut [fpp_ast::TransUnit]) -> ControlFlow<()> {
     ExpandSyntaxAndEnterSymbols::enter_symbols_and_expand_templates(a, tul)

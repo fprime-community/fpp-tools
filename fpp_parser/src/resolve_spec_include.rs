@@ -364,6 +364,22 @@ impl<Reader: FileReader> MutVisitor for ResolveIncludes<Reader> {
         ControlFlow::Continue(())
     }
 
+    /// An unexpanded template has no members to resolve
+    fn visit_spec_template_expand(
+        &self,
+        a: &mut Self::State,
+        node: &mut SpecTemplateExpand,
+    ) -> ControlFlow<Self::Break> {
+        if let Some(members) = &mut node.members {
+            let old_members = std::mem::take(members);
+            for member in old_members.into_iter() {
+                self.module_member(a, member, members)
+            }
+        }
+
+        ControlFlow::Continue(())
+    }
+
     fn visit_def_state(
         &self,
         a: &mut Self::State,

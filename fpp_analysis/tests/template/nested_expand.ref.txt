@@ -1,0 +1,14 @@
+ --> [ local path prefix ]/template/nested_expand.fpp:7:3
+  |
+7 |     expand T1
+  |     ^^^^^^^^^ template expansions cannot be nested
+  |
+ ::: [ local path prefix ]/template/nested_expand.fpp:5:1
+  |
+5 | / expand T1 {
+6 | |
+7 | |   expand T1
+8 | |
+9 | | }
+  | |_- enclosing template expansion is here
+

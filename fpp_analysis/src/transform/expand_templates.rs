@@ -1,30 +1,28 @@
 use crate::Analysis;
-use crate::errors::{SemanticError, SemanticResult};
+use crate::errors::SemanticResult;
 use crate::semantics::Symbol;
-use fpp_ast::{
-    AstNode, DefModule, DefModuleTemplate, ModuleMember, Replicator, SpecTemplateExpand, TransUnit,
-};
-use fpp_core::{Span, Spanned};
+use fpp_ast::{AstNode, ModuleMember, Replicator, SpecTemplateExpand, TransUnit};
+use fpp_core::Spanned;
 
 /// Expand any template expansion specifiers that have not yet been expanded
 ///
-/// The specifier is replaced by the expanded template: the specifier itself,
-/// carrying a copy of the syntax provided by the template definition it refers
-/// to. That syntax behaves as if it were written at the point of the specifier,
-/// except for the special rules for resolving names inside it, which are the
-/// business of [`crate::passes::EnterTemplateExpansionSymbols`] and
-/// [`crate::passes::CheckUses`].
+/// An unexpanded specifier is replaced by the expanded template: the specifier
+/// itself, carrying a copy of the syntax provided by the template definition it
+/// refers to. That syntax behaves as if it were written at the point of the
+/// specifier, except for the special rules for resolving names inside it, which
+/// are the business of [`crate::passes::EnterTemplateExpansionSymbols`] and
+/// [`crate::passes::CheckUses`]. An expanded specifier, whether written in the
+/// source as `expand T { ... }` or produced by an earlier expansion, is left
+/// unchanged, so expanding a model twice is the same as expanding it once.
 ///
 /// Each copy gets its own node identities, so every expansion is a distinct set
 /// of definitions. The span of each copied node still points at the template
 /// body, with the specifier recorded as the point of expansion, so a diagnostic
 /// reports both.
 ///
-/// The transform walks the model in source order, and it walks the body of a
-/// template both where the template is defined and where it is expanded. The
-/// `template_definition` parameter of the walk is the template definition the
-/// walk is inside of, if any: the rules that a template body defines no
-/// template and expands no template are checked against it.
+/// [`crate::passes::CheckTemplateDefs`] has checked that no template body
+/// defines a template or expands one, so a copy needs no further expansion, and
+/// the transform does not visit template bodies.
 ///
 /// A model that fails this transform cannot be analyzed, so the first error
 /// stops the transform.
@@ -41,77 +39,35 @@ impl ExpandTemplates {
 
     pub fn trans_unit(a: &Analysis, tu: &mut TransUnit) -> SemanticResult {
         for member in &mut tu.0 {
-            Self::match_module_member(a, None, member)?;
+            Self::match_module_member(a, member)?;
         }
         Ok(())
     }
 
-    fn match_module_member(
-        a: &Analysis,
-        template_definition: Option<Span>,
-        member: &mut ModuleMember,
-    ) -> SemanticResult {
+    fn match_module_member(a: &Analysis, member: &mut ModuleMember) -> SemanticResult {
         match member {
-            ModuleMember::DefModule(def) => Self::def_module(a, template_definition, def),
-            ModuleMember::DefModuleTemplate(def) => {
-                Self::def_module_template(a, template_definition, def)
+            ModuleMember::DefModule(def) => {
+                for member in &mut def.members {
+                    Self::match_module_member(a, member)?;
+                }
+                Ok(())
             }
-            ModuleMember::SpecTemplateExpand(spec) => {
-                Self::spec_template_expand(a, template_definition, spec)
-            }
+            ModuleMember::SpecTemplateExpand(spec) => Self::spec_template_expand(a, spec),
             _ => Ok(()),
         }
     }
 
-    /// Check the rules that ensure expanding a template never defines another
-    /// template and never causes another expansion: no template definition may
-    /// be the ancestor of another template definition or of a template expansion
-    /// specifier.
-    fn def_module_template(
-        a: &Analysis,
-        template_definition: Option<Span>,
-        def: &mut DefModuleTemplate,
-    ) -> SemanticResult {
-        // Validate no nested template
-        if let Some(parent_loc) = template_definition {
-            return Err(SemanticError::NestedTemplateDefinition {
-                nested_loc: def.span(),
-                parent_loc,
-            });
+    fn spec_template_expand(a: &Analysis, spec: &mut SpecTemplateExpand) -> SemanticResult {
+        match spec.members {
+            // Members are already there; nothing to do
+            Some(_) => Ok(()),
+            // Members are not there; expand
+            None => Self::expand_template(a, spec),
         }
-        let template_definition = Some(def.span());
-        for member in &mut def.members {
-            Self::match_module_member(a, template_definition, member)?;
-        }
-        Ok(())
     }
 
-    fn def_module(
-        a: &Analysis,
-        template_definition: Option<Span>,
-        def: &mut DefModule,
-    ) -> SemanticResult {
-        for member in &mut def.members {
-            Self::match_module_member(a, template_definition, member)?;
-        }
-        Ok(())
-    }
-
-    fn spec_template_expand(
-        a: &Analysis,
-        template_definition: Option<Span>,
-        spec: &mut SpecTemplateExpand,
-    ) -> SemanticResult {
-        if let Some(template_loc) = template_definition {
-            // The expansion specifier is nested inside a template body
-            return Err(SemanticError::TemplateExpansionInTemplate {
-                expand_loc: spec.span(),
-                template_loc,
-            });
-        }
-
-        // Not inside a template: expand it
-
+    /// Expand a template
+    fn expand_template(a: &Analysis, spec: &mut SpecTemplateExpand) -> SemanticResult {
         // Look up the template def. CheckTemplateUses reports a template name
         // that does not resolve, and the analysis goes on past that error, so a
         // specifier whose name did not resolve is left unexpanded.
@@ -119,16 +75,10 @@ impl ExpandTemplates {
             return Ok(());
         };
 
-        // Clone the template body, recording the template definition so that
-        // any nested template definition or expansion specifier is rejected.
-        let template_definition = Some(def.span());
+        // Clone the template body, giving every cloned node its own identity and
+        // recording the expansion node so that cloned nodes point back at the
+        // expansion site
         let mut members = def.members.clone();
-        for member in &mut members {
-            Self::match_module_member(a, template_definition, member)?;
-        }
-
-        // Give every cloned node its own identity, recording the expansion node
-        // so that cloned nodes point back at the expansion site
         let replicator = Replicator::new(spec.span());
         replicator.apply(&mut members);
 

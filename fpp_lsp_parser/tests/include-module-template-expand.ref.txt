@@ -1,0 +1,33 @@
+ROOT@0..67
+  DEF_MODULE_TEMPLATE@0..22
+    MODULE_KW@0..6 "module"
+    WHITESPACE@6..7 " "
+    TEMPLATE_KW@7..15 "template"
+    WHITESPACE@15..16 " "
+    NAME@16..17
+      IDENT@16..17 "T"
+    WHITESPACE@17..18 " "
+    MODULE_MEMBER_LIST@18..22
+      LEFT_CURLY@18..19 "{"
+      EOL@19..21 "\n\n"
+      RIGHT_CURLY@21..22 "}"
+  EOL@22..24 "\n\n"
+  SPEC_TEMPLATE_EXPAND@24..66
+    EXPAND_KW@24..30 "expand"
+    WHITESPACE@30..31 " "
+    QUAL_IDENT@31..32
+      IDENT@31..32 "T"
+    WHITESPACE@32..33 " "
+    MODULE_MEMBER_LIST@33..66
+      LEFT_CURLY@33..34 "{"
+      EOL@34..35 "\n"
+      WHITESPACE@35..37 "  "
+      EOL@37..38 "\n"
+      WHITESPACE@38..40 "  "
+      SPEC_INCLUDE@40..63
+        INCLUDE_KW@40..47 "include"
+        WHITESPACE@47..48 " "
+        LITERAL_STRING@48..63 "\"constant.fppi\""
+      EOL@63..65 "\n\n"
+      RIGHT_CURLY@65..66 "}"
+  EOL@66..67 "\n"

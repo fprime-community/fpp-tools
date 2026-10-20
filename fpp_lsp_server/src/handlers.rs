@@ -404,6 +404,7 @@ impl<'a> fpp_lsp_parser::Visitor for DocumentLinksVisitor<'a> {
             SyntaxKind::ROOT => VisitorResult::Recurse,
             SyntaxKind::DEF_MODULE => VisitorResult::Recurse,
             SyntaxKind::DEF_MODULE_TEMPLATE => VisitorResult::Recurse,
+            SyntaxKind::SPEC_TEMPLATE_EXPAND => VisitorResult::Recurse,
             SyntaxKind::MODULE_MEMBER_LIST => VisitorResult::Recurse,
             SyntaxKind::DEF_COMPONENT => VisitorResult::Recurse,
             SyntaxKind::COMPONENT_MEMBER_LIST => VisitorResult::Recurse,
@@ -1222,9 +1223,17 @@ pub fn handle_completion(
                                 // which is a *sibling* of the rule rather than a
                                 // descendant (nothing after the keyword parsed,
                                 // so the rule ends at it). Fall back to the rule
-                                // around the last real token to the left.
-                                let mut ancestors =
-                                    element.ancestors().chain(left_token.parent_ancestors());
+                                // around the last real token to the left. The
+                                // search stops at the module member list around
+                                // the cursor: a rule outside it, such as the
+                                // template expansion specifier whose members
+                                // the list holds, does not decide the name.
+                                let in_member =
+                                    |n: &SyntaxNode| n.kind() != SyntaxKind::MODULE_MEMBER_LIST;
+                                let mut ancestors = element
+                                    .ancestors()
+                                    .take_while(in_member)
+                                    .chain(left_token.parent_ancestors().take_while(in_member));
 
                                 if let Some(ng) = ancestors.find_map(|n| match n.kind() {
                                     SyntaxKind::DEF_COMPONENT_INSTANCE => {
@@ -1819,6 +1828,45 @@ module M {
             assert!(
                 hover.is_none(),
                 "hover on the use of `{needle}` in a template body should be empty, got:\n{hover:?}"
+            );
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    const WRITTEN_EXPANSION_SRC: &str = "\
+module M {
+  module template Tmpl(constant Size: U32) {
+  }
+  expand Tmpl(constant 3) {
+    constant written = Size
+    constant other = written
+  }
+  constant outside = written
+}
+";
+
+    /// The members of an expansion written in the source are analyzed where they
+    /// are written, so a use inside them hovers as the parameter or definition it
+    /// names, and a use outside them reaches their definitions.
+    #[test]
+    fn hover_on_use_inside_written_expansion() {
+        let dir = temp_dir("template-written-expand");
+        let (state, uri) = state_for(&dir, WRITTEN_EXPANSION_SRC);
+
+        for (needle, nth, expected) in [
+            ("Size", 1, "(Constant Template Parameter) Size"),
+            ("written", 1, "M.written"),
+            ("written", 2, "M.written"),
+        ] {
+            let value = hover_at(
+                &state,
+                &uri,
+                position_of_nth(WRITTEN_EXPANSION_SRC, needle, nth),
+            );
+            assert!(
+                value.contains(expected),
+                "hover on `{needle}` #{nth} should contain `{expected}`, got:\n{value}"
             );
         }
 

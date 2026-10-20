@@ -32,6 +32,11 @@ fn module_member(member: &mut ModuleMember) {
                 module_member(m);
             }
         }
+        ModuleMember::SpecTemplateExpand(spec) => {
+            for m in spec.members.iter_mut().flatten() {
+                module_member(m);
+            }
+        }
         ModuleMember::DefComponent(def) => {
             for m in &mut def.members {
                 component_member(m);

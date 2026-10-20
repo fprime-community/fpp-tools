@@ -1,0 +1,8 @@
+ --> [ local path prefix ]/template/source_expand_include.fppi:1:14
+  |
+1 | constant a = undefinedX
+  |              ^^^^^^^^^^ symbol undefinedX is not defined
+  |
+  = note: included from [ local path prefix ]/template/source_expand_include.fpp:10:11
+  = note: looking for a constant here
+

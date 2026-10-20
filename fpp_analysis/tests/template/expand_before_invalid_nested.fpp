@@ -1,5 +1,6 @@
-# The expansion of B comes first in the model, and the body of a template is
-# checked where it is expanded, so the nested template in B is the first error
+# The expansion of B comes first in the model, but the template definitions are
+# checked in source order before any template is expanded, so the nested
+# template in A is the first error
 
 expand B()
 

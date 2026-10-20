@@ -2450,8 +2450,9 @@ def parse(paths: typing.Optional[builtins.str | builtins.list[builtins.str]] = N
 
     This is the fast front end: the nodes it yields carry locations, annotations,
     and children, but no resolved symbols, types, or values. Use `analyze` for
-    those. A `SpecTemplateExpand` is likewise left unexpanded — its `members` is
-    `None` — because naming the template it expands is already a symbol lookup.
+    those. A `SpecTemplateExpand` is likewise left unexpanded, because naming the
+    template it expands is already a symbol lookup: its `members` is `None`
+    unless the source writes the expansion out, as `expand T { ... }`.
 
     There is no `imports=` here, unlike `analyze`: nothing at this depth reads
     another translation unit, so every unit `parse` returns is a source.

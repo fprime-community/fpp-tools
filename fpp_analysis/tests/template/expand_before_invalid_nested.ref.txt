@@ -1,12 +1,12 @@
-  --> [ local path prefix ]/template/expand_before_invalid_nested.fpp:11:3
-   |
-11 |     module template B1() {}
-   |     ^^^^^^^^^^^^^^^^^^^^^^^ module template definitions cannot be nested
-   |
-  ::: [ local path prefix ]/template/expand_before_invalid_nested.fpp:10:1
-   |
-10 | / module template B() {
-11 | |   module template B1() {}
-12 | | }
-   | |_- parent template defined here
+ --> [ local path prefix ]/template/expand_before_invalid_nested.fpp:8:3
+  |
+8 |     module template A1() {}
+  |     ^^^^^^^^^^^^^^^^^^^^^^^ module template definitions cannot be nested
+  |
+ ::: [ local path prefix ]/template/expand_before_invalid_nested.fpp:7:1
+  |
+7 | / module template A() {
+8 | |   module template A1() {}
+9 | | }
+  | |_- enclosing template is defined here
 

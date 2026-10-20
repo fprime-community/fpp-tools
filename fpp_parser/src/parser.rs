@@ -3143,12 +3143,16 @@ impl<'a> Parser<'a> {
         self.commit();
         let template = self.qual_ident()?;
         let args = self.template_arg_list()?;
+        let members = match self.peek(0) {
+            LeftCurly => Some(self.enclosed(LeftCurly, RightCurly, Parser::module_members)?),
+            _ => None,
+        };
 
         Ok(SpecTemplateExpand {
             node_id: self.node(first.span()),
             template,
             args,
-            members: None,
+            members,
         })
     }
 

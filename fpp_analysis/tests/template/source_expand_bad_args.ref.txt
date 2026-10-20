@@ -1,0 +1,16 @@
+ --> [ local path prefix ]/template/source_expand_bad_args.fpp:5:1
+  |
+5 | / expand T(constant 10) {
+6 | |
+7 | |   constant a = 0
+8 | |
+9 | | }
+  | |_^ expected 0 template arguments, got 1
+  |
+ ::: [ local path prefix ]/template/source_expand_bad_args.fpp:1:1
+  |
+1 | / module template T {
+2 | |
+3 | | }
+  | |_- template defined here
+

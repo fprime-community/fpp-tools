@@ -1,0 +1,16 @@
+ --> [ local path prefix ]/template/nested_template_def.fpp:3:5
+  |
+3 | /     module template T2 {
+4 | |
+5 | |     }
+  | |_____^ module template definitions cannot be nested
+  |
+ ::: [ local path prefix ]/template/nested_template_def.fpp:1:1
+  |
+1 | / module template T1 {
+2 | |
+3 | |     module template T2 {
+... |
+7 | | }
+  | |_- enclosing template is defined here
+

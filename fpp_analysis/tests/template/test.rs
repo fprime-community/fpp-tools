@@ -75,11 +75,6 @@ fn chained_constants() {
 }
 
 #[test]
-fn composition_invalid() {
-    run_test("template/composition_invalid")
-}
-
-#[test]
 fn constant_param_array_promote() {
     run_test("template/constant_param_array_promote")
 }
@@ -107,6 +102,11 @@ fn definition_point_scoping_ok() {
 #[test]
 fn duplicate_def() {
     run_test("template/duplicate_def")
+}
+
+#[test]
+fn expand_in_template_def() {
+    run_test("template/expand_in_template_def")
 }
 
 #[test]
@@ -185,13 +185,13 @@ fn interfaces_valid_port_instance_name_aliased() {
 }
 
 #[test]
-fn invalid_nested() {
-    run_test("template/invalid_nested")
+fn module_merge_ok() {
+    run_test("template/module_merge_ok")
 }
 
 #[test]
-fn module_merge_ok() {
-    run_test("template/module_merge_ok")
+fn nested_expand() {
+    run_test("template/nested_expand")
 }
 
 #[test]
@@ -202,6 +202,11 @@ fn nested_scope_resolution() {
 #[test]
 fn nested_scope_resolution_ok() {
     run_test("template/nested_scope_resolution_ok")
+}
+
+#[test]
+fn nested_template_def() {
+    run_test("template/nested_template_def")
 }
 
 #[test]
@@ -232,6 +237,21 @@ fn parameter_shadow_error() {
 #[test]
 fn parameter_shadow_ok() {
     run_test("template/parameter_shadow_ok")
+}
+
+#[test]
+fn source_expand_bad_args() {
+    run_test("template/source_expand_bad_args")
+}
+
+#[test]
+fn source_expand_ok() {
+    run_test("template/source_expand_ok")
+}
+
+#[test]
+fn source_expand_undefined_symbol() {
+    run_test("template/source_expand_undefined_symbol")
 }
 
 #[test]
@@ -282,6 +302,11 @@ fn struct_parameter_ok() {
 #[test]
 fn struct_parameter_omitted_member_ok() {
     run_test("template/struct_parameter_omitted_member_ok")
+}
+
+#[test]
+fn template_def_in_expand() {
+    run_test("template/template_def_in_expand")
 }
 
 #[test]
@@ -393,13 +418,15 @@ fn expand_absolute_undefined() {
     run_test("template/expand_absolute_undefined")
 }
 
-/// An expansion specifier in a template body is reported at the first expansion
+/// An expansion specifier in a template body is reported in source order, not
+/// at the first expansion
 #[test]
 fn expand_before_invalid_composition() {
     run_test("template/expand_before_invalid_composition")
 }
 
-/// A nested template in a template body is reported at the first expansion
+/// A nested template in a template body is reported in source order, not at
+/// the first expansion
 #[test]
 fn expand_before_invalid_nested() {
     run_test("template/expand_before_invalid_nested")
@@ -541,4 +568,22 @@ fn interface_arg_file_order() {
         ],
         "template/interface_arg_file_order_a",
     )
+}
+
+/// An expansion written in the source that names an undefined template
+#[test]
+fn source_expand_undefined_template() {
+    run_test("template/source_expand_undefined_template")
+}
+
+/// The definitions and uses of an expansion written in the source
+#[test]
+fn source_expand_member_use_ok() {
+    run_test("template/source_expand_member_use_ok")
+}
+
+/// An include specifier in an expansion written in the source
+#[test]
+fn source_expand_include() {
+    run_test("template/source_expand_include")
 }
