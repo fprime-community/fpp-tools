@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/template/system_in_expansion.fpp:7:3
+  |
+7 |     system S: D
+  |     ^^^^^^^^^^^ system definitions cannot appear inside a module template expansion
+  |
+ ::: [ local path prefix ]/template/system_in_expansion.fpp:6:1
+  |
+6 | / expand T() {
+7 | |   system S: D
+8 | | }
+  | |_- enclosing template expansion is here
+

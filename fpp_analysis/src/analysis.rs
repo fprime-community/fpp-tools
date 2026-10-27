@@ -7,7 +7,7 @@ use crate::semantics::{
     TypeConversionError, UseDefMatching, Value, state_machine::StateMachine,
 };
 use fpp_ast::{AstNode, Expr, FormalParam, FormalParamKind, QueueFull, SpecLoc};
-use fpp_core::{File, SourceFile, Span, Spanned};
+use fpp_core::{SourceFile, Span, Spanned};
 use indexmap::IndexMap;
 use rustc_hash::{FxBuildHasher, FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
@@ -15,20 +15,6 @@ use std::sync::Arc;
 /// The analysis data structure
 #[derive(Debug)]
 pub struct Analysis {
-    /// The set of files presented to the analyzer
-    pub input_file_set: HashSet<File>,
-    /// The recursive level of the analysis
-    pub(crate) level: i32,
-    /// The set of files on which the analysis transitively depends.
-    /// Does not contain included files.
-    pub dependency_file_set: HashSet<File>,
-    /// The set of files on which the analysis directly depends.
-    /// Does contain included files.
-    pub direct_dependency_file_set: HashSet<File>,
-    /// The set of dependency files that could not be opened
-    pub missing_dependency_file_set: HashSet<File>,
-    /// The set of files included when parsing input
-    pub included_file_set: HashSet<File>,
     /// The mapping from included files `.fppi` to the context they were included in
     pub include_context_map: HashMap<SourceFile, fpp_parser::IncludeParentKind>,
     /// A map from pairs (spec loc kind, qualified name) to spec locs.
@@ -40,8 +26,6 @@ pub struct Analysis {
     pub(crate) scope_name_list: Vec<String>,
     /// Whether dictionary generation is required
     pub dictionary_generation: bool,
-    /// Whether the dependency analysis includes dictionary dependencies
-    pub(crate) include_dictionary_deps: bool,
     /// The current nested scope for symbol lookup
     pub(crate) nested_scope: NestedScope,
     /// The outermost scope
@@ -139,17 +123,10 @@ impl Analysis {
         is_sync::<Analysis>();
 
         Analysis {
-            input_file_set: Default::default(),
-            level: 0,
-            dependency_file_set: Default::default(),
-            direct_dependency_file_set: Default::default(),
-            missing_dependency_file_set: Default::default(),
-            included_file_set: Default::default(),
             include_context_map: Default::default(),
             location_specifier_map: Default::default(),
             scope_name_list: Vec::new(),
             dictionary_generation: false,
-            include_dictionary_deps: false,
             nested_scope: NestedScope::empty(),
             global_scope: Scope::empty(),
             parent_symbol: None,

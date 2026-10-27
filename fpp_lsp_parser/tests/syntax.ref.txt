@@ -1,13 +1,13 @@
-ROOT@0..8355
+ROOT@0..9143
   PRE_ANNOTATION@0..28 "@ Definitions and spe ..."
   EOL@28..29 "\n"
-  DEF_MODULE@29..6298
+  DEF_MODULE@29..7086
     MODULE_KW@29..35 "module"
     WHITESPACE@35..36 " "
     NAME@36..60
       IDENT@36..60 "DefinitionsAndSpecifiers"
     WHITESPACE@60..61 " "
-    MODULE_MEMBER_LIST@61..6298
+    MODULE_MEMBER_LIST@61..7086
       LEFT_CURLY@61..62 "{"
       EOL@62..64 "\n\n"
       WHITESPACE@64..66 "  "
@@ -1241,1398 +1241,1594 @@ ROOT@0..8355
           RIGHT_CURLY@3904..3905 "}"
       EOL@3905..3907 "\n\n"
       WHITESPACE@3907..3909 "  "
-      PRE_ANNOTATION@3909..3926 "@ Port definition"
-      EOL@3926..3927 "\n"
-      WHITESPACE@3927..3929 "  "
-      DEF_PORT@3929..3958
-        PORT_KW@3929..3933 "port"
-        WHITESPACE@3933..3934 " "
-        NAME@3934..3935
-          IDENT@3934..3935 "P"
-        FORMAL_PARAM_LIST@3935..3951
-          LEFT_PAREN@3935..3936 "("
-          FORMAL_PARAM@3936..3942
-            NAME@3936..3937
-              IDENT@3936..3937 "a"
-            COLON@3937..3938 ":"
-            WHITESPACE@3938..3939 " "
-            TYPE_NAME@3939..3942
-              U32_KW@3939..3942 "U32"
-          COMMA@3942..3943 ","
-          WHITESPACE@3943..3944 " "
-          FORMAL_PARAM@3944..3950
-            NAME@3944..3945
-              IDENT@3944..3945 "b"
-            COLON@3945..3946 ":"
-            WHITESPACE@3946..3947 " "
-            TYPE_NAME@3947..3950
-              F32_KW@3947..3950 "F32"
-          RIGHT_PAREN@3950..3951 ")"
-        WHITESPACE@3951..3952 " "
-        RIGHT_ARROW@3952..3954 "->"
-        WHITESPACE@3954..3955 " "
-        TYPE_NAME@3955..3958
-          U32_KW@3955..3958 "U32"
-      EOL@3958..3959 "\n"
-      WHITESPACE@3959..3961 "  "
-      POST_ANNOTATION@3961..3979 "@< Port definition"
-      EOL@3979..3981 "\n\n"
-      WHITESPACE@3981..3983 "  "
-      PRE_ANNOTATION@3983..4002 "@ Struct definition"
-      EOL@4002..4003 "\n"
-      WHITESPACE@4003..4005 "  "
-      DEF_STRUCT@4005..4105
-        STRUCT_KW@4005..4011 "struct"
-        WHITESPACE@4011..4012 " "
-        NAME@4012..4013
-          IDENT@4012..4013 "S"
-        WHITESPACE@4013..4014 " "
-        STRUCT_MEMBER_LIST@4014..4105
-          LEFT_CURLY@4014..4015 "{"
-          EOL@4015..4016 "\n"
-          WHITESPACE@4016..4020 "    "
-          PRE_ANNOTATION@4020..4023 "@ x"
-          EOL@4023..4024 "\n"
-          WHITESPACE@4024..4028 "    "
-          STRUCT_MEMBER@4028..4048
-            NAME@4028..4029
-              IDENT@4028..4029 "x"
-            COLON@4029..4030 ":"
-            WHITESPACE@4030..4031 " "
-            TYPE_NAME@4031..4034
-              U32_KW@4031..4034 "U32"
-            WHITESPACE@4034..4035 " "
-            FORMAT@4035..4048
-              FORMAT_KW@4035..4041 "format"
-              WHITESPACE@4041..4042 " "
-              LITERAL_STRING@4042..4048 "\"{} s\""
+      PRE_ANNOTATION@3909..3937 "@ Module template def ..."
+      EOL@3937..3938 "\n"
+      WHITESPACE@3938..3940 "  "
+      DEF_MODULE_TEMPLATE@3940..4259
+        MODULE_KW@3940..3946 "module"
+        WHITESPACE@3946..3947 " "
+        TEMPLATE_KW@3947..3955 "template"
+        WHITESPACE@3955..3956 " "
+        NAME@3956..3958
+          IDENT@3956..3958 "MT"
+        TEMPLATE_PARAM_LIST@3958..4232
+          LEFT_PAREN@3958..3959 "("
+          EOL@3959..3960 "\n"
+          WHITESPACE@3960..3964 "    "
+          PRE_ANNOTATION@3964..3993 "@ Constant template p ..."
+          EOL@3993..3994 "\n"
+          WHITESPACE@3994..3998 "    "
+          TEMPLATE_PARAM@3998..4013
+            CONSTANT_KW@3998..4006 "constant"
+            WHITESPACE@4006..4007 " "
+            NAME@4007..4008
+              IDENT@4007..4008 "c"
+            COLON@4008..4009 ":"
+            WHITESPACE@4009..4010 " "
+            TYPE_NAME@4010..4013
+              U32_KW@4010..4013 "U32"
+          EOL@4013..4014 "\n"
+          WHITESPACE@4014..4018 "    "
+          POST_ANNOTATION@4018..4048 "@< Constant template  ..."
           EOL@4048..4049 "\n"
           WHITESPACE@4049..4053 "    "
-          POST_ANNOTATION@4053..4057 "@< x"
-          EOL@4057..4058 "\n"
-          WHITESPACE@4058..4062 "    "
-          PRE_ANNOTATION@4062..4065 "@ y"
-          EOL@4065..4066 "\n"
-          WHITESPACE@4066..4070 "    "
-          STRUCT_MEMBER@4070..4092
-            NAME@4070..4071
-              IDENT@4070..4071 "y"
-            COLON@4071..4072 ":"
-            WHITESPACE@4072..4073 " "
-            TYPE_NAME@4073..4076
-              F32_KW@4073..4076 "F32"
-            WHITESPACE@4076..4077 " "
-            FORMAT@4077..4092
-              FORMAT_KW@4077..4083 "format"
-              WHITESPACE@4083..4084 " "
-              LITERAL_STRING@4084..4092 "\"{} m/s\""
-          EOL@4092..4093 "\n"
-          WHITESPACE@4093..4097 "    "
-          POST_ANNOTATION@4097..4101 "@< y"
-          EOL@4101..4102 "\n"
-          WHITESPACE@4102..4104 "  "
-          RIGHT_CURLY@4104..4105 "}"
-      EOL@4105..4106 "\n"
-      WHITESPACE@4106..4108 "  "
-      POST_ANNOTATION@4108..4128 "@< Struct definition"
-      EOL@4128..4130 "\n\n"
-      WHITESPACE@4130..4132 "  "
-      PRE_ANNOTATION@4132..4153 "@ Topology definition"
-      EOL@4153..4154 "\n"
-      WHITESPACE@4154..4156 "  "
-      DEF_TOPOLOGY@4156..5410
-        TOPOLOGY_KW@4156..4164 "topology"
-        WHITESPACE@4164..4165 " "
-        NAME@4165..4166
-          IDENT@4165..4166 "T"
-        WHITESPACE@4166..4167 " "
-        TOPOLOGY_MEMBER_LIST@4167..5410
-          LEFT_CURLY@4167..4168 "{"
-          EOL@4168..4170 "\n\n"
-          WHITESPACE@4170..4174 "    "
-          PRE_ANNOTATION@4174..4201 "@ Public instance spe ..."
-          EOL@4201..4202 "\n"
-          WHITESPACE@4202..4206 "    "
-          SPEC_INSTANCE@4206..4217
-            INSTANCE_KW@4206..4214 "instance"
-            WHITESPACE@4214..4215 " "
-            QUAL_IDENT@4215..4217
-              IDENT@4215..4217 "i1"
-          EOL@4217..4218 "\n"
-          WHITESPACE@4218..4222 "    "
-          POST_ANNOTATION@4222..4250 "@< Public instance sp ..."
-          EOL@4250..4252 "\n\n"
-          WHITESPACE@4252..4256 "    "
-          PRE_ANNOTATION@4256..4318 "@ Public instance spe ..."
-          EOL@4318..4319 "\n"
-          WHITESPACE@4319..4323 "    "
-          SPEC_INSTANCE@4323..4338
-            INSTANCE_KW@4323..4331 "instance"
-            WHITESPACE@4331..4332 " "
-            QUAL_IDENT@4332..4338
-              DOT@4332..4333 "."
-              IDENT@4333..4338 "i1Abs"
-          EOL@4338..4339 "\n"
-          WHITESPACE@4339..4343 "    "
-          POST_ANNOTATION@4343..4406 "@< Public instance sp ..."
-          EOL@4406..4408 "\n\n"
-          WHITESPACE@4408..4412 "    "
-          PRE_ANNOTATION@4412..4447 "@ Direct connection g ..."
-          EOL@4447..4448 "\n"
-          WHITESPACE@4448..4452 "    "
-          SPEC_CONNECTION_GRAPH_DIRECT@4452..4589
-            CONNECTIONS_KW@4452..4463 "connections"
-            WHITESPACE@4463..4464 " "
-            NAME@4464..4465
-              IDENT@4464..4465 "C"
-            WHITESPACE@4465..4466 " "
-            CONNECTION_MEMBER_LIST@4466..4589
-              LEFT_CURLY@4466..4467 "{"
-              EOL@4467..4468 "\n"
-              WHITESPACE@4468..4474 "      "
-              CONNECTION@4474..4492
-                CONNECTION_FROM@4474..4481
-                  PORT_INSTANCE_IDENTIFIER@4474..4478
-                    IDENT@4474..4476 "i1"
-                    DOT@4476..4477 "."
-                    IDENT@4477..4478 "p"
-                  INDEX_OR_SIZE@4478..4481
-                    LEFT_SQUARE@4478..4479 "["
-                    EXPR@4479..4480
-                      EXPR_LITERAL@4479..4480
-                        LITERAL_INT@4479..4480 "0"
-                    RIGHT_SQUARE@4480..4481 "]"
-                WHITESPACE@4481..4482 " "
-                RIGHT_ARROW@4482..4484 "->"
-                WHITESPACE@4484..4485 " "
-                CONNECTION_TO@4485..4492
-                  PORT_INSTANCE_IDENTIFIER@4485..4489
-                    IDENT@4485..4487 "i2"
-                    DOT@4487..4488 "."
-                    IDENT@4488..4489 "p"
-                  INDEX_OR_SIZE@4489..4492
-                    LEFT_SQUARE@4489..4490 "["
-                    EXPR@4490..4491
-                      EXPR_LITERAL@4490..4491
-                        LITERAL_INT@4490..4491 "1"
-                    RIGHT_SQUARE@4491..4492 "]"
-              EOL@4492..4493 "\n"
-              WHITESPACE@4493..4499 "      "
-              CONNECTION@4499..4529
-                UNMATCHED_KW@4499..4508 "unmatched"
-                WHITESPACE@4508..4509 " "
-                CONNECTION_FROM@4509..4517
-                  PORT_INSTANCE_IDENTIFIER@4509..4514
-                    IDENT@4509..4511 "i1"
-                    DOT@4511..4512 "."
-                    IDENT@4512..4514 "p1"
-                  INDEX_OR_SIZE@4514..4517
-                    LEFT_SQUARE@4514..4515 "["
-                    EXPR@4515..4516
-                      EXPR_LITERAL@4515..4516
-                        LITERAL_INT@4515..4516 "0"
-                    RIGHT_SQUARE@4516..4517 "]"
-                WHITESPACE@4517..4518 " "
-                RIGHT_ARROW@4518..4520 "->"
-                WHITESPACE@4520..4521 " "
-                CONNECTION_TO@4521..4529
-                  PORT_INSTANCE_IDENTIFIER@4521..4526
-                    IDENT@4521..4523 "i2"
-                    DOT@4523..4524 "."
-                    IDENT@4524..4526 "p2"
-                  INDEX_OR_SIZE@4526..4529
-                    LEFT_SQUARE@4526..4527 "["
-                    EXPR@4527..4528
-                      EXPR_LITERAL@4527..4528
-                        LITERAL_INT@4527..4528 "0"
-                    RIGHT_SQUARE@4528..4529 "]"
-              EOL@4529..4530 "\n"
-              WHITESPACE@4530..4536 "      "
-              CONNECTION@4536..4560
-                UNMATCHED_KW@4536..4545 "unmatched"
-                WHITESPACE@4545..4546 " "
-                CONNECTION_FROM@4546..4551
-                  PORT_INSTANCE_IDENTIFIER@4546..4551
-                    IDENT@4546..4548 "i1"
-                    DOT@4548..4549 "."
-                    IDENT@4549..4551 "p1"
-                WHITESPACE@4551..4552 " "
-                RIGHT_ARROW@4552..4554 "->"
-                WHITESPACE@4554..4555 " "
-                CONNECTION_TO@4555..4560
-                  PORT_INSTANCE_IDENTIFIER@4555..4560
-                    IDENT@4555..4557 "i2"
-                    DOT@4557..4558 "."
-                    IDENT@4558..4560 "p2"
-              EOL@4560..4561 "\n"
-              WHITESPACE@4561..4567 "      "
-              CONNECTION@4567..4583
-                CONNECTION_FROM@4567..4573
-                  PORT_INSTANCE_IDENTIFIER@4567..4573
-                    DOT@4567..4568 "."
-                    IDENT@4568..4570 "i1"
-                    DOT@4570..4571 "."
-                    IDENT@4571..4573 "p3"
-                WHITESPACE@4573..4574 " "
-                RIGHT_ARROW@4574..4576 "->"
-                WHITESPACE@4576..4577 " "
-                CONNECTION_TO@4577..4583
-                  PORT_INSTANCE_IDENTIFIER@4577..4583
-                    DOT@4577..4578 "."
-                    IDENT@4578..4580 "i2"
-                    DOT@4580..4581 "."
-                    IDENT@4581..4583 "p3"
-              EOL@4583..4584 "\n"
-              WHITESPACE@4584..4588 "    "
-              RIGHT_CURLY@4588..4589 "}"
-          EOL@4589..4590 "\n"
-          WHITESPACE@4590..4594 "    "
-          POST_ANNOTATION@4594..4630 "@< Direct connection  ..."
-          EOL@4630..4632 "\n\n"
-          WHITESPACE@4632..4636 "    "
-          PRE_ANNOTATION@4636..4661 "@ Graph pattern speci ..."
-          EOL@4661..4662 "\n"
-          WHITESPACE@4662..4666 "    "
-          SPEC_CONNECTION_GRAPH_PATTERN@4666..4712
-            COMMAND_KW@4666..4673 "command"
-            WHITESPACE@4673..4674 " "
-            CONNECTIONS_KW@4674..4685 "connections"
-            WHITESPACE@4685..4686 " "
-            INSTANCE_KW@4686..4694 "instance"
-            WHITESPACE@4694..4695 " "
-            QUAL_IDENT@4695..4697
-              IDENT@4695..4697 "i1"
-            WHITESPACE@4697..4698 " "
-            PATTERN_TARGET_MEMBER_LIST@4698..4712
-              LEFT_CURLY@4698..4699 "{"
-              WHITESPACE@4699..4700 " "
-              QUAL_IDENT@4700..4702
-                IDENT@4700..4702 "i2"
-              COMMA@4702..4703 ","
-              WHITESPACE@4703..4704 " "
-              QUAL_IDENT@4704..4706
-                IDENT@4704..4706 "i3"
-              COMMA@4706..4707 ","
-              WHITESPACE@4707..4708 " "
-              QUAL_IDENT@4708..4710
-                IDENT@4708..4710 "i4"
-              WHITESPACE@4710..4711 " "
-              RIGHT_CURLY@4711..4712 "}"
-          EOL@4712..4713 "\n"
-          WHITESPACE@4713..4717 "    "
-          POST_ANNOTATION@4717..4743 "@< Graph pattern spec ..."
-          EOL@4743..4745 "\n\n"
-          WHITESPACE@4745..4749 "    "
-          PRE_ANNOTATION@4749..4778 "@ Topology instance s ..."
-          EOL@4778..4779 "\n"
-          WHITESPACE@4779..4783 "    "
-          SPEC_INSTANCE@4783..4792
-            IMPORT_KW@4783..4789 "import"
-            WHITESPACE@4789..4790 " "
-            QUAL_IDENT@4790..4792
-              IDENT@4790..4792 "T1"
-          EOL@4792..4793 "\n"
-          WHITESPACE@4793..4797 "    "
-          POST_ANNOTATION@4797..4827 "@< Topology instance  ..."
-          EOL@4827..4829 "\n\n"
-          WHITESPACE@4829..4833 "    "
-          PRE_ANNOTATION@4833..4857 "@ Telemetry packet group"
-          EOL@4857..4858 "\n"
-          WHITESPACE@4858..4862 "    "
-          TLM_PACKET_SET@4862..5144
-            TELEMETRY_KW@4862..4871 "telemetry"
-            WHITESPACE@4871..4872 " "
-            PACKETS_KW@4872..4879 "packets"
-            WHITESPACE@4879..4880 " "
-            NAME@4880..4881
-              IDENT@4880..4881 "P"
-            WHITESPACE@4881..4882 " "
-            TLM_PACKET_SET_MEMBER_LIST@4882..5106
-              LEFT_CURLY@4882..4883 "{"
-              EOL@4883..4885 "\n\n"
-              WHITESPACE@4885..4891 "      "
-              PRE_ANNOTATION@4891..4909 "@ Telemetry packet"
-              EOL@4909..4910 "\n"
-              WHITESPACE@4910..4916 "      "
-              SPEC_TLM_PACKET@4916..4991
-                PACKET_KW@4916..4922 "packet"
-                WHITESPACE@4922..4923 " "
-                NAME@4923..4925
-                  IDENT@4923..4925 "P1"
-                WHITESPACE@4925..4926 " "
-                ID@4926..4930
-                  ID_KW@4926..4928 "id"
-                  WHITESPACE@4928..4929 " "
-                  EXPR@4929..4930
-                    EXPR_LITERAL@4929..4930
-                      LITERAL_INT@4929..4930 "0"
-                WHITESPACE@4930..4931 " "
-                GROUP@4931..4938
-                  GROUP_KW@4931..4936 "group"
-                  WHITESPACE@4936..4937 " "
-                  EXPR@4937..4938
-                    EXPR_LITERAL@4937..4938
-                      LITERAL_INT@4937..4938 "0"
-                WHITESPACE@4938..4939 " "
-                TLM_PACKET_MEMBER_LIST@4939..4991
-                  LEFT_CURLY@4939..4940 "{"
-                  EOL@4940..4941 "\n"
-                  WHITESPACE@4941..4949 "        "
-                  TLM_CHANNEL_IDENTIFIER@4949..4954
-                    IDENT@4949..4951 "i1"
-                    DOT@4951..4952 "."
-                    IDENT@4952..4954 "c1"
-                  EOL@4954..4955 "\n"
-                  WHITESPACE@4955..4963 "        "
-                  TLM_CHANNEL_IDENTIFIER@4963..4968
-                    IDENT@4963..4965 "i2"
-                    DOT@4965..4966 "."
-                    IDENT@4966..4968 "c2"
-                  EOL@4968..4969 "\n"
-                  WHITESPACE@4969..4977 "        "
-                  TLM_CHANNEL_IDENTIFIER@4977..4983
-                    DOT@4977..4978 "."
-                    IDENT@4978..4980 "i1"
-                    DOT@4980..4981 "."
-                    IDENT@4981..4983 "c3"
-                  EOL@4983..4984 "\n"
-                  WHITESPACE@4984..4990 "      "
-                  RIGHT_CURLY@4990..4991 "}"
-              EOL@4991..4992 "\n"
-              WHITESPACE@4992..4998 "      "
-              POST_ANNOTATION@4998..5017 "@< Telemetry packet"
-              EOL@5017..5019 "\n\n"
-              WHITESPACE@5019..5025 "      "
-              PRE_ANNOTATION@5025..5044 "@ Include specifier"
-              EOL@5044..5045 "\n"
-              WHITESPACE@5045..5051 "      "
-              SPEC_INCLUDE@5051..5072
-                INCLUDE_KW@5051..5058 "include"
-                WHITESPACE@5058..5059 " "
-                LITERAL_STRING@5059..5072 "\"packet.fppi\""
-              EOL@5072..5073 "\n"
-              WHITESPACE@5073..5079 "      "
-              POST_ANNOTATION@5079..5099 "@< Include specifier"
-              EOL@5099..5101 "\n\n"
-              WHITESPACE@5101..5105 "    "
-              RIGHT_CURLY@5105..5106 "}"
-            WHITESPACE@5106..5107 " "
-            TLM_PACKET_OMIT@5107..5144
-              OMIT_KW@5107..5111 "omit"
-              WHITESPACE@5111..5112 " "
-              TLM_PACKET_OMIT_MEMBER_LIST@5112..5144
-                LEFT_CURLY@5112..5113 "{"
-                EOL@5113..5114 "\n"
-                WHITESPACE@5114..5120 "      "
-                TLM_CHANNEL_IDENTIFIER@5120..5125
-                  IDENT@5120..5122 "i3"
-                  DOT@5122..5123 "."
-                  IDENT@5123..5125 "c3"
-                EOL@5125..5126 "\n"
-                WHITESPACE@5126..5132 "      "
-                TLM_CHANNEL_IDENTIFIER@5132..5138
-                  DOT@5132..5133 "."
-                  IDENT@5133..5135 "i3"
-                  DOT@5135..5136 "."
-                  IDENT@5136..5138 "c4"
-                EOL@5138..5139 "\n"
-                WHITESPACE@5139..5143 "    "
-                RIGHT_CURLY@5143..5144 "}"
-          EOL@5144..5145 "\n"
-          WHITESPACE@5145..5149 "    "
-          POST_ANNOTATION@5149..5174 "@< Telemetry packet g ..."
-          EOL@5174..5176 "\n\n"
-          WHITESPACE@5176..5180 "    "
-          PRE_ANNOTATION@5180..5205 "@ Topology port speci ..."
-          EOL@5205..5206 "\n"
-          WHITESPACE@5206..5210 "    "
-          SPEC_TOP_PORT@5210..5222
-            PORT_KW@5210..5214 "port"
-            WHITESPACE@5214..5215 " "
-            NAME@5215..5216
-              IDENT@5215..5216 "a"
-            WHITESPACE@5216..5217 " "
-            EQUALS@5217..5218 "="
-            WHITESPACE@5218..5219 " "
-            PORT_INSTANCE_IDENTIFIER@5219..5222
-              IDENT@5219..5220 "b"
-              DOT@5220..5221 "."
-              IDENT@5221..5222 "a"
-          EOL@5222..5223 "\n"
-          WHITESPACE@5223..5227 "    "
-          POST_ANNOTATION@5227..5253 "@< Topology port spec ..."
-          EOL@5253..5255 "\n\n"
-          WHITESPACE@5255..5259 "    "
-          PRE_ANNOTATION@5259..5319 "@ Topology port speci ..."
-          EOL@5319..5320 "\n"
-          WHITESPACE@5320..5324 "    "
-          SPEC_TOP_PORT@5324..5340
-            PORT_KW@5324..5328 "port"
-            WHITESPACE@5328..5329 " "
-            NAME@5329..5333
-              IDENT@5329..5333 "aAbs"
-            WHITESPACE@5333..5334 " "
-            EQUALS@5334..5335 "="
-            WHITESPACE@5335..5336 " "
-            PORT_INSTANCE_IDENTIFIER@5336..5340
-              DOT@5336..5337 "."
-              IDENT@5337..5338 "b"
-              DOT@5338..5339 "."
-              IDENT@5339..5340 "a"
-          EOL@5340..5341 "\n"
-          WHITESPACE@5341..5345 "    "
-          POST_ANNOTATION@5345..5406 "@< Topology port spec ..."
-          EOL@5406..5407 "\n"
-          WHITESPACE@5407..5409 "  "
-          RIGHT_CURLY@5409..5410 "}"
-      EOL@5410..5411 "\n"
-      WHITESPACE@5411..5413 "  "
-      POST_ANNOTATION@5413..5435 "@< Topology definition"
-      EOL@5435..5437 "\n\n"
-      WHITESPACE@5437..5439 "  "
-      PRE_ANNOTATION@5439..5460 "@ Deployment topology"
-      EOL@5460..5461 "\n"
-      WHITESPACE@5461..5463 "  "
-      DEF_TOPOLOGY@5463..5488
-        DEPLOYMENT_KW@5463..5473 "deployment"
-        WHITESPACE@5473..5474 " "
-        TOPOLOGY_KW@5474..5482 "topology"
-        WHITESPACE@5482..5483 " "
-        NAME@5483..5485
-          IDENT@5483..5485 "T1"
-        WHITESPACE@5485..5486 " "
-        TOPOLOGY_MEMBER_LIST@5486..5488
-          LEFT_CURLY@5486..5487 "{"
-          RIGHT_CURLY@5487..5488 "}"
-      EOL@5488..5489 "\n"
-      WHITESPACE@5489..5491 "  "
-      POST_ANNOTATION@5491..5513 "@< Deployment topology"
-      EOL@5513..5515 "\n\n"
-      WHITESPACE@5515..5517 "  "
-      PRE_ANNOTATION@5517..5558 "@ Topology definition ..."
-      EOL@5558..5559 "\n"
-      WHITESPACE@5559..5561 "  "
-      DEF_TOPOLOGY@5561..5588
-        TOPOLOGY_KW@5561..5569 "topology"
-        WHITESPACE@5569..5570 " "
-        NAME@5570..5572
-          IDENT@5570..5572 "T2"
-        WHITESPACE@5572..5573 " "
-        IMPLEMENTS_CLAUSE@5573..5585
-          IMPLEMENTS_KW@5573..5583 "implements"
-          WHITESPACE@5583..5584 " "
-          QUAL_IDENT@5584..5585
-            IDENT@5584..5585 "I"
-        WHITESPACE@5585..5586 " "
-        TOPOLOGY_MEMBER_LIST@5586..5588
-          LEFT_CURLY@5586..5587 "{"
-          RIGHT_CURLY@5587..5588 "}"
-      EOL@5588..5589 "\n"
-      WHITESPACE@5589..5591 "  "
-      POST_ANNOTATION@5591..5633 "@< Topology definitio ..."
-      EOL@5633..5635 "\n\n"
-      WHITESPACE@5635..5637 "  "
-      PRE_ANNOTATION@5637..5678 "@ Topology definition ..."
-      EOL@5678..5679 "\n"
-      WHITESPACE@5679..5681 "  "
-      DEF_TOPOLOGY@5681..5711
-        TOPOLOGY_KW@5681..5689 "topology"
-        WHITESPACE@5689..5690 " "
-        NAME@5690..5692
-          IDENT@5690..5692 "T3"
-        WHITESPACE@5692..5693 " "
-        IMPLEMENTS_CLAUSE@5693..5708
-          IMPLEMENTS_KW@5693..5703 "implements"
-          WHITESPACE@5703..5704 " "
-          QUAL_IDENT@5704..5705
-            IDENT@5704..5705 "I"
-          COMMA@5705..5706 ","
-          WHITESPACE@5706..5707 " "
-          QUAL_IDENT@5707..5708
-            IDENT@5707..5708 "I"
-        WHITESPACE@5708..5709 " "
-        TOPOLOGY_MEMBER_LIST@5709..5711
-          LEFT_CURLY@5709..5710 "{"
-          RIGHT_CURLY@5710..5711 "}"
-      EOL@5711..5712 "\n"
-      WHITESPACE@5712..5714 "  "
-      POST_ANNOTATION@5714..5756 "@< Topology definitio ..."
-      EOL@5756..5758 "\n\n"
-      WHITESPACE@5758..5760 "  "
-      PRE_ANNOTATION@5760..5779 "@ System definition"
-      EOL@5779..5780 "\n"
-      WHITESPACE@5780..5782 "  "
-      DEF_SYSTEM@5782..5795
-        SYSTEM_KW@5782..5788 "system"
-        WHITESPACE@5788..5789 " "
-        NAME@5789..5790
-          IDENT@5789..5790 "S"
-        COLON@5790..5791 ":"
-        WHITESPACE@5791..5792 " "
-        QUAL_IDENT@5792..5795
-          IDENT@5792..5793 "M"
-          DOT@5793..5794 "."
-          IDENT@5794..5795 "T"
-      EOL@5795..5796 "\n"
-      WHITESPACE@5796..5798 "  "
-      POST_ANNOTATION@5798..5818 "@< System definition"
-      EOL@5818..5820 "\n\n"
-      WHITESPACE@5820..5822 "  "
-      PRE_ANNOTATION@5822..5876 "@ System definition w ..."
-      EOL@5876..5877 "\n"
-      WHITESPACE@5877..5879 "  "
-      DEF_SYSTEM@5879..5896
-        SYSTEM_KW@5879..5885 "system"
-        WHITESPACE@5885..5886 " "
-        NAME@5886..5890
-          IDENT@5886..5890 "SAbs"
-        COLON@5890..5891 ":"
-        WHITESPACE@5891..5892 " "
-        QUAL_IDENT@5892..5896
-          DOT@5892..5893 "."
-          IDENT@5893..5894 "M"
-          DOT@5894..5895 "."
-          IDENT@5895..5896 "T"
-      EOL@5896..5897 "\n"
-      WHITESPACE@5897..5899 "  "
-      POST_ANNOTATION@5899..5954 "@< System definition  ..."
-      EOL@5954..5956 "\n\n"
-      WHITESPACE@5956..5958 "  "
-      PRE_ANNOTATION@5958..5978 "@ Location specifier"
-      EOL@5978..5979 "\n"
-      WHITESPACE@5979..5981 "  "
-      SPEC_LOC@5981..6017
-        LOCATE_KW@5981..5987 "locate"
-        WHITESPACE@5987..5988 " "
-        INSTANCE_KW@5988..5996 "instance"
-        WHITESPACE@5996..5997 " "
-        QUAL_IDENT@5997..5998
-          IDENT@5997..5998 "i"
-        WHITESPACE@5998..5999 " "
-        AT_KW@5999..6001 "at"
-        WHITESPACE@6001..6002 " "
-        LITERAL_STRING@6002..6017 "\"instances.fpp\""
-      EOL@6017..6018 "\n"
-      WHITESPACE@6018..6020 "  "
-      POST_ANNOTATION@6020..6041 "@< Location specifier"
-      EOL@6041..6043 "\n\n"
-      WHITESPACE@6043..6045 "  "
-      PRE_ANNOTATION@6045..6100 "@ Location specifier  ..."
-      EOL@6100..6101 "\n"
-      WHITESPACE@6101..6103 "  "
-      SPEC_LOC@6103..6140
-        LOCATE_KW@6103..6109 "locate"
-        WHITESPACE@6109..6110 " "
-        INSTANCE_KW@6110..6118 "instance"
-        WHITESPACE@6118..6119 " "
-        QUAL_IDENT@6119..6121
-          DOT@6119..6120 "."
-          IDENT@6120..6121 "i"
-        WHITESPACE@6121..6122 " "
-        AT_KW@6122..6124 "at"
-        WHITESPACE@6124..6125 " "
-        LITERAL_STRING@6125..6140 "\"instances.fpp\""
-      EOL@6140..6141 "\n"
-      WHITESPACE@6141..6143 "  "
-      POST_ANNOTATION@6143..6199 "@< Location specifier ..."
-      EOL@6199..6201 "\n\n"
-      WHITESPACE@6201..6203 "  "
-      PRE_ANNOTATION@6203..6230 "@ System location spe ..."
-      EOL@6230..6231 "\n"
-      WHITESPACE@6231..6233 "  "
-      SPEC_LOC@6233..6264
-        LOCATE_KW@6233..6239 "locate"
-        WHITESPACE@6239..6240 " "
-        SYSTEM_KW@6240..6246 "system"
-        WHITESPACE@6246..6247 " "
-        QUAL_IDENT@6247..6248
-          IDENT@6247..6248 "S"
-        WHITESPACE@6248..6249 " "
-        AT_KW@6249..6251 "at"
-        WHITESPACE@6251..6252 " "
-        LITERAL_STRING@6252..6264 "\"system.fpp\""
-      EOL@6264..6265 "\n"
-      WHITESPACE@6265..6267 "  "
-      POST_ANNOTATION@6267..6295 "@< System location sp ..."
-      EOL@6295..6297 "\n\n"
-      RIGHT_CURLY@6297..6298 "}"
-  EOL@6298..6299 "\n"
-  POST_ANNOTATION@6299..6328 "@< Definitions and sp ..."
-  EOL@6328..6330 "\n\n"
-  PRE_ANNOTATION@6330..6342 "@ Type names"
-  EOL@6342..6343 "\n"
-  DEF_MODULE@6343..6581
-    MODULE_KW@6343..6349 "module"
-    WHITESPACE@6349..6350 " "
-    NAME@6350..6359
-      IDENT@6350..6359 "TypeNames"
-    WHITESPACE@6359..6360 " "
-    MODULE_MEMBER_LIST@6360..6581
-      LEFT_CURLY@6360..6361 "{"
-      EOL@6361..6363 "\n\n"
-      WHITESPACE@6363..6365 "  "
-      DEF_ARRAY@6365..6393
-        ARRAY_KW@6365..6370 "array"
-        WHITESPACE@6370..6371 " "
-        NAME@6371..6382
-          IDENT@6371..6382 "typeNameU32"
-        WHITESPACE@6382..6383 " "
-        EQUALS@6383..6384 "="
-        WHITESPACE@6384..6385 " "
-        INDEX_OR_SIZE@6385..6389
-          LEFT_SQUARE@6385..6386 "["
-          EXPR@6386..6388
-            EXPR_LITERAL@6386..6388
-              LITERAL_INT@6386..6388 "10"
-          RIGHT_SQUARE@6388..6389 "]"
-        WHITESPACE@6389..6390 " "
-        TYPE_NAME@6390..6393
-          U32_KW@6390..6393 "U32"
-      EOL@6393..6394 "\n"
-      WHITESPACE@6394..6396 "  "
-      DEF_ARRAY@6396..6424
-        ARRAY_KW@6396..6401 "array"
-        WHITESPACE@6401..6402 " "
-        NAME@6402..6413
-          IDENT@6402..6413 "typeNameF32"
-        WHITESPACE@6413..6414 " "
-        EQUALS@6414..6415 "="
-        WHITESPACE@6415..6416 " "
-        INDEX_OR_SIZE@6416..6420
-          LEFT_SQUARE@6416..6417 "["
-          EXPR@6417..6419
-            EXPR_LITERAL@6417..6419
-              LITERAL_INT@6417..6419 "10"
-          RIGHT_SQUARE@6419..6420 "]"
-        WHITESPACE@6420..6421 " "
-        TYPE_NAME@6421..6424
-          F32_KW@6421..6424 "F32"
-      EOL@6424..6425 "\n"
-      WHITESPACE@6425..6427 "  "
-      DEF_ARRAY@6427..6457
-        ARRAY_KW@6427..6432 "array"
-        WHITESPACE@6432..6433 " "
-        NAME@6433..6445
-          IDENT@6433..6445 "typeNameBool"
-        WHITESPACE@6445..6446 " "
-        EQUALS@6446..6447 "="
-        WHITESPACE@6447..6448 " "
-        INDEX_OR_SIZE@6448..6452
-          LEFT_SQUARE@6448..6449 "["
-          EXPR@6449..6451
-            EXPR_LITERAL@6449..6451
-              LITERAL_INT@6449..6451 "10"
-          RIGHT_SQUARE@6451..6452 "]"
-        WHITESPACE@6452..6453 " "
-        TYPE_NAME@6453..6457
-          BOOL_KW@6453..6457 "bool"
-      EOL@6457..6458 "\n"
-      WHITESPACE@6458..6460 "  "
-      DEF_ARRAY@6460..6503
-        ARRAY_KW@6460..6465 "array"
-        WHITESPACE@6465..6466 " "
-        NAME@6466..6480
-          IDENT@6466..6480 "typeNameString"
-        WHITESPACE@6480..6481 " "
-        EQUALS@6481..6482 "="
-        WHITESPACE@6482..6483 " "
-        INDEX_OR_SIZE@6483..6487
-          LEFT_SQUARE@6483..6484 "["
-          EXPR@6484..6486
-            EXPR_LITERAL@6484..6486
-              LITERAL_INT@6484..6486 "10"
-          RIGHT_SQUARE@6486..6487 "]"
-        WHITESPACE@6487..6488 " "
-        TYPE_NAME@6488..6503
-          STRING_KW@6488..6494 "string"
-          WHITESPACE@6494..6495 " "
-          SIZE_KW@6495..6499 "size"
-          WHITESPACE@6499..6500 " "
-          EXPR@6500..6503
-            EXPR_LITERAL@6500..6503
-              LITERAL_INT@6500..6503 "256"
-      EOL@6503..6504 "\n"
-      WHITESPACE@6504..6506 "  "
-      DEF_ARRAY@6506..6536
-        ARRAY_KW@6506..6511 "array"
-        WHITESPACE@6511..6512 " "
-        NAME@6512..6523
-          IDENT@6512..6523 "typeNameQID"
-        WHITESPACE@6523..6524 " "
-        EQUALS@6524..6525 "="
-        WHITESPACE@6525..6526 " "
-        INDEX_OR_SIZE@6526..6530
-          LEFT_SQUARE@6526..6527 "["
-          EXPR@6527..6529
-            EXPR_LITERAL@6527..6529
-              LITERAL_INT@6527..6529 "10"
-          RIGHT_SQUARE@6529..6530 "]"
-        WHITESPACE@6530..6531 " "
-        TYPE_NAME@6531..6536
-          QUAL_IDENT@6531..6536
-            IDENT@6531..6532 "a"
-            DOT@6532..6533 "."
-            IDENT@6533..6534 "b"
-            DOT@6534..6535 "."
-            IDENT@6535..6536 "c"
-      EOL@6536..6537 "\n"
-      WHITESPACE@6537..6539 "  "
-      DEF_ARRAY@6539..6578
-        ARRAY_KW@6539..6544 "array"
-        WHITESPACE@6544..6545 " "
-        NAME@6545..6564
-          IDENT@6545..6564 "typeNameAbsoluteQID"
-        WHITESPACE@6564..6565 " "
-        EQUALS@6565..6566 "="
-        WHITESPACE@6566..6567 " "
-        INDEX_OR_SIZE@6567..6571
-          LEFT_SQUARE@6567..6568 "["
-          EXPR@6568..6570
-            EXPR_LITERAL@6568..6570
-              LITERAL_INT@6568..6570 "10"
-          RIGHT_SQUARE@6570..6571 "]"
-        WHITESPACE@6571..6572 " "
-        TYPE_NAME@6572..6578
-          QUAL_IDENT@6572..6578
-            DOT@6572..6573 "."
-            IDENT@6573..6574 "a"
-            DOT@6574..6575 "."
-            IDENT@6575..6576 "b"
-            DOT@6576..6577 "."
-            IDENT@6577..6578 "c"
-      EOL@6578..6580 "\n\n"
-      RIGHT_CURLY@6580..6581 "}"
-  EOL@6581..6582 "\n"
-  POST_ANNOTATION@6582..6595 "@< Type names"
-  EOL@6595..6597 "\n\n"
-  PRE_ANNOTATION@6597..6610 "@ Expressions"
-  EOL@6610..6611 "\n"
-  DEF_MODULE@6611..8339
-    MODULE_KW@6611..6617 "module"
-    WHITESPACE@6617..6618 " "
-    NAME@6618..6629
-      IDENT@6618..6629 "Expressions"
-    WHITESPACE@6629..6630 " "
-    MODULE_MEMBER_LIST@6630..8339
-      LEFT_CURLY@6630..6631 "{"
-      EOL@6631..6633 "\n\n"
-      WHITESPACE@6633..6635 "  "
-      PRE_ANNOTATION@6635..6647 "@ Arithmetic"
-      EOL@6647..6648 "\n"
-      WHITESPACE@6648..6650 "  "
-      DEF_CONSTANT@6650..6692
-        CONSTANT_KW@6650..6658 "constant"
-        WHITESPACE@6658..6659 " "
-        NAME@6659..6667
-          IDENT@6659..6667 "arithExp"
-        WHITESPACE@6667..6668 " "
-        EQUALS@6668..6669 "="
-        WHITESPACE@6669..6670 " "
-        EXPR@6670..6692
-          EXPR_BINARY@6670..6692
-            EXPR_BINARY@6670..6688
-              EXPR_BINARY@6670..6679
-                EXPR_LITERAL@6670..6671
-                  LITERAL_INT@6670..6671 "1"
-                WHITESPACE@6671..6672 " "
-                BINARY_OP@6672..6674
-                  PLUS@6672..6673 "+"
-                  WHITESPACE@6673..6674 " "
-                EXPR_BINARY@6674..6679
-                  EXPR_LITERAL@6674..6675
-                    LITERAL_INT@6674..6675 "2"
-                  WHITESPACE@6675..6676 " "
-                  BINARY_OP@6676..6678
-                    STAR@6676..6677 "*"
-                    WHITESPACE@6677..6678 " "
-                  EXPR_LITERAL@6678..6679
-                    LITERAL_INT@6678..6679 "3"
-              WHITESPACE@6679..6680 " "
-              BINARY_OP@6680..6682
-                MINUS@6680..6681 "-"
-                WHITESPACE@6681..6682 " "
-              EXPR_BINARY@6682..6688
-                EXPR_UNARY@6682..6684
-                  MINUS@6682..6683 "-"
-                  EXPR_LITERAL@6683..6684
-                    LITERAL_INT@6683..6684 "4"
-                WHITESPACE@6684..6685 " "
-                BINARY_OP@6685..6687
-                  STAR@6685..6686 "*"
-                  WHITESPACE@6686..6687 " "
-                EXPR_LITERAL@6687..6688
-                  LITERAL_INT@6687..6688 "5"
-            WHITESPACE@6688..6689 " "
-            BINARY_OP@6689..6691
-              PLUS@6689..6690 "+"
-              WHITESPACE@6690..6691 " "
-            EXPR_LITERAL@6691..6692
-              LITERAL_INT@6691..6692 "6"
-      EOL@6692..6693 "\n"
-      WHITESPACE@6693..6695 "  "
-      POST_ANNOTATION@6695..6708 "@< Arithmetic"
-      EOL@6708..6710 "\n\n"
-      WHITESPACE@6710..6712 "  "
-      PRE_ANNOTATION@6712..6719 "@ Shift"
-      EOL@6719..6720 "\n"
-      WHITESPACE@6720..6722 "  "
-      DEF_CONSTANT@6722..6757
-        CONSTANT_KW@6722..6730 "constant"
-        WHITESPACE@6730..6731 " "
-        NAME@6731..6739
-          IDENT@6731..6739 "shiftExp"
-        WHITESPACE@6739..6740 " "
-        EQUALS@6740..6741 "="
-        WHITESPACE@6741..6742 " "
-        EXPR@6742..6757
-          EXPR_BINARY@6742..6757
-            EXPR_BINARY@6742..6752
-              EXPR_BINARY@6742..6747
-                EXPR_LITERAL@6742..6743
-                  LITERAL_INT@6742..6743 "1"
-                WHITESPACE@6743..6744 " "
-                BINARY_OP@6744..6746
-                  PLUS@6744..6745 "+"
-                  WHITESPACE@6745..6746 " "
-                EXPR_LITERAL@6746..6747
-                  LITERAL_INT@6746..6747 "2"
-              WHITESPACE@6747..6748 " "
-              BINARY_OP@6748..6750
-                SHIFT_LEFT@6748..6750 "<<"
-              WHITESPACE@6750..6751 " "
-              EXPR_LITERAL@6751..6752
-                LITERAL_INT@6751..6752 "3"
-            WHITESPACE@6752..6753 " "
-            BINARY_OP@6753..6755
-              SHIFT_RIGHT@6753..6755 ">>"
-            WHITESPACE@6755..6756 " "
-            EXPR_LITERAL@6756..6757
-              LITERAL_INT@6756..6757 "1"
-      EOL@6757..6758 "\n"
-      WHITESPACE@6758..6760 "  "
-      POST_ANNOTATION@6760..6768 "@< Shift"
-      EOL@6768..6770 "\n\n"
-      WHITESPACE@6770..6772 "  "
-      PRE_ANNOTATION@6772..6779 "@ Array"
-      EOL@6779..6780 "\n"
-      WHITESPACE@6780..6782 "  "
-      DEF_CONSTANT@6782..6813
-        CONSTANT_KW@6782..6790 "constant"
-        WHITESPACE@6790..6791 " "
-        NAME@6791..6799
-          IDENT@6791..6799 "arrayExp"
-        WHITESPACE@6799..6800 " "
-        EQUALS@6800..6801 "="
+          PRE_ANNOTATION@4053..4078 "@ Type template param ..."
+          EOL@4078..4079 "\n"
+          WHITESPACE@4079..4083 "    "
+          TEMPLATE_PARAM@4083..4090
+            TYPE_KW@4083..4087 "type"
+            WHITESPACE@4087..4088 " "
+            NAME@4088..4090
+              IDENT@4088..4090 "Ty"
+          EOL@4090..4091 "\n"
+          WHITESPACE@4091..4095 "    "
+          POST_ANNOTATION@4095..4121 "@< Type template para ..."
+          EOL@4121..4122 "\n"
+          WHITESPACE@4122..4126 "    "
+          PRE_ANNOTATION@4126..4165 "@ Interface instance  ..."
+          EOL@4165..4166 "\n"
+          WHITESPACE@4166..4170 "    "
+          TEMPLATE_PARAM@4170..4183
+            INSTANCE_KW@4170..4178 "instance"
+            WHITESPACE@4178..4179 " "
+            NAME@4179..4180
+              IDENT@4179..4180 "i"
+            COLON@4180..4181 ":"
+            WHITESPACE@4181..4182 " "
+            QUAL_IDENT@4182..4183
+              IDENT@4182..4183 "I"
+          EOL@4183..4184 "\n"
+          WHITESPACE@4184..4188 "    "
+          POST_ANNOTATION@4188..4228 "@< Interface instance ..."
+          EOL@4228..4229 "\n"
+          WHITESPACE@4229..4231 "  "
+          RIGHT_PAREN@4231..4232 ")"
+        WHITESPACE@4232..4233 " "
+        MODULE_MEMBER_LIST@4233..4259
+          LEFT_CURLY@4233..4234 "{"
+          EOL@4234..4236 "\n\n"
+          WHITESPACE@4236..4240 "    "
+          DEF_CONSTANT@4240..4254
+            CONSTANT_KW@4240..4248 "constant"
+            WHITESPACE@4248..4249 " "
+            NAME@4249..4250
+              IDENT@4249..4250 "a"
+            WHITESPACE@4250..4251 " "
+            EQUALS@4251..4252 "="
+            WHITESPACE@4252..4253 " "
+            EXPR@4253..4254
+              EXPR_IDENT@4253..4254
+                IDENT@4253..4254 "c"
+          EOL@4254..4256 "\n\n"
+          WHITESPACE@4256..4258 "  "
+          RIGHT_CURLY@4258..4259 "}"
+      EOL@4259..4260 "\n"
+      WHITESPACE@4260..4262 "  "
+      POST_ANNOTATION@4262..4291 "@< Module template de ..."
+      EOL@4291..4293 "\n\n"
+      WHITESPACE@4293..4295 "  "
+      PRE_ANNOTATION@4295..4336 "@ Unexpanded template ..."
+      EOL@4336..4337 "\n"
+      WHITESPACE@4337..4339 "  "
+      SPEC_TEMPLATE_EXPAND@4339..4383
+        EXPAND_KW@4339..4345 "expand"
+        WHITESPACE@4345..4346 " "
+        QUAL_IDENT@4346..4348
+          IDENT@4346..4348 "MT"
+        TEMPLATE_ARG_LIST@4348..4383
+          LEFT_PAREN@4348..4349 "("
+          TEMPLATE_ARG@4349..4359
+            CONSTANT_KW@4349..4357 "constant"
+            WHITESPACE@4357..4358 " "
+            EXPR@4358..4359
+              EXPR_LITERAL@4358..4359
+                LITERAL_INT@4358..4359 "0"
+          COMMA@4359..4360 ","
+          WHITESPACE@4360..4361 " "
+          TEMPLATE_ARG@4361..4369
+            TYPE_KW@4361..4365 "type"
+            WHITESPACE@4365..4366 " "
+            TYPE_NAME@4366..4369
+              U32_KW@4366..4369 "U32"
+          COMMA@4369..4370 ","
+          WHITESPACE@4370..4371 " "
+          TEMPLATE_ARG@4371..4382
+            INSTANCE_KW@4371..4379 "instance"
+            WHITESPACE@4379..4380 " "
+            QUAL_IDENT@4380..4382
+              IDENT@4380..4382 "i1"
+          RIGHT_PAREN@4382..4383 ")"
+      EOL@4383..4384 "\n"
+      WHITESPACE@4384..4386 "  "
+      POST_ANNOTATION@4386..4428 "@< Unexpanded templat ..."
+      EOL@4428..4430 "\n\n"
+      WHITESPACE@4430..4432 "  "
+      PRE_ANNOTATION@4432..4471 "@ Expanded template e ..."
+      EOL@4471..4472 "\n"
+      WHITESPACE@4472..4474 "  "
+      SPEC_TEMPLATE_EXPAND@4474..4545
+        EXPAND_KW@4474..4480 "expand"
+        WHITESPACE@4480..4481 " "
+        QUAL_IDENT@4481..4483
+          IDENT@4481..4483 "MT"
+        TEMPLATE_ARG_LIST@4483..4518
+          LEFT_PAREN@4483..4484 "("
+          TEMPLATE_ARG@4484..4494
+            CONSTANT_KW@4484..4492 "constant"
+            WHITESPACE@4492..4493 " "
+            EXPR@4493..4494
+              EXPR_LITERAL@4493..4494
+                LITERAL_INT@4493..4494 "0"
+          COMMA@4494..4495 ","
+          WHITESPACE@4495..4496 " "
+          TEMPLATE_ARG@4496..4504
+            TYPE_KW@4496..4500 "type"
+            WHITESPACE@4500..4501 " "
+            TYPE_NAME@4501..4504
+              U32_KW@4501..4504 "U32"
+          COMMA@4504..4505 ","
+          WHITESPACE@4505..4506 " "
+          TEMPLATE_ARG@4506..4517
+            INSTANCE_KW@4506..4514 "instance"
+            WHITESPACE@4514..4515 " "
+            QUAL_IDENT@4515..4517
+              IDENT@4515..4517 "i1"
+          RIGHT_PAREN@4517..4518 ")"
+        WHITESPACE@4518..4519 " "
+        MODULE_MEMBER_LIST@4519..4545
+          LEFT_CURLY@4519..4520 "{"
+          EOL@4520..4522 "\n\n"
+          WHITESPACE@4522..4526 "    "
+          DEF_CONSTANT@4526..4540
+            CONSTANT_KW@4526..4534 "constant"
+            WHITESPACE@4534..4535 " "
+            NAME@4535..4536
+              IDENT@4535..4536 "b"
+            WHITESPACE@4536..4537 " "
+            EQUALS@4537..4538 "="
+            WHITESPACE@4538..4539 " "
+            EXPR@4539..4540
+              EXPR_LITERAL@4539..4540
+                LITERAL_INT@4539..4540 "0"
+          EOL@4540..4542 "\n\n"
+          WHITESPACE@4542..4544 "  "
+          RIGHT_CURLY@4544..4545 "}"
+      EOL@4545..4546 "\n"
+      WHITESPACE@4546..4548 "  "
+      POST_ANNOTATION@4548..4588 "@< Expanded template  ..."
+      EOL@4588..4590 "\n\n"
+      WHITESPACE@4590..4592 "  "
+      PRE_ANNOTATION@4592..4609 "@ Port definition"
+      EOL@4609..4610 "\n"
+      WHITESPACE@4610..4612 "  "
+      DEF_PORT@4612..4641
+        PORT_KW@4612..4616 "port"
+        WHITESPACE@4616..4617 " "
+        NAME@4617..4618
+          IDENT@4617..4618 "P"
+        FORMAL_PARAM_LIST@4618..4634
+          LEFT_PAREN@4618..4619 "("
+          FORMAL_PARAM@4619..4625
+            NAME@4619..4620
+              IDENT@4619..4620 "a"
+            COLON@4620..4621 ":"
+            WHITESPACE@4621..4622 " "
+            TYPE_NAME@4622..4625
+              U32_KW@4622..4625 "U32"
+          COMMA@4625..4626 ","
+          WHITESPACE@4626..4627 " "
+          FORMAL_PARAM@4627..4633
+            NAME@4627..4628
+              IDENT@4627..4628 "b"
+            COLON@4628..4629 ":"
+            WHITESPACE@4629..4630 " "
+            TYPE_NAME@4630..4633
+              F32_KW@4630..4633 "F32"
+          RIGHT_PAREN@4633..4634 ")"
+        WHITESPACE@4634..4635 " "
+        RIGHT_ARROW@4635..4637 "->"
+        WHITESPACE@4637..4638 " "
+        TYPE_NAME@4638..4641
+          U32_KW@4638..4641 "U32"
+      EOL@4641..4642 "\n"
+      WHITESPACE@4642..4644 "  "
+      POST_ANNOTATION@4644..4662 "@< Port definition"
+      EOL@4662..4664 "\n\n"
+      WHITESPACE@4664..4666 "  "
+      PRE_ANNOTATION@4666..4685 "@ Struct definition"
+      EOL@4685..4686 "\n"
+      WHITESPACE@4686..4688 "  "
+      DEF_STRUCT@4688..4788
+        STRUCT_KW@4688..4694 "struct"
+        WHITESPACE@4694..4695 " "
+        NAME@4695..4696
+          IDENT@4695..4696 "S"
+        WHITESPACE@4696..4697 " "
+        STRUCT_MEMBER_LIST@4697..4788
+          LEFT_CURLY@4697..4698 "{"
+          EOL@4698..4699 "\n"
+          WHITESPACE@4699..4703 "    "
+          PRE_ANNOTATION@4703..4706 "@ x"
+          EOL@4706..4707 "\n"
+          WHITESPACE@4707..4711 "    "
+          STRUCT_MEMBER@4711..4731
+            NAME@4711..4712
+              IDENT@4711..4712 "x"
+            COLON@4712..4713 ":"
+            WHITESPACE@4713..4714 " "
+            TYPE_NAME@4714..4717
+              U32_KW@4714..4717 "U32"
+            WHITESPACE@4717..4718 " "
+            FORMAT@4718..4731
+              FORMAT_KW@4718..4724 "format"
+              WHITESPACE@4724..4725 " "
+              LITERAL_STRING@4725..4731 "\"{} s\""
+          EOL@4731..4732 "\n"
+          WHITESPACE@4732..4736 "    "
+          POST_ANNOTATION@4736..4740 "@< x"
+          EOL@4740..4741 "\n"
+          WHITESPACE@4741..4745 "    "
+          PRE_ANNOTATION@4745..4748 "@ y"
+          EOL@4748..4749 "\n"
+          WHITESPACE@4749..4753 "    "
+          STRUCT_MEMBER@4753..4775
+            NAME@4753..4754
+              IDENT@4753..4754 "y"
+            COLON@4754..4755 ":"
+            WHITESPACE@4755..4756 " "
+            TYPE_NAME@4756..4759
+              F32_KW@4756..4759 "F32"
+            WHITESPACE@4759..4760 " "
+            FORMAT@4760..4775
+              FORMAT_KW@4760..4766 "format"
+              WHITESPACE@4766..4767 " "
+              LITERAL_STRING@4767..4775 "\"{} m/s\""
+          EOL@4775..4776 "\n"
+          WHITESPACE@4776..4780 "    "
+          POST_ANNOTATION@4780..4784 "@< y"
+          EOL@4784..4785 "\n"
+          WHITESPACE@4785..4787 "  "
+          RIGHT_CURLY@4787..4788 "}"
+      EOL@4788..4789 "\n"
+      WHITESPACE@4789..4791 "  "
+      POST_ANNOTATION@4791..4811 "@< Struct definition"
+      EOL@4811..4813 "\n\n"
+      WHITESPACE@4813..4815 "  "
+      PRE_ANNOTATION@4815..4836 "@ Topology definition"
+      EOL@4836..4837 "\n"
+      WHITESPACE@4837..4839 "  "
+      DEF_TOPOLOGY@4839..6093
+        TOPOLOGY_KW@4839..4847 "topology"
+        WHITESPACE@4847..4848 " "
+        NAME@4848..4849
+          IDENT@4848..4849 "T"
+        WHITESPACE@4849..4850 " "
+        TOPOLOGY_MEMBER_LIST@4850..6093
+          LEFT_CURLY@4850..4851 "{"
+          EOL@4851..4853 "\n\n"
+          WHITESPACE@4853..4857 "    "
+          PRE_ANNOTATION@4857..4884 "@ Public instance spe ..."
+          EOL@4884..4885 "\n"
+          WHITESPACE@4885..4889 "    "
+          SPEC_INSTANCE@4889..4900
+            INSTANCE_KW@4889..4897 "instance"
+            WHITESPACE@4897..4898 " "
+            QUAL_IDENT@4898..4900
+              IDENT@4898..4900 "i1"
+          EOL@4900..4901 "\n"
+          WHITESPACE@4901..4905 "    "
+          POST_ANNOTATION@4905..4933 "@< Public instance sp ..."
+          EOL@4933..4935 "\n\n"
+          WHITESPACE@4935..4939 "    "
+          PRE_ANNOTATION@4939..5001 "@ Public instance spe ..."
+          EOL@5001..5002 "\n"
+          WHITESPACE@5002..5006 "    "
+          SPEC_INSTANCE@5006..5021
+            INSTANCE_KW@5006..5014 "instance"
+            WHITESPACE@5014..5015 " "
+            QUAL_IDENT@5015..5021
+              DOT@5015..5016 "."
+              IDENT@5016..5021 "i1Abs"
+          EOL@5021..5022 "\n"
+          WHITESPACE@5022..5026 "    "
+          POST_ANNOTATION@5026..5089 "@< Public instance sp ..."
+          EOL@5089..5091 "\n\n"
+          WHITESPACE@5091..5095 "    "
+          PRE_ANNOTATION@5095..5130 "@ Direct connection g ..."
+          EOL@5130..5131 "\n"
+          WHITESPACE@5131..5135 "    "
+          SPEC_CONNECTION_GRAPH_DIRECT@5135..5272
+            CONNECTIONS_KW@5135..5146 "connections"
+            WHITESPACE@5146..5147 " "
+            NAME@5147..5148
+              IDENT@5147..5148 "C"
+            WHITESPACE@5148..5149 " "
+            CONNECTION_MEMBER_LIST@5149..5272
+              LEFT_CURLY@5149..5150 "{"
+              EOL@5150..5151 "\n"
+              WHITESPACE@5151..5157 "      "
+              CONNECTION@5157..5175
+                CONNECTION_FROM@5157..5164
+                  PORT_INSTANCE_IDENTIFIER@5157..5161
+                    IDENT@5157..5159 "i1"
+                    DOT@5159..5160 "."
+                    IDENT@5160..5161 "p"
+                  INDEX_OR_SIZE@5161..5164
+                    LEFT_SQUARE@5161..5162 "["
+                    EXPR@5162..5163
+                      EXPR_LITERAL@5162..5163
+                        LITERAL_INT@5162..5163 "0"
+                    RIGHT_SQUARE@5163..5164 "]"
+                WHITESPACE@5164..5165 " "
+                RIGHT_ARROW@5165..5167 "->"
+                WHITESPACE@5167..5168 " "
+                CONNECTION_TO@5168..5175
+                  PORT_INSTANCE_IDENTIFIER@5168..5172
+                    IDENT@5168..5170 "i2"
+                    DOT@5170..5171 "."
+                    IDENT@5171..5172 "p"
+                  INDEX_OR_SIZE@5172..5175
+                    LEFT_SQUARE@5172..5173 "["
+                    EXPR@5173..5174
+                      EXPR_LITERAL@5173..5174
+                        LITERAL_INT@5173..5174 "1"
+                    RIGHT_SQUARE@5174..5175 "]"
+              EOL@5175..5176 "\n"
+              WHITESPACE@5176..5182 "      "
+              CONNECTION@5182..5212
+                UNMATCHED_KW@5182..5191 "unmatched"
+                WHITESPACE@5191..5192 " "
+                CONNECTION_FROM@5192..5200
+                  PORT_INSTANCE_IDENTIFIER@5192..5197
+                    IDENT@5192..5194 "i1"
+                    DOT@5194..5195 "."
+                    IDENT@5195..5197 "p1"
+                  INDEX_OR_SIZE@5197..5200
+                    LEFT_SQUARE@5197..5198 "["
+                    EXPR@5198..5199
+                      EXPR_LITERAL@5198..5199
+                        LITERAL_INT@5198..5199 "0"
+                    RIGHT_SQUARE@5199..5200 "]"
+                WHITESPACE@5200..5201 " "
+                RIGHT_ARROW@5201..5203 "->"
+                WHITESPACE@5203..5204 " "
+                CONNECTION_TO@5204..5212
+                  PORT_INSTANCE_IDENTIFIER@5204..5209
+                    IDENT@5204..5206 "i2"
+                    DOT@5206..5207 "."
+                    IDENT@5207..5209 "p2"
+                  INDEX_OR_SIZE@5209..5212
+                    LEFT_SQUARE@5209..5210 "["
+                    EXPR@5210..5211
+                      EXPR_LITERAL@5210..5211
+                        LITERAL_INT@5210..5211 "0"
+                    RIGHT_SQUARE@5211..5212 "]"
+              EOL@5212..5213 "\n"
+              WHITESPACE@5213..5219 "      "
+              CONNECTION@5219..5243
+                UNMATCHED_KW@5219..5228 "unmatched"
+                WHITESPACE@5228..5229 " "
+                CONNECTION_FROM@5229..5234
+                  PORT_INSTANCE_IDENTIFIER@5229..5234
+                    IDENT@5229..5231 "i1"
+                    DOT@5231..5232 "."
+                    IDENT@5232..5234 "p1"
+                WHITESPACE@5234..5235 " "
+                RIGHT_ARROW@5235..5237 "->"
+                WHITESPACE@5237..5238 " "
+                CONNECTION_TO@5238..5243
+                  PORT_INSTANCE_IDENTIFIER@5238..5243
+                    IDENT@5238..5240 "i2"
+                    DOT@5240..5241 "."
+                    IDENT@5241..5243 "p2"
+              EOL@5243..5244 "\n"
+              WHITESPACE@5244..5250 "      "
+              CONNECTION@5250..5266
+                CONNECTION_FROM@5250..5256
+                  PORT_INSTANCE_IDENTIFIER@5250..5256
+                    DOT@5250..5251 "."
+                    IDENT@5251..5253 "i1"
+                    DOT@5253..5254 "."
+                    IDENT@5254..5256 "p3"
+                WHITESPACE@5256..5257 " "
+                RIGHT_ARROW@5257..5259 "->"
+                WHITESPACE@5259..5260 " "
+                CONNECTION_TO@5260..5266
+                  PORT_INSTANCE_IDENTIFIER@5260..5266
+                    DOT@5260..5261 "."
+                    IDENT@5261..5263 "i2"
+                    DOT@5263..5264 "."
+                    IDENT@5264..5266 "p3"
+              EOL@5266..5267 "\n"
+              WHITESPACE@5267..5271 "    "
+              RIGHT_CURLY@5271..5272 "}"
+          EOL@5272..5273 "\n"
+          WHITESPACE@5273..5277 "    "
+          POST_ANNOTATION@5277..5313 "@< Direct connection  ..."
+          EOL@5313..5315 "\n\n"
+          WHITESPACE@5315..5319 "    "
+          PRE_ANNOTATION@5319..5344 "@ Graph pattern speci ..."
+          EOL@5344..5345 "\n"
+          WHITESPACE@5345..5349 "    "
+          SPEC_CONNECTION_GRAPH_PATTERN@5349..5395
+            COMMAND_KW@5349..5356 "command"
+            WHITESPACE@5356..5357 " "
+            CONNECTIONS_KW@5357..5368 "connections"
+            WHITESPACE@5368..5369 " "
+            INSTANCE_KW@5369..5377 "instance"
+            WHITESPACE@5377..5378 " "
+            QUAL_IDENT@5378..5380
+              IDENT@5378..5380 "i1"
+            WHITESPACE@5380..5381 " "
+            PATTERN_TARGET_MEMBER_LIST@5381..5395
+              LEFT_CURLY@5381..5382 "{"
+              WHITESPACE@5382..5383 " "
+              QUAL_IDENT@5383..5385
+                IDENT@5383..5385 "i2"
+              COMMA@5385..5386 ","
+              WHITESPACE@5386..5387 " "
+              QUAL_IDENT@5387..5389
+                IDENT@5387..5389 "i3"
+              COMMA@5389..5390 ","
+              WHITESPACE@5390..5391 " "
+              QUAL_IDENT@5391..5393
+                IDENT@5391..5393 "i4"
+              WHITESPACE@5393..5394 " "
+              RIGHT_CURLY@5394..5395 "}"
+          EOL@5395..5396 "\n"
+          WHITESPACE@5396..5400 "    "
+          POST_ANNOTATION@5400..5426 "@< Graph pattern spec ..."
+          EOL@5426..5428 "\n\n"
+          WHITESPACE@5428..5432 "    "
+          PRE_ANNOTATION@5432..5461 "@ Topology instance s ..."
+          EOL@5461..5462 "\n"
+          WHITESPACE@5462..5466 "    "
+          SPEC_INSTANCE@5466..5475
+            IMPORT_KW@5466..5472 "import"
+            WHITESPACE@5472..5473 " "
+            QUAL_IDENT@5473..5475
+              IDENT@5473..5475 "T1"
+          EOL@5475..5476 "\n"
+          WHITESPACE@5476..5480 "    "
+          POST_ANNOTATION@5480..5510 "@< Topology instance  ..."
+          EOL@5510..5512 "\n\n"
+          WHITESPACE@5512..5516 "    "
+          PRE_ANNOTATION@5516..5540 "@ Telemetry packet group"
+          EOL@5540..5541 "\n"
+          WHITESPACE@5541..5545 "    "
+          TLM_PACKET_SET@5545..5827
+            TELEMETRY_KW@5545..5554 "telemetry"
+            WHITESPACE@5554..5555 " "
+            PACKETS_KW@5555..5562 "packets"
+            WHITESPACE@5562..5563 " "
+            NAME@5563..5564
+              IDENT@5563..5564 "P"
+            WHITESPACE@5564..5565 " "
+            TLM_PACKET_SET_MEMBER_LIST@5565..5789
+              LEFT_CURLY@5565..5566 "{"
+              EOL@5566..5568 "\n\n"
+              WHITESPACE@5568..5574 "      "
+              PRE_ANNOTATION@5574..5592 "@ Telemetry packet"
+              EOL@5592..5593 "\n"
+              WHITESPACE@5593..5599 "      "
+              SPEC_TLM_PACKET@5599..5674
+                PACKET_KW@5599..5605 "packet"
+                WHITESPACE@5605..5606 " "
+                NAME@5606..5608
+                  IDENT@5606..5608 "P1"
+                WHITESPACE@5608..5609 " "
+                ID@5609..5613
+                  ID_KW@5609..5611 "id"
+                  WHITESPACE@5611..5612 " "
+                  EXPR@5612..5613
+                    EXPR_LITERAL@5612..5613
+                      LITERAL_INT@5612..5613 "0"
+                WHITESPACE@5613..5614 " "
+                GROUP@5614..5621
+                  GROUP_KW@5614..5619 "group"
+                  WHITESPACE@5619..5620 " "
+                  EXPR@5620..5621
+                    EXPR_LITERAL@5620..5621
+                      LITERAL_INT@5620..5621 "0"
+                WHITESPACE@5621..5622 " "
+                TLM_PACKET_MEMBER_LIST@5622..5674
+                  LEFT_CURLY@5622..5623 "{"
+                  EOL@5623..5624 "\n"
+                  WHITESPACE@5624..5632 "        "
+                  TLM_CHANNEL_IDENTIFIER@5632..5637
+                    IDENT@5632..5634 "i1"
+                    DOT@5634..5635 "."
+                    IDENT@5635..5637 "c1"
+                  EOL@5637..5638 "\n"
+                  WHITESPACE@5638..5646 "        "
+                  TLM_CHANNEL_IDENTIFIER@5646..5651
+                    IDENT@5646..5648 "i2"
+                    DOT@5648..5649 "."
+                    IDENT@5649..5651 "c2"
+                  EOL@5651..5652 "\n"
+                  WHITESPACE@5652..5660 "        "
+                  TLM_CHANNEL_IDENTIFIER@5660..5666
+                    DOT@5660..5661 "."
+                    IDENT@5661..5663 "i1"
+                    DOT@5663..5664 "."
+                    IDENT@5664..5666 "c3"
+                  EOL@5666..5667 "\n"
+                  WHITESPACE@5667..5673 "      "
+                  RIGHT_CURLY@5673..5674 "}"
+              EOL@5674..5675 "\n"
+              WHITESPACE@5675..5681 "      "
+              POST_ANNOTATION@5681..5700 "@< Telemetry packet"
+              EOL@5700..5702 "\n\n"
+              WHITESPACE@5702..5708 "      "
+              PRE_ANNOTATION@5708..5727 "@ Include specifier"
+              EOL@5727..5728 "\n"
+              WHITESPACE@5728..5734 "      "
+              SPEC_INCLUDE@5734..5755
+                INCLUDE_KW@5734..5741 "include"
+                WHITESPACE@5741..5742 " "
+                LITERAL_STRING@5742..5755 "\"packet.fppi\""
+              EOL@5755..5756 "\n"
+              WHITESPACE@5756..5762 "      "
+              POST_ANNOTATION@5762..5782 "@< Include specifier"
+              EOL@5782..5784 "\n\n"
+              WHITESPACE@5784..5788 "    "
+              RIGHT_CURLY@5788..5789 "}"
+            WHITESPACE@5789..5790 " "
+            TLM_PACKET_OMIT@5790..5827
+              OMIT_KW@5790..5794 "omit"
+              WHITESPACE@5794..5795 " "
+              TLM_PACKET_OMIT_MEMBER_LIST@5795..5827
+                LEFT_CURLY@5795..5796 "{"
+                EOL@5796..5797 "\n"
+                WHITESPACE@5797..5803 "      "
+                TLM_CHANNEL_IDENTIFIER@5803..5808
+                  IDENT@5803..5805 "i3"
+                  DOT@5805..5806 "."
+                  IDENT@5806..5808 "c3"
+                EOL@5808..5809 "\n"
+                WHITESPACE@5809..5815 "      "
+                TLM_CHANNEL_IDENTIFIER@5815..5821
+                  DOT@5815..5816 "."
+                  IDENT@5816..5818 "i3"
+                  DOT@5818..5819 "."
+                  IDENT@5819..5821 "c4"
+                EOL@5821..5822 "\n"
+                WHITESPACE@5822..5826 "    "
+                RIGHT_CURLY@5826..5827 "}"
+          EOL@5827..5828 "\n"
+          WHITESPACE@5828..5832 "    "
+          POST_ANNOTATION@5832..5857 "@< Telemetry packet g ..."
+          EOL@5857..5859 "\n\n"
+          WHITESPACE@5859..5863 "    "
+          PRE_ANNOTATION@5863..5888 "@ Topology port speci ..."
+          EOL@5888..5889 "\n"
+          WHITESPACE@5889..5893 "    "
+          SPEC_TOP_PORT@5893..5905
+            PORT_KW@5893..5897 "port"
+            WHITESPACE@5897..5898 " "
+            NAME@5898..5899
+              IDENT@5898..5899 "a"
+            WHITESPACE@5899..5900 " "
+            EQUALS@5900..5901 "="
+            WHITESPACE@5901..5902 " "
+            PORT_INSTANCE_IDENTIFIER@5902..5905
+              IDENT@5902..5903 "b"
+              DOT@5903..5904 "."
+              IDENT@5904..5905 "a"
+          EOL@5905..5906 "\n"
+          WHITESPACE@5906..5910 "    "
+          POST_ANNOTATION@5910..5936 "@< Topology port spec ..."
+          EOL@5936..5938 "\n\n"
+          WHITESPACE@5938..5942 "    "
+          PRE_ANNOTATION@5942..6002 "@ Topology port speci ..."
+          EOL@6002..6003 "\n"
+          WHITESPACE@6003..6007 "    "
+          SPEC_TOP_PORT@6007..6023
+            PORT_KW@6007..6011 "port"
+            WHITESPACE@6011..6012 " "
+            NAME@6012..6016
+              IDENT@6012..6016 "aAbs"
+            WHITESPACE@6016..6017 " "
+            EQUALS@6017..6018 "="
+            WHITESPACE@6018..6019 " "
+            PORT_INSTANCE_IDENTIFIER@6019..6023
+              DOT@6019..6020 "."
+              IDENT@6020..6021 "b"
+              DOT@6021..6022 "."
+              IDENT@6022..6023 "a"
+          EOL@6023..6024 "\n"
+          WHITESPACE@6024..6028 "    "
+          POST_ANNOTATION@6028..6089 "@< Topology port spec ..."
+          EOL@6089..6090 "\n"
+          WHITESPACE@6090..6092 "  "
+          RIGHT_CURLY@6092..6093 "}"
+      EOL@6093..6094 "\n"
+      WHITESPACE@6094..6096 "  "
+      POST_ANNOTATION@6096..6118 "@< Topology definition"
+      EOL@6118..6120 "\n\n"
+      WHITESPACE@6120..6122 "  "
+      PRE_ANNOTATION@6122..6143 "@ Deployment topology"
+      EOL@6143..6144 "\n"
+      WHITESPACE@6144..6146 "  "
+      DEF_TOPOLOGY@6146..6171
+        DEPLOYMENT_KW@6146..6156 "deployment"
+        WHITESPACE@6156..6157 " "
+        TOPOLOGY_KW@6157..6165 "topology"
+        WHITESPACE@6165..6166 " "
+        NAME@6166..6168
+          IDENT@6166..6168 "T1"
+        WHITESPACE@6168..6169 " "
+        TOPOLOGY_MEMBER_LIST@6169..6171
+          LEFT_CURLY@6169..6170 "{"
+          RIGHT_CURLY@6170..6171 "}"
+      EOL@6171..6172 "\n"
+      WHITESPACE@6172..6174 "  "
+      POST_ANNOTATION@6174..6196 "@< Deployment topology"
+      EOL@6196..6198 "\n\n"
+      WHITESPACE@6198..6200 "  "
+      PRE_ANNOTATION@6200..6241 "@ Topology definition ..."
+      EOL@6241..6242 "\n"
+      WHITESPACE@6242..6244 "  "
+      DEF_TOPOLOGY@6244..6271
+        TOPOLOGY_KW@6244..6252 "topology"
+        WHITESPACE@6252..6253 " "
+        NAME@6253..6255
+          IDENT@6253..6255 "T2"
+        WHITESPACE@6255..6256 " "
+        IMPLEMENTS_CLAUSE@6256..6268
+          IMPLEMENTS_KW@6256..6266 "implements"
+          WHITESPACE@6266..6267 " "
+          QUAL_IDENT@6267..6268
+            IDENT@6267..6268 "I"
+        WHITESPACE@6268..6269 " "
+        TOPOLOGY_MEMBER_LIST@6269..6271
+          LEFT_CURLY@6269..6270 "{"
+          RIGHT_CURLY@6270..6271 "}"
+      EOL@6271..6272 "\n"
+      WHITESPACE@6272..6274 "  "
+      POST_ANNOTATION@6274..6316 "@< Topology definitio ..."
+      EOL@6316..6318 "\n\n"
+      WHITESPACE@6318..6320 "  "
+      PRE_ANNOTATION@6320..6361 "@ Topology definition ..."
+      EOL@6361..6362 "\n"
+      WHITESPACE@6362..6364 "  "
+      DEF_TOPOLOGY@6364..6394
+        TOPOLOGY_KW@6364..6372 "topology"
+        WHITESPACE@6372..6373 " "
+        NAME@6373..6375
+          IDENT@6373..6375 "T3"
+        WHITESPACE@6375..6376 " "
+        IMPLEMENTS_CLAUSE@6376..6391
+          IMPLEMENTS_KW@6376..6386 "implements"
+          WHITESPACE@6386..6387 " "
+          QUAL_IDENT@6387..6388
+            IDENT@6387..6388 "I"
+          COMMA@6388..6389 ","
+          WHITESPACE@6389..6390 " "
+          QUAL_IDENT@6390..6391
+            IDENT@6390..6391 "I"
+        WHITESPACE@6391..6392 " "
+        TOPOLOGY_MEMBER_LIST@6392..6394
+          LEFT_CURLY@6392..6393 "{"
+          RIGHT_CURLY@6393..6394 "}"
+      EOL@6394..6395 "\n"
+      WHITESPACE@6395..6397 "  "
+      POST_ANNOTATION@6397..6439 "@< Topology definitio ..."
+      EOL@6439..6441 "\n\n"
+      WHITESPACE@6441..6443 "  "
+      PRE_ANNOTATION@6443..6462 "@ System definition"
+      EOL@6462..6463 "\n"
+      WHITESPACE@6463..6465 "  "
+      DEF_SYSTEM@6465..6478
+        SYSTEM_KW@6465..6471 "system"
+        WHITESPACE@6471..6472 " "
+        NAME@6472..6473
+          IDENT@6472..6473 "S"
+        COLON@6473..6474 ":"
+        WHITESPACE@6474..6475 " "
+        QUAL_IDENT@6475..6478
+          IDENT@6475..6476 "M"
+          DOT@6476..6477 "."
+          IDENT@6477..6478 "T"
+      EOL@6478..6479 "\n"
+      WHITESPACE@6479..6481 "  "
+      POST_ANNOTATION@6481..6501 "@< System definition"
+      EOL@6501..6503 "\n\n"
+      WHITESPACE@6503..6505 "  "
+      PRE_ANNOTATION@6505..6559 "@ System definition w ..."
+      EOL@6559..6560 "\n"
+      WHITESPACE@6560..6562 "  "
+      DEF_SYSTEM@6562..6579
+        SYSTEM_KW@6562..6568 "system"
+        WHITESPACE@6568..6569 " "
+        NAME@6569..6573
+          IDENT@6569..6573 "SAbs"
+        COLON@6573..6574 ":"
+        WHITESPACE@6574..6575 " "
+        QUAL_IDENT@6575..6579
+          DOT@6575..6576 "."
+          IDENT@6576..6577 "M"
+          DOT@6577..6578 "."
+          IDENT@6578..6579 "T"
+      EOL@6579..6580 "\n"
+      WHITESPACE@6580..6582 "  "
+      POST_ANNOTATION@6582..6637 "@< System definition  ..."
+      EOL@6637..6639 "\n\n"
+      WHITESPACE@6639..6641 "  "
+      PRE_ANNOTATION@6641..6661 "@ Location specifier"
+      EOL@6661..6662 "\n"
+      WHITESPACE@6662..6664 "  "
+      SPEC_LOC@6664..6700
+        LOCATE_KW@6664..6670 "locate"
+        WHITESPACE@6670..6671 " "
+        INSTANCE_KW@6671..6679 "instance"
+        WHITESPACE@6679..6680 " "
+        QUAL_IDENT@6680..6681
+          IDENT@6680..6681 "i"
+        WHITESPACE@6681..6682 " "
+        AT_KW@6682..6684 "at"
+        WHITESPACE@6684..6685 " "
+        LITERAL_STRING@6685..6700 "\"instances.fpp\""
+      EOL@6700..6701 "\n"
+      WHITESPACE@6701..6703 "  "
+      POST_ANNOTATION@6703..6724 "@< Location specifier"
+      EOL@6724..6726 "\n\n"
+      WHITESPACE@6726..6728 "  "
+      PRE_ANNOTATION@6728..6783 "@ Location specifier  ..."
+      EOL@6783..6784 "\n"
+      WHITESPACE@6784..6786 "  "
+      SPEC_LOC@6786..6823
+        LOCATE_KW@6786..6792 "locate"
+        WHITESPACE@6792..6793 " "
+        INSTANCE_KW@6793..6801 "instance"
         WHITESPACE@6801..6802 " "
-        EXPR@6802..6813
-          EXPR_ARRAY@6802..6813
-            EXPR_ARRAY_MEMBER_LIST@6802..6813
-              LEFT_SQUARE@6802..6803 "["
-              WHITESPACE@6803..6804 " "
-              EXPR@6804..6805
-                EXPR_LITERAL@6804..6805
-                  LITERAL_INT@6804..6805 "1"
-              COMMA@6805..6806 ","
-              WHITESPACE@6806..6807 " "
-              EXPR@6807..6808
-                EXPR_LITERAL@6807..6808
-                  LITERAL_INT@6807..6808 "2"
-              COMMA@6808..6809 ","
-              WHITESPACE@6809..6810 " "
-              EXPR@6810..6811
-                EXPR_LITERAL@6810..6811
-                  LITERAL_INT@6810..6811 "3"
-              WHITESPACE@6811..6812 " "
-              RIGHT_SQUARE@6812..6813 "]"
-      EOL@6813..6814 "\n"
-      WHITESPACE@6814..6816 "  "
-      POST_ANNOTATION@6816..6824 "@< Array"
-      EOL@6824..6826 "\n\n"
-      WHITESPACE@6826..6828 "  "
-      PRE_ANNOTATION@6828..6845 "@ Array Subscript"
-      EOL@6845..6846 "\n"
-      WHITESPACE@6846..6848 "  "
-      DEF_CONSTANT@6848..6886
-        CONSTANT_KW@6848..6856 "constant"
-        WHITESPACE@6856..6857 " "
-        NAME@6857..6869
-          IDENT@6857..6869 "arraySubExp1"
-        WHITESPACE@6869..6870 " "
-        EQUALS@6870..6871 "="
-        WHITESPACE@6871..6872 " "
-        EXPR@6872..6886
-          EXPR_POSTFIX@6872..6886
-            EXPR_SUBSCRIPT@6872..6886
-              EXPR_ARRAY@6872..6883
-                EXPR_ARRAY_MEMBER_LIST@6872..6883
-                  LEFT_SQUARE@6872..6873 "["
-                  WHITESPACE@6873..6874 " "
-                  EXPR@6874..6875
-                    EXPR_LITERAL@6874..6875
-                      LITERAL_INT@6874..6875 "1"
-                  COMMA@6875..6876 ","
-                  WHITESPACE@6876..6877 " "
-                  EXPR@6877..6878
-                    EXPR_LITERAL@6877..6878
-                      LITERAL_INT@6877..6878 "2"
-                  COMMA@6878..6879 ","
-                  WHITESPACE@6879..6880 " "
-                  EXPR@6880..6881
-                    EXPR_LITERAL@6880..6881
-                      LITERAL_INT@6880..6881 "3"
-                  WHITESPACE@6881..6882 " "
-                  RIGHT_SQUARE@6882..6883 "]"
-              INDEX_OR_SIZE@6883..6886
-                LEFT_SQUARE@6883..6884 "["
-                EXPR@6884..6885
-                  EXPR_LITERAL@6884..6885
-                    LITERAL_INT@6884..6885 "1"
-                RIGHT_SQUARE@6885..6886 "]"
-      EOL@6886..6887 "\n"
-      WHITESPACE@6887..6889 "  "
-      POST_ANNOTATION@6889..6907 "@< Array Subscript"
-      EOL@6907..6909 "\n\n"
-      WHITESPACE@6909..6911 "  "
-      PRE_ANNOTATION@6911..6928 "@ Array Subscript"
-      EOL@6928..6929 "\n"
-      WHITESPACE@6929..6931 "  "
-      DEF_CONSTANT@6931..6963
-        CONSTANT_KW@6931..6939 "constant"
-        WHITESPACE@6939..6940 " "
-        NAME@6940..6952
-          IDENT@6940..6952 "arraySubExp2"
-        WHITESPACE@6952..6953 " "
-        EQUALS@6953..6954 "="
-        WHITESPACE@6954..6955 " "
-        EXPR@6955..6963
-          EXPR_POSTFIX@6955..6963
-            EXPR_SUBSCRIPT@6955..6963
-              EXPR_MEMBER@6955..6960
-                EXPR_MEMBER@6955..6958
-                  EXPR_IDENT@6955..6956
-                    IDENT@6955..6956 "a"
-                  DOT@6956..6957 "."
-                  IDENT@6957..6958 "b"
-                DOT@6958..6959 "."
-                IDENT@6959..6960 "c"
-              INDEX_OR_SIZE@6960..6963
-                LEFT_SQUARE@6960..6961 "["
-                EXPR@6961..6962
-                  EXPR_LITERAL@6961..6962
-                    LITERAL_INT@6961..6962 "1"
-                RIGHT_SQUARE@6962..6963 "]"
-      EOL@6963..6964 "\n"
-      WHITESPACE@6964..6966 "  "
-      POST_ANNOTATION@6966..6984 "@< Array Subscript"
-      EOL@6984..6986 "\n\n"
-      WHITESPACE@6986..6988 "  "
-      PRE_ANNOTATION@6988..7027 "@ Array Subscript wit ..."
-      EOL@7027..7028 "\n"
-      WHITESPACE@7028..7030 "  "
-      DEF_CONSTANT@7030..7071
-        CONSTANT_KW@7030..7038 "constant"
-        WHITESPACE@7038..7039 " "
-        NAME@7039..7051
-          IDENT@7039..7051 "arraySubExp3"
-        WHITESPACE@7051..7052 " "
-        EQUALS@7052..7053 "="
-        WHITESPACE@7053..7054 " "
-        EXPR@7054..7071
-          EXPR_POSTFIX@7054..7071
-            EXPR_SUBSCRIPT@7054..7071
-              EXPR_MEMBER@7054..7067
-                EXPR_SUBSCRIPT@7054..7065
-                  EXPR_SUBSCRIPT@7054..7062
-                    EXPR_MEMBER@7054..7059
-                      EXPR_MEMBER@7054..7057
-                        EXPR_IDENT@7054..7055
-                          IDENT@7054..7055 "a"
-                        DOT@7055..7056 "."
-                        IDENT@7056..7057 "b"
-                      DOT@7057..7058 "."
-                      IDENT@7058..7059 "c"
-                    INDEX_OR_SIZE@7059..7062
-                      LEFT_SQUARE@7059..7060 "["
-                      EXPR@7060..7061
-                        EXPR_LITERAL@7060..7061
-                          LITERAL_INT@7060..7061 "1"
-                      RIGHT_SQUARE@7061..7062 "]"
-                  INDEX_OR_SIZE@7062..7065
-                    LEFT_SQUARE@7062..7063 "["
-                    EXPR@7063..7064
-                      EXPR_LITERAL@7063..7064
-                        LITERAL_INT@7063..7064 "2"
-                    RIGHT_SQUARE@7064..7065 "]"
-                DOT@7065..7066 "."
-                IDENT@7066..7067 "s"
-              INDEX_OR_SIZE@7067..7071
-                LEFT_SQUARE@7067..7068 "["
-                EXPR@7068..7070
-                  EXPR_LITERAL@7068..7070
-                    LITERAL_INT@7068..7070 "12"
-                RIGHT_SQUARE@7070..7071 "]"
-      EOL@7071..7072 "\n"
-      WHITESPACE@7072..7074 "  "
-      POST_ANNOTATION@7074..7093 "@< Array Subscript "
-      EOL@7093..7095 "\n\n"
-      WHITESPACE@7095..7097 "  "
-      PRE_ANNOTATION@7097..7114 "@ Boolean literal"
-      EOL@7114..7115 "\n"
-      WHITESPACE@7115..7117 "  "
-      DEF_CONSTANT@7117..7150
-        CONSTANT_KW@7117..7125 "constant"
-        WHITESPACE@7125..7126 " "
-        NAME@7126..7143
-          IDENT@7126..7143 "booleanLiteralExp"
-        WHITESPACE@7143..7144 " "
-        EQUALS@7144..7145 "="
-        WHITESPACE@7145..7146 " "
-        EXPR@7146..7150
-          EXPR_LITERAL@7146..7150
-            TRUE_KW@7146..7150 "true"
-      EOL@7150..7151 "\n"
+        QUAL_IDENT@6802..6804
+          DOT@6802..6803 "."
+          IDENT@6803..6804 "i"
+        WHITESPACE@6804..6805 " "
+        AT_KW@6805..6807 "at"
+        WHITESPACE@6807..6808 " "
+        LITERAL_STRING@6808..6823 "\"instances.fpp\""
+      EOL@6823..6824 "\n"
+      WHITESPACE@6824..6826 "  "
+      POST_ANNOTATION@6826..6882 "@< Location specifier ..."
+      EOL@6882..6884 "\n\n"
+      WHITESPACE@6884..6886 "  "
+      PRE_ANNOTATION@6886..6913 "@ System location spe ..."
+      EOL@6913..6914 "\n"
+      WHITESPACE@6914..6916 "  "
+      SPEC_LOC@6916..6947
+        LOCATE_KW@6916..6922 "locate"
+        WHITESPACE@6922..6923 " "
+        SYSTEM_KW@6923..6929 "system"
+        WHITESPACE@6929..6930 " "
+        QUAL_IDENT@6930..6931
+          IDENT@6930..6931 "S"
+        WHITESPACE@6931..6932 " "
+        AT_KW@6932..6934 "at"
+        WHITESPACE@6934..6935 " "
+        LITERAL_STRING@6935..6947 "\"system.fpp\""
+      EOL@6947..6948 "\n"
+      WHITESPACE@6948..6950 "  "
+      POST_ANNOTATION@6950..6978 "@< System location sp ..."
+      EOL@6978..6980 "\n\n"
+      WHITESPACE@6980..6982 "  "
+      PRE_ANNOTATION@6982..7011 "@ Template location s ..."
+      EOL@7011..7012 "\n"
+      WHITESPACE@7012..7014 "  "
+      SPEC_LOC@7014..7050
+        LOCATE_KW@7014..7020 "locate"
+        WHITESPACE@7020..7021 " "
+        TEMPLATE_KW@7021..7029 "template"
+        WHITESPACE@7029..7030 " "
+        QUAL_IDENT@7030..7032
+          IDENT@7030..7032 "MT"
+        WHITESPACE@7032..7033 " "
+        AT_KW@7033..7035 "at"
+        WHITESPACE@7035..7036 " "
+        LITERAL_STRING@7036..7050 "\"template.fpp\""
+      EOL@7050..7051 "\n"
+      WHITESPACE@7051..7053 "  "
+      POST_ANNOTATION@7053..7083 "@< Template location  ..."
+      EOL@7083..7085 "\n\n"
+      RIGHT_CURLY@7085..7086 "}"
+  EOL@7086..7087 "\n"
+  POST_ANNOTATION@7087..7116 "@< Definitions and sp ..."
+  EOL@7116..7118 "\n\n"
+  PRE_ANNOTATION@7118..7130 "@ Type names"
+  EOL@7130..7131 "\n"
+  DEF_MODULE@7131..7369
+    MODULE_KW@7131..7137 "module"
+    WHITESPACE@7137..7138 " "
+    NAME@7138..7147
+      IDENT@7138..7147 "TypeNames"
+    WHITESPACE@7147..7148 " "
+    MODULE_MEMBER_LIST@7148..7369
+      LEFT_CURLY@7148..7149 "{"
+      EOL@7149..7151 "\n\n"
       WHITESPACE@7151..7153 "  "
-      POST_ANNOTATION@7153..7171 "@< Boolean literal"
-      EOL@7171..7173 "\n\n"
-      WHITESPACE@7173..7175 "  "
-      PRE_ANNOTATION@7175..7180 "@ Dot"
-      EOL@7180..7181 "\n"
-      WHITESPACE@7181..7183 "  "
-      DEF_CONSTANT@7183..7206
-        CONSTANT_KW@7183..7191 "constant"
-        WHITESPACE@7191..7192 " "
-        NAME@7192..7198
-          IDENT@7192..7198 "dotExp"
-        WHITESPACE@7198..7199 " "
-        EQUALS@7199..7200 "="
-        WHITESPACE@7200..7201 " "
-        EXPR@7201..7206
-          EXPR_POSTFIX@7201..7206
-            EXPR_MEMBER@7201..7206
-              EXPR_MEMBER@7201..7204
-                EXPR_IDENT@7201..7202
-                  IDENT@7201..7202 "a"
-                DOT@7202..7203 "."
-                IDENT@7203..7204 "b"
-              DOT@7204..7205 "."
-              IDENT@7205..7206 "c"
-      EOL@7206..7207 "\n"
-      WHITESPACE@7207..7209 "  "
-      POST_ANNOTATION@7209..7215 "@< Dot"
-      EOL@7215..7217 "\n\n"
-      WHITESPACE@7217..7219 "  "
-      PRE_ANNOTATION@7219..7259 "@ Dot with absolute q ..."
-      EOL@7259..7260 "\n"
-      WHITESPACE@7260..7262 "  "
-      DEF_CONSTANT@7262..7294
-        CONSTANT_KW@7262..7270 "constant"
+      DEF_ARRAY@7153..7181
+        ARRAY_KW@7153..7158 "array"
+        WHITESPACE@7158..7159 " "
+        NAME@7159..7170
+          IDENT@7159..7170 "typeNameU32"
+        WHITESPACE@7170..7171 " "
+        EQUALS@7171..7172 "="
+        WHITESPACE@7172..7173 " "
+        INDEX_OR_SIZE@7173..7177
+          LEFT_SQUARE@7173..7174 "["
+          EXPR@7174..7176
+            EXPR_LITERAL@7174..7176
+              LITERAL_INT@7174..7176 "10"
+          RIGHT_SQUARE@7176..7177 "]"
+        WHITESPACE@7177..7178 " "
+        TYPE_NAME@7178..7181
+          U32_KW@7178..7181 "U32"
+      EOL@7181..7182 "\n"
+      WHITESPACE@7182..7184 "  "
+      DEF_ARRAY@7184..7212
+        ARRAY_KW@7184..7189 "array"
+        WHITESPACE@7189..7190 " "
+        NAME@7190..7201
+          IDENT@7190..7201 "typeNameF32"
+        WHITESPACE@7201..7202 " "
+        EQUALS@7202..7203 "="
+        WHITESPACE@7203..7204 " "
+        INDEX_OR_SIZE@7204..7208
+          LEFT_SQUARE@7204..7205 "["
+          EXPR@7205..7207
+            EXPR_LITERAL@7205..7207
+              LITERAL_INT@7205..7207 "10"
+          RIGHT_SQUARE@7207..7208 "]"
+        WHITESPACE@7208..7209 " "
+        TYPE_NAME@7209..7212
+          F32_KW@7209..7212 "F32"
+      EOL@7212..7213 "\n"
+      WHITESPACE@7213..7215 "  "
+      DEF_ARRAY@7215..7245
+        ARRAY_KW@7215..7220 "array"
+        WHITESPACE@7220..7221 " "
+        NAME@7221..7233
+          IDENT@7221..7233 "typeNameBool"
+        WHITESPACE@7233..7234 " "
+        EQUALS@7234..7235 "="
+        WHITESPACE@7235..7236 " "
+        INDEX_OR_SIZE@7236..7240
+          LEFT_SQUARE@7236..7237 "["
+          EXPR@7237..7239
+            EXPR_LITERAL@7237..7239
+              LITERAL_INT@7237..7239 "10"
+          RIGHT_SQUARE@7239..7240 "]"
+        WHITESPACE@7240..7241 " "
+        TYPE_NAME@7241..7245
+          BOOL_KW@7241..7245 "bool"
+      EOL@7245..7246 "\n"
+      WHITESPACE@7246..7248 "  "
+      DEF_ARRAY@7248..7291
+        ARRAY_KW@7248..7253 "array"
+        WHITESPACE@7253..7254 " "
+        NAME@7254..7268
+          IDENT@7254..7268 "typeNameString"
+        WHITESPACE@7268..7269 " "
+        EQUALS@7269..7270 "="
         WHITESPACE@7270..7271 " "
-        NAME@7271..7285
-          IDENT@7271..7285 "dotAbsoluteExp"
-        WHITESPACE@7285..7286 " "
-        EQUALS@7286..7287 "="
-        WHITESPACE@7287..7288 " "
-        EXPR@7288..7294
-          EXPR_POSTFIX@7288..7294
-            EXPR_MEMBER@7288..7294
-              EXPR_MEMBER@7288..7292
-                EXPR_IDENT@7288..7290
-                  DOT@7288..7289 "."
-                  IDENT@7289..7290 "a"
-                DOT@7290..7291 "."
-                IDENT@7291..7292 "b"
-              DOT@7292..7293 "."
-              IDENT@7293..7294 "c"
-      EOL@7294..7295 "\n"
-      WHITESPACE@7295..7297 "  "
-      POST_ANNOTATION@7297..7338 "@< Dot with absolute  ..."
-      EOL@7338..7340 "\n\n"
-      WHITESPACE@7340..7342 "  "
-      PRE_ANNOTATION@7342..7354 "@ FP literal"
-      EOL@7354..7355 "\n"
-      WHITESPACE@7355..7357 "  "
-      DEF_CONSTANT@7357..7387
-        CONSTANT_KW@7357..7365 "constant"
-        WHITESPACE@7365..7366 " "
-        NAME@7366..7378
-          IDENT@7366..7378 "fpLiteralExp"
-        WHITESPACE@7378..7379 " "
-        EQUALS@7379..7380 "="
-        WHITESPACE@7380..7381 " "
-        EXPR@7381..7387
-          EXPR_LITERAL@7381..7387
-            LITERAL_FLOAT@7381..7387 "0.1234"
-      EOL@7387..7388 "\n"
-      WHITESPACE@7388..7390 "  "
-      POST_ANNOTATION@7390..7403 "@< FP literal"
-      EOL@7403..7405 "\n\n"
-      WHITESPACE@7405..7407 "  "
-      PRE_ANNOTATION@7407..7419 "@ Identifier"
-      EOL@7419..7420 "\n"
-      WHITESPACE@7420..7422 "  "
-      DEF_CONSTANT@7422..7443
-        CONSTANT_KW@7422..7430 "constant"
-        WHITESPACE@7430..7431 " "
-        NAME@7431..7439
-          IDENT@7431..7439 "identExp"
-        WHITESPACE@7439..7440 " "
-        EQUALS@7440..7441 "="
-        WHITESPACE@7441..7442 " "
-        EXPR@7442..7443
-          EXPR_IDENT@7442..7443
-            IDENT@7442..7443 "x"
-      EOL@7443..7444 "\n"
-      WHITESPACE@7444..7446 "  "
-      POST_ANNOTATION@7446..7459 "@< Identifier"
-      EOL@7459..7461 "\n\n"
-      WHITESPACE@7461..7463 "  "
-      PRE_ANNOTATION@7463..7510 "@ Identifier with abs ..."
-      EOL@7510..7511 "\n"
-      WHITESPACE@7511..7513 "  "
-      DEF_CONSTANT@7513..7543
-        CONSTANT_KW@7513..7521 "constant"
-        WHITESPACE@7521..7522 " "
-        NAME@7522..7538
-          IDENT@7522..7538 "identAbsoluteExp"
-        WHITESPACE@7538..7539 " "
-        EQUALS@7539..7540 "="
-        WHITESPACE@7540..7541 " "
-        EXPR@7541..7543
-          EXPR_IDENT@7541..7543
-            DOT@7541..7542 "."
-            IDENT@7542..7543 "x"
-      EOL@7543..7544 "\n"
-      WHITESPACE@7544..7546 "  "
-      POST_ANNOTATION@7546..7594 "@< Identifier with ab ..."
-      EOL@7594..7596 "\n\n"
-      WHITESPACE@7596..7598 "  "
-      PRE_ANNOTATION@7598..7611 "@ Int literal"
-      EOL@7611..7612 "\n"
-      WHITESPACE@7612..7614 "  "
-      DEF_CONSTANT@7614..7643
-        CONSTANT_KW@7614..7622 "constant"
-        WHITESPACE@7622..7623 " "
-        NAME@7623..7636
-          IDENT@7623..7636 "intLiteralExp"
-        WHITESPACE@7636..7637 " "
-        EQUALS@7637..7638 "="
-        WHITESPACE@7638..7639 " "
-        EXPR@7639..7643
-          EXPR_LITERAL@7639..7643
-            LITERAL_INT@7639..7643 "1234"
-      EOL@7643..7644 "\n"
-      WHITESPACE@7644..7646 "  "
-      POST_ANNOTATION@7646..7660 "@< Int literal"
-      EOL@7660..7662 "\n\n"
-      WHITESPACE@7662..7664 "  "
-      PRE_ANNOTATION@7664..7671 "@ Paren"
-      EOL@7671..7672 "\n"
-      WHITESPACE@7672..7674 "  "
-      DEF_CONSTANT@7674..7705
-        CONSTANT_KW@7674..7682 "constant"
-        WHITESPACE@7682..7683 " "
-        NAME@7683..7691
-          IDENT@7683..7691 "parenExp"
-        WHITESPACE@7691..7692 " "
-        EQUALS@7692..7693 "="
-        WHITESPACE@7693..7694 " "
-        EXPR@7694..7705
-          EXPR_BINARY@7694..7705
-            EXPR@7694..7701
-              LEFT_PAREN@7694..7695 "("
-              EXPR@7695..7700
-                EXPR_BINARY@7695..7700
-                  EXPR_LITERAL@7695..7696
-                    LITERAL_INT@7695..7696 "1"
-                  WHITESPACE@7696..7697 " "
-                  BINARY_OP@7697..7699
-                    PLUS@7697..7698 "+"
-                    WHITESPACE@7698..7699 " "
-                  EXPR_LITERAL@7699..7700
-                    LITERAL_INT@7699..7700 "2"
-              RIGHT_PAREN@7700..7701 ")"
-            WHITESPACE@7701..7702 " "
-            BINARY_OP@7702..7704
-              STAR@7702..7703 "*"
-              WHITESPACE@7703..7704 " "
-            EXPR_LITERAL@7704..7705
-              LITERAL_INT@7704..7705 "3"
-      EOL@7705..7706 "\n"
-      WHITESPACE@7706..7708 "  "
-      POST_ANNOTATION@7708..7716 "@< Paren"
-      EOL@7716..7718 "\n\n"
-      WHITESPACE@7718..7720 "  "
-      PRE_ANNOTATION@7720..7743 "@ String literal single"
-      EOL@7743..7744 "\n"
-      WHITESPACE@7744..7746 "  "
-      DEF_CONSTANT@7746..7799
-        CONSTANT_KW@7746..7754 "constant"
-        WHITESPACE@7754..7755 " "
-        NAME@7755..7777
-          IDENT@7755..7777 "stringLiteralSingleExp"
-        WHITESPACE@7777..7778 " "
-        EQUALS@7778..7779 "="
-        WHITESPACE@7779..7780 " "
-        EXPR@7780..7799
-          EXPR_LITERAL@7780..7799
-            LITERAL_STRING@7780..7799 "\"This is a string.\""
-      EOL@7799..7800 "\n"
-      WHITESPACE@7800..7802 "  "
-      POST_ANNOTATION@7802..7826 "@< String literal single"
-      EOL@7826..7828 "\n\n"
-      WHITESPACE@7828..7830 "  "
-      PRE_ANNOTATION@7830..7852 "@ String literal multi"
-      EOL@7852..7853 "\n"
-      WHITESPACE@7853..7855 "  "
-      DEF_CONSTANT@7855..8051
-        CONSTANT_KW@7855..7863 "constant"
-        WHITESPACE@7863..7864 " "
-        NAME@7864..7884
-          IDENT@7864..7884 "stringLiteralMultExp"
-        WHITESPACE@7884..7885 " "
-        EQUALS@7885..7886 "="
-        WHITESPACE@7886..7887 " "
-        EXPR@7887..8051
-          EXPR_LITERAL@7887..8051
-            LITERAL_STRING@7887..8051 "\"\"\"\n                  ..."
-      EOL@8051..8052 "\n"
-      WHITESPACE@8052..8054 "  "
-      POST_ANNOTATION@8054..8077 "@< String literal multi"
-      EOL@8077..8079 "\n\n"
-      WHITESPACE@8079..8081 "  "
-      PRE_ANNOTATION@8081..8089 "@ Struct"
-      EOL@8089..8090 "\n"
-      WHITESPACE@8090..8092 "  "
-      DEF_CONSTANT@8092..8136
-        CONSTANT_KW@8092..8100 "constant"
-        WHITESPACE@8100..8101 " "
-        NAME@8101..8110
-          IDENT@8101..8110 "structExp"
-        WHITESPACE@8110..8111 " "
-        EQUALS@8111..8112 "="
-        WHITESPACE@8112..8113 " "
-        EXPR@8113..8136
-          EXPR_STRUCT@8113..8136
-            EXPR_STRUCT_MEMBER_LIST@8113..8136
-              LEFT_CURLY@8113..8114 "{"
-              WHITESPACE@8114..8115 " "
-              EXPR_STRUCT_MEMBER@8115..8120
-                NAME@8115..8116
-                  IDENT@8115..8116 "a"
-                WHITESPACE@8116..8117 " "
-                EQUALS@8117..8118 "="
-                WHITESPACE@8118..8119 " "
-                EXPR@8119..8120
-                  EXPR_LITERAL@8119..8120
-                    LITERAL_INT@8119..8120 "1"
-              COMMA@8120..8121 ","
-              WHITESPACE@8121..8122 " "
-              EXPR_STRUCT_MEMBER@8122..8127
-                NAME@8122..8123
-                  IDENT@8122..8123 "b"
-                WHITESPACE@8123..8124 " "
-                EQUALS@8124..8125 "="
-                WHITESPACE@8125..8126 " "
-                EXPR@8126..8127
-                  EXPR_LITERAL@8126..8127
-                    LITERAL_INT@8126..8127 "2"
-              COMMA@8127..8128 ","
-              WHITESPACE@8128..8129 " "
-              EXPR_STRUCT_MEMBER@8129..8134
-                NAME@8129..8130
-                  IDENT@8129..8130 "c"
-                WHITESPACE@8130..8131 " "
-                EQUALS@8131..8132 "="
-                WHITESPACE@8132..8133 " "
-                EXPR@8133..8134
-                  EXPR_LITERAL@8133..8134
-                    LITERAL_INT@8133..8134 "3"
-              WHITESPACE@8134..8135 " "
-              RIGHT_CURLY@8135..8136 "}"
-      EOL@8136..8137 "\n"
-      WHITESPACE@8137..8139 "  "
-      POST_ANNOTATION@8139..8148 "@< Struct"
-      EOL@8148..8150 "\n\n"
-      WHITESPACE@8150..8152 "  "
-      PRE_ANNOTATION@8152..8160 "@ SizeOf"
-      EOL@8160..8161 "\n"
-      WHITESPACE@8161..8163 "  "
-      DEF_MODULE@8163..8324
-        MODULE_KW@8163..8169 "module"
-        WHITESPACE@8169..8170 " "
-        NAME@8170..8176
-          IDENT@8170..8176 "SizeOf"
-        WHITESPACE@8176..8177 " "
-        MODULE_MEMBER_LIST@8177..8324
-          LEFT_CURLY@8177..8178 "{"
-          EOL@8178..8179 "\n"
-          WHITESPACE@8179..8183 "    "
-          DEF_CONSTANT@8183..8215
-            CONSTANT_KW@8183..8191 "constant"
-            WHITESPACE@8191..8192 " "
-            NAME@8192..8201
-              IDENT@8192..8201 "typeFloat"
-            WHITESPACE@8201..8202 " "
-            EQUALS@8202..8203 "="
-            WHITESPACE@8203..8204 " "
-            EXPR@8204..8215
-              EXPR_SIZEOF@8204..8215
-                SIZEOF_KW@8204..8210 "sizeof"
-                LEFT_PAREN@8210..8211 "("
-                TYPE_NAME@8211..8214
-                  F64_KW@8211..8214 "F64"
-                RIGHT_PAREN@8214..8215 ")"
-          EOL@8215..8216 "\n"
-          WHITESPACE@8216..8220 "    "
-          DEF_CONSTANT@8220..8271
-            CONSTANT_KW@8220..8228 "constant"
-            WHITESPACE@8228..8229 " "
-            NAME@8229..8239
-              IDENT@8229..8239 "typeQualId"
-            WHITESPACE@8239..8240 " "
-            EQUALS@8240..8241 "="
-            WHITESPACE@8241..8242 " "
-            EXPR@8242..8271
-              EXPR_SIZEOF@8242..8271
-                SIZEOF_KW@8242..8248 "sizeof"
-                LEFT_PAREN@8248..8249 "("
-                TYPE_NAME@8249..8270
-                  QUAL_IDENT@8249..8270
-                    IDENT@8249..8258 "TypeNames"
-                    DOT@8258..8259 "."
-                    IDENT@8259..8270 "typeNameU32"
-                RIGHT_PAREN@8270..8271 ")"
-          EOL@8271..8272 "\n"
-          WHITESPACE@8272..8276 "    "
-          DEF_CONSTANT@8276..8320
-            CONSTANT_KW@8276..8284 "constant"
-            WHITESPACE@8284..8285 " "
-            NAME@8285..8295
-              IDENT@8285..8295 "typeString"
-            WHITESPACE@8295..8296 " "
-            EQUALS@8296..8297 "="
-            WHITESPACE@8297..8298 " "
-            EXPR@8298..8320
-              EXPR_SIZEOF@8298..8320
-                SIZEOF_KW@8298..8304 "sizeof"
-                LEFT_PAREN@8304..8305 "("
-                TYPE_NAME@8305..8319
-                  STRING_KW@8305..8311 "string"
-                  WHITESPACE@8311..8312 " "
-                  SIZE_KW@8312..8316 "size"
-                  WHITESPACE@8316..8317 " "
-                  EXPR@8317..8319
-                    EXPR_LITERAL@8317..8319
-                      LITERAL_INT@8317..8319 "20"
-                RIGHT_PAREN@8319..8320 ")"
-          EOL@8320..8321 "\n"
-          WHITESPACE@8321..8323 "  "
-          RIGHT_CURLY@8323..8324 "}"
-      EOL@8324..8325 "\n"
-      WHITESPACE@8325..8327 "  "
-      POST_ANNOTATION@8327..8336 "@< SizeOf"
-      EOL@8336..8338 "\n\n"
-      RIGHT_CURLY@8338..8339 "}"
-  EOL@8339..8340 "\n"
-  POST_ANNOTATION@8340..8354 "@< Expressions"
-  EOL@8354..8355 "\n"
+        INDEX_OR_SIZE@7271..7275
+          LEFT_SQUARE@7271..7272 "["
+          EXPR@7272..7274
+            EXPR_LITERAL@7272..7274
+              LITERAL_INT@7272..7274 "10"
+          RIGHT_SQUARE@7274..7275 "]"
+        WHITESPACE@7275..7276 " "
+        TYPE_NAME@7276..7291
+          STRING_KW@7276..7282 "string"
+          WHITESPACE@7282..7283 " "
+          SIZE_KW@7283..7287 "size"
+          WHITESPACE@7287..7288 " "
+          EXPR@7288..7291
+            EXPR_LITERAL@7288..7291
+              LITERAL_INT@7288..7291 "256"
+      EOL@7291..7292 "\n"
+      WHITESPACE@7292..7294 "  "
+      DEF_ARRAY@7294..7324
+        ARRAY_KW@7294..7299 "array"
+        WHITESPACE@7299..7300 " "
+        NAME@7300..7311
+          IDENT@7300..7311 "typeNameQID"
+        WHITESPACE@7311..7312 " "
+        EQUALS@7312..7313 "="
+        WHITESPACE@7313..7314 " "
+        INDEX_OR_SIZE@7314..7318
+          LEFT_SQUARE@7314..7315 "["
+          EXPR@7315..7317
+            EXPR_LITERAL@7315..7317
+              LITERAL_INT@7315..7317 "10"
+          RIGHT_SQUARE@7317..7318 "]"
+        WHITESPACE@7318..7319 " "
+        TYPE_NAME@7319..7324
+          QUAL_IDENT@7319..7324
+            IDENT@7319..7320 "a"
+            DOT@7320..7321 "."
+            IDENT@7321..7322 "b"
+            DOT@7322..7323 "."
+            IDENT@7323..7324 "c"
+      EOL@7324..7325 "\n"
+      WHITESPACE@7325..7327 "  "
+      DEF_ARRAY@7327..7366
+        ARRAY_KW@7327..7332 "array"
+        WHITESPACE@7332..7333 " "
+        NAME@7333..7352
+          IDENT@7333..7352 "typeNameAbsoluteQID"
+        WHITESPACE@7352..7353 " "
+        EQUALS@7353..7354 "="
+        WHITESPACE@7354..7355 " "
+        INDEX_OR_SIZE@7355..7359
+          LEFT_SQUARE@7355..7356 "["
+          EXPR@7356..7358
+            EXPR_LITERAL@7356..7358
+              LITERAL_INT@7356..7358 "10"
+          RIGHT_SQUARE@7358..7359 "]"
+        WHITESPACE@7359..7360 " "
+        TYPE_NAME@7360..7366
+          QUAL_IDENT@7360..7366
+            DOT@7360..7361 "."
+            IDENT@7361..7362 "a"
+            DOT@7362..7363 "."
+            IDENT@7363..7364 "b"
+            DOT@7364..7365 "."
+            IDENT@7365..7366 "c"
+      EOL@7366..7368 "\n\n"
+      RIGHT_CURLY@7368..7369 "}"
+  EOL@7369..7370 "\n"
+  POST_ANNOTATION@7370..7383 "@< Type names"
+  EOL@7383..7385 "\n\n"
+  PRE_ANNOTATION@7385..7398 "@ Expressions"
+  EOL@7398..7399 "\n"
+  DEF_MODULE@7399..9127
+    MODULE_KW@7399..7405 "module"
+    WHITESPACE@7405..7406 " "
+    NAME@7406..7417
+      IDENT@7406..7417 "Expressions"
+    WHITESPACE@7417..7418 " "
+    MODULE_MEMBER_LIST@7418..9127
+      LEFT_CURLY@7418..7419 "{"
+      EOL@7419..7421 "\n\n"
+      WHITESPACE@7421..7423 "  "
+      PRE_ANNOTATION@7423..7435 "@ Arithmetic"
+      EOL@7435..7436 "\n"
+      WHITESPACE@7436..7438 "  "
+      DEF_CONSTANT@7438..7480
+        CONSTANT_KW@7438..7446 "constant"
+        WHITESPACE@7446..7447 " "
+        NAME@7447..7455
+          IDENT@7447..7455 "arithExp"
+        WHITESPACE@7455..7456 " "
+        EQUALS@7456..7457 "="
+        WHITESPACE@7457..7458 " "
+        EXPR@7458..7480
+          EXPR_BINARY@7458..7480
+            EXPR_BINARY@7458..7476
+              EXPR_BINARY@7458..7467
+                EXPR_LITERAL@7458..7459
+                  LITERAL_INT@7458..7459 "1"
+                WHITESPACE@7459..7460 " "
+                BINARY_OP@7460..7462
+                  PLUS@7460..7461 "+"
+                  WHITESPACE@7461..7462 " "
+                EXPR_BINARY@7462..7467
+                  EXPR_LITERAL@7462..7463
+                    LITERAL_INT@7462..7463 "2"
+                  WHITESPACE@7463..7464 " "
+                  BINARY_OP@7464..7466
+                    STAR@7464..7465 "*"
+                    WHITESPACE@7465..7466 " "
+                  EXPR_LITERAL@7466..7467
+                    LITERAL_INT@7466..7467 "3"
+              WHITESPACE@7467..7468 " "
+              BINARY_OP@7468..7470
+                MINUS@7468..7469 "-"
+                WHITESPACE@7469..7470 " "
+              EXPR_BINARY@7470..7476
+                EXPR_UNARY@7470..7472
+                  MINUS@7470..7471 "-"
+                  EXPR_LITERAL@7471..7472
+                    LITERAL_INT@7471..7472 "4"
+                WHITESPACE@7472..7473 " "
+                BINARY_OP@7473..7475
+                  STAR@7473..7474 "*"
+                  WHITESPACE@7474..7475 " "
+                EXPR_LITERAL@7475..7476
+                  LITERAL_INT@7475..7476 "5"
+            WHITESPACE@7476..7477 " "
+            BINARY_OP@7477..7479
+              PLUS@7477..7478 "+"
+              WHITESPACE@7478..7479 " "
+            EXPR_LITERAL@7479..7480
+              LITERAL_INT@7479..7480 "6"
+      EOL@7480..7481 "\n"
+      WHITESPACE@7481..7483 "  "
+      POST_ANNOTATION@7483..7496 "@< Arithmetic"
+      EOL@7496..7498 "\n\n"
+      WHITESPACE@7498..7500 "  "
+      PRE_ANNOTATION@7500..7507 "@ Shift"
+      EOL@7507..7508 "\n"
+      WHITESPACE@7508..7510 "  "
+      DEF_CONSTANT@7510..7545
+        CONSTANT_KW@7510..7518 "constant"
+        WHITESPACE@7518..7519 " "
+        NAME@7519..7527
+          IDENT@7519..7527 "shiftExp"
+        WHITESPACE@7527..7528 " "
+        EQUALS@7528..7529 "="
+        WHITESPACE@7529..7530 " "
+        EXPR@7530..7545
+          EXPR_BINARY@7530..7545
+            EXPR_BINARY@7530..7540
+              EXPR_BINARY@7530..7535
+                EXPR_LITERAL@7530..7531
+                  LITERAL_INT@7530..7531 "1"
+                WHITESPACE@7531..7532 " "
+                BINARY_OP@7532..7534
+                  PLUS@7532..7533 "+"
+                  WHITESPACE@7533..7534 " "
+                EXPR_LITERAL@7534..7535
+                  LITERAL_INT@7534..7535 "2"
+              WHITESPACE@7535..7536 " "
+              BINARY_OP@7536..7538
+                SHIFT_LEFT@7536..7538 "<<"
+              WHITESPACE@7538..7539 " "
+              EXPR_LITERAL@7539..7540
+                LITERAL_INT@7539..7540 "3"
+            WHITESPACE@7540..7541 " "
+            BINARY_OP@7541..7543
+              SHIFT_RIGHT@7541..7543 ">>"
+            WHITESPACE@7543..7544 " "
+            EXPR_LITERAL@7544..7545
+              LITERAL_INT@7544..7545 "1"
+      EOL@7545..7546 "\n"
+      WHITESPACE@7546..7548 "  "
+      POST_ANNOTATION@7548..7556 "@< Shift"
+      EOL@7556..7558 "\n\n"
+      WHITESPACE@7558..7560 "  "
+      PRE_ANNOTATION@7560..7567 "@ Array"
+      EOL@7567..7568 "\n"
+      WHITESPACE@7568..7570 "  "
+      DEF_CONSTANT@7570..7601
+        CONSTANT_KW@7570..7578 "constant"
+        WHITESPACE@7578..7579 " "
+        NAME@7579..7587
+          IDENT@7579..7587 "arrayExp"
+        WHITESPACE@7587..7588 " "
+        EQUALS@7588..7589 "="
+        WHITESPACE@7589..7590 " "
+        EXPR@7590..7601
+          EXPR_ARRAY@7590..7601
+            EXPR_ARRAY_MEMBER_LIST@7590..7601
+              LEFT_SQUARE@7590..7591 "["
+              WHITESPACE@7591..7592 " "
+              EXPR@7592..7593
+                EXPR_LITERAL@7592..7593
+                  LITERAL_INT@7592..7593 "1"
+              COMMA@7593..7594 ","
+              WHITESPACE@7594..7595 " "
+              EXPR@7595..7596
+                EXPR_LITERAL@7595..7596
+                  LITERAL_INT@7595..7596 "2"
+              COMMA@7596..7597 ","
+              WHITESPACE@7597..7598 " "
+              EXPR@7598..7599
+                EXPR_LITERAL@7598..7599
+                  LITERAL_INT@7598..7599 "3"
+              WHITESPACE@7599..7600 " "
+              RIGHT_SQUARE@7600..7601 "]"
+      EOL@7601..7602 "\n"
+      WHITESPACE@7602..7604 "  "
+      POST_ANNOTATION@7604..7612 "@< Array"
+      EOL@7612..7614 "\n\n"
+      WHITESPACE@7614..7616 "  "
+      PRE_ANNOTATION@7616..7633 "@ Array Subscript"
+      EOL@7633..7634 "\n"
+      WHITESPACE@7634..7636 "  "
+      DEF_CONSTANT@7636..7674
+        CONSTANT_KW@7636..7644 "constant"
+        WHITESPACE@7644..7645 " "
+        NAME@7645..7657
+          IDENT@7645..7657 "arraySubExp1"
+        WHITESPACE@7657..7658 " "
+        EQUALS@7658..7659 "="
+        WHITESPACE@7659..7660 " "
+        EXPR@7660..7674
+          EXPR_POSTFIX@7660..7674
+            EXPR_SUBSCRIPT@7660..7674
+              EXPR_ARRAY@7660..7671
+                EXPR_ARRAY_MEMBER_LIST@7660..7671
+                  LEFT_SQUARE@7660..7661 "["
+                  WHITESPACE@7661..7662 " "
+                  EXPR@7662..7663
+                    EXPR_LITERAL@7662..7663
+                      LITERAL_INT@7662..7663 "1"
+                  COMMA@7663..7664 ","
+                  WHITESPACE@7664..7665 " "
+                  EXPR@7665..7666
+                    EXPR_LITERAL@7665..7666
+                      LITERAL_INT@7665..7666 "2"
+                  COMMA@7666..7667 ","
+                  WHITESPACE@7667..7668 " "
+                  EXPR@7668..7669
+                    EXPR_LITERAL@7668..7669
+                      LITERAL_INT@7668..7669 "3"
+                  WHITESPACE@7669..7670 " "
+                  RIGHT_SQUARE@7670..7671 "]"
+              INDEX_OR_SIZE@7671..7674
+                LEFT_SQUARE@7671..7672 "["
+                EXPR@7672..7673
+                  EXPR_LITERAL@7672..7673
+                    LITERAL_INT@7672..7673 "1"
+                RIGHT_SQUARE@7673..7674 "]"
+      EOL@7674..7675 "\n"
+      WHITESPACE@7675..7677 "  "
+      POST_ANNOTATION@7677..7695 "@< Array Subscript"
+      EOL@7695..7697 "\n\n"
+      WHITESPACE@7697..7699 "  "
+      PRE_ANNOTATION@7699..7716 "@ Array Subscript"
+      EOL@7716..7717 "\n"
+      WHITESPACE@7717..7719 "  "
+      DEF_CONSTANT@7719..7751
+        CONSTANT_KW@7719..7727 "constant"
+        WHITESPACE@7727..7728 " "
+        NAME@7728..7740
+          IDENT@7728..7740 "arraySubExp2"
+        WHITESPACE@7740..7741 " "
+        EQUALS@7741..7742 "="
+        WHITESPACE@7742..7743 " "
+        EXPR@7743..7751
+          EXPR_POSTFIX@7743..7751
+            EXPR_SUBSCRIPT@7743..7751
+              EXPR_MEMBER@7743..7748
+                EXPR_MEMBER@7743..7746
+                  EXPR_IDENT@7743..7744
+                    IDENT@7743..7744 "a"
+                  DOT@7744..7745 "."
+                  IDENT@7745..7746 "b"
+                DOT@7746..7747 "."
+                IDENT@7747..7748 "c"
+              INDEX_OR_SIZE@7748..7751
+                LEFT_SQUARE@7748..7749 "["
+                EXPR@7749..7750
+                  EXPR_LITERAL@7749..7750
+                    LITERAL_INT@7749..7750 "1"
+                RIGHT_SQUARE@7750..7751 "]"
+      EOL@7751..7752 "\n"
+      WHITESPACE@7752..7754 "  "
+      POST_ANNOTATION@7754..7772 "@< Array Subscript"
+      EOL@7772..7774 "\n\n"
+      WHITESPACE@7774..7776 "  "
+      PRE_ANNOTATION@7776..7815 "@ Array Subscript wit ..."
+      EOL@7815..7816 "\n"
+      WHITESPACE@7816..7818 "  "
+      DEF_CONSTANT@7818..7859
+        CONSTANT_KW@7818..7826 "constant"
+        WHITESPACE@7826..7827 " "
+        NAME@7827..7839
+          IDENT@7827..7839 "arraySubExp3"
+        WHITESPACE@7839..7840 " "
+        EQUALS@7840..7841 "="
+        WHITESPACE@7841..7842 " "
+        EXPR@7842..7859
+          EXPR_POSTFIX@7842..7859
+            EXPR_SUBSCRIPT@7842..7859
+              EXPR_MEMBER@7842..7855
+                EXPR_SUBSCRIPT@7842..7853
+                  EXPR_SUBSCRIPT@7842..7850
+                    EXPR_MEMBER@7842..7847
+                      EXPR_MEMBER@7842..7845
+                        EXPR_IDENT@7842..7843
+                          IDENT@7842..7843 "a"
+                        DOT@7843..7844 "."
+                        IDENT@7844..7845 "b"
+                      DOT@7845..7846 "."
+                      IDENT@7846..7847 "c"
+                    INDEX_OR_SIZE@7847..7850
+                      LEFT_SQUARE@7847..7848 "["
+                      EXPR@7848..7849
+                        EXPR_LITERAL@7848..7849
+                          LITERAL_INT@7848..7849 "1"
+                      RIGHT_SQUARE@7849..7850 "]"
+                  INDEX_OR_SIZE@7850..7853
+                    LEFT_SQUARE@7850..7851 "["
+                    EXPR@7851..7852
+                      EXPR_LITERAL@7851..7852
+                        LITERAL_INT@7851..7852 "2"
+                    RIGHT_SQUARE@7852..7853 "]"
+                DOT@7853..7854 "."
+                IDENT@7854..7855 "s"
+              INDEX_OR_SIZE@7855..7859
+                LEFT_SQUARE@7855..7856 "["
+                EXPR@7856..7858
+                  EXPR_LITERAL@7856..7858
+                    LITERAL_INT@7856..7858 "12"
+                RIGHT_SQUARE@7858..7859 "]"
+      EOL@7859..7860 "\n"
+      WHITESPACE@7860..7862 "  "
+      POST_ANNOTATION@7862..7881 "@< Array Subscript "
+      EOL@7881..7883 "\n\n"
+      WHITESPACE@7883..7885 "  "
+      PRE_ANNOTATION@7885..7902 "@ Boolean literal"
+      EOL@7902..7903 "\n"
+      WHITESPACE@7903..7905 "  "
+      DEF_CONSTANT@7905..7938
+        CONSTANT_KW@7905..7913 "constant"
+        WHITESPACE@7913..7914 " "
+        NAME@7914..7931
+          IDENT@7914..7931 "booleanLiteralExp"
+        WHITESPACE@7931..7932 " "
+        EQUALS@7932..7933 "="
+        WHITESPACE@7933..7934 " "
+        EXPR@7934..7938
+          EXPR_LITERAL@7934..7938
+            TRUE_KW@7934..7938 "true"
+      EOL@7938..7939 "\n"
+      WHITESPACE@7939..7941 "  "
+      POST_ANNOTATION@7941..7959 "@< Boolean literal"
+      EOL@7959..7961 "\n\n"
+      WHITESPACE@7961..7963 "  "
+      PRE_ANNOTATION@7963..7968 "@ Dot"
+      EOL@7968..7969 "\n"
+      WHITESPACE@7969..7971 "  "
+      DEF_CONSTANT@7971..7994
+        CONSTANT_KW@7971..7979 "constant"
+        WHITESPACE@7979..7980 " "
+        NAME@7980..7986
+          IDENT@7980..7986 "dotExp"
+        WHITESPACE@7986..7987 " "
+        EQUALS@7987..7988 "="
+        WHITESPACE@7988..7989 " "
+        EXPR@7989..7994
+          EXPR_POSTFIX@7989..7994
+            EXPR_MEMBER@7989..7994
+              EXPR_MEMBER@7989..7992
+                EXPR_IDENT@7989..7990
+                  IDENT@7989..7990 "a"
+                DOT@7990..7991 "."
+                IDENT@7991..7992 "b"
+              DOT@7992..7993 "."
+              IDENT@7993..7994 "c"
+      EOL@7994..7995 "\n"
+      WHITESPACE@7995..7997 "  "
+      POST_ANNOTATION@7997..8003 "@< Dot"
+      EOL@8003..8005 "\n\n"
+      WHITESPACE@8005..8007 "  "
+      PRE_ANNOTATION@8007..8047 "@ Dot with absolute q ..."
+      EOL@8047..8048 "\n"
+      WHITESPACE@8048..8050 "  "
+      DEF_CONSTANT@8050..8082
+        CONSTANT_KW@8050..8058 "constant"
+        WHITESPACE@8058..8059 " "
+        NAME@8059..8073
+          IDENT@8059..8073 "dotAbsoluteExp"
+        WHITESPACE@8073..8074 " "
+        EQUALS@8074..8075 "="
+        WHITESPACE@8075..8076 " "
+        EXPR@8076..8082
+          EXPR_POSTFIX@8076..8082
+            EXPR_MEMBER@8076..8082
+              EXPR_MEMBER@8076..8080
+                EXPR_IDENT@8076..8078
+                  DOT@8076..8077 "."
+                  IDENT@8077..8078 "a"
+                DOT@8078..8079 "."
+                IDENT@8079..8080 "b"
+              DOT@8080..8081 "."
+              IDENT@8081..8082 "c"
+      EOL@8082..8083 "\n"
+      WHITESPACE@8083..8085 "  "
+      POST_ANNOTATION@8085..8126 "@< Dot with absolute  ..."
+      EOL@8126..8128 "\n\n"
+      WHITESPACE@8128..8130 "  "
+      PRE_ANNOTATION@8130..8142 "@ FP literal"
+      EOL@8142..8143 "\n"
+      WHITESPACE@8143..8145 "  "
+      DEF_CONSTANT@8145..8175
+        CONSTANT_KW@8145..8153 "constant"
+        WHITESPACE@8153..8154 " "
+        NAME@8154..8166
+          IDENT@8154..8166 "fpLiteralExp"
+        WHITESPACE@8166..8167 " "
+        EQUALS@8167..8168 "="
+        WHITESPACE@8168..8169 " "
+        EXPR@8169..8175
+          EXPR_LITERAL@8169..8175
+            LITERAL_FLOAT@8169..8175 "0.1234"
+      EOL@8175..8176 "\n"
+      WHITESPACE@8176..8178 "  "
+      POST_ANNOTATION@8178..8191 "@< FP literal"
+      EOL@8191..8193 "\n\n"
+      WHITESPACE@8193..8195 "  "
+      PRE_ANNOTATION@8195..8207 "@ Identifier"
+      EOL@8207..8208 "\n"
+      WHITESPACE@8208..8210 "  "
+      DEF_CONSTANT@8210..8231
+        CONSTANT_KW@8210..8218 "constant"
+        WHITESPACE@8218..8219 " "
+        NAME@8219..8227
+          IDENT@8219..8227 "identExp"
+        WHITESPACE@8227..8228 " "
+        EQUALS@8228..8229 "="
+        WHITESPACE@8229..8230 " "
+        EXPR@8230..8231
+          EXPR_IDENT@8230..8231
+            IDENT@8230..8231 "x"
+      EOL@8231..8232 "\n"
+      WHITESPACE@8232..8234 "  "
+      POST_ANNOTATION@8234..8247 "@< Identifier"
+      EOL@8247..8249 "\n\n"
+      WHITESPACE@8249..8251 "  "
+      PRE_ANNOTATION@8251..8298 "@ Identifier with abs ..."
+      EOL@8298..8299 "\n"
+      WHITESPACE@8299..8301 "  "
+      DEF_CONSTANT@8301..8331
+        CONSTANT_KW@8301..8309 "constant"
+        WHITESPACE@8309..8310 " "
+        NAME@8310..8326
+          IDENT@8310..8326 "identAbsoluteExp"
+        WHITESPACE@8326..8327 " "
+        EQUALS@8327..8328 "="
+        WHITESPACE@8328..8329 " "
+        EXPR@8329..8331
+          EXPR_IDENT@8329..8331
+            DOT@8329..8330 "."
+            IDENT@8330..8331 "x"
+      EOL@8331..8332 "\n"
+      WHITESPACE@8332..8334 "  "
+      POST_ANNOTATION@8334..8382 "@< Identifier with ab ..."
+      EOL@8382..8384 "\n\n"
+      WHITESPACE@8384..8386 "  "
+      PRE_ANNOTATION@8386..8399 "@ Int literal"
+      EOL@8399..8400 "\n"
+      WHITESPACE@8400..8402 "  "
+      DEF_CONSTANT@8402..8431
+        CONSTANT_KW@8402..8410 "constant"
+        WHITESPACE@8410..8411 " "
+        NAME@8411..8424
+          IDENT@8411..8424 "intLiteralExp"
+        WHITESPACE@8424..8425 " "
+        EQUALS@8425..8426 "="
+        WHITESPACE@8426..8427 " "
+        EXPR@8427..8431
+          EXPR_LITERAL@8427..8431
+            LITERAL_INT@8427..8431 "1234"
+      EOL@8431..8432 "\n"
+      WHITESPACE@8432..8434 "  "
+      POST_ANNOTATION@8434..8448 "@< Int literal"
+      EOL@8448..8450 "\n\n"
+      WHITESPACE@8450..8452 "  "
+      PRE_ANNOTATION@8452..8459 "@ Paren"
+      EOL@8459..8460 "\n"
+      WHITESPACE@8460..8462 "  "
+      DEF_CONSTANT@8462..8493
+        CONSTANT_KW@8462..8470 "constant"
+        WHITESPACE@8470..8471 " "
+        NAME@8471..8479
+          IDENT@8471..8479 "parenExp"
+        WHITESPACE@8479..8480 " "
+        EQUALS@8480..8481 "="
+        WHITESPACE@8481..8482 " "
+        EXPR@8482..8493
+          EXPR_BINARY@8482..8493
+            EXPR@8482..8489
+              LEFT_PAREN@8482..8483 "("
+              EXPR@8483..8488
+                EXPR_BINARY@8483..8488
+                  EXPR_LITERAL@8483..8484
+                    LITERAL_INT@8483..8484 "1"
+                  WHITESPACE@8484..8485 " "
+                  BINARY_OP@8485..8487
+                    PLUS@8485..8486 "+"
+                    WHITESPACE@8486..8487 " "
+                  EXPR_LITERAL@8487..8488
+                    LITERAL_INT@8487..8488 "2"
+              RIGHT_PAREN@8488..8489 ")"
+            WHITESPACE@8489..8490 " "
+            BINARY_OP@8490..8492
+              STAR@8490..8491 "*"
+              WHITESPACE@8491..8492 " "
+            EXPR_LITERAL@8492..8493
+              LITERAL_INT@8492..8493 "3"
+      EOL@8493..8494 "\n"
+      WHITESPACE@8494..8496 "  "
+      POST_ANNOTATION@8496..8504 "@< Paren"
+      EOL@8504..8506 "\n\n"
+      WHITESPACE@8506..8508 "  "
+      PRE_ANNOTATION@8508..8531 "@ String literal single"
+      EOL@8531..8532 "\n"
+      WHITESPACE@8532..8534 "  "
+      DEF_CONSTANT@8534..8587
+        CONSTANT_KW@8534..8542 "constant"
+        WHITESPACE@8542..8543 " "
+        NAME@8543..8565
+          IDENT@8543..8565 "stringLiteralSingleExp"
+        WHITESPACE@8565..8566 " "
+        EQUALS@8566..8567 "="
+        WHITESPACE@8567..8568 " "
+        EXPR@8568..8587
+          EXPR_LITERAL@8568..8587
+            LITERAL_STRING@8568..8587 "\"This is a string.\""
+      EOL@8587..8588 "\n"
+      WHITESPACE@8588..8590 "  "
+      POST_ANNOTATION@8590..8614 "@< String literal single"
+      EOL@8614..8616 "\n\n"
+      WHITESPACE@8616..8618 "  "
+      PRE_ANNOTATION@8618..8640 "@ String literal multi"
+      EOL@8640..8641 "\n"
+      WHITESPACE@8641..8643 "  "
+      DEF_CONSTANT@8643..8839
+        CONSTANT_KW@8643..8651 "constant"
+        WHITESPACE@8651..8652 " "
+        NAME@8652..8672
+          IDENT@8652..8672 "stringLiteralMultExp"
+        WHITESPACE@8672..8673 " "
+        EQUALS@8673..8674 "="
+        WHITESPACE@8674..8675 " "
+        EXPR@8675..8839
+          EXPR_LITERAL@8675..8839
+            LITERAL_STRING@8675..8839 "\"\"\"\n                  ..."
+      EOL@8839..8840 "\n"
+      WHITESPACE@8840..8842 "  "
+      POST_ANNOTATION@8842..8865 "@< String literal multi"
+      EOL@8865..8867 "\n\n"
+      WHITESPACE@8867..8869 "  "
+      PRE_ANNOTATION@8869..8877 "@ Struct"
+      EOL@8877..8878 "\n"
+      WHITESPACE@8878..8880 "  "
+      DEF_CONSTANT@8880..8924
+        CONSTANT_KW@8880..8888 "constant"
+        WHITESPACE@8888..8889 " "
+        NAME@8889..8898
+          IDENT@8889..8898 "structExp"
+        WHITESPACE@8898..8899 " "
+        EQUALS@8899..8900 "="
+        WHITESPACE@8900..8901 " "
+        EXPR@8901..8924
+          EXPR_STRUCT@8901..8924
+            EXPR_STRUCT_MEMBER_LIST@8901..8924
+              LEFT_CURLY@8901..8902 "{"
+              WHITESPACE@8902..8903 " "
+              EXPR_STRUCT_MEMBER@8903..8908
+                NAME@8903..8904
+                  IDENT@8903..8904 "a"
+                WHITESPACE@8904..8905 " "
+                EQUALS@8905..8906 "="
+                WHITESPACE@8906..8907 " "
+                EXPR@8907..8908
+                  EXPR_LITERAL@8907..8908
+                    LITERAL_INT@8907..8908 "1"
+              COMMA@8908..8909 ","
+              WHITESPACE@8909..8910 " "
+              EXPR_STRUCT_MEMBER@8910..8915
+                NAME@8910..8911
+                  IDENT@8910..8911 "b"
+                WHITESPACE@8911..8912 " "
+                EQUALS@8912..8913 "="
+                WHITESPACE@8913..8914 " "
+                EXPR@8914..8915
+                  EXPR_LITERAL@8914..8915
+                    LITERAL_INT@8914..8915 "2"
+              COMMA@8915..8916 ","
+              WHITESPACE@8916..8917 " "
+              EXPR_STRUCT_MEMBER@8917..8922
+                NAME@8917..8918
+                  IDENT@8917..8918 "c"
+                WHITESPACE@8918..8919 " "
+                EQUALS@8919..8920 "="
+                WHITESPACE@8920..8921 " "
+                EXPR@8921..8922
+                  EXPR_LITERAL@8921..8922
+                    LITERAL_INT@8921..8922 "3"
+              WHITESPACE@8922..8923 " "
+              RIGHT_CURLY@8923..8924 "}"
+      EOL@8924..8925 "\n"
+      WHITESPACE@8925..8927 "  "
+      POST_ANNOTATION@8927..8936 "@< Struct"
+      EOL@8936..8938 "\n\n"
+      WHITESPACE@8938..8940 "  "
+      PRE_ANNOTATION@8940..8948 "@ SizeOf"
+      EOL@8948..8949 "\n"
+      WHITESPACE@8949..8951 "  "
+      DEF_MODULE@8951..9112
+        MODULE_KW@8951..8957 "module"
+        WHITESPACE@8957..8958 " "
+        NAME@8958..8964
+          IDENT@8958..8964 "SizeOf"
+        WHITESPACE@8964..8965 " "
+        MODULE_MEMBER_LIST@8965..9112
+          LEFT_CURLY@8965..8966 "{"
+          EOL@8966..8967 "\n"
+          WHITESPACE@8967..8971 "    "
+          DEF_CONSTANT@8971..9003
+            CONSTANT_KW@8971..8979 "constant"
+            WHITESPACE@8979..8980 " "
+            NAME@8980..8989
+              IDENT@8980..8989 "typeFloat"
+            WHITESPACE@8989..8990 " "
+            EQUALS@8990..8991 "="
+            WHITESPACE@8991..8992 " "
+            EXPR@8992..9003
+              EXPR_SIZEOF@8992..9003
+                SIZEOF_KW@8992..8998 "sizeof"
+                LEFT_PAREN@8998..8999 "("
+                TYPE_NAME@8999..9002
+                  F64_KW@8999..9002 "F64"
+                RIGHT_PAREN@9002..9003 ")"
+          EOL@9003..9004 "\n"
+          WHITESPACE@9004..9008 "    "
+          DEF_CONSTANT@9008..9059
+            CONSTANT_KW@9008..9016 "constant"
+            WHITESPACE@9016..9017 " "
+            NAME@9017..9027
+              IDENT@9017..9027 "typeQualId"
+            WHITESPACE@9027..9028 " "
+            EQUALS@9028..9029 "="
+            WHITESPACE@9029..9030 " "
+            EXPR@9030..9059
+              EXPR_SIZEOF@9030..9059
+                SIZEOF_KW@9030..9036 "sizeof"
+                LEFT_PAREN@9036..9037 "("
+                TYPE_NAME@9037..9058
+                  QUAL_IDENT@9037..9058
+                    IDENT@9037..9046 "TypeNames"
+                    DOT@9046..9047 "."
+                    IDENT@9047..9058 "typeNameU32"
+                RIGHT_PAREN@9058..9059 ")"
+          EOL@9059..9060 "\n"
+          WHITESPACE@9060..9064 "    "
+          DEF_CONSTANT@9064..9108
+            CONSTANT_KW@9064..9072 "constant"
+            WHITESPACE@9072..9073 " "
+            NAME@9073..9083
+              IDENT@9073..9083 "typeString"
+            WHITESPACE@9083..9084 " "
+            EQUALS@9084..9085 "="
+            WHITESPACE@9085..9086 " "
+            EXPR@9086..9108
+              EXPR_SIZEOF@9086..9108
+                SIZEOF_KW@9086..9092 "sizeof"
+                LEFT_PAREN@9092..9093 "("
+                TYPE_NAME@9093..9107
+                  STRING_KW@9093..9099 "string"
+                  WHITESPACE@9099..9100 " "
+                  SIZE_KW@9100..9104 "size"
+                  WHITESPACE@9104..9105 " "
+                  EXPR@9105..9107
+                    EXPR_LITERAL@9105..9107
+                      LITERAL_INT@9105..9107 "20"
+                RIGHT_PAREN@9107..9108 ")"
+          EOL@9108..9109 "\n"
+          WHITESPACE@9109..9111 "  "
+          RIGHT_CURLY@9111..9112 "}"
+      EOL@9112..9113 "\n"
+      WHITESPACE@9113..9115 "  "
+      POST_ANNOTATION@9115..9124 "@< SizeOf"
+      EOL@9124..9126 "\n\n"
+      RIGHT_CURLY@9126..9127 "}"
+  EOL@9127..9128 "\n"
+  POST_ANNOTATION@9128..9142 "@< Expressions"
+  EOL@9142..9143 "\n"

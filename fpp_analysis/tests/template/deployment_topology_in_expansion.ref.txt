@@ -1,0 +1,12 @@
+ --> [ local path prefix ]/template/deployment_topology_in_expansion.fpp:5:3
+  |
+5 |     deployment topology D {}
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^ deployment topology cannot appear inside a module template expansion
+  |
+ ::: [ local path prefix ]/template/deployment_topology_in_expansion.fpp:4:1
+  |
+4 | / expand T() {
+5 | |   deployment topology D {}
+6 | | }
+  | |_- enclosing template expansion is here
+

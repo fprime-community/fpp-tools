@@ -100,6 +100,16 @@ fn definition_point_scoping_ok() {
 }
 
 #[test]
+fn deployment_topology_in_template() {
+    run_test("template/deployment_topology_in_template")
+}
+
+#[test]
+fn deployment_topology_in_expansion() {
+    run_test("template/deployment_topology_in_expansion")
+}
+
+#[test]
 fn duplicate_def() {
     run_test("template/duplicate_def")
 }
@@ -255,6 +265,11 @@ fn source_expand_undefined_symbol() {
 }
 
 #[test]
+fn state_machine_enum() {
+    run_test("template/state_machine_enum")
+}
+
+#[test]
 fn struct_parameter_alias_default_ok() {
     run_test("template/struct_parameter_alias_default_ok")
 }
@@ -302,6 +317,16 @@ fn struct_parameter_ok() {
 #[test]
 fn struct_parameter_omitted_member_ok() {
     run_test("template/struct_parameter_omitted_member_ok")
+}
+
+#[test]
+fn system_in_template() {
+    run_test("template/system_in_template")
+}
+
+#[test]
+fn system_in_expansion() {
+    run_test("template/system_in_expansion")
 }
 
 #[test]

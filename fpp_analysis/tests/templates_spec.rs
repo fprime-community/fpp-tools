@@ -5,8 +5,9 @@
 //! the template body, that a use inside it resolves to the bound argument, and
 //! that a name in the body resolves at the point of the template definition.
 
+use fpp_analysis::passes::{CheckTemplateUses, EnterSymbols};
 use fpp_analysis::semantics::{Connection, Symbol, Topology, Type};
-use fpp_analysis::{Analysis, CheckSemantics, ExpandSyntaxAndEnterSymbols};
+use fpp_analysis::{Analysis, CheckSemantics, ExpandTemplates};
 use fpp_ast::{
     DefAliasType, DefConstant, DefModule, ModuleMember, MoveWalkable, Node, TransUnit, Visitable,
     Visitor,
@@ -434,12 +435,30 @@ fn check_expand_unique(path: &str, src: String) -> usize {
         let source = SourceFile::new(path, src);
         let mut ast = fpp_parser::parse(source, |p| p.trans_unit(), None);
         let mut a = Analysis::new();
-        let result = ExpandSyntaxAndEnterSymbols::tu_list(
-            &mut a,
-            FsReader {},
-            std::slice::from_mut(&mut ast),
+        // Expand without checking the template definitions and expansions: the
+        // test checks only that the copies are deep
+        let tul = std::slice::from_mut(&mut ast);
+        assert!(
+            fpp_analysis::resolve_includes(&mut a, FsReader {}, &mut tul[0]).is_continue(),
+            "the includes should resolve"
         );
-        assert!(result.is_continue(), "the expansion should succeed");
+        fpp_analysis::add_state_enums(&mut tul[0]);
+        assert!(
+            EnterSymbols
+                .visit_trans_units(&mut a, tul.iter())
+                .is_continue(),
+            "the symbols should enter"
+        );
+        assert!(
+            CheckTemplateUses
+                .visit_trans_units(&mut a, tul.iter())
+                .is_continue(),
+            "the template uses should resolve"
+        );
+        assert!(
+            ExpandTemplates::transform_list(&a, tul).is_ok(),
+            "the expansion should succeed"
+        );
 
         let mut seen = SeenNodes::default();
         let _ = ast.visit(&mut seen, &CollectNodes);

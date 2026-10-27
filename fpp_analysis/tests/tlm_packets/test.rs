@@ -126,30 +126,6 @@ fn omit_instance_not_in_topology() {
 }
 
 #[test]
-fn template_arg_channel() {
-    run_test_with(
-        &["tlm_packets/instances"],
-        "tlm_packets/template_arg_channel",
-    )
-}
-
-#[test]
-fn template_arg_topology() {
-    run_test_with(
-        &["tlm_packets/instances"],
-        "tlm_packets/template_arg_topology",
-    )
-}
-
-#[test]
-fn template_channel_neither_used_nor_omitted() {
-    run_test_with(
-        &["tlm_packets/instances"],
-        "tlm_packets/template_channel_neither_used_nor_omitted",
-    )
-}
-
-#[test]
 fn template_ok() {
     run_test_with(&["tlm_packets/instances"], "tlm_packets/template_ok")
 }
@@ -208,15 +184,6 @@ fn topology_order_files() {
     run_test_with(
         &["tlm_packets/instances", "tlm_packets/topology_order_b"],
         "tlm_packets/topology_order_a",
-    )
-}
-
-/// A deployment topology from an expansion is visited at the expansion
-#[test]
-fn topology_order_template() {
-    run_test_with(
-        &["tlm_packets/instances"],
-        "tlm_packets/topology_order_template",
     )
 }
 

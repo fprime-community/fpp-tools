@@ -316,21 +316,13 @@ pub mod semantics {
 /// files with `reader`.
 ///
 /// The files included so far are recorded in `a.include_context_map`, with
-/// the kind of member list each one is spliced into, and in
-/// `a.included_file_set`.
+/// the kind of member list each one is spliced into.
 pub fn resolve_includes<Reader: FileReader>(
     a: &mut Analysis,
     reader: Reader,
     ast: &mut fpp_ast::TransUnit,
 ) -> ControlFlow<()> {
-    let result =
-        fpp_parser::ResolveIncludes::new(reader).visit_trans_unit(&mut a.include_context_map, ast);
-    a.included_file_set = a
-        .include_context_map
-        .keys()
-        .map(|f| fpp_core::File::from_string(&f.uri()))
-        .collect();
-    result
+    fpp_parser::ResolveIncludes::new(reader).visit_trans_unit(&mut a.include_context_map, ast)
 }
 
 /// Enter the symbols of a model and expand its templates: the steps of

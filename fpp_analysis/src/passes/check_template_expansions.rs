@@ -1,7 +1,8 @@
 use crate::Analysis;
 use crate::errors::SemanticError;
 use fpp_ast::{
-    DefModule, DefModuleTemplate, SpecTemplateExpand, TransUnit, Visitable, Visitor, Walkable,
+    DefModule, DefModuleTemplate, DefSystem, DefTopology, SpecTemplateExpand, TransUnit, Visitable,
+    Visitor, Walkable,
 };
 use fpp_core::Spanned;
 use std::ops::ControlFlow;
@@ -11,7 +12,9 @@ use std::ops::ControlFlow;
 /// The members of an expanded template, whether written in the source or produced
 /// by template expansion, may contain no module template definition and no
 /// template expansion specifier. The rule ensures that the members written in the
-/// source could have been produced by expanding some template.
+/// source could have been produced by expanding some template. Nor may they
+/// contain a deployment topology or a system definition, so a template expansion
+/// never creates a dictionary.
 ///
 /// The first error stops the pass: template expansion relies on these rules.
 pub struct CheckTemplateExpansions;
@@ -82,5 +85,37 @@ impl<'ast> Visitor<'ast> for CheckTemplateExpansions {
         let result = members.iter().try_for_each(|member| member.visit(a, self));
         a.template_expansion_id = None;
         result
+    }
+
+    fn visit_def_system(&self, a: &mut Analysis, def: &'ast DefSystem) -> ControlFlow<()> {
+        match a.template_expansion_id {
+            Some(expand_id) => {
+                SemanticError::TemplateExpandError {
+                    loc: def.span(),
+                    msg: "system definitions cannot appear inside a module template expansion"
+                        .to_string(),
+                    expand_loc: expand_id.span(),
+                }
+                .emit();
+                ControlFlow::Break(())
+            }
+            None => ControlFlow::Continue(()),
+        }
+    }
+
+    fn visit_def_topology(&self, a: &mut Analysis, def: &'ast DefTopology) -> ControlFlow<()> {
+        match (a.template_expansion_id, def.is_deployment) {
+            (Some(expand_id), true) => {
+                SemanticError::TemplateExpandError {
+                    loc: def.span(),
+                    msg: "deployment topology cannot appear inside a module template expansion"
+                        .to_string(),
+                    expand_loc: expand_id.span(),
+                }
+                .emit();
+                ControlFlow::Break(())
+            }
+            _ => ControlFlow::Continue(()),
+        }
     }
 }

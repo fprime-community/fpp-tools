@@ -11,7 +11,6 @@ fn compiler_main() -> String {
     let mut ast = fpp_parser::parse(src, |p| p.trans_unit(), None);
 
     let mut a = fpp_analysis::Analysis::new();
-    a.input_file_set.insert(fpp_core::File::StdIn);
 
     let _ = fpp_analysis::CheckSemantics::tu_list(
         &mut a,

@@ -15,11 +15,6 @@ fpp_python_macros::fpp_sem_bindings! {
 
     analysis native fpp_analysis::Analysis {
         fields {
-            input_file_set: skip,
-            dependency_file_set: skip,
-            direct_dependency_file_set: skip,
-            missing_dependency_file_set: skip,
-            included_file_set: skip,
             include_context_map: skip,
             location_specifier_map: map(tuple(leaf(crate::ast::SpecLocKind), entity(QualifiedName)), astdef(SpecLoc)),
             dictionary_generation: bool,
