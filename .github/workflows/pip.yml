@@ -20,12 +20,27 @@ concurrency:
 
 jobs:
   wheels:
-    name: Wheel ${{ matrix.package.name }} (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Wheel ${{ matrix.package.name }} (${{ matrix.platform.target }})
+    runs-on: ${{ matrix.platform.runner }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        # One runner per OS; architectures other than the runner's own are
+        # cross-compiled (Linux in maturin's manylinux cross images, macOS and
+        # Windows with the host toolchain).
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64
+          - runner: ubuntu-latest
+            target: aarch64
+          - runner: macos-latest
+            target: aarch64
+          - runner: macos-latest
+            target: x86_64
+          - runner: windows-latest
+            target: x64
+          - runner: windows-latest
+            target: aarch64
         package:
           - name: fprime-fpp-lsp
             dir: fpp_lsp_server
@@ -62,6 +77,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: build
+          target: ${{ matrix.platform.target }}
           args: --release --out dist
           working-directory: ${{ matrix.package.dir }}
           manylinux: auto
@@ -69,7 +85,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.package.name }}-${{ matrix.os }}
+          name: wheels-${{ matrix.package.name }}-${{ runner.os }}-${{ matrix.platform.target }}
           path: ${{ matrix.package.dir }}/dist/*
 
   sdist:
