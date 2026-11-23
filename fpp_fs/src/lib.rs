@@ -1,6 +1,8 @@
 use fpp_core::{Error, FileReader};
 use std::fs;
 
+pub mod fprime;
+
 /// A file reader for the file system
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FsReader {}
