@@ -3,6 +3,7 @@
 //! Cargo exposes its path as `CARGO_BIN_EXE_<name>`.
 
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 
 /// Run `fpp-diagram` with `args`, feeding `model` on stdin.
@@ -28,6 +29,85 @@ fn output_text(out: &Output) -> String {
     let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
     text.push_str(&String::from_utf8_lossy(&out.stderr));
     text
+}
+
+/// A unique temp dir per test without pulling in a tempfile dependency.
+fn temp_dir(tag: &str) -> PathBuf {
+    let dir =
+        std::env::temp_dir().join(format!("fpp-diagram-cli-test-{tag}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// An F´ project whose topology uses a component defined in another file, which
+/// only the locs file of its native build cache locates.
+fn project(tag: &str) -> PathBuf {
+    let dir = temp_dir(tag);
+    std::fs::create_dir_all(dir.join("Comp")).unwrap();
+    std::fs::create_dir_all(dir.join("Top")).unwrap();
+    std::fs::create_dir_all(dir.join("build-fprime-automatic-native")).unwrap();
+    std::fs::write(dir.join("settings.ini"), "[fprime]\nproject_root: .\n").unwrap();
+    std::fs::write(
+        dir.join("Comp/C.fpp"),
+        "passive component C { }\ninstance c: C base id 0x100\n",
+    )
+    .unwrap();
+    std::fs::write(dir.join("Top/T.fpp"), "topology T { instance c }\n").unwrap();
+    std::fs::write(
+        dir.join("build-fprime-automatic-native/locs.fpp"),
+        "locate component C at \"../Comp/C.fpp\"\n\
+         locate instance c at \"../Comp/C.fpp\"\n\
+         locate interface T at \"../Top/T.fpp\"\n",
+    )
+    .unwrap();
+    dir
+}
+
+const TOPOLOGY: &[&str] = &["--name", "T", "--kind", "topology", "--format", "sprotty"];
+
+#[test]
+fn the_locs_file_of_the_enclosing_project_is_detected() {
+    let dir = project("detect");
+    let file = dir.join("Top/T.fpp");
+    let out = run(&[TOPOLOGY, &[file.to_str().unwrap()]].concat(), "");
+    let text = output_text(&out);
+    assert_eq!(out.status.code(), Some(0), "{text}");
+    assert!(text.contains("\"text\":\"C\""), "{text}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn an_explicit_locs_file_is_used() {
+    let dir = project("explicit");
+    std::fs::remove_file(dir.join("settings.ini")).unwrap();
+    let locs = dir.join("build-fprime-automatic-native/locs.fpp");
+    let file = dir.join("Top/T.fpp");
+    let out = run(
+        &[
+            TOPOLOGY,
+            &["--locs", locs.to_str().unwrap(), file.to_str().unwrap()],
+        ]
+        .concat(),
+        "",
+    );
+    let text = output_text(&out);
+    assert_eq!(out.status.code(), Some(0), "{text}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn no_locs_analyzes_the_input_alone() {
+    let dir = project("no-locs");
+    let file = dir.join("Top/T.fpp");
+    let out = run(
+        &[TOPOLOGY, &["--no-locs", file.to_str().unwrap()]].concat(),
+        "",
+    );
+    let text = output_text(&out);
+    assert_eq!(out.status.code(), Some(1), "{text}");
+    assert!(text.contains("is not defined"), "{text}");
+    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 /// Template resolution failed, so the model is not expanded and nothing in it can
